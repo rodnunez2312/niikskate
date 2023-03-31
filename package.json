@@ -1,5 +1,15 @@
 {
+  "scripts": {
+    "dev": "nuxi dev",
+    "build": "nuxt build",
+    "start": "nuxt start",
+    "generate": "nuxt generate",
+    "nuxi": "npx nuxi"
+  },
   "dependencies": {
     "nuxt": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^18.15.11"
   }
 }
