@@ -1,0 +1,1976 @@
+{
+  "source": "1 - Manual de Trucos",
+  "sourceFile": "Niik_Plan_Clases.xlsx",
+  "generatedAt": "2026-03-04T20:35:39.449Z",
+  "totalTricks": 157,
+  "tricks": [
+    {
+      "name": "Estiramiento de brazos, pierna, caderas, espalda",
+      "name_es": "Estiramiento de brazos, pierna, caderas, espalda",
+      "description": "Estiramiento de brazos, pierna, caderas, espalda",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Brazos",
+        "Piernas",
+        "Caderas",
+        "Espalda"
+      ],
+      "sort_order": 1
+    },
+    {
+      "name": "Tobillos - circulos",
+      "name_es": "Tobillos - circulos",
+      "description": "Tobillos - circulos",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Tobillos",
+        "Piernas",
+        "Glúteos",
+        "Core"
+      ],
+      "sort_order": 2
+    },
+    {
+      "name": "Tobillos - Reverse calf raise",
+      "name_es": "Tobillos - Reverse calf raise",
+      "description": "Tobillos - Reverse calf raise",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Tobillos",
+        "Piernas",
+        "Glúteos",
+        "Core"
+      ],
+      "sort_order": 3
+    },
+    {
+      "name": "Sentadillas",
+      "name_es": "Sentadillas",
+      "description": "Sentadillas",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Fuerza y estabilidad en piernas y core"
+      ],
+      "sort_order": 4
+    },
+    {
+      "name": "Hippie Jumps",
+      "name_es": "Hippie Jumps",
+      "description": "Hippie Jumps",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Coordinación general y confianza al despegar"
+      ],
+      "sort_order": 5
+    },
+    {
+      "name": "Hippie Jumps con Indy y Melon",
+      "name_es": "Hippie Jumps con Indy y Melon",
+      "description": "Hippie Jumps con Indy y Melon",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Coordinación de brazos y piernas + confianza"
+      ],
+      "sort_order": 6
+    },
+    {
+      "name": "Cadera, cuello y munecas",
+      "name_es": "Cadera, cuello y munecas",
+      "description": "Cadera, cuello y munecas",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Caderas",
+        "Cuello",
+        "Muñecas"
+      ],
+      "sort_order": 7
+    },
+    {
+      "name": "Good morning",
+      "name_es": "Good morning",
+      "description": "Good morning",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Estabilidad y fortalecimiento del core"
+      ],
+      "sort_order": 8
+    },
+    {
+      "name": "Side Lunges",
+      "name_es": "Side Lunges",
+      "description": "Side Lunges",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Fuerza",
+        "agilidad y estabilidad de piernas"
+      ],
+      "sort_order": 9
+    },
+    {
+      "name": "Side to side",
+      "name_es": "Side to side",
+      "description": "Side to side",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Coordinación lateral",
+        "agilidad y core"
+      ],
+      "sort_order": 10
+    },
+    {
+      "name": "Vuelta al parque",
+      "name_es": "Vuelta al parque",
+      "description": "Vuelta al parque",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Piernas",
+        "Corazón (cardio ligero)"
+      ],
+      "sort_order": 11
+    },
+    {
+      "name": "Escalera",
+      "name_es": "Escalera",
+      "description": "Escalera",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Piernas",
+        "Tobillos",
+        "Agilidad general"
+      ],
+      "sort_order": 12
+    },
+    {
+      "name": "Balance board",
+      "name_es": "Balance board",
+      "description": "Balance board",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Core",
+        "Tobillos",
+        "Piernas"
+      ],
+      "sort_order": 13
+    },
+    {
+      "name": "Skater Squat",
+      "name_es": "Skater Squat",
+      "description": "Skater Squat",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Piernas",
+        "Glúteos",
+        "Core",
+        "Tobillos"
+      ],
+      "sort_order": 14
+    },
+    {
+      "name": "Pistol Squat",
+      "name_es": "Pistol Squat",
+      "description": "Pistol Squat",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Piernas",
+        "Glúteos",
+        "Core",
+        "Tobillos"
+      ],
+      "sort_order": 15
+    },
+    {
+      "name": "Balance board",
+      "name_es": "Balance board",
+      "description": "Balance board",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Balance",
+        "Core",
+        "Estabilidad"
+      ],
+      "sort_order": 16
+    },
+    {
+      "name": "Skate lunge",
+      "name_es": "Skate lunge",
+      "description": "Hacer moviminto del skate atras  y adelante mientras el pie del push esta en el piso",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Fuerza en Piernas",
+        "Balance",
+        "Coordinación"
+      ],
+      "sort_order": 17
+    },
+    {
+      "name": "Powerpush",
+      "name_es": "Powerpush",
+      "description": "Powerpush",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Fuerza en Piernas",
+        "Balance",
+        "Resistencia"
+      ],
+      "sort_order": 18
+    },
+    {
+      "name": "Medio flips",
+      "name_es": "Medio flips",
+      "description": "Medio flips",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Coordinación",
+        "Fuerza",
+        "Balance"
+      ],
+      "sort_order": 19
+    },
+    {
+      "name": "Box jumps x10 reps",
+      "name_es": "Box jumps x10 reps",
+      "description": "Box jumps x10 reps",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Potencia",
+        "piernas y confianza"
+      ],
+      "sort_order": 20
+    },
+    {
+      "name": "Side plank x30 seg",
+      "name_es": "Side plank x30 seg",
+      "description": "Side plank x30 seg",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Core y control del cuerpo"
+      ],
+      "sort_order": 21
+    },
+    {
+      "name": "Single leg squats x10 reps",
+      "name_es": "Single leg squats x10 reps",
+      "description": "Single leg squats x10 reps",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Equilibrio y fuerza unilateral en piernas"
+      ],
+      "sort_order": 22
+    },
+    {
+      "name": "V-ups x10 reps",
+      "name_es": "V-ups x10 reps",
+      "description": "V-ups x10 reps",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Fortalecimiento abdominal"
+      ],
+      "sort_order": 23
+    },
+    {
+      "name": "Lateral Leg raises x10 reps",
+      "name_es": "Lateral Leg raises x10 reps",
+      "description": "Lateral Leg raises x10 reps",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Ejercicios funcionales",
+      "motor_skills": [
+        "Fuerza de piernas y estabilidad"
+      ],
+      "sort_order": 24
+    },
+    {
+      "name": "360 tabla sin llantas",
+      "name_es": "360 tabla sin llantas",
+      "description": "Marcar con gis o conos para hacer el tic toc y marca los lados izq y der. Despues hacer tic tocs, siguen 180, hasta lograr hacer un 360.",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación",
+        "Balance",
+        "Agilidad"
+      ],
+      "sort_order": 25
+    },
+    {
+      "name": "Reloj",
+      "name_es": "Reloj",
+      "description": "Reloj",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación",
+        "Agilidad"
+      ],
+      "sort_order": 26
+    },
+    {
+      "name": "Tic tac",
+      "name_es": "Tic tac",
+      "description": "1. Giro Izquierda y Derecha\r\n2. Giro 180 BS\r\n3. Giro 360 BS\r\n4. Giro 180 FS\r\n5. Giro 360 FS\r\n6. Tic toc con cinta/gis\r\nHaz mas grande la separacion entre las cintas/gis",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación",
+        "Balance",
+        "Core"
+      ],
+      "sort_order": 27
+    },
+    {
+      "name": "Carrera de obstaculos",
+      "name_es": "Carrera de obstaculos",
+      "description": "Carrera de obstaculos",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación",
+        "Agilidad",
+        "Balance"
+      ],
+      "sort_order": 28
+    },
+    {
+      "name": "Carrera de velocidad",
+      "name_es": "Carrera de velocidad",
+      "description": "Carrera de velocidad",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Velocidad",
+        "Coordinación",
+        "Resistencia"
+      ],
+      "sort_order": 29
+    },
+    {
+      "name": "Escalera",
+      "name_es": "Escalera",
+      "description": "Hacer la escalera con un pie, despues brincar dentro del circulo, despues brincar encima de una patineta encima de un circulo de yoga e intentar meter los aros en el cono",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación",
+        "Agilidad",
+        "Fuerza en Piernas"
+      ],
+      "sort_order": 30
+    },
+    {
+      "name": "Penguins and Monster walks",
+      "name_es": "Penguins and Monster walks",
+      "description": "1. Poner una madera en el piso\r\n2. Separar cada madera la distancia de un skate.\r\n3. Comenzar con Nose/Tail lifts\r\n4. Despues con Monster walks (giros 180)",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación",
+        "piernas y confianza"
+      ],
+      "sort_order": 31
+    },
+    {
+      "name": "Principiantes Course #1",
+      "name_es": "Principiantes Course #1",
+      "description": "Paso 1: Tic toc sin llantas\r\nPaso 2: duelo, tabla sin llantas boca abajo\r\nPaso 3: Balanceo - escalera skater\r\nPaso 4: Balanceo - escalera primo\r\nPaso 5: Balanceo - 4 obstaculos: \r\n\t1. Madera - encima skate (solo tabla) al revés\r\n\t2. Madera - encima skate (solo tabla)\r\n\t3. Madera redonda - balanceo en skate (solo tabla)\r\nSubirte a tu Skate (con llantas)",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación",
+        "Balance",
+        "Agilidad"
+      ],
+      "sort_order": 32
+    },
+    {
+      "name": "Trabajo en equipo",
+      "name_es": "Trabajo en equipo",
+      "description": "Equilibrio y coordinacion: en el pasto formar un circulo y subirse a su skate. tomar un balon y pasarlo, quien tenga el balon sus companieros del lado izquierdo y derecho hacen una sentadilla.",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Balance",
+        "Coordinación",
+        "Fuerza en Piernas"
+      ],
+      "sort_order": 33
+    },
+    {
+      "name": "Brincar de tabla sin llantas al cajon, del cajon a una tabla con llantas",
+      "name_es": "Brincar de tabla sin llantas al cajon, del cajon a una tabla con llantas",
+      "description": "Brincar de tabla sin llantas al cajon, del cajon a una tabla con llantas",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Fuerza",
+        "Coordinación",
+        "Agilidad"
+      ],
+      "sort_order": 34
+    },
+    {
+      "name": "Drill 1: Empujarse > subir botador > bajar de fakie",
+      "name_es": "Drill 1: Empujarse > subir botador > bajar de fakie",
+      "description": "Empujarse 2 veces, subir mini rampa y bajar de fakie.",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Balance",
+        "Coordinación",
+        "Confianza"
+      ],
+      "sort_order": 35
+    },
+    {
+      "name": "Drill 2: Tic toc > subir botador > kick turn",
+      "name_es": "Drill 2: Tic toc > subir botador > kick turn",
+      "description": "Avanzar hacia el fun box grande (segun proceso). Subir y girar 180 (kick-turn)",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Balance",
+        "Coordinación",
+        "Fuerza"
+      ],
+      "sort_order": 36
+    },
+    {
+      "name": "Drill 3: Frenar > Tail scratch (stop)",
+      "name_es": "Drill 3: Frenar > Tail scratch (stop)",
+      "description": "Como frenar en la patineta, enseniar las diferentes maneras de freno hasta llegar al tail scratch\r\nPaso 1: detenido\r\nPaso 2: andando\r\nPaso 3: andando giro 180",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación",
+        "Balance"
+      ],
+      "sort_order": 37
+    },
+    {
+      "name": "Drill 4: Carving > Caveman > Ghostride > Tic tacs",
+      "name_es": "Drill 4: Carving > Caveman > Ghostride > Tic tacs",
+      "description": "1. Poner conos para el circuito\r\n2. Carving\r\n3. Caveman\r\n4. Ghostride\r\n5. Tic tacs\r\n6. Powerslides\r\n7. Manual Taps\r\n8. Manual 3-5 segundos\r\nBaby Ollies",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Combinación de varias habilidades integradas"
+      ],
+      "sort_order": 38
+    },
+    {
+      "name": "Equilibrio con un pie en movimiento de skate",
+      "name_es": "Equilibrio con un pie en movimiento de skate",
+      "description": "Paso 1: usar la tabla sin ruedas, pararse en un pie (6 seg.)\r\nPaso 2: usar skate sin movimiento, pararse en un pie (10 seg.)\r\nPaso 3: usar skate con movimiento, pararse en un pie (10 seg. +)",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Balance",
+        "Fuerza en Piernas",
+        "Core"
+      ],
+      "sort_order": 39
+    },
+    {
+      "name": "Salto de tabla. Poner tablas en el piso y saltarlas. Subir y bajar botador, regresar la tabla a su lugar.",
+      "name_es": "Salto de tabla. Poner tablas en el piso y saltarlas. Subir y bajar botador, regresar la tabla a su lugar.",
+      "description": "Salto de tabla. Poner tablas en el piso y saltarlas. Subir y bajar botador, regresar la tabla a su lugar.",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Fuerza en Piernas",
+        "Agilidad",
+        "Coordinación"
+      ],
+      "sort_order": 40
+    },
+    {
+      "name": "Step up",
+      "name_es": "Step up",
+      "description": "Paso 1: detenido\r\nPaso 2: andando\r\nPaso 3: andando sobre una tabla\r\nPaso 4: andando un gap\r\nPaso 5: andando subiendo una banqueta/funbox",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Fuerza en Piernas",
+        "Agilidad",
+        "Balance"
+      ],
+      "sort_order": 41
+    },
+    {
+      "name": "Strong Push",
+      "name_es": "Strong Push",
+      "description": "Strong Push",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Fuerza en Piernas",
+        "Resistencia",
+        "Balance"
+      ],
+      "sort_order": 42
+    },
+    {
+      "name": "Tic tac",
+      "name_es": "Tic tac",
+      "description": "1. Inclinacion hacia adelante/atras\r\n2. Girar 360 BS/FS\r\n3. Sin la tabla impulso para tic tocs\r\n4. Con tabla avanzar haciendo tic tocs (sin empujarse)",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Control de tabla",
+        "equilibrio y timing"
+      ],
+      "sort_order": 43
+    },
+    {
+      "name": "Walking",
+      "name_es": "Walking",
+      "description": "1. Inclinacion hacia adeltan\r\n2. Camina con tu patineta como si tuvieras los pies en un snowboard",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación",
+        "Agilidad"
+      ],
+      "sort_order": 44
+    },
+    {
+      "name": "Skill 1: Balance y equilibrio > Powerpush & Balance one foot",
+      "name_es": "Skill 1: Balance y equilibrio > Powerpush & Balance one foot",
+      "description": "1. Primero sin tabla, posicion: Powerpush\r\n2. Ahora la tabla al reves, patea la llanta trasera\r\n3. Subirte a la tabla balanceo con un pie\r\n4. Andando balanceo con un pie\r\nPowerpush sin tocar el piso",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Skill",
+      "motor_skills": [
+        "Fuerza en Piernas",
+        "Balance",
+        "Resistencia"
+      ],
+      "sort_order": 45
+    },
+    {
+      "name": "Skill 2: Empujarse y frenar > Push & Stop",
+      "name_es": "Skill 2: Empujarse y frenar > Push & Stop",
+      "description": "1. Con la tabla al reves. Subete al board y patea la llanta trasera.\r\na. Powerpush (Equilibrio: cuerpo adelante, pie de atras levantado)\r\nb. Vuelta hacia la izquierda/derecha (inclinar tobillos)\r\n2. Andar y detenerte:\r\na. Pon todo tu peso en tu pie de adelante.\r\nb. Empujate andanddo\r\nC. Frena bajando un pie",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Skill",
+      "motor_skills": [
+        "Coordinación",
+        "Balance",
+        "Tiempo de Reacción"
+      ],
+      "sort_order": 46
+    },
+    {
+      "name": "Skill 3: Girar > Como girar BS/FS",
+      "name_es": "Skill 3: Girar > Como girar BS/FS",
+      "description": "Skill 3: Girar > Como girar BS/FS",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Skill",
+      "motor_skills": [
+        "Coordinación",
+        "Balance",
+        "Core"
+      ],
+      "sort_order": 47
+    },
+    {
+      "name": "Skill 4: Bajar un escalon > Roll of a Ledge",
+      "name_es": "Skill 4: Bajar un escalon > Roll of a Ledge",
+      "description": "How to: Roll off a ledge\r\n\t1. Sin skate y despues con Skate: Bend your knees, perform manual while standing, bend knees when landing\r\n\t2. Con tus manos simula la caida del roll off\r\n\t3. Poner una cinta en el piso o banqueta baja, e intentarlo en movimiento\r\nIntentarlo en una caida baja, y despues ir subiendo poco a poco la altura",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Skill",
+      "motor_skills": [
+        "Coordinación",
+        "confianza",
+        "impacto controlado"
+      ],
+      "sort_order": 48
+    },
+    {
+      "name": "Skill 5: Como caerse > How to bail",
+      "name_es": "Skill 5: Como caerse > How to bail",
+      "description": "1. The run out\r\n\t2. The foot drag\r\n\t3. Kick-out\r\n\t4. Double foot drag\r\n\t5. Pop-out runout\r\n                6. Heel-drag",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Skill",
+      "motor_skills": [
+        "Coordinación",
+        "Tiempo de Reacción"
+      ],
+      "sort_order": 49
+    },
+    {
+      "name": "Pop",
+      "name_es": "Pop",
+      "description": "Pop",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Fuerza y Técnica"
+      ],
+      "sort_order": 50
+    },
+    {
+      "name": "Pop and grab the board",
+      "name_es": "Pop and grab the board",
+      "description": "Pop and grab the board",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación y Agilidad"
+      ],
+      "sort_order": 51
+    },
+    {
+      "name": "Carrera de impulso - solo tic tocs",
+      "name_es": "Carrera de impulso - solo tic tocs",
+      "description": "No se vale empujarse con el pie !",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación"
+      ],
+      "sort_order": 52
+    },
+    {
+      "name": "Manuals - distancia",
+      "name_es": "Manuals - distancia",
+      "description": "Con conos establecer la distancia y ve aumentando la distancia hasta llegar manual de 5-6 segundos",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación"
+      ],
+      "sort_order": 53
+    },
+    {
+      "name": "Walk the dog - Carrera",
+      "name_es": "Walk the dog - Carrera",
+      "description": "Hacer equipos y ver quien logra llegar mas lejos !",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación"
+      ],
+      "sort_order": 54
+    },
+    {
+      "name": "Hippy Jumps",
+      "name_es": "Hippy Jumps",
+      "description": "Empieza abajo y ve subiendo la altura segun la confianza de los chic@s. Seguridad primero, ponte trucha !\r\nPaso 1: Brincar en la tabla - sin movimiento\r\nPaso 2: Marchar en tu skate - sin movimiento\r\nPaso 3: Bajarte del skate y volver a subirte - sin movimiento\r\nRepetir paso 1-3 pero ahora en movimiento\r\nPaso 4: Caminar y cruzar el tubo\r\nPaso 5: Brincar desde una banqueta hacia tu skate\r\nPaso 6: Brincar desde un 2 escalones o mas hacia tu skate",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Salto y Coordinación"
+      ],
+      "sort_order": 55
+    },
+    {
+      "name": "Juego: Skate",
+      "name_es": "Juego: Skate",
+      "description": "Juego: Skate",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación y Agilidad"
+      ],
+      "sort_order": 56
+    },
+    {
+      "name": "Manual Taps (2 seg)",
+      "name_es": "Manual Taps (2 seg)",
+      "description": "Manual Taps (2 seg)",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Balance y Control"
+      ],
+      "sort_order": 57
+    },
+    {
+      "name": "Manual (5 segs)",
+      "name_es": "Manual (5 segs)",
+      "description": "Manual (5 segs)",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Balance y Core"
+      ],
+      "sort_order": 58
+    },
+    {
+      "name": "Ghost Ride - piso",
+      "name_es": "Ghost Ride - piso",
+      "description": "Ghost Ride - piso",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación"
+      ],
+      "sort_order": 59
+    },
+    {
+      "name": "Ghost Ride - cajon",
+      "name_es": "Ghost Ride - cajon",
+      "description": "Ghost Ride - cajon",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación y Confianza"
+      ],
+      "sort_order": 60
+    },
+    {
+      "name": "Bajar el cajon/banqueta",
+      "name_es": "Bajar el cajon/banqueta",
+      "description": "Bajar el cajon/banqueta",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Confianza y Balance"
+      ],
+      "sort_order": 61
+    },
+    {
+      "name": "Doble Ollie, despues subir y bajar rampa con slappy",
+      "name_es": "Doble Ollie, despues subir y bajar rampa con slappy",
+      "description": "Doble Ollie, despues subir y bajar rampa con slappy",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Fuerza y Técnica"
+      ],
+      "sort_order": 62
+    },
+    {
+      "name": "Trown down & Caveman",
+      "name_es": "Trown down & Caveman",
+      "description": "Trown down & Caveman",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación y confianza al iniciar"
+      ],
+      "sort_order": 63
+    },
+    {
+      "name": "Ollie, Lift the body, step up, hippie jumps",
+      "name_es": "Ollie, Lift the body, step up, hippie jumps",
+      "description": "Ollie, Lift the body, step up, hippie jumps",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Fuerza y Técnica"
+      ],
+      "sort_order": 64
+    },
+    {
+      "name": "Slalom",
+      "name_es": "Slalom",
+      "description": "Slalom",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Agilidad"
+      ],
+      "sort_order": 65
+    },
+    {
+      "name": "Drill #2: Jump off/on",
+      "name_es": "Drill #2: Jump off/on",
+      "description": "Drill #2: Jump off/on",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación",
+        "pierna",
+        "timing y confianza"
+      ],
+      "sort_order": 66
+    },
+    {
+      "name": "Monster Walks",
+      "name_es": "Monster Walks",
+      "description": "Monster Walks",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Fuerza",
+        "Coordinación"
+      ],
+      "sort_order": 67
+    },
+    {
+      "name": "Lift the body",
+      "name_es": "Lift the body",
+      "description": "How to: Lift the body (levantar cuerpo)\r\n\t1. Como si fueras a bajar la banqueta, primero con una cinta en el piso, levantas el manual\r\n\t2. Pones una cuerda en el piso y la pegas con cinta\r\n\t3. Ahora con una barra o palo más grande\r\n\t4. Junta una tablas en la orilla de la banqueta\r\nJunta dos tablas con cinta",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Fuerza en piernas y control"
+      ],
+      "sort_order": 68
+    },
+    {
+      "name": "Penguin steps (180 y 360)",
+      "name_es": "Penguin steps (180 y 360)",
+      "description": "Penguin steps (180 y 360)",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación",
+        "Balance",
+        "Agilidad"
+      ],
+      "sort_order": 69
+    },
+    {
+      "name": "Trow Down",
+      "name_es": "Trow Down",
+      "description": "Trow Down",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación",
+        "Control de Tabla"
+      ],
+      "sort_order": 70
+    },
+    {
+      "name": "Shuv it",
+      "name_es": "Shuv it",
+      "description": "How to: Shuv-it\r\n\t1. Sin tabla, patea hacia atrás con tu pie derecho (regular), caes con el pie izquierdo y después el pie derecho\r\n\t2. Con tabla, sin llantas, haz el giro y cae con el pie izquierdo (regular)\r\n\t3. Con las manos haz el giro de shuv-it y caes con las 2 manos sobre la tabla\r\n\t4. Ahora con el skate, haz el giro + pop de shuv-it con un solo pie sin caerle.\r\n\t5. Intenta hacer shuvit y caer con dos pies en el piso\r\nIntenta hacer tu shuv-it bajando una banqueta",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y control del giro del skate"
+      ],
+      "sort_order": 71
+    },
+    {
+      "name": "Nose stall",
+      "name_es": "Nose stall",
+      "description": "Nose stall",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Control"
+      ],
+      "sort_order": 72
+    },
+    {
+      "name": "Manual",
+      "name_es": "Manual",
+      "description": "Manual",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Core"
+      ],
+      "sort_order": 73
+    },
+    {
+      "name": "Powerslide",
+      "name_es": "Powerslide",
+      "description": "How to: Powerslide\r\n        1. Sin skateboard, dobla rodillas y arrastra tu pie de atras 90 grados y pon todo tu peso en el pie de enfrente\r\n        2. Penguin/Monster walks pero sin levantar el nose, arrastrando las 4 llantas.\r\n        3. Andando haz un giro 180 arrastrando las 4 llantas. Ahora practica powerslides cortos, pratica aumentado la velocidad y hazlo sobrepasando una tabla.\r\n        4. Ahora en el piso, baja tu cuerpo y usando tu mano de pivote gira 180",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance dinámico y control sobre la tabla"
+      ],
+      "sort_order": 74
+    },
+    {
+      "name": "Ollie",
+      "name_es": "Ollie",
+      "description": "How to: Ollie\r\n\t1. Haz pop al skate y agarra con una mano\r\n\t2. Subete al skate y haz pop, agarra con una mano \r\n\t3. Sin tabla, con las agujetas amarradas\r\n\t4. Haz el movimiento de ollie agarrando la nose\r\n\t5. Movimiento rapido de ollie (parado sin movimiento)\r\nOllie en el pasto o agarrandote de algun barandal",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Potencia y Coordinación"
+      ],
+      "sort_order": 75
+    },
+    {
+      "name": "Kick turn",
+      "name_es": "Kick turn",
+      "description": "Kick turn",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación"
+      ],
+      "sort_order": 76
+    },
+    {
+      "name": "Fakie 180",
+      "name_es": "Fakie 180",
+      "description": "Fakie 180",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 77
+    },
+    {
+      "name": "Caveman",
+      "name_es": "Caveman",
+      "description": "Caveman",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Confianza"
+      ],
+      "sort_order": 78
+    },
+    {
+      "name": "Sex Change (giro 180 cuerpo)",
+      "name_es": "Sex Change (giro 180 cuerpo)",
+      "description": "Sex Change (giro 180 cuerpo)",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Coordinación"
+      ],
+      "sort_order": 79
+    },
+    {
+      "name": "360 en piso",
+      "name_es": "360 en piso",
+      "description": "360 en piso",
+      "difficulty": "beginner",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 80
+    },
+    {
+      "name": "Pumping Challenge",
+      "name_es": "Pumping Challenge",
+      "description": "Pumping Challenge",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Impulso y Resistencia"
+      ],
+      "sort_order": 81
+    },
+    {
+      "name": "Confianza en el Bowl",
+      "name_es": "Confianza en el Bowl",
+      "description": "Confianza en el Bowl",
+      "difficulty": "beginner",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Confianza y Técnica"
+      ],
+      "sort_order": 82
+    },
+    {
+      "name": "rock to fakie a fake 180 rock",
+      "name_es": "rock to fakie a fake 180 rock",
+      "description": "rock to fakie a fake 180 rock",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 83
+    },
+    {
+      "name": "Linea en bowl",
+      "name_es": "Linea en bowl",
+      "description": "Linea en bowl",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Resistencia y Control"
+      ],
+      "sort_order": 84
+    },
+    {
+      "name": "Mini ramp",
+      "name_es": "Mini ramp",
+      "description": "Beginner ramp tricks:\r\n- Rock to fakie\r\n- Switch rock\r\n- Axel stall\r\n- Rock n roll\r\n- One foot tail\r\n- 5-0",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación completa",
+        "transiciones y confianza"
+      ],
+      "sort_order": 85
+    },
+    {
+      "name": "Early grabs en piso",
+      "name_es": "Early grabs en piso",
+      "description": "How to: Early grabs\r\n\t1. Early grab ollie en piso, elije entre tu mano izquierda o derecha\r\n\t2. Early grab to fakie en el Quarter pipe, despues intentalo bajando una banqueta y/o una rampa.\r\n\t3. Early grab con V turn  (90 grados), entrando a la rampa de diagonal\r\nTrata de llegar al coping y hacer un BS crooked 5-0.",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Confianza y Balance"
+      ],
+      "sort_order": 86
+    },
+    {
+      "name": "Rock to fakie - fakie a rock",
+      "name_es": "Rock to fakie - fakie a rock",
+      "description": "Rock to fakie - fakie a rock",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Confianza y Técnica"
+      ],
+      "sort_order": 87
+    },
+    {
+      "name": "Pump (impulso y momentum)",
+      "name_es": "Pump (impulso y momentum)",
+      "description": "How to: Pumping\r\n\t1. Sin skate, en la base de la rampa, bajas y te impulsas hacia adelante con tu pie trasero.\r\n\t2. Con tabla sin ruedas, en la base de la rampas, te agachas y te impulsas hacia adelante con tu pie trasero. Primero ligeramente, cada vez más fuerte, te desplazas hacia adelante.\r\n\t3. En el piso, bajas y subes imitando el impulso hacia adelante. Primero lento despues lo haces rapidamente, subir y bajar.\r\nEn tu skate, comienza a impulsarte hasta obtener momentum (pumping)",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 88
+    },
+    {
+      "name": "Carving Backside",
+      "name_es": "Carving Backside",
+      "description": "Carving Backside",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Confianza y Balance"
+      ],
+      "sort_order": 89
+    },
+    {
+      "name": "Carving Frontside",
+      "name_es": "Carving Frontside",
+      "description": "Carving Frontside",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Giro y Control"
+      ],
+      "sort_order": 90
+    },
+    {
+      "name": "Drop-in: Bank",
+      "name_es": "Drop-in: Bank",
+      "description": "Drop-in: Bank",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Fuerza"
+      ],
+      "sort_order": 91
+    },
+    {
+      "name": "Drop in: Vert",
+      "name_es": "Drop in: Vert",
+      "description": "Drop in: Vert",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Confianza"
+      ],
+      "sort_order": 92
+    },
+    {
+      "name": "Kick turn",
+      "name_es": "Kick turn",
+      "description": "Kick turn",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Control"
+      ],
+      "sort_order": 93
+    },
+    {
+      "name": "Roll in",
+      "name_es": "Roll in",
+      "description": "Roll in",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Resistencia y Piernas"
+      ],
+      "sort_order": 94
+    },
+    {
+      "name": "Early grabs",
+      "name_es": "Early grabs",
+      "description": "Early grabs",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 95
+    },
+    {
+      "name": "BS 50-50 Kickturn",
+      "name_es": "BS 50-50 Kickturn",
+      "description": "BS 50-50 Kickturn",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Control"
+      ],
+      "sort_order": 96
+    },
+    {
+      "name": "FS 50-50 Kickturn",
+      "name_es": "FS 50-50 Kickturn",
+      "description": "FS 50-50 Kickturn",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Control"
+      ],
+      "sort_order": 97
+    },
+    {
+      "name": "FS Kick turn",
+      "name_es": "FS Kick turn",
+      "description": "FS Kick turn",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Control"
+      ],
+      "sort_order": 98
+    },
+    {
+      "name": "BS Kick turn",
+      "name_es": "BS Kick turn",
+      "description": "BS Kick turn",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Control"
+      ],
+      "sort_order": 99
+    },
+    {
+      "name": "Axle stall",
+      "name_es": "Axle stall",
+      "description": "Axle stall",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Estabilidad"
+      ],
+      "sort_order": 100
+    },
+    {
+      "name": "Rock to fakie",
+      "name_es": "Rock to fakie",
+      "description": "Rock to fakie",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Confianza"
+      ],
+      "sort_order": 101
+    },
+    {
+      "name": "Rock 'n roll",
+      "name_es": "Rock 'n roll",
+      "description": "Primero en una rampa, despues en una transicion",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 102
+    },
+    {
+      "name": "Fakie Rock",
+      "name_es": "Fakie Rock",
+      "description": "Fakie Rock",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Balance"
+      ],
+      "sort_order": 103
+    },
+    {
+      "name": "Half Cab Rock to Fakie",
+      "name_es": "Half Cab Rock to Fakie",
+      "description": "Half Cab Rock to Fakie",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 104
+    },
+    {
+      "name": "Pop rock",
+      "name_es": "Pop rock",
+      "description": "Pop rock",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y control en transición/bowl"
+      ],
+      "sort_order": 105
+    },
+    {
+      "name": "Backside Ollie",
+      "name_es": "Backside Ollie",
+      "description": "How to: Backside Ollie\r\n\t1. Poner 2 cintas en el bank\r\n\t2. Practica primero ollie to fakie\r\n\t3. Practica el 180 FS en el bank\r\n180 FS en el 1/4",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Fuerza y Giro"
+      ],
+      "sort_order": 106
+    },
+    {
+      "name": "Frontside Ollie",
+      "name_es": "Frontside Ollie",
+      "description": "Frontside Ollie",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Fuerza y Giro"
+      ],
+      "sort_order": 107
+    },
+    {
+      "name": "50-50",
+      "name_es": "50-50",
+      "description": "50-50",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Estabilidad"
+      ],
+      "sort_order": 108
+    },
+    {
+      "name": "Fakie Tail stall",
+      "name_es": "Fakie Tail stall",
+      "description": "Fakie Tail stall",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Control"
+      ],
+      "sort_order": 109
+    },
+    {
+      "name": "Fakie Tail Nose Grab",
+      "name_es": "Fakie Tail Nose Grab",
+      "description": "Fakie Tail Nose Grab",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Confianza"
+      ],
+      "sort_order": 110
+    },
+    {
+      "name": "One Foot Tail",
+      "name_es": "One Foot Tail",
+      "description": "One Foot Tail",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Confianza"
+      ],
+      "sort_order": 111
+    },
+    {
+      "name": "Nose stall",
+      "name_es": "Nose stall",
+      "description": "Nose stall",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Control"
+      ],
+      "sort_order": 112
+    },
+    {
+      "name": "Feeble stall",
+      "name_es": "Feeble stall",
+      "description": "Feeble stall",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Técnica"
+      ],
+      "sort_order": 113
+    },
+    {
+      "name": "Ollie",
+      "name_es": "Ollie",
+      "description": "Ollie",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Fuerza y Confianza"
+      ],
+      "sort_order": 114
+    },
+    {
+      "name": "Roll-in 50/50",
+      "name_es": "Roll-in 50/50",
+      "description": "Roll-in 50/50",
+      "difficulty": "beginner",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Confianza"
+      ],
+      "sort_order": 115
+    },
+    {
+      "name": "Hippy Jump Avanzado",
+      "name_es": "Hippy Jump Avanzado",
+      "description": "Paso 1: Parado\r\nPaso 2: Andando\r\nPaso 3: Brinca con los pies bien extendidos\r\nPaso 4: Paso a otra tabla\r\nPaso 5: Brincar a otra tabla\r\nPaso 6: Paso sobre el tubo\r\nPaso 7: Brincar el tubo\r\nPaso 8: Brincar el tubo con pies extendidos\r\nPaso 9: Brincar el tubo con FS/BS body varial",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Salto y Agilidad"
+      ],
+      "sort_order": 116
+    },
+    {
+      "name": "Juego: Skate",
+      "name_es": "Juego: Skate",
+      "description": "Juego: Skate",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "activity_type": "Juego",
+      "motor_skills": [
+        "Coordinación y Agilidad"
+      ],
+      "sort_order": 117
+    },
+    {
+      "name": "Brincar del cajon a la tabla",
+      "name_es": "Brincar del cajon a la tabla",
+      "description": "Brincar del cajon a la tabla",
+      "difficulty": "intermediate",
+      "category": "street_obstaculos",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Salto y Confianza"
+      ],
+      "sort_order": 118
+    },
+    {
+      "name": "Toe taps, Single leg snakes, Toe touches and Switcheroo",
+      "name_es": "Toe taps, Single leg snakes, Toe touches and Switcheroo",
+      "description": "Drills - balance",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Balance y Core"
+      ],
+      "sort_order": 119
+    },
+    {
+      "name": "Backside pivot, front side pivot, pivot walks, backside revert, frontside revert, BS powerslide, FS powerslide",
+      "name_es": "Backside pivot, front side pivot, pivot walks, backside revert, frontside revert, BS powerslide, FS powerslide",
+      "description": "Drills - board control",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Control y Coordinación"
+      ],
+      "sort_order": 120
+    },
+    {
+      "name": "Pegar una cuerda en el piso y hacer un fakie ollie sin pop",
+      "name_es": "Pegar una cuerda en el piso y hacer un fakie ollie sin pop",
+      "description": "Pegar una cuerda en el piso y hacer un fakie ollie sin pop",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "activity_type": "Linea",
+      "motor_skills": [
+        "Coordinación"
+      ],
+      "sort_order": 121
+    },
+    {
+      "name": "Fakie 360",
+      "name_es": "Fakie 360",
+      "description": "Fakie 360",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 122
+    },
+    {
+      "name": "FS 180",
+      "name_es": "FS 180",
+      "description": "How to: FS 180\r\n        1. Scoop and land\r\n        2. Add 180 rotation\r\n        3. With board, Land it",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Fuerza"
+      ],
+      "sort_order": 123
+    },
+    {
+      "name": "Varial Kickflip",
+      "name_es": "Varial Kickflip",
+      "description": "Varial Kickflip",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación",
+        "control de pies y tabla"
+      ],
+      "sort_order": 124
+    },
+    {
+      "name": "BS 180",
+      "name_es": "BS 180",
+      "description": "BS 180",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Fuerza"
+      ],
+      "sort_order": 125
+    },
+    {
+      "name": "Caballerial",
+      "name_es": "Caballerial",
+      "description": "Caballerial",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Control completo",
+        "giros en fakie"
+      ],
+      "sort_order": 126
+    },
+    {
+      "name": "Fakie Ollie",
+      "name_es": "Fakie Ollie",
+      "description": "Fakie Ollie",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Confianza y control en postura inversa"
+      ],
+      "sort_order": 127
+    },
+    {
+      "name": "Half Cab",
+      "name_es": "Half Cab",
+      "description": "1. While in Fakie, pop a FS 180 turn\r\nTo do Caballerial, with your front foot do a revert 180",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y rotación desde fakie"
+      ],
+      "sort_order": 128
+    },
+    {
+      "name": "No comply",
+      "name_es": "No comply",
+      "description": "No comply",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación pie/mano y control espacial"
+      ],
+      "sort_order": 129
+    },
+    {
+      "name": "Roll-in to fakie",
+      "name_es": "Roll-in to fakie",
+      "description": "Roll-in to fakie",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Control y Balance"
+      ],
+      "sort_order": 130
+    },
+    {
+      "name": "Fakie roll-in",
+      "name_es": "Fakie roll-in",
+      "description": "Fakie roll-in",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 131
+    },
+    {
+      "name": "Step on, step off",
+      "name_es": "Step on, step off",
+      "description": "Step on, step off",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Control"
+      ],
+      "sort_order": 132
+    },
+    {
+      "name": "Ollie",
+      "name_es": "Ollie",
+      "description": "Ollie",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Fuerza y Técnica"
+      ],
+      "sort_order": 133
+    },
+    {
+      "name": "Saltar y caer en la tabla",
+      "name_es": "Saltar y caer en la tabla",
+      "description": "Saltar y caer en la tabla",
+      "difficulty": "intermediate",
+      "category": "street_piso",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Salto y Balance"
+      ],
+      "sort_order": 134
+    },
+    {
+      "name": "Boardslide",
+      "name_es": "Boardslide",
+      "description": "How to: Boardslide\r\n\t1. Sin tabla sube el pie y bájalo girando 90 grados\r\n\t2. De frente al funbox, sube tu eje delantero y bájalo girando 90 grados\r\n\t3. Pon un skate sin ejes encima de otro skate, corre y brinca en el skateboard\r\n\t4. Pon un ladrillo y sube tu skate de boardslide para balancearte\r\n\t5. Balance board\r\nIntenta en el funbox al principio y después usa el rail una vez que ganes confianza",
+      "difficulty": "intermediate",
+      "category": "street_obstaculos",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance sobre rieles y confianza en maniobras"
+      ],
+      "sort_order": 135
+    },
+    {
+      "name": "Tail stall",
+      "name_es": "Tail stall",
+      "description": "Tail stall",
+      "difficulty": "intermediate",
+      "category": "street_obstaculos",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Control"
+      ],
+      "sort_order": 136
+    },
+    {
+      "name": "Nose slide",
+      "name_es": "Nose slide",
+      "description": "Nose slide",
+      "difficulty": "intermediate",
+      "category": "street_obstaculos",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Control y Coordinación"
+      ],
+      "sort_order": 137
+    },
+    {
+      "name": "Transfer - bajo",
+      "name_es": "Transfer - bajo",
+      "description": "Transfer - bajo",
+      "difficulty": "intermediate",
+      "category": "street_obstaculos",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Salto y Confianza"
+      ],
+      "sort_order": 138
+    },
+    {
+      "name": "Fakie 360",
+      "name_es": "Fakie 360",
+      "description": "Fakie 360",
+      "difficulty": "intermediate",
+      "category": "street_obstaculos",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 139
+    },
+    {
+      "name": "Spine - rock to rock",
+      "name_es": "Spine - rock to rock",
+      "description": "Spine - rock to rock",
+      "difficulty": "intermediate",
+      "category": "street_obstaculos",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Confianza"
+      ],
+      "sort_order": 140
+    },
+    {
+      "name": "Slash",
+      "name_es": "Slash",
+      "description": "Slash",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 141
+    },
+    {
+      "name": "Fakie 360 Kick turn",
+      "name_es": "Fakie 360 Kick turn",
+      "description": "Fakie 360 Kick turn",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 142
+    },
+    {
+      "name": "360 Rock",
+      "name_es": "360 Rock",
+      "description": "360 Rock",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Confianza"
+      ],
+      "sort_order": 143
+    },
+    {
+      "name": "Nollie Pop Rock",
+      "name_es": "Nollie Pop Rock",
+      "description": "Nollie Pop Rock",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Fuerza"
+      ],
+      "sort_order": 144
+    },
+    {
+      "name": "Ollie to Fakie",
+      "name_es": "Ollie to Fakie",
+      "description": "Ollie to Fakie",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Fuerza y Control"
+      ],
+      "sort_order": 145
+    },
+    {
+      "name": "Early Grab to Fakie",
+      "name_es": "Early Grab to Fakie",
+      "description": "Early Grab to Fakie",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Coordinación y Confianza"
+      ],
+      "sort_order": 146
+    },
+    {
+      "name": "Fakie Tail Stall Madonna",
+      "name_es": "Fakie Tail Stall Madonna",
+      "description": "Fakie Tail Stall Madonna",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Fuerza"
+      ],
+      "sort_order": 147
+    },
+    {
+      "name": "Fakie 360 turn",
+      "name_es": "Fakie 360 turn",
+      "description": "Fakie 360 turn",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Giro y Balance"
+      ],
+      "sort_order": 148
+    },
+    {
+      "name": "Fakie Smith stall",
+      "name_es": "Fakie Smith stall",
+      "description": "Fakie Smith stall",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Estabilidad"
+      ],
+      "sort_order": 149
+    },
+    {
+      "name": "Smith stall",
+      "name_es": "Smith stall",
+      "description": "Smith stall",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Técnica"
+      ],
+      "sort_order": 150
+    },
+    {
+      "name": "FS Tail stall",
+      "name_es": "FS Tail stall",
+      "description": "FS Tail stall",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Confianza"
+      ],
+      "sort_order": 151
+    },
+    {
+      "name": "BS Tail stall",
+      "name_es": "BS Tail stall",
+      "description": "BS Tail stall",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Confianza"
+      ],
+      "sort_order": 152
+    },
+    {
+      "name": "50-50 grind to fakie",
+      "name_es": "50-50 grind to fakie",
+      "description": "50-50 grind to fakie",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Control y Balance"
+      ],
+      "sort_order": 153
+    },
+    {
+      "name": "FS 50-50 grind",
+      "name_es": "FS 50-50 grind",
+      "description": "FS 50-50 grind",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Control y Balance"
+      ],
+      "sort_order": 154
+    },
+    {
+      "name": "FS 5-0 grind",
+      "name_es": "FS 5-0 grind",
+      "description": "FS 5-0 grind",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Control y Fuerza"
+      ],
+      "sort_order": 155
+    },
+    {
+      "name": "Nose stall Revert",
+      "name_es": "Nose stall Revert",
+      "description": "Nose stall Revert",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Balance y Giro"
+      ],
+      "sort_order": 156
+    },
+    {
+      "name": "Boardslide en coping",
+      "name_es": "Boardslide en coping",
+      "description": "Boardslide en coping",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "activity_type": "Truco",
+      "motor_skills": [
+        "Control y Técnica"
+      ],
+      "sort_order": 157
+    }
+  ]
+}

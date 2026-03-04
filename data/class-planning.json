@@ -1,0 +1,318 @@
+{
+  "warmup_exercises": [
+    {
+      "id": 1,
+      "name": "Estiramiento de brazos, pierna, caderas, espalda",
+      "name_en": "Arms, legs, hips, back stretching",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["brazos", "piernas", "caderas", "espalda"],
+      "attributes": { "balance": true, "resistencia": true, "core": true, "agilidad": true }
+    },
+    {
+      "id": 2,
+      "name": "Tobillos - circulos",
+      "name_en": "Ankle circles",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["tobillos", "piernas", "gluteos", "core"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true, "confianza": true }
+    },
+    {
+      "id": 3,
+      "name": "Tobillos - Reverse calf raise",
+      "name_en": "Reverse calf raise",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["tobillos", "piernas", "gluteos", "core"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true, "confianza": true }
+    },
+    {
+      "id": 4,
+      "name": "Sentadillas",
+      "name_en": "Squats",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["piernas", "core"],
+      "attributes": { "balance": true, "resistencia": true, "core": true, "fuerza_piernas": true, "estabilidad": true }
+    },
+    {
+      "id": 5,
+      "name": "Hippie Jumps",
+      "name_en": "Hippie Jumps",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["coordinacion", "confianza"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true, "agilidad": true, "confianza": true }
+    },
+    {
+      "id": 6,
+      "name": "Hippie Jumps con Indy y Melon",
+      "name_en": "Hippie Jumps with Indy and Melon",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["coordinacion", "brazos", "piernas", "confianza"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true, "agilidad": true, "confianza": true }
+    },
+    {
+      "id": 7,
+      "name": "Cadera, cuello y muñecas",
+      "name_en": "Hips, neck and wrists",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["caderas", "cuello", "munecas"],
+      "attributes": { "resistencia": true, "tiempo_reaccion": true, "control_tabla": true }
+    },
+    {
+      "id": 8,
+      "name": "Good morning",
+      "name_en": "Good morning",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["core", "estabilidad"],
+      "attributes": { "core": true, "estabilidad": true }
+    },
+    {
+      "id": 9,
+      "name": "Side Lunges",
+      "name_en": "Side Lunges",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["fuerza", "agilidad", "estabilidad", "piernas"],
+      "attributes": { "balance": true, "resistencia": true, "core": true, "fuerza_piernas": true, "agilidad": true, "estabilidad": true }
+    },
+    {
+      "id": 10,
+      "name": "Side to side",
+      "name_en": "Side to side",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["coordinacion", "agilidad", "core"],
+      "attributes": { "coordinacion": true, "balance": true, "core": true, "agilidad": true }
+    },
+    {
+      "id": 11,
+      "name": "Vuelta al parque",
+      "name_en": "Park lap",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["piernas", "cardio"],
+      "attributes": { "balance": true, "estabilidad": true }
+    },
+    {
+      "id": 12,
+      "name": "Escalera",
+      "name_en": "Ladder",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["piernas", "tobillos", "agilidad"],
+      "attributes": { "coordinacion": true, "balance": true, "estabilidad": true }
+    },
+    {
+      "id": 13,
+      "name": "Balance board",
+      "name_en": "Balance board",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["core", "tobillos", "piernas"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true }
+    },
+    {
+      "id": 14,
+      "name": "Skater Squat",
+      "name_en": "Skater Squat",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["piernas", "gluteos", "core", "tobillos"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true, "confianza": true }
+    },
+    {
+      "id": 15,
+      "name": "Pistol Squat",
+      "name_en": "Pistol Squat",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["piernas", "gluteos", "core", "tobillos"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true, "confianza": true }
+    },
+    {
+      "id": 16,
+      "name": "Skate lunge",
+      "name_en": "Skate lunge",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "notes": "Hacer movimiento del skate atrás y adelante mientras el pie del push está en el piso",
+      "skills": ["fuerza_piernas", "balance", "coordinacion"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true }
+    },
+    {
+      "id": 17,
+      "name": "Powerpush",
+      "name_en": "Powerpush",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["fuerza_piernas", "balance", "resistencia"],
+      "attributes": { "balance": true, "resistencia": true, "fuerza_piernas": true }
+    },
+    {
+      "id": 18,
+      "name": "Medio flips",
+      "name_en": "Half flips",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "skills": ["coordinacion", "fuerza", "balance"],
+      "attributes": { "coordinacion": true, "balance": true, "fuerza_piernas": true }
+    },
+    {
+      "id": 19,
+      "name": "Box jumps x10 reps",
+      "name_en": "Box jumps x10 reps",
+      "category": "calentamiento",
+      "type": "ejercicios_funcionales",
+      "target": "todos",
+      "url": "https://doseskateboarding.com/articles/strengthen-skateboarding-performance",
+      "skills": ["potencia", "piernas", "confianza"],
+      "attributes": { "balance": true, "fuerza_piernas": true, "agilidad": true, "confianza": true, "estabilidad": true }
+    }
+  ],
+  "class_structure": [
+    { "id": 1, "name": "Calentamiento", "name_en": "Warmup", "duration_minutes": 15 },
+    { "id": 2, "name": "Juego", "name_en": "Game", "duration_minutes": 15 },
+    { "id": 3, "name": "Linea técnica", "name_en": "Technical line", "duration_minutes": 30 },
+    { "id": 4, "name": "Trucos", "name_en": "Tricks", "duration_minutes": 30 },
+    { "id": 5, "name": "Free skate (Skate libre)", "name_en": "Free skate", "duration_minutes": 30 }
+  ],
+  "skill_levels": {
+    "iniciacion": {
+      "name": "Iniciación",
+      "name_en": "Initiation",
+      "skills": [
+        "Fuerza en piernas",
+        "Agilidad",
+        "Coordinación",
+        "Confianza"
+      ],
+      "tricks": [
+        "Penguins and Monster walks",
+        "Powerpush & Balance one foot",
+        "Giro FS y BS",
+        "Fakie 180 giro",
+        "Pop",
+        "Manual (3-5 segundos)"
+      ]
+    },
+    "principiante": {
+      "name": "Principiante",
+      "name_en": "Beginner",
+      "skills": [
+        "Balance",
+        "Estabilidad",
+        "Control",
+        "Resistencia"
+      ],
+      "tricks": [
+        "Hippy Jump Avanzado",
+        "Drop in",
+        "Roll in",
+        "Ollie",
+        "180 FS/BS",
+        "Shuvit"
+      ]
+    },
+    "intermedio": {
+      "name": "Intermedio",
+      "name_en": "Intermediate",
+      "skills": [],
+      "tricks": []
+    }
+  },
+  "park_plans": {
+    "moch_couoh": {
+      "name": "Parque Moch Couoh",
+      "type": "Bowl, Street, Piso",
+      "obstacles": {
+        "bowl": {
+          "class_1": ["Pumping", "BS 180", "FS 180"]
+        },
+        "medio_tubo": {
+          "class_5": ["Salir del medio tubo", "50-50 stall", "50-50 grind"]
+        },
+        "mini_bowl": {
+          "class_1": ["Rock 2 fakie", "Rock n roll"]
+        },
+        "spine": {
+          "class_5": ["Rock 2 fakie", "Rock 2 fakie (cruzar hacia el otro lado)"]
+        },
+        "escalon": {
+          "class_1": ["Ollie bajando", "Ollie subiendo"],
+          "class_5": ["180 FS", "180 BS"]
+        },
+        "china_gap": {
+          "class_5": ["Hippy jump", "Hippy jump con giro 180"]
+        }
+      }
+    },
+    "parque_acuatico": {
+      "name": "Parque Acuático",
+      "type": "Vert, Street, Piso",
+      "obstacles": {
+        "cajon": {
+          "class_2": ["Ollie bajando", "Ollie subiendo"]
+        },
+        "rails": {
+          "class_2": ["Boardslide"]
+        },
+        "rampa_botador": {
+          "class_2": ["Early grab"]
+        },
+        "rampa_cuarto": {
+          "class_2": ["Fakie tail", "Fakie 180 rock 2 fakie"]
+        },
+        "rampa_fun_box": {
+          "class_2": ["Manuals"]
+        }
+      }
+    },
+    "nelson_barrera": {
+      "name": "Parque Nelson Barrera",
+      "type": "Street, Piso",
+      "obstacles": {
+        "piramide": {
+          "class_6": ["Ollie", "FS 180", "BS 180"]
+        }
+      }
+    }
+  },
+  "focus_areas": [
+    { "id": "cardio", "name": "Cardio", "name_es": "Cardio", "icon": "🏃" },
+    { "id": "fisio", "name": "Physiotherapy", "name_es": "Fisio", "icon": "🦵" },
+    { "id": "strength", "name": "Strength", "name_es": "Fuerza", "icon": "💪" },
+    { "id": "aerials", "name": "Aerials", "name_es": "Aéreos", "icon": "🌀" },
+    { "id": "neck", "name": "Neck", "name_es": "Cuello", "icon": "🦒" },
+    { "id": "shoulders", "name": "Shoulders", "name_es": "Hombros", "icon": "🤸" },
+    { "id": "hips", "name": "Hips", "name_es": "Caderas", "icon": "🦴" },
+    { "id": "ankles", "name": "Ankles", "name_es": "Tobillos", "icon": "🦶" },
+    { "id": "core", "name": "Core", "name_es": "Core", "icon": "🎯" },
+    { "id": "balance", "name": "Balance", "name_es": "Balance", "icon": "⚖️" },
+    { "id": "agility", "name": "Agility", "name_es": "Agilidad", "icon": "⚡" },
+    { "id": "stretching", "name": "Stretching", "name_es": "Estiramiento", "icon": "🧘" }
+  ]
+}
