@@ -52,10 +52,12 @@ export default defineNuxtConfig({
   // SSR configuration - disable for Capacitor mobile builds
   ssr: true,
 
-  // Nitro configuration for static generation (mobile)
+  // Nitro configuration
   nitro: {
     prerender: {
-      crawlLinks: true,
+      crawlLinks: false,
+      routes: ['/'],
+      ignore: ['/auth/', '/dashboard/', '/coach/', '/admin/', '/student/'],
     },
   },
 
