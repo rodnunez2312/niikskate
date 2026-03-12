@@ -79,6 +79,36 @@ A mobile-first app for managing skateboard classes, coach schedules, and equipme
    ```
    Open [http://localhost:3000](http://localhost:3000)
 
+### Running from a local folder (e.g. C:\Scheduling)
+
+If you keep the project in a local folder like `C:\Scheduling` (to avoid OneDrive sync issues with `node_modules` and the dev server), use that folder for daily work and push to GitHub when you're ready.
+
+**Open and run the app**
+
+1. In Cursor: **File → Open Folder** → choose `C:\Scheduling`.
+2. In the terminal: `npm run dev`.
+3. Develop as usual in `C:\Scheduling`.
+
+**Push your changes to GitHub (OneDrive repo)**
+
+Choose one of these:
+
+- **Option 1 – Push from C:\Scheduling (recommended)**  
+  If `C:\Scheduling` is a git clone of this repo:
+  1. In Cursor with `C:\Scheduling` open, open **Source Control** (Ctrl+Shift+G).
+  2. Stage your changes, write a commit message, then **Commit**.
+  3. Click **Sync** or **Push** to update GitHub.  
+  Your OneDrive repo will sync the updated files from GitHub.
+
+- **Option 2 – Copy into the OneDrive repo, then push**  
+  If `C:\Scheduling` is just a copy (not a git repo):
+  1. Copy the files you changed from `C:\Scheduling` into your OneDrive repo folder  
+     `...\Documents\GitHub\niikskate`.
+  2. In Cursor, open that OneDrive repo folder.
+  3. In **Source Control**, commit and push to GitHub.
+
+To make `C:\Scheduling` a proper clone so you can use Option 1: clone the repo into `C:\Scheduling` (or run `git init` there and add the GitHub remote), then run `npm install` and `npm run dev` in that folder.
+
 ### Building for Production
 
 **Web**:
