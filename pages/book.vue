@@ -222,7 +222,7 @@ const singleClassOptions = computed(() => [
     id: 'individual',
     name: language.value === 'es' ? 'Clase Individual' : 'Individual Class',
     description: language.value === 'es' ? 'Entrenamiento personalizado' : 'Personalized coaching',
-    priceMXN: 130,
+    priceMXN: 200,
     priceUSD: 200,
     icon: '👤',
     color: 'from-purple-400 to-purple-600',

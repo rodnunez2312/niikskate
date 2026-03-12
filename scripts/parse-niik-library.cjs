@@ -26,13 +26,15 @@ const DIRIGIDO_KEYS = ['dirigido']  // "Dirigido" column has obstacle type (0-To
 const NEW_CATEGORY_KEYS = ['new category', 'nueva categoria', 'new_category']  // NEW CATEGORY column (user-defined)
 const TYPE_KEYS = ['tipo', 'type']  // "Tipo" column has activity type (Ejercicios funcionales, Juego, Linea, Skill, Truco)
 const MOTOR_SKILLS_KEYS = ['habilidad motriz', 'motor skills', 'body parts', 'desarrollada']
+const URL_KEYS = ['url', 'link', 'video']
 
 // Map "NEW CATEGORY" or "Dirigido" values to our activity categories
 const ACTIVITY_CATEGORY_MAP = {
-  iniciacion: ['ejercicios', 'funcionales', '0 - todos', 'todos', 'calentamiento', 'juegos', 'juego', '1 - iniciacion', 'iniciacion'],
-  street_piso: ['street piso', 'street-piso', '2 - street - piso', 'street - piso', 'piso'],
-  street_obstaculos: ['street obstaculos', 'street-obstaculos', 'street obstáculos', '2 - street - obstaculos', 'street - obstaculos', 'obstaculos'],
-  vert_bowl: ['vert-bowl', 'vert bowl', 'vert/bowl', '3 - bowl', 'bowl', 'vert'],
+  excercise: ['ejercicios funcionales', 'ejercicios', 'funcionales', 'exercise', 'excercise'],
+  iniciacion: ['0 - todos', 'todos', '1 - iniciacion', 'iniciacion', 'calentamiento', 'juegos', 'juego'],
+  street_piso: ['2 - street - piso', 'street - piso', 'street piso', 'street-piso', 'piso'],
+  street_obstaculos: ['3 - street - obstaculos', 'street - obstaculos', 'street obstáculos', 'street obstaculos', 'street-obstaculos', 'obstaculos'],
+  vert_bowl: ['4 - bowl', 'bowl', 'vert-bowl', 'vert bowl', 'vert/bowl', 'vert'],
   surf_skate: ['surf skate', 'surfskate', 'surf-skate', 'surf'],
 }
 
@@ -45,13 +47,15 @@ const DIFFICULTY_MAP = {
 
 // Normalize "Dirigido" value to activity category
 function normalizeActivityCategory(dirigidoValue, tipoValue) {
+  const tipo = (tipoValue || '').toString().toLowerCase().trim()
+  // Prioritize exercise grouping from "Tipo"/"NEW CATEGORY" field.
+  if (tipo.includes('ejercicio') || tipo.includes('funcional') || tipo.includes('exercise') || tipo.includes('excercise')) {
+    return 'excercise'
+  }
+
   if (!dirigidoValue || typeof dirigidoValue !== 'string') {
     // Fallback to tipo if no dirigido
-    if (tipoValue) {
-      const t = tipoValue.toLowerCase().trim()
-      if (t.includes('ejercicio') || t.includes('funcional')) return 'iniciacion'
-      if (t.includes('juego')) return 'juegos_iniciacion'
-    }
+    if (tipo.includes('juego')) return 'iniciacion'
     return 'iniciacion'
   }
   
@@ -116,6 +120,7 @@ function main() {
   const newCategoryCol = findColumn(headerRow, NEW_CATEGORY_KEYS)  // "NEW CATEGORY" column (preferred)
   const typeCol = findColumn(headerRow, TYPE_KEYS)              // "Tipo" column - activity type
   const motorSkillsCol = findColumn(headerRow, MOTOR_SKILLS_KEYS)
+  const urlCol = findColumn(headerRow, URL_KEYS)
 
   console.log('Column indices:', {
     name: nameCol,
@@ -125,7 +130,8 @@ function main() {
     dirigido: dirigidoCol,
     newCategory: newCategoryCol,
     type: typeCol,
-    motorSkills: motorSkillsCol
+    motorSkills: motorSkillsCol,
+    url: urlCol
   })
   
   if (newCategoryCol >= 0) {
@@ -152,6 +158,7 @@ function main() {
     const dirigidoValue = dirigidoCol >= 0 ? (row[dirigidoCol] || '').toString().trim() : ''
     const tipoValue = typeCol >= 0 ? (row[typeCol] || '').toString().trim() : ''
     const categoriaValue = difficultyCol >= 0 ? (row[difficultyCol] || '').toString().trim() : ''
+    const urlValue = urlCol >= 0 ? (row[urlCol] || '').toString().trim() : ''
     
     // Map to our schema - prefer NEW CATEGORY column if available
     const activityCategory = normalizeActivityCategory(newCategoryValue || dirigidoValue, tipoValue)
@@ -174,6 +181,13 @@ function main() {
       name_es: nameEs || name || undefined,
       description: description || name || 'No description',
       description_es: descriptionEs || undefined,
+      truco: name || undefined,
+      categoria: categoriaValue || undefined,
+      dirigido: dirigidoValue || undefined,
+      comentarios: description || undefined,
+      url: urlValue || undefined,
+      new_category: newCategoryValue || undefined,
+      habilidad_motriz_habilitada: motorSkills.length > 0 ? motorSkills : undefined,
       difficulty,
       category: activityCategory,  // Use activity category (from Dirigido column)
       activity_type: tipoValue || undefined,  // Keep original Tipo value for reference

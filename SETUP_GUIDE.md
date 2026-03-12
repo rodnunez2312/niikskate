@@ -22,7 +22,11 @@ Create/update your `.env` file:
 ```env
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_KEY=your-anon-public-key
+
+# Required for Admin "Add user" (Dashboard → Settings → API → service_role key)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
+**Important:** Never expose the service role key in the client. It is only used by the server API for creating users.
 
 ### Step 4: Run Database Migrations
 In Supabase Dashboard, go to **SQL Editor** and run these files in order:

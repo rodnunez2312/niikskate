@@ -5,7 +5,7 @@
  * Run: node scripts/parse-niik-library.mjs
  */
 
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx'
 import { writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -21,33 +21,44 @@ const SHEET_NAME = '1 - Manual de Trucos'
 // Map possible Excel column names to our schema keys
 const NAME_KEYS = ['truco', 'trick', 'nombre', 'name', 'skill', 'habilidad']
 const NAME_ES_KEYS = ['nombre_es', 'name_es', 'truco_es', 'español', 'espanol']
-const DESC_KEYS = ['descripción', 'descripcion', 'description', 'desc']
+const DESC_KEYS = ['descripción', 'descripcion', 'description', 'desc', 'comentarios']
 const DESC_ES_KEYS = ['descripción_es', 'descripcion_es', 'description_es']
-const CATEGORY_KEYS = ['categoría', 'categoria', 'category', 'tipo', 'type']
-const DIFFICULTY_KEYS = ['dificultad', 'difficulty', 'nivel', 'level']
+const DIFFICULTY_KEYS = ['categoría', 'categoria']
+const DIRIGIDO_KEYS = ['dirigido']
+const NEW_CATEGORY_KEYS = ['new category', 'nueva categoria', 'new_category']
+const TYPE_KEYS = ['tipo', 'type']
 const MOTOR_SKILLS_KEYS = ['habilidad motriz', 'motor skills', 'body parts', 'desarrollada']
+const URL_KEYS = ['url', 'link', 'video']
 
-const CATEGORY_MAP = {
-  bowl: ['bowl', 'bowl'],
-  street: ['street', 'street', 'calle'],
-  surf_skate: ['surf skate', 'surf skate', 'surf', 'surfskate'],
-  fundamentals: ['fundamentals', 'fundamentos', 'fundamento', 'basico', 'básico'],
-  safety: ['safety', 'seguridad', 'safety'],
+const ACTIVITY_CATEGORY_MAP = {
+  excercise: ['ejercicios funcionales', 'ejercicios', 'funcionales', 'exercise', 'excercise'],
+  iniciacion: ['0 - todos', 'todos', '1 - iniciacion', 'iniciacion', 'calentamiento', 'juegos', 'juego'],
+  street_piso: ['2 - street - piso', 'street - piso', 'street piso', 'street-piso', 'piso'],
+  street_obstaculos: ['3 - street - obstaculos', 'street - obstaculos', 'street obstáculos', 'street obstaculos', 'street-obstaculos', 'obstaculos'],
+  vert_bowl: ['4 - bowl', 'bowl', 'vert-bowl', 'vert bowl', 'vert/bowl', 'vert'],
+  surf_skate: ['surf skate', 'surfskate', 'surf-skate', 'surf'],
 }
 
 const DIFFICULTY_MAP = {
-  beginner: ['beginner', 'principiante', 'básico', 'basico', 'principiantes', '1'],
-  intermediate: ['intermediate', 'intermedio', 'intermedios', '2'],
-  advanced: ['advanced', 'avanzado', 'avanzados', '3'],
+  beginner: ['0 - calentamiento', 'calentamiento', '1 - basics', 'basics', 'beginner', 'principiante', 'básico', 'basico'],
+  intermediate: ['2 - principiantes', 'principiantes', 'intermediate', 'intermedio'],
+  advanced: ['3 - intermedios', 'intermedios', 'advanced', 'avanzado', 'avanzados'],
 }
 
-function normalizeCategory(value) {
-  if (!value || typeof value !== 'string') return 'fundamentals'
-  const v = value.toLowerCase().trim()
-  for (const [cat, aliases] of Object.entries(CATEGORY_MAP)) {
+function normalizeActivityCategory(dirigidoValue, tipoValue) {
+  const tipo = (tipoValue || '').toString().toLowerCase().trim()
+  if (tipo.includes('ejercicio') || tipo.includes('funcional') || tipo.includes('exercise') || tipo.includes('excercise')) {
+    return 'excercise'
+  }
+
+  if (!dirigidoValue || typeof dirigidoValue !== 'string') {
+    return 'iniciacion'
+  }
+  const v = dirigidoValue.toLowerCase().trim()
+  for (const [cat, aliases] of Object.entries(ACTIVITY_CATEGORY_MAP)) {
     if (aliases.some(a => v.includes(a))) return cat
   }
-  return 'fundamentals'
+  return 'iniciacion'
 }
 
 function normalizeDifficulty(value) {
@@ -92,9 +103,12 @@ function main() {
   const nameEsCol = findColumn(headerRow, NAME_ES_KEYS)
   const descCol = findColumn(headerRow, DESC_KEYS)
   const descEsCol = findColumn(headerRow, DESC_ES_KEYS)
-  const categoryCol = findColumn(headerRow, CATEGORY_KEYS)
   const difficultyCol = findColumn(headerRow, DIFFICULTY_KEYS)
+  const dirigidoCol = findColumn(headerRow, DIRIGIDO_KEYS)
+  const newCategoryCol = findColumn(headerRow, NEW_CATEGORY_KEYS)
+  const typeCol = findColumn(headerRow, TYPE_KEYS)
   const motorSkillsCol = findColumn(headerRow, MOTOR_SKILLS_KEYS)
+  const urlCol = findColumn(headerRow, URL_KEYS)
 
   if (nameCol < 0 && descCol < 0) {
     console.error('Could not find name or description column. Header row:', headerRow)
@@ -108,7 +122,12 @@ function main() {
     const nameEs = (nameEsCol >= 0 ? row[nameEsCol] : '').toString().trim()
     const description = (row[descCol] ?? row[1] ?? '').toString().trim()
     const descriptionEs = (descEsCol >= 0 ? row[descEsCol] : '').toString().trim()
-    const category = categoryCol >= 0 ? normalizeCategory(row[categoryCol]) : 'fundamentals'
+    const newCategoryValue = newCategoryCol >= 0 ? (row[newCategoryCol] || '').toString().trim() : ''
+    const dirigidoValue = dirigidoCol >= 0 ? (row[dirigidoCol] || '').toString().trim() : ''
+    const tipoValue = typeCol >= 0 ? (row[typeCol] || '').toString().trim() : ''
+    const categoriaValue = difficultyCol >= 0 ? (row[difficultyCol] || '').toString().trim() : ''
+    const urlValue = urlCol >= 0 ? (row[urlCol] || '').toString().trim() : ''
+    const category = normalizeActivityCategory(newCategoryValue || dirigidoValue, tipoValue)
     const difficulty = difficultyCol >= 0 ? normalizeDifficulty(row[difficultyCol]) : 'beginner'
     
     // Parse motor skills (body parts) - split by comma and clean up
@@ -128,8 +147,16 @@ function main() {
       name_es: nameEs || name || undefined,
       description: description || name || 'No description',
       description_es: descriptionEs || undefined,
+      truco: name || undefined,
+      categoria: categoriaValue || undefined,
+      dirigido: dirigidoValue || undefined,
+      comentarios: description || undefined,
+      url: urlValue || undefined,
+      new_category: newCategoryValue || undefined,
+      habilidad_motriz_habilitada: motorSkills.length > 0 ? motorSkills : undefined,
       difficulty,
       category,
+      activity_type: tipoValue || undefined,
       motor_skills: motorSkills.length > 0 ? motorSkills : undefined,
       sort_order: i,
     })
@@ -152,7 +179,9 @@ function main() {
   console.log('Wrote', tricks.length, 'tricks to', outPath, 'and', outPathPublic)
 }
 
-main().catch(err => {
+try {
+  main()
+} catch (err) {
   console.error(err)
   process.exit(1)
-})
+}

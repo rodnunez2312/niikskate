@@ -13,6 +13,8 @@ export interface NiikTrick {
   name_es?: string
   description: string
   description_es?: string
+  comentarios?: string
+  url?: string
   difficulty: string
   category: string
   sort_order: number
@@ -40,6 +42,13 @@ let lastSyncTime: string | null = null
 export function useNiikLibrarySync() {
   const client = useSupabaseClient()
   const syncing = ref(false)
+  const normalizeSkillKey = (value?: string | null) =>
+    (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
 
   const syncNiikLibrary = async (): Promise<SyncResult> => {
     syncing.value = true
@@ -69,14 +78,20 @@ export function useNiikLibrarySync() {
       }
 
       // Get existing skills to map names to IDs
-      const { data: existing } = await client
+      const { data: existing, error: existingError } = await client
         .from('skills_library')
         .select('id, name, name_es')
+      if (existingError) {
+        throw new Error(`Unable to read skills_library: ${existingError.message}`)
+      }
       
       const byName = new Map<string, string>()
+      const niikNameSet = new Set<string>()
       for (const s of existing || []) {
-        if (s.name) byName.set(s.name.toLowerCase().trim(), s.id)
-        if (s.name_es) byName.set(s.name_es.toLowerCase().trim(), s.id)
+        const n1 = normalizeSkillKey(s.name)
+        const n2 = normalizeSkillKey(s.name_es)
+        if (n1) byName.set(n1, s.id)
+        if (n2) byName.set(n2, s.id)
       }
 
       // Prepare batch rows
@@ -84,16 +99,20 @@ export function useNiikLibrarySync() {
       const toUpdate: { id: string; row: any }[] = []
 
       for (const t of tricks) {
-        const key = (t.name_es || t.name || '').toLowerCase().trim()
-        const existingId = byName.get(key) ?? byName.get(t.name.toLowerCase().trim())
+        const key = normalizeSkillKey(t.name_es || t.name || '')
+        const keyAlt = normalizeSkillKey(t.name)
+        if (key) niikNameSet.add(key)
+        if (keyAlt) niikNameSet.add(keyAlt)
+        const existingId = byName.get(key) ?? byName.get(keyAlt)
 
         const row = {
           name: t.name || 'Unnamed',
           name_es: t.name_es || null,
-          description: t.description || '',
+          description: t.comentarios || t.description || '',
           description_es: t.description_es || null,
           difficulty: t.difficulty || 'beginner',
           category: t.category || 'iniciacion',
+          video_url: t.url || null,
           sort_order: t.sort_order ?? 0,
           motor_skills: t.motor_skills || [],
           is_active: true,
@@ -109,8 +128,10 @@ export function useNiikLibrarySync() {
       // Batch insert new tricks (single call)
       if (toInsert.length > 0) {
         const { error } = await client.from('skills_library').insert(toInsert)
-        if (!error) result.inserted = toInsert.length
-        else console.error('Insert error:', error)
+        if (error) {
+          throw new Error(`Insert failed: ${error.message}`)
+        }
+        result.inserted = toInsert.length
       }
 
       // Batch update existing tricks (chunks of 50 for safety)
@@ -124,11 +145,38 @@ export function useNiikLibrarySync() {
             client.from('skills_library').update(row).eq('id', id)
           )
         )
-        updateErrors += results.filter(r => r.error).length
+        const errors = results.filter(r => r.error).map(r => r.error?.message).filter(Boolean) as string[]
+        updateErrors += errors.length
+        if (errors.length > 0) {
+          throw new Error(`Update failed: ${errors[0]}`)
+        }
       }
       result.updated = toUpdate.length - updateErrors
-      if (updateErrors > 0) console.error(`${updateErrors} update errors`)
       console.log(`Sync complete: ${result.inserted} inserted, ${result.updated} updated`)
+
+      // Enforce Niik-only active list: deactivate legacy/sample rows not present in Niik file
+      const toDeactivate = (existing || [])
+        .filter((s: any) => {
+          const n1 = normalizeSkillKey(s.name)
+          const n2 = normalizeSkillKey(s.name_es)
+          return !niikNameSet.has(n1) && !niikNameSet.has(n2)
+        })
+        .map((s: any) => s.id)
+
+      if (toDeactivate.length > 0) {
+        const chunkSize = 100
+        for (let i = 0; i < toDeactivate.length; i += chunkSize) {
+          const chunk = toDeactivate.slice(i, i + chunkSize)
+          const { error } = await client
+            .from('skills_library')
+            .update({ is_active: false })
+            .in('id', chunk)
+          if (error) {
+            throw new Error(`Deactivate legacy skills failed: ${error.message}`)
+          }
+        }
+        console.log(`Deactivated ${toDeactivate.length} legacy/non-Niik skills`)
+      }
       
       // Remember this sync
       lastSyncTime = res.generatedAt || null

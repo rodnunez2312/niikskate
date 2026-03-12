@@ -28,9 +28,6 @@ const stats = ref({
 // Recent bookings
 const recentBookings = ref<any[]>([])
 
-// All coaches
-const coaches = ref<any[]>([])
-
 onMounted(async () => {
   if (!user.value) {
     router.push('/auth/login?redirect=/admin')
@@ -56,15 +53,14 @@ onMounted(async () => {
 })
 
 const loadDashboardData = async () => {
-  // Load coaches
-  const { data: coachesData } = await client
+  // Coaches count (for stat card)
+  const { count: coachesCount } = await client
     .from('profiles')
-    .select('*')
+    .select('*', { count: 'exact', head: true })
     .eq('role', 'coach')
     .eq('is_active', true)
 
-  coaches.value = coachesData || []
-  stats.value.activeCoaches = coaches.value.length
+  stats.value.activeCoaches = coachesCount || 0
 
   // Load total customers
   const { count: customersCount } = await client
@@ -162,31 +158,43 @@ const formatDate = (date: string) => {
 
     <!-- Dashboard Content -->
     <div v-else-if="isAdmin" class="px-4 py-6 max-w-2xl mx-auto space-y-6">
-      <!-- Stats Grid -->
+      <!-- Stats Grid (clickable cards) -->
       <div class="grid grid-cols-2 gap-3">
         <!-- Total Bookings -->
-        <div class="bg-gradient-to-br from-glass-blue/20 to-glass-purple/20 rounded-2xl p-4 border border-glass-blue/30">
+        <NuxtLink
+          to="/admin/registrations"
+          class="bg-gradient-to-br from-glass-blue/20 to-glass-purple/20 rounded-2xl p-4 border border-glass-blue/30 hover:border-glass-blue/50 transition-colors block"
+        >
           <p class="text-3xl font-bold text-white">{{ stats.totalBookings }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Reservas Totales' : 'Total Bookings' }}</p>
-        </div>
+        </NuxtLink>
 
-        <!-- Pending Bookings -->
-        <div class="bg-gradient-to-br from-gold-400/20 to-gold-500/20 rounded-2xl p-4 border border-gold-400/30">
-          <p class="text-3xl font-bold text-gold-400">{{ stats.pendingBookings }}</p>
+        <!-- Pending (Registrations) -->
+        <NuxtLink
+          to="/admin/registrations"
+          class="bg-gradient-to-br from-gold-400/20 to-gold-500/20 rounded-2xl p-4 border border-gold-400/30 hover:border-gold-400/50 transition-colors block"
+        >
+          <p class="text-3xl font-bold text-gold-400">{{ stats.pendingRegistrations }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Pendientes' : 'Pending' }}</p>
-        </div>
+        </NuxtLink>
 
         <!-- Active Coaches -->
-        <div class="bg-gradient-to-br from-glass-green/20 to-glass-blue/20 rounded-2xl p-4 border border-glass-green/30">
+        <NuxtLink
+          to="/admin/coaches"
+          class="bg-gradient-to-br from-glass-green/20 to-glass-blue/20 rounded-2xl p-4 border border-glass-green/30 hover:border-glass-green/50 transition-colors block"
+        >
           <p class="text-3xl font-bold text-glass-green">{{ stats.activeCoaches }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Coaches Activos' : 'Active Coaches' }}</p>
-        </div>
+        </NuxtLink>
 
-        <!-- Total Customers -->
-        <div class="bg-gradient-to-br from-flame-600/20 to-glass-orange/20 rounded-2xl p-4 border border-flame-600/30">
+        <!-- Clientes → Users (customers) -->
+        <NuxtLink
+          to="/admin/users?role=customer"
+          class="bg-gradient-to-br from-flame-600/20 to-glass-orange/20 rounded-2xl p-4 border border-flame-600/30 hover:border-flame-600/50 transition-colors block"
+        >
           <p class="text-3xl font-bold text-flame-600">{{ stats.totalCustomers }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Clientes' : 'Customers' }}</p>
-        </div>
+        </NuxtLink>
       </div>
 
       <!-- Quick Actions -->
@@ -300,62 +308,6 @@ const formatDate = (date: string) => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </NuxtLink>
-        </div>
-      </section>
-
-      <!-- Coaches Overview -->
-      <section>
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-bold text-white">
-            {{ language === 'es' ? 'Coaches' : 'Coaches' }}
-          </h2>
-          <NuxtLink to="/admin/coaches" class="text-sm text-gold-400">
-            {{ language === 'es' ? 'Ver todos' : 'View all' }}
-          </NuxtLink>
-        </div>
-        
-        <div class="grid grid-cols-3 gap-3">
-          <!-- Coach Rod -->
-          <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3 text-center">
-            <div class="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-flame-600 to-glass-orange flex items-center justify-center ring-2 ring-flame-600/50 mb-2">
-              <span class="text-2xl">🧑‍🏫</span>
-            </div>
-            <p class="font-semibold text-white text-sm">Rod</p>
-            <p class="text-xs text-gray-500">Vert/Street</p>
-            <div class="mt-2">
-              <span class="inline-block px-2 py-0.5 bg-glass-green/20 text-glass-green text-xs rounded-full">
-                {{ language === 'es' ? 'Activo' : 'Active' }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Coach Leo -->
-          <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3 text-center">
-            <div class="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-glass-blue to-glass-purple flex items-center justify-center ring-2 ring-glass-blue/50 mb-2">
-              <span class="text-2xl">👨‍🏫</span>
-            </div>
-            <p class="font-semibold text-white text-sm">Leo</p>
-            <p class="text-xs text-gray-500">Vert/Street</p>
-            <div class="mt-2">
-              <span class="inline-block px-2 py-0.5 bg-glass-green/20 text-glass-green text-xs rounded-full">
-                {{ language === 'es' ? 'Activo' : 'Active' }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Coach Itza -->
-          <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3 text-center">
-            <div class="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-glass-green to-glass-blue flex items-center justify-center ring-2 ring-glass-green/50 mb-2">
-              <span class="text-2xl">👩‍🏫</span>
-            </div>
-            <p class="font-semibold text-white text-sm">Itza</p>
-            <p class="text-xs text-gray-500">Fundamentos</p>
-            <div class="mt-2">
-              <span class="inline-block px-2 py-0.5 bg-glass-green/20 text-glass-green text-xs rounded-full">
-                {{ language === 'es' ? 'Activo' : 'Active' }}
-              </span>
-            </div>
-          </div>
         </div>
       </section>
 

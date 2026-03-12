@@ -67,11 +67,11 @@ const selectedWarmupFocus = ref<string[]>([])
 const skillCategoryFilter = ref<string>('')
 const skillDifficultyFilter = ref<string>('')
 const skillCategories: ActivityCategory[] = [
+  'excercise',
   'iniciacion',
   'street_piso',
   'street_obstaculos',
-  'vert_bowl',
-  'surf_skate'
+  'vert_bowl'
 ]
 import type { ActivityCategory } from '~/types'
 import { ACTIVITY_CATEGORY_LABELS } from '~/types'
@@ -246,6 +246,30 @@ const filteredSkills = computed(() => {
 
 // Get skill by id
 const getSkillById = (id: string) => skills.value.find(s => s.id === id)
+
+const difficultyStars = (difficulty?: string) => {
+  if (difficulty === 'advanced') return '★★★'
+  if (difficulty === 'intermediate') return '★★'
+  return '★'
+}
+
+const categoryTagClass = (category?: string) => {
+  const map: Record<string, string> = {
+    excercise: 'bg-sky-500/20 text-sky-300',
+    iniciacion: 'bg-teal-500/20 text-teal-300',
+    street_piso: 'bg-indigo-500/20 text-indigo-300',
+    street_obstaculos: 'bg-amber-500/20 text-amber-300',
+    vert_bowl: 'bg-rose-500/20 text-rose-300',
+    surf_skate: 'bg-cyan-500/20 text-cyan-300',
+    fundamentals: 'bg-fuchsia-500/20 text-fuchsia-300',
+    flatground: 'bg-blue-500/20 text-blue-300',
+    street: 'bg-orange-500/20 text-orange-300',
+    bowl: 'bg-pink-500/20 text-pink-300',
+    vert: 'bg-red-500/20 text-red-300',
+    safety: 'bg-lime-500/20 text-lime-300'
+  }
+  return map[category || ''] || 'bg-purple-500/20 text-purple-300'
+}
 
 // Auto-sync tricks from Niik Library on page load (silent, no alerts)
 const autoSyncNiikLibrary = async () => {
@@ -424,13 +448,13 @@ watch([selectedDate, selectedSession], () => {
         <!-- Category Filter - Instagram Stories Style with Ramp Images -->
         <div class="mb-4">
           <p class="text-xs text-gray-500 mb-2">{{ language === 'es' ? 'Categoría' : 'Category' }}</p>
-          <div class="flex gap-3 justify-center flex-wrap">
+          <div class="grid grid-cols-5 gap-2 w-full">
             <!-- Activity Type Icons with Ramp Images (click again to deselect) -->
             <button
               v-for="cat in skillCategories"
               :key="cat"
               @click="skillCategoryFilter = skillCategoryFilter === cat ? '' : cat"
-              class="flex flex-col items-center gap-1 flex-shrink-0"
+              class="flex flex-col items-center gap-1"
             >
               <div 
                 class="p-0.5 rounded-full transition-all"
@@ -438,10 +462,10 @@ watch([selectedDate, selectedSession], () => {
                   ? 'bg-gradient-to-br from-gold-400 via-flame-500 to-glass-purple' 
                   : 'bg-gray-700 hover:bg-gray-600'"
               >
-                <RampIcon :type="activityLabels[cat]?.rampType || 'all'" :size="52" />
+                <RampIcon :type="activityLabels[cat]?.rampType || 'all'" :size="64" />
               </div>
               <span 
-                class="text-[10px] font-semibold mt-0.5 max-w-20 text-center leading-tight" 
+                class="text-[10px] font-semibold mt-0.5 w-full text-center leading-tight" 
                 :class="skillCategoryFilter === cat ? 'text-gold-400' : 'text-gray-400'"
               >
                 {{ language === 'es' ? activityLabels[cat]?.name_es : activityLabels[cat]?.name }}
@@ -456,7 +480,7 @@ watch([selectedDate, selectedSession], () => {
             v-for="skill in filteredSkills"
             :key="skill.id"
             @click="toggleSkill(skill.id)"
-            class="w-full p-2 rounded-xl text-left transition-all"
+            class="w-full p-1.5 rounded-xl text-left transition-all"
             :class="selectedSkills.includes(skill.id) 
               ? 'bg-gold-400/20 border border-gold-400' 
               : 'bg-gray-800 border border-gray-700 hover:border-gray-600'"
@@ -466,31 +490,15 @@ watch([selectedDate, selectedSession], () => {
                 {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
               </span>
               <div class="flex gap-1">
-                <span v-if="skill.category" class="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-400">
+                <span v-if="skill.category" class="px-1.5 py-0.5 rounded text-[10px]" :class="categoryTagClass(skill.category)">
                   {{ language === 'es' 
                     ? (activityLabels[skill.category as ActivityCategory]?.name_es || skill.category) 
                     : (activityLabels[skill.category as ActivityCategory]?.name || skill.category) }}
                 </span>
-                <span class="px-1.5 py-0.5 rounded text-[10px]" :class="{
-                  'bg-green-500/20 text-green-400': skill.difficulty === 'beginner',
-                  'bg-yellow-500/20 text-yellow-400': skill.difficulty === 'intermediate',
-                  'bg-red-500/20 text-red-400': skill.difficulty === 'advanced'
-                }">
-                  {{ skill.difficulty }}
+                <span class="px-1.5 py-0.5 rounded text-[10px] bg-green-500/20 text-green-400">
+                  {{ difficultyStars(skill.difficulty) }}
                 </span>
               </div>
-            </div>
-            <div v-if="skill.motor_skills?.length" class="flex flex-wrap gap-1 mt-1">
-              <span 
-                v-for="tag in skill.motor_skills.slice(0, 3)" 
-                :key="tag"
-                class="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px]"
-              >
-                {{ tag }}
-              </span>
-              <span v-if="skill.motor_skills.length > 3" class="text-[10px] text-gray-500">
-                +{{ skill.motor_skills.length - 3 }}
-              </span>
             </div>
           </button>
         </div>

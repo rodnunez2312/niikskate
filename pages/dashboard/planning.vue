@@ -31,11 +31,11 @@ const selectedDifficulty = ref('')
 
 // Activity type categories matching NEW CATEGORY column in Excel (ordered)
 const categories: ActivityCategory[] = [
+  'excercise',
   'iniciacion',
   'street_piso',
   'street_obstaculos',
-  'vert_bowl',
-  'surf_skate'
+  'vert_bowl'
 ]
 const difficulties = ['beginner', 'intermediate', 'advanced']
 
@@ -44,9 +44,25 @@ import type { ActivityCategory } from '~/types'
 import { ACTIVITY_CATEGORY_LABELS } from '~/types'
 const categoryLabels = ACTIVITY_CATEGORY_LABELS
 
+interface ExcelTrickMeta {
+  truco?: string
+  categoria?: string
+  dirigido?: string
+  comentarios?: string
+  url?: string
+  new_category?: string
+  habilidad_motriz_habilitada?: string[]
+}
+
+interface ExcelTrickLibrary {
+  tricks: Array<ExcelTrickMeta & { name?: string; name_es?: string }>
+}
+
+const excelTricksByName = ref<Record<string, ExcelTrickMeta>>({})
+
 onMounted(async () => {
   // Load skills first (fast)
-  await Promise.all([fetchSkills(), fetchClassPlans()])
+  await Promise.all([fetchSkills(), fetchClassPlans(), loadExcelTrickLibrary()])
   // Set date to next class day
   while (!isClassDay(selectedDate.value)) {
     selectedDate.value = addDays(selectedDate.value, 1)
@@ -56,6 +72,26 @@ onMounted(async () => {
   // Background sync: update from source data without blocking UI
   autoSyncNiikLibrary().then(() => fetchSkills())
 })
+
+const normalizeTrickKey = (value?: string) => (value || '').toLowerCase().trim()
+
+const loadExcelTrickLibrary = async () => {
+  try {
+    const data = await $fetch<ExcelTrickLibrary>('/data/niik-trick-library.json', {
+      headers: { 'Cache-Control': 'no-cache' }
+    })
+    const map: Record<string, ExcelTrickMeta> = {}
+    for (const trick of data?.tricks || []) {
+      const keys = [trick.truco, trick.name_es, trick.name]
+        .map(normalizeTrickKey)
+        .filter(Boolean)
+      for (const key of keys) map[key] = trick
+    }
+    excelTricksByName.value = map
+  } catch (e) {
+    console.error('Error loading Excel trick metadata:', e)
+  }
+}
 
 const fetchSkills = async () => {
   loading.value = true
@@ -223,8 +259,74 @@ const selectedSkillsDetails = computed(() => {
   return skills.value.filter(s => plan.value.planned_skills.includes(s.id))
 })
 
+const getTrickMeta = (skill: any) => {
+  return excelTricksByName.value[normalizeTrickKey(skill?.name_es || skill?.name)]
+    || excelTricksByName.value[normalizeTrickKey(skill?.name)]
+}
+
+const trickDetailSkill = ref<any | null>(null)
+const trickDetailMeta = computed(() => trickDetailSkill.value ? getTrickMeta(trickDetailSkill.value) : undefined)
+const openTrickDetail = (skill: any) => { trickDetailSkill.value = skill }
+const closeTrickDetail = () => { trickDetailSkill.value = null }
+
+const buildBenefits = (skill: any, meta?: ExcelTrickMeta) => {
+  const motorSkills = meta?.habilidad_motriz_habilitada?.length
+    ? meta.habilidad_motriz_habilitada
+    : (skill.motor_skills || [])
+  const areaByCategory: Record<string, string> = {
+    excercise: language.value === 'es' ? 'base física y control corporal' : 'physical foundation and body control',
+    iniciacion: language.value === 'es' ? 'street piso y control base' : 'street flatground and board fundamentals',
+    street_piso: language.value === 'es' ? 'street obstáculos y transiciones' : 'street obstacles and transitions',
+    street_obstaculos: language.value === 'es' ? 'líneas técnicas en obstáculos' : 'technical obstacle lines',
+    vert_bowl: language.value === 'es' ? 'trucos de coping y líneas más rápidas' : 'coping tricks and faster transition lines',
+    surf_skate: language.value === 'es' ? 'carving avanzado y flow' : 'advanced carving and flow'
+  }
+  const unlockedArea = areaByCategory[meta?.new_category || skill.category] || (language.value === 'es' ? 'variaciones más avanzadas' : 'more advanced variations')
+  const skillName = language.value === 'es' ? (skill.name_es || skill.name) : skill.name
+  const bodyFocus = motorSkills.length ? motorSkills.join(', ') : (language.value === 'es' ? 'balance y coordinación' : 'balance and coordination')
+
+  return language.value === 'es'
+    ? [
+        `Desarrolla ${bodyFocus}.`,
+        `Te ayuda a desbloquear ${unlockedArea}.`,
+        `Mejora tu consistencia y confianza para repetir ${skillName} bajo presión.`
+      ]
+    : [
+        `Builds ${bodyFocus}.`,
+        `Helps unlock ${unlockedArea}.`,
+        `Improves consistency and confidence to repeat ${skillName} under pressure.`
+      ]
+}
+
+const difficultyStars = (difficulty?: string) => {
+  if (difficulty === 'advanced') return '★★★'
+  if (difficulty === 'intermediate') return '★★'
+  return '★'
+}
+
+const categoryTagClass = (category?: string) => {
+  const map: Record<string, string> = {
+    excercise: 'bg-sky-500/20 text-sky-300',
+    iniciacion: 'bg-teal-500/20 text-teal-300',
+    street_piso: 'bg-indigo-500/20 text-indigo-300',
+    street_obstaculos: 'bg-amber-500/20 text-amber-300',
+    vert_bowl: 'bg-rose-500/20 text-rose-300',
+    surf_skate: 'bg-cyan-500/20 text-cyan-300',
+    fundamentals: 'bg-fuchsia-500/20 text-fuchsia-300',
+    flatground: 'bg-blue-500/20 text-blue-300',
+    street: 'bg-orange-500/20 text-orange-300',
+    bowl: 'bg-pink-500/20 text-pink-300',
+    vert: 'bg-red-500/20 text-red-300',
+    safety: 'bg-lime-500/20 text-lime-300'
+  }
+  return map[category || ''] || 'bg-purple-500/20 text-purple-300'
+}
+
 // Watch session changes
 watch(selectedSession, () => loadExistingPlan())
+watch(activeTab, () => {
+  if (activeTab.value !== 'tricks') closeTrickDetail()
+})
 </script>
 
 <template>
@@ -367,7 +469,7 @@ watch(selectedSession, () => loadExistingPlan())
                   <p class="text-white text-sm font-semibold">
                     {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
                   </p>
-                  <p class="text-xs text-gray-500">{{ skill.category }} • {{ skill.difficulty }}</p>
+                  <p class="text-xs text-gray-500">{{ skill.category }} • {{ difficultyStars(skill.difficulty) }}</p>
                   <div v-if="skill.motor_skills?.length" class="flex flex-wrap gap-1 mt-1">
                     <span 
                       v-for="tag in skill.motor_skills" 
@@ -479,13 +581,13 @@ watch(selectedSession, () => loadExistingPlan())
         <!-- Category Filter - Instagram Stories Style with Ramp Images -->
         <div class="mb-6">
           <p class="text-xs text-gray-500 mb-3">{{ language === 'es' ? 'Categoría' : 'Category' }}</p>
-          <div class="flex gap-3 justify-center flex-wrap">
+          <div class="grid grid-cols-5 gap-2 w-full">
             <!-- Activity Type Icons with Ramp Images (click again to deselect) -->
             <button
               v-for="cat in categories"
               :key="cat"
               @click="selectedCategory = selectedCategory === cat ? '' : cat"
-              class="flex flex-col items-center gap-1 flex-shrink-0"
+              class="flex flex-col items-center gap-1"
             >
               <div 
                 class="p-0.5 rounded-full transition-all"
@@ -493,10 +595,10 @@ watch(selectedSession, () => loadExistingPlan())
                   ? 'bg-gradient-to-br from-gold-400 via-flame-500 to-glass-purple' 
                   : 'bg-gray-700 hover:bg-gray-600'"
               >
-                <RampIcon :type="categoryLabels[cat]?.rampType || 'all'" :size="60" />
+                <RampIcon :type="categoryLabels[cat]?.rampType || 'all'" :size="68" />
               </div>
               <span 
-                class="text-[10px] font-semibold mt-0.5 max-w-20 text-center leading-tight" 
+                class="text-[10px] font-semibold mt-0.5 w-full text-center leading-tight" 
                 :class="selectedCategory === cat ? 'text-gold-400' : 'text-gray-400'"
               >
                 {{ language === 'es' ? categoryLabels[cat]?.name_es : categoryLabels[cat]?.name }}
@@ -511,57 +613,50 @@ watch(selectedSession, () => loadExistingPlan())
         </div>
 
         <!-- Flat list of all filtered skills -->
-        <div v-else class="space-y-1">
-          <button
+        <div v-else class="space-y-2">
+          <div
             v-for="skill in filteredSkills"
             :key="skill.id"
-            @click="toggleSkill(skill.id)"
-            class="w-full p-3 rounded-xl flex items-center gap-3 transition-all text-left"
+            class="w-full p-2 rounded-xl transition-all border"
             :class="plan.planned_skills.includes(skill.id) 
-              ? 'bg-gold-400/20 border border-gold-400' 
-              : 'bg-gray-900 border border-gray-800 hover:border-gray-700'"
+              ? 'bg-gold-400/20 border-gold-400' 
+              : 'bg-gray-900 border-gray-800 hover:border-gray-700'"
           >
-            <div 
-              class="w-6 h-6 rounded-full flex items-center justify-center"
-              :class="plan.planned_skills.includes(skill.id) ? 'bg-gold-400 text-black' : 'bg-gray-800'"
-            >
-              <svg v-if="plan.planned_skills.includes(skill.id)" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p :class="plan.planned_skills.includes(skill.id) ? 'text-white' : 'text-gray-300'">
-                {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
-              </p>
-              <p class="text-xs text-gray-500">{{ skill.description?.slice(0, 60) }}...</p>
-              <div v-if="skill.motor_skills?.length" class="flex flex-wrap gap-1 mt-1">
-                <span 
-                  v-for="tag in skill.motor_skills.slice(0, 4)" 
-                  :key="tag"
-                  class="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px]"
+            <div class="w-full flex items-start gap-3 text-left">
+              <button
+                @click="toggleSkill(skill.id)"
+                class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                :class="plan.planned_skills.includes(skill.id) ? 'bg-gold-400 text-black' : 'bg-gray-800'"
+              >
+                <svg v-if="plan.planned_skills.includes(skill.id)" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+              </button>
+              <div 
+                class="flex-1"
+              >
+                <p :class="plan.planned_skills.includes(skill.id) ? 'text-white' : 'text-gray-300'">
+                  {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
+                </p>
+                <button
+                  @click="openTrickDetail(skill)"
+                  class="mt-1 px-2 py-0.5 rounded-md text-[11px] leading-tight font-semibold bg-gray-800 text-blue-300 hover:bg-gray-700"
                 >
-                  {{ tag }}
+                  {{ language === 'es' ? 'Ver detalle' : 'View details' }}
+                </button>
+              </div>
+              <div class="flex flex-col gap-1 items-end">
+                <span v-if="skill.category" class="px-2 py-0.5 rounded text-xs" :class="categoryTagClass(skill.category)">
+                  {{ language === 'es' 
+                    ? (categoryLabels[skill.category as ActivityCategory]?.name_es || skill.category) 
+                    : (categoryLabels[skill.category as ActivityCategory]?.name || skill.category) }}
                 </span>
-                <span v-if="skill.motor_skills.length > 4" class="text-[10px] text-gray-500">
-                  +{{ skill.motor_skills.length - 4 }}
+                <span class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
+                  {{ difficultyStars(skill.difficulty) }}
                 </span>
               </div>
             </div>
-            <div class="flex flex-col gap-1 items-end">
-              <span v-if="skill.category" class="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400">
-                {{ language === 'es' 
-                  ? (categoryLabels[skill.category as ActivityCategory]?.name_es || skill.category) 
-                  : (categoryLabels[skill.category as ActivityCategory]?.name || skill.category) }}
-              </span>
-              <span class="px-2 py-0.5 rounded text-xs" :class="{
-                'bg-green-500/20 text-green-400': skill.difficulty === 'beginner',
-                'bg-yellow-500/20 text-yellow-400': skill.difficulty === 'intermediate',
-                'bg-red-500/20 text-red-400': skill.difficulty === 'advanced'
-              }">
-                {{ skill.difficulty }}
-              </span>
-            </div>
-          </button>
+          </div>
         </div>
 
         <!-- Back to Plan Button -->
@@ -573,6 +668,64 @@ watch(selectedSession, () => loadExistingPlan())
             >
               {{ language === 'es' ? `Volver al Plan (${plan.planned_skills.length} trucos)` : `Back to Plan (${plan.planned_skills.length} tricks)` }}
             </button>
+          </div>
+        </div>
+
+        <!-- Trick Detail Modal -->
+        <div
+          v-if="trickDetailSkill"
+          class="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-3"
+          @click="closeTrickDetail"
+        >
+          <div
+            class="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-2xl p-4 max-h-[85vh] overflow-y-auto"
+            @click.stop
+          >
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-white font-semibold">
+                {{ language === 'es' ? trickDetailSkill.name_es || trickDetailSkill.name : trickDetailSkill.name }}
+              </h3>
+              <button
+                @click="closeTrickDetail"
+                class="w-8 h-8 rounded-lg bg-gray-800 text-gray-300 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2 text-sm">
+              <p class="text-gray-300"><span class="text-gray-500">Truco:</span> {{ trickDetailMeta?.truco || (language === 'es' ? trickDetailSkill.name_es || trickDetailSkill.name : trickDetailSkill.name) }}</p>
+              <p class="text-gray-300"><span class="text-gray-500">categoria:</span> {{ trickDetailMeta?.categoria || trickDetailSkill.difficulty || '-' }}</p>
+              <p class="text-gray-300"><span class="text-gray-500">dirigido:</span> {{ trickDetailMeta?.dirigido || '-' }}</p>
+              <p class="text-gray-300"><span class="text-gray-500">comentarios:</span> {{ trickDetailMeta?.comentarios || trickDetailSkill.description || '-' }}</p>
+              <p class="text-gray-300">
+                <span class="text-gray-500">url:</span>
+                <a
+                  v-if="trickDetailMeta?.url"
+                  :href="trickDetailMeta.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-blue-400 underline break-all ml-1"
+                >
+                  {{ trickDetailMeta.url }}
+                </a>
+                <span v-else>-</span>
+              </p>
+              <p class="text-gray-300"><span class="text-gray-500">new category:</span> {{ trickDetailMeta?.new_category || trickDetailSkill.category || '-' }}</p>
+              <p class="text-gray-300">
+                <span class="text-gray-500">habilidad motriz habilitada:</span>
+                {{ (trickDetailMeta?.habilidad_motriz_habilitada?.length ? trickDetailMeta.habilidad_motriz_habilitada : trickDetailSkill.motor_skills || []).join(', ') || '-' }}
+              </p>
+            </div>
+
+            <div class="pt-2 mt-3 border-t border-gray-800">
+              <p class="text-xs uppercase tracking-wide text-gold-400 mb-1">
+                {{ language === 'es' ? 'Beneficios y desbloqueos' : 'Benefits and unlocks' }}
+              </p>
+              <ul class="text-sm text-gray-300 space-y-1">
+                <li v-for="benefit in buildBenefits(trickDetailSkill, trickDetailMeta)" :key="benefit">• {{ benefit }}</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

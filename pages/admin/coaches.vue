@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns'
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { DayOfWeek, TimeSlot } from '~/types'
 
 definePageMeta({
   middleware: ['auth'],
@@ -17,7 +16,7 @@ const isAdmin = ref(false)
 const checkingRole = ref(true)
 const loading = ref(false)
 
-// Demo coaches data
+// Availability is stored by date string YYYY-MM-DD (only class days matter)
 const coaches = ref([
   {
     id: 'coach-rod',
@@ -58,11 +57,39 @@ const coaches = ref([
 const selectedCoach = ref<typeof coaches.value[0] | null>(null)
 const showEditModal = ref(false)
 
-// Calendar state
+// Calendar state (main page)
 const currentDate = ref(new Date())
 const monthLabel = computed(() => {
   const locale = language.value === 'es' ? es : undefined
   return format(currentDate.value, 'MMMM yyyy', { locale })
+})
+
+// --- 45-day availability calendar (modal) ---
+const AVAILABILITY_DAYS = 45
+const calendarStartDate = ref(new Date())
+
+// Next 45 days from today (fixed window, no more)
+const next45Days = computed(() => {
+  const start = new Date(calendarStartDate.value)
+  start.setHours(0, 0, 0, 0)
+  return Array.from({ length: AVAILABILITY_DAYS }, (_, i) => addDays(start, i))
+})
+
+// Grid for modal: 7 columns, rows of 7 (pad first row to align week)
+const calendarGrid = computed(() => {
+  const days = next45Days.value
+  const first = days[0]
+  const pad = getDay(first) // 0 = Sun, 2 = Tue, etc.
+  const padding = Array(pad).fill(null)
+  const grid = [...padding, ...days]
+  return grid
+})
+
+const calendarRangeLabel = computed(() => {
+  const start = next45Days.value[0]
+  const end = next45Days.value[AVAILABILITY_DAYS - 1]
+  const locale = language.value === 'es' ? es : undefined
+  return `${format(start, 'd MMM', { locale })} – ${format(end, 'd MMM yyyy', { locale })}`
 })
 
 onMounted(async () => {
@@ -71,7 +98,6 @@ onMounted(async () => {
     return
   }
 
-  // Check user role
   const { data } = await client
     .from('profiles')
     .select('role')
@@ -87,7 +113,12 @@ onMounted(async () => {
   checkingRole.value = false
 })
 
-// Calendar navigation
+// Reset 45-day window when opening modal (always from today)
+const openEditModal = () => {
+  calendarStartDate.value = new Date()
+}
+
+// Calendar navigation (main page)
 const goToPrevMonth = () => {
   currentDate.value = subMonths(currentDate.value, 1)
 }
@@ -96,75 +127,61 @@ const goToNextMonth = () => {
   currentDate.value = addMonths(currentDate.value, 1)
 }
 
-// Get calendar days for the month
+// Get calendar days for the month (main page)
 const calendarDays = computed(() => {
   const start = startOfMonth(currentDate.value)
   const end = endOfMonth(currentDate.value)
   const days = eachDayOfInterval({ start, end })
-  
-  // Pad with nulls for alignment
   const startDayOfWeek = getDay(start)
   const padding = Array(startDayOfWeek).fill(null)
-  
   return [...padding, ...days]
 })
 
-// Check if a day is a class day
+// Class days: Tue (2), Thu (4), Sat (6)
 const isClassDay = (date: Date): boolean => {
   const dayNum = getDay(date)
-  return dayNum === 2 || dayNum === 4 || dayNum === 6 // Tue, Thu, Sat
+  return dayNum === 2 || dayNum === 4 || dayNum === 6
 }
 
-// Get coaches available for a specific date (mock implementation)
 const getCoachesForDate = (date: Date) => {
   if (!isClassDay(date)) return []
-  // For demo, show all coaches on all class days
   return coaches.value.filter(c => c.isActive)
 }
 
-// Week day labels
 const weekDays = computed(() => {
   return language.value === 'es' 
     ? ['D', 'L', 'M', 'M', 'J', 'V', 'S']
     : ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 })
 
-// Open coach availability editor
+const toDateKey = (date: Date) => format(date, 'yyyy-MM-dd')
+
+// Open coach availability editor (45-day calendar)
 const editCoachAvailability = (coach: typeof coaches.value[0]) => {
   selectedCoach.value = coach
+  openEditModal()
   showEditModal.value = true
 }
 
-// Toggle coach active status
 const toggleCoachStatus = (coach: typeof coaches.value[0]) => {
   coach.isActive = !coach.isActive
 }
 
-// Class days for availability grid
-const classDays: DayOfWeek[] = ['tuesday', 'thursday', 'saturday']
-const timeSlots: TimeSlot[] = ['early', 'late']
-
-const dayLabels: Record<DayOfWeek, string> = {
-  tuesday: language.value === 'es' ? 'Mar' : 'Tue',
-  thursday: language.value === 'es' ? 'Jue' : 'Thu',
-  saturday: language.value === 'es' ? 'Sáb' : 'Sat',
-}
-
-// Toggle availability for selected coach
-const toggleAvailability = (day: DayOfWeek, slot: TimeSlot) => {
-  if (!selectedCoach.value) return
-  const key = `${day}-${slot}`
+// Toggle one date for selected coach (only class days)
+const toggleDateAvailability = (date: Date) => {
+  if (!selectedCoach.value || !isClassDay(date)) return
+  const key = toDateKey(date)
   selectedCoach.value.availability[key] = !selectedCoach.value.availability[key]
 }
 
-const getAvailability = (day: DayOfWeek, slot: TimeSlot) => {
+const getDateAvailability = (date: Date): boolean => {
   if (!selectedCoach.value) return false
-  return selectedCoach.value.availability[`${day}-${slot}`] ?? true // Default to available
+  const key = toDateKey(date)
+  return selectedCoach.value.availability[key] ?? true
 }
 
 // Save coach availability
 const saveCoachAvailability = () => {
-  // In real app, save to database
   showEditModal.value = false
   selectedCoach.value = null
 }
@@ -362,47 +379,55 @@ const saveCoachAvailability = () => {
               </button>
             </div>
 
-            <!-- Modal Content -->
+            <!-- Modal Content: 45-day calendar -->
             <div class="p-6 space-y-4">
               <p class="text-sm text-gray-400">
                 {{ language === 'es' 
-                  ? 'Selecciona los horarios en los que el coach estará disponible para dar clases.'
-                  : 'Select the time slots when the coach will be available to teach.'
+                  ? 'Marca los días en que el coach estará disponible para dar clase (solo Mar, Jue, Sáb). Vista de 45 días.'
+                  : 'Confirm the dates the coach is available to teach (Tue, Thu, Sat only). 45-day view.'
                 }}
               </p>
+              <p class="text-xs text-gray-500 font-medium">{{ calendarRangeLabel }}</p>
 
-              <!-- Availability Grid -->
-              <div class="bg-gray-800 rounded-xl overflow-hidden">
-                <!-- Header -->
-                <div class="grid grid-cols-4 bg-gray-700">
-                  <div class="p-3"></div>
-                  <div v-for="day in classDays" :key="day" class="p-3 text-center text-sm font-semibold text-gold-400">
-                    {{ dayLabels[day] }}
-                  </div>
-                </div>
-
-                <!-- Rows -->
-                <div v-for="slot in timeSlots" :key="slot" class="grid grid-cols-4 border-t border-gray-700">
-                  <div class="p-3">
-                    <p class="text-sm font-medium text-white">{{ slot === 'early' ? 'Sesión 1' : 'Sesión 2' }}</p>
-                    <p class="text-xs text-gray-500">{{ slot === 'early' ? '5:30 PM' : '7:00 PM' }}</p>
-                  </div>
-                  <div v-for="day in classDays" :key="`${day}-${slot}`" class="p-3 flex items-center justify-center">
-                    <button
-                      @click="toggleAvailability(day, slot)"
-                      class="w-12 h-12 rounded-xl transition-all flex items-center justify-center"
-                      :class="getAvailability(day, slot) ? 'bg-glass-green text-white' : 'bg-gray-700 text-gray-500'"
-                    >
-                      <svg v-if="getAvailability(day, slot)" class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                      </svg>
-                      <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
+              <!-- Week headers -->
+              <div class="grid grid-cols-7 gap-1 mb-1">
+                <div 
+                  v-for="(day, index) in weekDays" 
+                  :key="day" 
+                  class="text-center text-xs font-medium py-1"
+                  :class="[2, 4, 6].includes(index) ? 'text-gold-400' : 'text-gray-500'"
+                >
+                  {{ day }}
                 </div>
               </div>
+
+              <!-- 45-day grid -->
+              <div class="grid grid-cols-7 gap-1">
+                <template v-for="(day, index) in calendarGrid" :key="index">
+                  <div v-if="!day" class="aspect-square"></div>
+                  <button
+                    v-else
+                    type="button"
+                    class="aspect-square rounded-lg flex flex-col items-center justify-center text-sm transition-all min-h-[44px]"
+                    :class="isClassDay(day)
+                      ? getDateAvailability(day)
+                        ? 'bg-glass-green text-white hover:opacity-90'
+                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      : 'bg-gray-800/50 text-gray-600 cursor-default'"
+                    :disabled="!isClassDay(day)"
+                    @click="toggleDateAvailability(day)"
+                  >
+                    <span class="font-medium">{{ format(day, 'd') }}</span>
+                    <span v-if="isClassDay(day)" class="text-[10px] mt-0.5 opacity-80">
+                      {{ getDateAvailability(day) ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No') }}
+                    </span>
+                  </button>
+                </template>
+              </div>
+
+              <p class="text-xs text-gray-500 pt-2">
+                {{ language === 'es' ? 'Solo días de clase (Mar, Jue, Sáb) se pueden marcar.' : 'Only class days (Tue, Thu, Sat) can be toggled.' }}
+              </p>
             </div>
 
             <!-- Modal Footer -->

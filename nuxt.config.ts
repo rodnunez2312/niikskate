@@ -47,6 +47,8 @@ export default defineNuxtConfig({
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseKey: process.env.SUPABASE_KEY,
     },
+    // Server-only: for admin create user (use in server/api)
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   },
 
   // SSR configuration - disable for Capacitor mobile builds

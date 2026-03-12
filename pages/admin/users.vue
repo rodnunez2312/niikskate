@@ -8,6 +8,7 @@ definePageMeta({
 })
 
 const router = useRouter()
+const route = useRoute()
 const user = useSupabaseUser()
 const client = useSupabaseClient()
 const { language } = useI18n()
@@ -24,6 +25,17 @@ const showEditModal = ref(false)
 const editingUser = ref<User | null>(null)
 const newRole = ref<'admin' | 'coach' | 'customer'>('customer')
 const saving = ref(false)
+
+// Add user modal
+const showAddModal = ref(false)
+const addUserSaving = ref(false)
+const addUserError = ref('')
+const newUserForm = ref({
+  email: '',
+  password: '',
+  full_name: '',
+  role: 'customer' as 'admin' | 'coach' | 'customer',
+})
 
 onMounted(async () => {
   if (!user.value) {
@@ -43,6 +55,11 @@ onMounted(async () => {
   }
 
   isAdmin.value = true
+  // If opened from Clientes card (?role=customer), filter to customers
+  const roleFromQuery = route.query.role as string
+  if (roleFromQuery && ['admin', 'coach', 'customer'].includes(roleFromQuery)) {
+    selectedRole.value = roleFromQuery as any
+  }
   await loadUsers()
 })
 
@@ -128,6 +145,50 @@ const toggleUserStatus = async (userToToggle: User) => {
   }
 }
 
+// Add user
+const openAddModal = () => {
+  newUserForm.value = { email: '', password: '', full_name: '', role: 'customer' }
+  addUserError.value = ''
+  showAddModal.value = true
+}
+
+const closeAddModal = () => {
+  showAddModal.value = false
+  addUserError.value = ''
+}
+
+const submitAddUser = async () => {
+  addUserError.value = ''
+  if (!newUserForm.value.email?.trim()) {
+    addUserError.value = language.value === 'es' ? 'El email es obligatorio' : 'Email is required'
+    return
+  }
+  if (!newUserForm.value.password || newUserForm.value.password.length < 6) {
+    addUserError.value = language.value === 'es' ? 'La contraseña debe tener al menos 6 caracteres' : 'Password must be at least 6 characters'
+    return
+  }
+
+  addUserSaving.value = true
+  try {
+    await $fetch('/api/admin/create-user', {
+      method: 'POST',
+      body: {
+        email: newUserForm.value.email.trim(),
+        password: newUserForm.value.password,
+        full_name: newUserForm.value.full_name.trim() || undefined,
+        role: newUserForm.value.role,
+      },
+    })
+    closeAddModal()
+    await loadUsers()
+  } catch (e: any) {
+    const msg = e?.data?.message || e?.message || 'Error creating user'
+    addUserError.value = msg
+  } finally {
+    addUserSaving.value = false
+  }
+}
+
 // Format date
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
@@ -148,18 +209,29 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
     <!-- Header -->
     <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
       <div class="px-4 py-4 max-w-2xl mx-auto">
-        <div class="flex items-center gap-3">
-          <button @click="router.push('/admin')" class="p-2 -ml-2 text-white">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div>
-            <h1 class="text-xl font-bold text-white">
-              {{ language === 'es' ? 'Usuarios' : 'Users' }}
-            </h1>
-            <p class="text-sm text-gray-400">{{ language === 'es' ? 'Gestionar usuarios y permisos' : 'Manage users and permissions' }}</p>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <button @click="router.push('/admin')" class="p-2 -ml-2 text-white flex-shrink-0">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div class="min-w-0">
+              <h1 class="text-xl font-bold text-white">
+                {{ language === 'es' ? 'Usuarios' : 'Users' }}
+              </h1>
+              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Gestionar usuarios y permisos' : 'Manage users and permissions' }}</p>
+            </div>
           </div>
+          <button
+            @click="openAddModal"
+            class="flex-shrink-0 px-4 py-2 rounded-xl bg-gold-400 text-black font-semibold text-sm flex items-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            {{ language === 'es' ? 'Nuevo usuario' : 'Add user' }}
+          </button>
         </div>
       </div>
     </header>
@@ -353,6 +425,111 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
           </div>
         </div>
       </div>
+    </Teleport>
+
+    <!-- Add User Modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-200"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-200"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="showAddModal" class="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center p-4">
+          <div class="bg-gray-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden border border-gray-800">
+            <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+              <h3 class="text-lg font-bold text-white">
+                {{ language === 'es' ? 'Nuevo usuario' : 'Add user' }}
+              </h3>
+              <button @click="closeAddModal" class="p-2 text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form @submit.prevent="submitAddUser" class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Email *</label>
+                <input
+                  v-model="newUserForm.email"
+                  type="email"
+                  required
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
+                  :placeholder="language === 'es' ? 'correo@ejemplo.com' : 'email@example.com'"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Contraseña temporal *' : 'Temporary password *' }}</label>
+                <input
+                  v-model="newUserForm.password"
+                  type="password"
+                  required
+                  minlength="6"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
+                  :placeholder="language === 'es' ? 'Mín. 6 caracteres' : 'Min. 6 characters'"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Nombre completo' : 'Full name' }}</label>
+                <input
+                  v-model="newUserForm.full_name"
+                  type="text"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
+                  :placeholder="language === 'es' ? 'Opcional' : 'Optional'"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">{{ language === 'es' ? 'Rol' : 'Role' }}</label>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    @click="newUserForm.role = 'customer'"
+                    class="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
+                    :class="newUserForm.role === 'customer' ? 'bg-glass-blue text-white' : 'bg-gray-800 text-gray-400'"
+                  >
+                    🛹 {{ language === 'es' ? 'Patinador' : 'Skater' }}
+                  </button>
+                  <button
+                    type="button"
+                    @click="newUserForm.role = 'coach'"
+                    class="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
+                    :class="newUserForm.role === 'coach' ? 'bg-gold-400 text-black' : 'bg-gray-800 text-gray-400'"
+                  >
+                    🎓 Coach
+                  </button>
+                  <button
+                    type="button"
+                    @click="newUserForm.role = 'admin'"
+                    class="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
+                    :class="newUserForm.role === 'admin' ? 'bg-flame-600 text-white' : 'bg-gray-800 text-gray-400'"
+                  >
+                    👑 Admin
+                  </button>
+                </div>
+              </div>
+              <div v-if="addUserError" class="text-sm text-red-400">{{ addUserError }}</div>
+              <div class="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  @click="closeAddModal"
+                  class="flex-1 py-3 bg-gray-800 text-white font-semibold rounded-xl"
+                >
+                  {{ language === 'es' ? 'Cancelar' : 'Cancel' }}
+                </button>
+                <button
+                  type="submit"
+                  :disabled="addUserSaving"
+                  class="flex-1 py-3 bg-gold-400 text-black font-bold rounded-xl disabled:opacity-50"
+                >
+                  {{ addUserSaving ? '...' : (language === 'es' ? 'Crear usuario' : 'Create user') }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
