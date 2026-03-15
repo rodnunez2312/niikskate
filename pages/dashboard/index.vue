@@ -27,6 +27,41 @@ const stats = ref({
   pending_approvals: 0
 })
 
+// Emergency contacts popup (fresh fetch from DB, not from coach view)
+const showEmergencyModal = ref(false)
+const emergencyContactsList = ref<Array<{ id: string; name: string; role: string; phone: string; email?: string; description?: string }>>([])
+const emergencyContactsLoading = ref(false)
+const fetchEmergencyContacts = async () => {
+  emergencyContactsLoading.value = true
+  emergencyContactsList.value = []
+  try {
+    const { data } = await client
+      .from('emergency_contacts')
+      .select('id, name, role, phone, email, description')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+    emergencyContactsList.value = (data || []).map((r: any) => ({
+      id: r.id,
+      name: r.name || '',
+      role: r.role || '',
+      phone: r.phone || '',
+      email: r.email || '',
+      description: r.description || ''
+    }))
+  } catch (e) {
+    console.error('Error fetching emergency contacts:', e)
+  } finally {
+    emergencyContactsLoading.value = false
+  }
+}
+const openEmergencyModal = () => {
+  showEmergencyModal.value = true
+  fetchEmergencyContacts()
+}
+const closeEmergencyModal = () => {
+  showEmergencyModal.value = false
+}
+
 // Current week dates
 const currentDate = new Date()
 const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
@@ -418,7 +453,7 @@ const formatDate = (dateStr: string) => {
             </NuxtLink>
             
             <NuxtLink 
-              to="/coach/students"
+              to="/dashboard/students"
               class="bg-gradient-to-br from-glass-green to-glass-blue p-4 rounded-xl"
             >
               <span class="text-2xl mb-2 block">📊</span>
@@ -434,8 +469,81 @@ const formatDate = (dateStr: string) => {
               <p class="font-bold text-white">{{ language === 'es' ? 'Trucos' : 'Tricks' }}</p>
               <p class="text-xs text-white/70">{{ language === 'es' ? 'Biblioteca de trucos' : 'Tricks library' }}</p>
             </NuxtLink>
+
+            <button
+              type="button"
+              @click="openEmergencyModal"
+              class="bg-gradient-to-br from-rose-600 to-amber-600 p-4 rounded-xl text-left col-span-2"
+            >
+              <span class="text-2xl mb-2 block">📞</span>
+              <p class="font-bold text-white">{{ language === 'es' ? 'Contactos de emergencia' : 'Emergency contacts' }}</p>
+              <p class="text-xs text-white/80">{{ language === 'es' ? 'Ver números de emergencia' : 'View emergency numbers' }}</p>
+            </button>
           </div>
         </div>
+
+        <!-- Emergency contacts popup -->
+        <Teleport to="body">
+          <div
+            v-if="showEmergencyModal"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            @click.self="closeEmergencyModal"
+          >
+            <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col">
+              <div class="flex items-center justify-between p-4 border-b border-gray-800">
+                <h3 class="text-lg font-bold text-white">
+                  {{ language === 'es' ? 'Contactos de emergencia' : 'Emergency contacts' }}
+                </h3>
+                <button
+                  type="button"
+                  class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                  aria-label="Close"
+                  @click="closeEmergencyModal"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                <p v-if="emergencyContactsLoading" class="text-gray-400 text-sm text-center py-4">
+                  {{ language === 'es' ? 'Cargando...' : 'Loading...' }}
+                </p>
+                <p v-else-if="emergencyContactsList.length === 0" class="text-gray-400 text-sm text-center py-4">
+                  {{ language === 'es' ? 'No hay contactos configurados' : 'No contacts configured' }}
+                </p>
+                <div
+                  v-else
+                  v-for="contact in emergencyContactsList"
+                  :key="contact.id"
+                  class="bg-gray-800/80 border border-gray-700 rounded-xl p-4"
+                >
+                  <p class="font-semibold text-white">{{ contact.name }}</p>
+                  <p class="text-xs text-gold-400 uppercase mt-0.5">{{ contact.role }}</p>
+                  <p v-if="contact.description" class="text-sm text-gray-400 mt-1">{{ contact.description }}</p>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <a
+                      v-if="contact.phone"
+                      :href="`tel:${contact.phone.replace(/\s/g, '')}`"
+                      class="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-500/30 transition-colors"
+                    >
+                      <span>📞</span>
+                      <span>{{ contact.phone }}</span>
+                    </a>
+                    <a
+                      v-if="contact.email"
+                      :href="`mailto:${contact.email}`"
+                      class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-500/30 transition-colors"
+                    >
+                      <span>✉️</span>
+                      <span>{{ contact.email }}</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Teleport>
       </template>
     </div>
   </div>

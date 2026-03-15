@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const { email, password, full_name, role } = body || {}
+  const { email, password, full_name, role, phone } = body || {}
 
   if (!email || typeof email !== 'string' || !email.trim()) {
     throw createError({
@@ -70,9 +70,12 @@ export default defineEventHandler(async (event) => {
     .upsert(
       {
         id: userId,
+        email: email.trim(),
         full_name: displayName,
         role,
-        is_active: true,
+        phone: (phone || '').trim() || null,
+        // New users are pending until admin explicitly activates access.
+        is_active: false,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }

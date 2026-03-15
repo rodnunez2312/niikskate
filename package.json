@@ -20,7 +20,10 @@
     "cap:open:android": "cap open android",
     "mobile:build": "npm run generate && npm run cap:sync",
     "niik:parse": "node scripts/parse-niik-library.mjs",
-    "stock:parse": "node scripts/parse-stock.cjs"
+    "niik:sync": "node scripts/sync-niik-to-supabase.mjs",
+    "niik:refresh": "node scripts/parse-niik-library.mjs && node scripts/sync-niik-to-supabase.mjs",
+    "stock:parse": "node scripts/parse-stock.cjs",
+    "students:import": "node scripts/import-students.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.0",

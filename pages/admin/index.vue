@@ -187,13 +187,13 @@ const formatDate = (date: string) => {
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Coaches Activos' : 'Active Coaches' }}</p>
         </NuxtLink>
 
-        <!-- Clientes → Users (customers) -->
+        <!-- Patinadores → Users (customers) -->
         <NuxtLink
           to="/admin/users?role=customer"
           class="bg-gradient-to-br from-flame-600/20 to-glass-orange/20 rounded-2xl p-4 border border-flame-600/30 hover:border-flame-600/50 transition-colors block"
         >
           <p class="text-3xl font-bold text-flame-600">{{ stats.totalCustomers }}</p>
-          <p class="text-sm text-gray-400">{{ language === 'es' ? 'Clientes' : 'Customers' }}</p>
+          <p class="text-sm text-gray-400">{{ language === 'es' ? 'Patinadores' : 'Skaters' }}</p>
         </NuxtLink>
       </div>
 
@@ -286,6 +286,23 @@ const formatDate = (date: string) => {
             <div class="flex-1">
               <p class="font-semibold text-white">{{ language === 'es' ? 'Usuarios' : 'Users' }}</p>
               <p class="text-sm text-gray-400">{{ language === 'es' ? 'Gestionar usuarios y permisos' : 'Manage users and permissions' }}</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </NuxtLink>
+
+          <!-- Programs (admin-only: delete programs) -->
+          <NuxtLink 
+            to="/admin/programs"
+            class="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all"
+          >
+            <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl">
+              📋
+            </div>
+            <div class="flex-1">
+              <p class="font-semibold text-white">{{ language === 'es' ? 'Programas' : 'Programs' }}</p>
+              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Eliminar o gestionar programas' : 'Delete or manage programs' }}</p>
             </div>
             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

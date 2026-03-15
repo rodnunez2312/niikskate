@@ -88,19 +88,19 @@ const adminNavItems = computed(() => [
     icon: 'students',
   },
   {
+    name: language.value === 'es' ? 'Coaching' : 'Coaching',
+    path: '/dashboard/planning',
+    icon: 'coaching',
+  },
+  {
+    name: language.value === 'es' ? 'Habilidades' : 'Skills',
+    path: '/dashboard/skills',
+    icon: 'skills',
+  },
+  {
     name: language.value === 'es' ? 'Tienda' : 'Store',
     path: '/dashboard/store',
     icon: 'store',
-  },
-  {
-    name: language.value === 'es' ? 'Evals' : 'Evals',
-    path: '/coach/evaluations',
-    icon: 'clipboard',
-  },
-  {
-    name: language.value === 'es' ? 'Clases' : 'Classes',
-    path: '/dashboard/planning',
-    icon: 'planning',
   },
   {
     name: language.value === 'es' ? 'Perfil' : 'Profile',
@@ -109,27 +109,27 @@ const adminNavItems = computed(() => [
   },
 ])
 
-// Coach navigation (NO Store access)
+// Coach navigation (NO Store access) — Inicio goes to dashboard (same as image)
 const coachNavItems = computed(() => [
   {
     name: language.value === 'es' ? 'Inicio' : 'Home',
-    path: '/coach',
+    path: '/dashboard',
     icon: 'home',
   },
   {
-    name: language.value === 'es' ? 'Asistencia' : 'Attendance',
+    name: language.value === 'es' ? 'Alumnos' : 'Students',
     path: '/dashboard/students',
     icon: 'students',
   },
   {
-    name: language.value === 'es' ? 'Evaluaciones' : 'Evaluations',
-    path: '/coach/evaluations',
-    icon: 'clipboard',
+    name: language.value === 'es' ? 'Coaching' : 'Coaching',
+    path: '/dashboard/planning',
+    icon: 'coaching',
   },
   {
-    name: language.value === 'es' ? 'Clases' : 'Classes',
-    path: '/dashboard/planning',
-    icon: 'planning',
+    name: language.value === 'es' ? 'Habilidades' : 'Skills',
+    path: '/dashboard/skills',
+    icon: 'skills',
   },
   {
     name: language.value === 'es' ? 'Perfil' : 'Profile',
@@ -218,9 +218,18 @@ const isActive = (path: string) => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
           </svg>
           
-          <!-- Planning Icon -->
-          <svg v-else-if="item.icon === 'planning'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+          <!-- Coaching (skateboard helmet) Icon -->
+          <svg v-else-if="item.icon === 'coaching'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3c-4.5 0-8 3.2-8 7.2 0 2.2.9 4.1 2.2 5.5L5.5 19h13l-.7-3.3c1.3-1.4 2.2-3.3 2.2-5.5 0-4-3.5-7.2-8-7.2z" />
+            <circle cx="9" cy="10" r="0.75" stroke="currentColor" fill="none" stroke-width="1.5" />
+            <circle cx="12" cy="9" r="0.75" stroke="currentColor" fill="none" stroke-width="1.5" />
+            <circle cx="15" cy="10" r="0.75" stroke="currentColor" fill="none" stroke-width="1.5" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 17.5h1.5M14.5 17.5H16M11 18v1" />
+          </svg>
+          
+          <!-- Skills (groups / target) Icon -->
+          <svg v-else-if="item.icon === 'skills'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
           </svg>
           
           <span class="text-xs font-medium">{{ item.name }}</span>

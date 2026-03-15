@@ -39,7 +39,7 @@ const filteredSkills = computed(() => {
   return skills.value.filter(skill => {
     // Category filter
     if (selectedCategory.value !== 'all' && skill.category !== selectedCategory.value) return false
-    
+
     // Search filter
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()

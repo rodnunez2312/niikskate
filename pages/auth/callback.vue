@@ -6,13 +6,17 @@ const client = useSupabaseClient()
 // Wait for auth to complete and redirect to dashboard for coach/admin, else home
 watch(user, async (newUser) => {
   if (newUser) {
-    const { data } = await client.from('profiles').select('role').eq('id', newUser.id).single()
-    const role = data?.role
-    if (role === 'coach' || role === 'admin') {
-      router.push('/dashboard')
-    } else {
-      router.push('/')
+    const { data } = await client.from('profiles').select('role, is_active').eq('id', newUser.id).single()
+    if (!data?.is_active) {
+      await client.auth.signOut()
+      router.push('/auth/login?reason=pending_approval')
+      return
     }
+    if (data.role === 'coach' || data.role === 'admin') {
+      router.push('/dashboard')
+      return
+    }
+    router.push('/')
   }
 }, { immediate: true })
 

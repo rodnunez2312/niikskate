@@ -4,6 +4,18 @@ A mobile-first app for managing skateboard classes, coach schedules, and equipme
 
 ## Features
 
+### 🛹 Student Dashboard (Skater Card)
+A **central feature** of the app: each student has a dedicated **Student Dashboard** that coaches and admins open from the Alumnos list.
+
+- **Skater cards**: From the Alumnos tab, each student is a **skater card**. Tapping the card or the **Dashboard** button goes to that student’s full dashboard.
+- **Single place per student**: One dashboard per student at `/dashboard/students/[id]` with:
+  - **Quick actions**: Link to Evaluaciones (evaluation history and new evaluation) for that student.
+  - **Overall progress**: Progress bar and skills learned vs total in the library.
+  - **Attendance calendar**: Monthly view of attended, missed, upcoming, and today’s sessions.
+  - **Progress timeline**: Payment and skill milestones in one timeline.
+  - **Skills by category**: Mark skills as learned and see progress by category.
+- **Extensible**: The Student Dashboard is the main place to add more student-level features (notes, goals, media, etc.) over time.
+
 ### Class Scheduling
 - **Monthly Calendar View**: See all available classes at a glance
 - **Fixed Schedule**: Classes on Tuesday, Thursday, Saturday

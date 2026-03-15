@@ -63,16 +63,15 @@ const warmupFocusAreas = [
 ]
 const selectedWarmupFocus = ref<string[]>([])
 
-// Activity type filter - 5 categories matching Excel NEW CATEGORY column (ordered)
-const skillCategoryFilter = ref<string>('')
+// Categoria filter (Excel Categoria: 1 - Basics, 2 - Principiantes, 3 - Intermedios, 4 - Avanzados)
+const skillCategoriaFilter = ref<string>('')
 const skillDifficultyFilter = ref<string>('')
-const skillCategories: ActivityCategory[] = [
-  'excercise',
-  'iniciacion',
-  'street_piso',
-  'street_obstaculos',
-  'vert_bowl'
-]
+const CATEGORIA_OPTIONS = [
+  { value: '1 - Basics', label: '1 - Basics', label_es: '1 - Basics' },
+  { value: '2 - Principiantes', label: '2 - Beginners', label_es: '2 - Principiantes' },
+  { value: '3 - Intermedios', label: '3 - Intermediate', label_es: '3 - Intermedios' },
+  { value: '4 - Avanzados', label: '4 - Advanced', label_es: '4 - Avanzados' },
+] as const
 import type { ActivityCategory } from '~/types'
 import { ACTIVITY_CATEGORY_LABELS } from '~/types'
 const activityLabels = ACTIVITY_CATEGORY_LABELS
@@ -97,8 +96,10 @@ onMounted(async () => {
   isCoach.value = true
   await loadData()
   
-  // Background sync: update from source data without blocking UI
-  autoSyncNiikLibrary().then(() => loadData())
+  // Only admin syncs from Excel; coaches just see current DB data
+  if (data?.role === 'admin') {
+    autoSyncNiikLibrary().then(() => loadData())
+  }
 })
 
 const loadData = async () => {
@@ -113,10 +114,8 @@ const loadData = async () => {
 
     skills.value = skillsData || []
     
-    // Debug: Log unique categories in database
-    const uniqueCats = [...new Set(skills.value.map(s => s.category))]
-    console.log('Categories in database:', uniqueCats)
-    console.log('Expected filter categories:', skillCategories)
+    const uniqueCats = [...new Set(skills.value.map(s => s.categoria).filter(Boolean))]
+    console.log('Categorias in database:', uniqueCats)
 
     // Load existing plans
     const { data: plansData } = await client
@@ -238,9 +237,8 @@ const savePlan = async () => {
 // Filtered skills (flat list)
 const filteredSkills = computed(() => {
   return skills.value.filter(skill => {
-    const matchesCategory = !skillCategoryFilter.value || skill.category === skillCategoryFilter.value
     const matchesDifficulty = !skillDifficultyFilter.value || skill.difficulty === skillDifficultyFilter.value
-    return matchesCategory && matchesDifficulty
+    return matchesDifficulty
   })
 })
 
@@ -257,13 +255,11 @@ const categoryTagClass = (category?: string) => {
   const map: Record<string, string> = {
     excercise: 'bg-sky-500/20 text-sky-300',
     iniciacion: 'bg-teal-500/20 text-teal-300',
-    street_piso: 'bg-indigo-500/20 text-indigo-300',
-    street_obstaculos: 'bg-amber-500/20 text-amber-300',
+    street: 'bg-indigo-500/20 text-indigo-300',
     vert_bowl: 'bg-rose-500/20 text-rose-300',
     surf_skate: 'bg-cyan-500/20 text-cyan-300',
     fundamentals: 'bg-fuchsia-500/20 text-fuchsia-300',
     flatground: 'bg-blue-500/20 text-blue-300',
-    street: 'bg-orange-500/20 text-orange-300',
     bowl: 'bg-pink-500/20 text-pink-300',
     vert: 'bg-red-500/20 text-red-300',
     safety: 'bg-lime-500/20 text-lime-300'
@@ -445,35 +441,6 @@ watch([selectedDate, selectedSession], () => {
           </div>
         </div>
 
-        <!-- Category Filter - Instagram Stories Style with Ramp Images -->
-        <div class="mb-4">
-          <p class="text-xs text-gray-500 mb-2">{{ language === 'es' ? 'Categoría' : 'Category' }}</p>
-          <div class="grid grid-cols-5 gap-2 w-full">
-            <!-- Activity Type Icons with Ramp Images (click again to deselect) -->
-            <button
-              v-for="cat in skillCategories"
-              :key="cat"
-              @click="skillCategoryFilter = skillCategoryFilter === cat ? '' : cat"
-              class="flex flex-col items-center gap-1"
-            >
-              <div 
-                class="p-0.5 rounded-full transition-all"
-                :class="skillCategoryFilter === cat 
-                  ? 'bg-gradient-to-br from-gold-400 via-flame-500 to-glass-purple' 
-                  : 'bg-gray-700 hover:bg-gray-600'"
-              >
-                <RampIcon :type="activityLabels[cat]?.rampType || 'all'" :size="64" />
-              </div>
-              <span 
-                class="text-[10px] font-semibold mt-0.5 w-full text-center leading-tight" 
-                :class="skillCategoryFilter === cat ? 'text-gold-400' : 'text-gray-400'"
-              >
-                {{ language === 'es' ? activityLabels[cat]?.name_es : activityLabels[cat]?.name }}
-              </span>
-            </button>
-          </div>
-        </div>
-
         <!-- Skills List (flat) -->
         <div class="space-y-2">
           <button
@@ -490,10 +457,8 @@ watch([selectedDate, selectedSession], () => {
                 {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
               </span>
               <div class="flex gap-1">
-                <span v-if="skill.category" class="px-1.5 py-0.5 rounded text-[10px]" :class="categoryTagClass(skill.category)">
-                  {{ language === 'es' 
-                    ? (activityLabels[skill.category as ActivityCategory]?.name_es || skill.category) 
-                    : (activityLabels[skill.category as ActivityCategory]?.name || skill.category) }}
+                <span v-if="skill.categoria" class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300">
+                  {{ skill.categoria }}
                 </span>
                 <span class="px-1.5 py-0.5 rounded text-[10px] bg-green-500/20 text-green-400">
                   {{ difficultyStars(skill.difficulty) }}

@@ -5,25 +5,85 @@ const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { t, language } = useI18n()
 
-const email = ref('')
+const identifier = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+const normalizePhone = (value: string) => value.replace(/\D/g, '')
+
+const resolveEmailFromIdentifier = async (value: string) => {
+  const raw = value.trim()
+  if (raw.includes('@')) return raw
+
+  const digits = normalizePhone(raw)
+  if (!digits) return raw
+
+  const { data, error: lookupError } = await client
+    .from('profiles')
+    .select('email, phone')
+    .not('phone', 'is', null)
+
+  if (lookupError) throw lookupError
+
+  const match = (data || []).find((p: any) => {
+    const pPhone = normalizePhone(p.phone || '')
+    return pPhone === digits || (p.phone || '').trim() === raw
+  })
+
+  return match?.email || raw
+}
+
+const ensureProfileApproved = async (userId: string) => {
+  const { data, error: profileError } = await client
+    .from('profiles')
+    .select('role, is_active')
+    .eq('id', userId)
+    .single()
+
+  if (profileError || !data) {
+    await client.auth.signOut()
+    throw new Error(language.value === 'es'
+      ? 'No se encontró tu perfil. Contacta a un administrador.'
+      : 'Your profile was not found. Please contact an admin.')
+  }
+
+  if (!data.is_active) {
+    await client.auth.signOut()
+    throw new Error(language.value === 'es'
+      ? 'Tu acceso está pendiente de aprobación por un administrador.'
+      : 'Your access is pending admin approval.')
+  }
+
+  return data.role
+}
+
+onMounted(() => {
+  const reason = route.query.reason as string
+  if (reason === 'pending_approval') {
+    error.value = language.value === 'es'
+      ? 'Tu acceso está pendiente de aprobación por un administrador.'
+      : 'Your access is pending admin approval.'
+  }
+})
+
 // Redirect if already logged in → dashboard (coach/admin home), or custom ?redirect=
 watch(user, async (newUser) => {
   if (newUser) {
-    const explicitRedirect = route.query.redirect as string
-    if (explicitRedirect) {
-      router.push(explicitRedirect)
-      return
-    }
-    const { data } = await client.from('profiles').select('role').eq('id', newUser.id).single()
-    const role = data?.role
-    if (role === 'coach' || role === 'admin') {
-      router.push('/dashboard')
-    } else {
-      router.push('/')
+    try {
+      const role = await ensureProfileApproved(newUser.id)
+      const explicitRedirect = route.query.redirect as string
+      if (explicitRedirect) {
+        router.push(explicitRedirect)
+        return
+      }
+      if (role === 'coach' || role === 'admin') {
+        router.push('/dashboard')
+      } else {
+        router.push('/')
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : (language.value === 'es' ? 'Error al iniciar sesión' : 'Sign-in error')
     }
   }
 }, { immediate: true })
@@ -33,20 +93,20 @@ const handleLogin = async () => {
   error.value = null
 
   try {
+    const email = await resolveEmailFromIdentifier(identifier.value)
     const { error: authError } = await client.auth.signInWithPassword({
-      email: email.value,
+      email,
       password: password.value,
     })
 
     if (authError) throw authError
 
+    const role = await ensureProfileApproved(user.value!.id)
     const explicitRedirect = route.query.redirect as string
     if (explicitRedirect) {
       router.push(explicitRedirect)
       return
     }
-    const { data } = await client.from('profiles').select('role').eq('id', user.value!.id).single()
-    const role = data?.role
     if (role === 'coach' || role === 'admin') {
       router.push('/dashboard')
     } else {
@@ -109,14 +169,14 @@ const handleGoogleLogin = async () => {
         <!-- Login Form -->
         <form @submit.prevent="handleLogin" class="space-y-4">
           <div>
-            <label class="label">{{ t('auth.email') }}</label>
+            <label class="label">{{ language === 'es' ? 'Correo o teléfono' : 'Email or phone' }}</label>
             <input
-              v-model="email"
-              type="email"
+              v-model="identifier"
+              type="text"
               required
               class="input"
-              :placeholder="language === 'es' ? 'Ingresa tu correo' : 'Enter your email'"
-              autocomplete="email"
+              :placeholder="language === 'es' ? 'Ingresa correo o teléfono' : 'Enter email or phone'"
+              autocomplete="username"
             />
           </div>
 

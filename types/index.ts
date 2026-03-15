@@ -386,8 +386,7 @@ export type SkillCategory = 'bowl' | 'street' | 'surf_skate' | 'fundamentals' | 
 export type ActivityCategory = 
   | 'excercise'              // Exercise / functional drills
   | 'iniciacion'              // Initiation (Exercises + Games)
-  | 'street_piso'             // Street Flatground
-  | 'street_obstaculos'       // Street Obstacles
+  | 'street'                  // Street
   | 'vert_bowl'               // Bowl (Transition)
   | 'surf_skate'              // Surf Skate
 
@@ -442,8 +441,7 @@ export const SKILL_CATEGORY_LABELS: Record<SkillCategory, { name: string; name_e
 export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { name: string; name_es: string; icon: string; rampType: SkillCategory | 'all' }> = {
   excercise: { name: 'Excercise', name_es: 'Excercise', icon: '💪', rampType: 'fundamentals' },
   iniciacion: { name: 'Initiation', name_es: 'Iniciación', icon: '🎮', rampType: 'fundamentals' },
-  street_piso: { name: 'Street Piso', name_es: 'Street Piso', icon: '⬜', rampType: 'flatground' },
-  street_obstaculos: { name: 'Street', name_es: 'Street Obstáculos', icon: '🏗️', rampType: 'street' },
+  street: { name: 'Street', name_es: 'Street', icon: '🛤️', rampType: 'street' },
   vert_bowl: { name: 'Bowl', name_es: 'Bowl', icon: '🥣', rampType: 'bowl' },
   surf_skate: { name: 'Surf Skate', name_es: 'Surf Skate', icon: '🌊', rampType: 'surf_skate' },
 }

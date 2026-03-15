@@ -5,6 +5,7 @@ import { es } from 'date-fns/locale'
 // Page meta - auth check done manually in onMounted for better error handling
 
 const router = useRouter()
+const route = useRoute()
 const user = useSupabaseUser()
 const client = useSupabaseClient()
 const { language } = useI18n()
@@ -15,8 +16,7 @@ const loading = ref(true)
 const students = ref<any[]>([])
 const evaluations = ref<any[]>([])
 const selectedStudent = ref<any | null>(null)
-const searchQuery = ref('')
-const activeTab = ref<'new' | 'history'>('new')
+// History is the only view (no "Nueva Evaluación" tab)
 
 // Modal state
 const showEvaluationModal = ref(false)
@@ -67,6 +67,12 @@ const checkAuthAndLoad = async () => {
 
     isCoach.value = true
     await loadData()
+    // If opened from Alumnos "Evaluar" with ?student=ID: go to history for that student and show "new evaluation" button (no modal auto-open)
+    const studentId = route.query.student as string | undefined
+    if (studentId && students.value.length) {
+      const student = students.value.find((s: any) => s.id === studentId)
+      if (student) selectedStudent.value = student
+    }
   } catch (e) {
     console.error('Error loading evaluations page:', e)
     loading.value = false
@@ -108,19 +114,35 @@ const loadData = async () => {
 
     students.value = studentsData || []
 
-    // Load recent evaluations by this coach (table might not exist yet)
-    try {
-      const { data: evalsData } = await client
-        .from('student_evaluations')
-        .select(`
-          *,
-          student:profiles!student_id(full_name, email)
-        `)
-        .eq('coach_id', user.value?.id)
-        .order('evaluation_date', { ascending: false })
-        .limit(20)
+    const studentId = route.query.student as string | undefined
 
-      evaluations.value = evalsData || []
+    // Load evaluations: for one student when ?student=ID, otherwise recent by coach
+    try {
+      let evalsData: any[] = []
+      if (studentId) {
+        const { data } = await client
+          .from('student_evaluations')
+          .select(`
+            *,
+            student:profiles!student_id(full_name, email)
+          `)
+          .eq('student_id', studentId)
+          .eq('coach_id', user.value?.id)
+          .order('evaluation_date', { ascending: false })
+        evalsData = data || []
+      } else {
+        const { data } = await client
+          .from('student_evaluations')
+          .select(`
+            *,
+            student:profiles!student_id(full_name, email)
+          `)
+          .eq('coach_id', user.value?.id)
+          .order('evaluation_date', { ascending: false })
+          .limit(20)
+        evalsData = data || []
+      }
+      evaluations.value = evalsData
     } catch (evalError) {
       console.warn('student_evaluations table may not exist yet:', evalError)
       evaluations.value = []
@@ -132,21 +154,22 @@ const loadData = async () => {
   }
 }
 
-// Filter students
-const filteredStudents = computed(() => {
-  if (!searchQuery.value) return students.value
-  const query = searchQuery.value.toLowerCase()
-  return students.value.filter(s => 
-    s.full_name.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)
-  )
-})
-
-// Select student for evaluation
+// Select student for evaluation (used when opening modal from "Nueva evaluación para este alumno")
 const selectStudent = (student: any) => {
   selectedStudent.value = student
   resetForm()
   showEvaluationModal.value = true
 }
+
+// When viewing one student's history (from Alumnos "Evaluar"), open modal to submit new evaluation for that student
+const openNewEvaluationForSelectedStudent = () => {
+  if (!selectedStudent.value) return
+  resetForm()
+  showEvaluationModal.value = true
+}
+
+// True when we landed on this page with ?student= (evaluaciones history for one student)
+const isStudentContext = computed(() => !!route.query.student && !!selectedStudent.value)
 
 // Reset form
 const resetForm = () => {
@@ -184,7 +207,7 @@ const saveEvaluation = async () => {
     if (error) throw error
 
     showEvaluationModal.value = false
-    selectedStudent.value = null
+    if (!route.query.student) selectedStudent.value = null
     await loadData()
   } catch (e) {
     console.error('Error saving evaluation:', e)
@@ -229,7 +252,7 @@ const getAverageRating = (evaluation: any) => {
     <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
       <div class="px-4 py-4 max-w-lg mx-auto">
         <div class="flex items-center gap-3 mb-4">
-          <button @click="router.push('/coach')" class="p-2 -ml-2 text-white">
+          <button @click="router.push('/dashboard/students')" class="p-2 -ml-2 text-white">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
@@ -242,27 +265,6 @@ const getAverageRating = (evaluation: any) => {
           </div>
         </div>
 
-        <!-- Tabs -->
-        <div class="flex gap-2">
-          <button
-            @click="activeTab = 'new'"
-            class="flex-1 py-2 rounded-xl font-semibold text-sm transition-all"
-            :class="activeTab === 'new' 
-              ? 'bg-gold-400 text-black' 
-              : 'bg-gray-800 text-gray-400'"
-          >
-            {{ language === 'es' ? 'Nueva Evaluación' : 'New Evaluation' }}
-          </button>
-          <button
-            @click="activeTab = 'history'"
-            class="flex-1 py-2 rounded-xl font-semibold text-sm transition-all"
-            :class="activeTab === 'history' 
-              ? 'bg-gold-400 text-black' 
-              : 'bg-gray-800 text-gray-400'"
-          >
-            {{ language === 'es' ? 'Historial' : 'History' }}
-          </button>
-        </div>
       </div>
     </header>
 
@@ -271,52 +273,32 @@ const getAverageRating = (evaluation: any) => {
       <div class="w-12 h-12 border-4 border-gold-400 border-t-transparent rounded-full animate-spin"></div>
     </div>
 
-    <!-- Content -->
+    <!-- Content: evaluation history (home view) -->
     <div v-else-if="isCoach" class="px-4 py-6 max-w-lg mx-auto">
-      <!-- New Evaluation Tab -->
-      <div v-if="activeTab === 'new'">
-        <!-- Search -->
-        <div class="relative mb-6">
-          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="language === 'es' ? 'Buscar estudiante...' : 'Search student...'"
-            class="w-full pl-12 pr-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
-          />
-        </div>
-
-        <!-- Students List -->
-        <div v-if="filteredStudents.length === 0" class="text-center py-12">
-          <p class="text-4xl mb-3">👨‍🎓</p>
-          <p class="text-gray-400">{{ language === 'es' ? 'No se encontraron estudiantes' : 'No students found' }}</p>
-        </div>
-
-        <div v-else class="space-y-2">
+      <div>
+        <!-- When opened from Alumnos "Evaluar" (?student=): show button to submit new evaluation for this student -->
+        <div v-if="isStudentContext" class="mb-6">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-glass-purple to-glass-blue flex items-center justify-center text-lg font-bold text-white">
+              {{ selectedStudent?.full_name?.charAt(0)?.toUpperCase() || '?' }}
+            </div>
+            <div>
+              <p class="font-semibold text-white">{{ selectedStudent?.full_name }}</p>
+              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Historial de evaluaciones' : 'Evaluation history' }}</p>
+            </div>
+          </div>
           <button
-            v-for="student in filteredStudents"
-            :key="student.id"
-            @click="selectStudent(student)"
-            class="w-full bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-3 hover:border-gold-400/50 transition-all text-left"
+            type="button"
+            @click="openNewEvaluationForSelectedStudent"
+            class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gold-400 text-black font-semibold rounded-xl hover:bg-gold-300 transition-colors"
           >
-            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-glass-purple to-glass-blue flex items-center justify-center text-xl font-bold text-white">
-              {{ student.full_name.charAt(0).toUpperCase() }}
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="font-semibold text-white truncate">{{ student.full_name }}</p>
-              <p class="text-sm text-gray-400 truncate">{{ student.email }}</p>
-            </div>
-            <div class="px-3 py-1 bg-gold-400/20 text-gold-400 rounded-full text-xs font-bold">
-              {{ language === 'es' ? 'Evaluar' : 'Evaluate' }}
-            </div>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            {{ language === 'es' ? 'Nueva evaluación para este alumno' : 'Submit new evaluation for this student' }}
           </button>
         </div>
-      </div>
 
-      <!-- History Tab -->
-      <div v-else-if="activeTab === 'history'">
         <div v-if="evaluations.length === 0" class="text-center py-12">
           <p class="text-4xl mb-3">📋</p>
           <p class="text-gray-400">{{ language === 'es' ? 'No hay evaluaciones aún' : 'No evaluations yet' }}</p>

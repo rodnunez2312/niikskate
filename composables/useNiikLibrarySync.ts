@@ -17,6 +17,8 @@ export interface NiikTrick {
   url?: string
   difficulty: string
   category: string
+  categoria?: string // Excel Categoria: 1 - Basics, 2 - Principiantes, 3 - Intermedios, 4 - Avanzados
+  program?: string
   sort_order: number
   motor_skills?: string[]
 }
@@ -50,14 +52,15 @@ export function useNiikLibrarySync() {
       .replace(/[^a-z0-9]+/g, ' ')
       .trim()
 
-  const syncNiikLibrary = async (): Promise<SyncResult> => {
+  const syncNiikLibrary = async (options?: { force?: boolean }): Promise<SyncResult> => {
     syncing.value = true
     const result: SyncResult = { ok: false, inserted: 0, updated: 0, total: 0 }
     
     try {
-      // Fetch JSON with cache-busting
-      const res = await $fetch<NiikLibraryJson>(NIIK_LIBRARY_URL, {
-        headers: { 'Cache-Control': 'no-cache' }
+      // Strong cache-bust so browser and dev server serve latest file after niik:parse
+      const url = `${NIIK_LIBRARY_URL}?v=${Date.now()}`
+      const res = await $fetch<NiikLibraryJson>(url, {
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
       })
       const tricks = res?.tricks || []
       result.total = tricks.length
@@ -67,12 +70,11 @@ export function useNiikLibrarySync() {
         return result
       }
       
-      // Log JSON info
       console.log('JSON has', tricks.length, 'tricks, generated at:', res.generatedAt)
       
-      // Skip if already synced this session with same data
-      if (lastSyncTime === res.generatedAt) {
-        console.log('Niik Library already synced this session, skipping...')
+      // When user clicks "Sincronizar desde Excel", force=true so we always run full sync
+      if (!options?.force && lastSyncTime === res.generatedAt) {
+        console.log('Niik Library already synced this session, skipping (use force to re-sync)')
         result.ok = true
         return result
       }
@@ -112,10 +114,12 @@ export function useNiikLibrarySync() {
           description_es: t.description_es || null,
           difficulty: t.difficulty || 'beginner',
           category: t.category || 'iniciacion',
+          categoria: (t as any).categoria || null,
           video_url: t.url || null,
           sort_order: t.sort_order ?? 0,
           motor_skills: t.motor_skills || [],
           is_active: true,
+          program: t.program || null,
         }
 
         if (existingId) {
@@ -129,7 +133,15 @@ export function useNiikLibrarySync() {
       if (toInsert.length > 0) {
         const { error } = await client.from('skills_library').insert(toInsert)
         if (error) {
-          throw new Error(`Insert failed: ${error.message}`)
+          const msg = error.message || ''
+          if (/categoria|column.*schema cache/i.test(msg)) {
+            throw new Error(
+              `Insert failed: skills_library is missing the 'categoria' column. ` +
+              `In Supabase: SQL Editor → New query → run: ALTER TABLE skills_library ADD COLUMN IF NOT EXISTS categoria TEXT; ` +
+              `Then try "Sincronizar desde Excel" again.`
+            )
+          }
+          throw new Error(`Insert failed: ${msg}`)
         }
         result.inserted = toInsert.length
       }
@@ -148,7 +160,15 @@ export function useNiikLibrarySync() {
         const errors = results.filter(r => r.error).map(r => r.error?.message).filter(Boolean) as string[]
         updateErrors += errors.length
         if (errors.length > 0) {
-          throw new Error(`Update failed: ${errors[0]}`)
+          const msg = errors[0] || ''
+          if (/categoria|column.*schema cache/i.test(msg)) {
+            throw new Error(
+              `Update failed: skills_library is missing the 'categoria' column. ` +
+              `In Supabase: SQL Editor → New query → run: ALTER TABLE skills_library ADD COLUMN IF NOT EXISTS categoria TEXT; ` +
+              `Then try "Sincronizar desde Excel" again.`
+            )
+          }
+          throw new Error(`Update failed: ${msg}`)
         }
       }
       result.updated = toUpdate.length - updateErrors

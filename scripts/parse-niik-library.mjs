@@ -1,8 +1,12 @@
 /**
- * Parse "1 - Manual de Trucos" from Niik_Plan_Clases.xlsx
- * and write data/niik-trick-library.json for the class planning section.
+ * Parse "1 - Manual de Trucos" from Niik_Plan_Clases.xlsx → niik-trick-library.json
  *
- * Run: node scripts/parse-niik-library.mjs
+ * Expected columns (from current Excel):
+ *   #, Truco, Categoria, Tipo, Program, Comentarios, URL,
+ *   Habilidad motriz desarrollada (sub-columns: Coordinación, Balance, Resistencia, Fuerza, Agilidad, Confianza, Estabilidad)
+ *
+ * Run: npm run niik:parse
+ * Excel: data/Niik_source/Niik_Plan_Clases.xlsx or data/Niik_Plan_Clases.xlsx
  */
 
 import XLSX from 'xlsx'
@@ -12,158 +16,161 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = join(__dirname, '..')
-const excelPath = join(projectRoot, 'data', 'Niik_source', 'Niik_Plan_Clases.xlsx')
+
+function resolveExcelPath() {
+  const withSource = join(projectRoot, 'data', 'Niik_source', 'Niik_Plan_Clases.xlsx')
+  const rootData = join(projectRoot, 'data', 'Niik_Plan_Clases.xlsx')
+  if (existsSync(withSource)) return withSource
+  if (existsSync(rootData)) return rootData
+  return withSource
+}
+
+const excelPath = resolveExcelPath()
 const outPath = join(projectRoot, 'data', 'niik-trick-library.json')
 const outPathPublic = join(projectRoot, 'public', 'data', 'niik-trick-library.json')
 
-const SHEET_NAME = '1 - Manual de Trucos'
+const SHEET_MATCH = /1\s*-\s*manual\s*de\s*trucos|manual|trucos/i
 
-// Map possible Excel column names to our schema keys
-const NAME_KEYS = ['truco', 'trick', 'nombre', 'name', 'skill', 'habilidad']
-const NAME_ES_KEYS = ['nombre_es', 'name_es', 'truco_es', 'español', 'espanol']
-const DESC_KEYS = ['descripción', 'descripcion', 'description', 'desc', 'comentarios']
-const DESC_ES_KEYS = ['descripción_es', 'descripcion_es', 'description_es']
-const DIFFICULTY_KEYS = ['categoría', 'categoria']
-const DIRIGIDO_KEYS = ['dirigido']
-const NEW_CATEGORY_KEYS = ['new category', 'nueva categoria', 'new_category']
-const TYPE_KEYS = ['tipo', 'type']
-const MOTOR_SKILLS_KEYS = ['habilidad motriz', 'motor skills', 'body parts', 'desarrollada']
-const URL_KEYS = ['url', 'link', 'video']
+const MOTOR_LABELS = [
+  'Coordinación',
+  'Balance',
+  'Resistencia',
+  'Fuerza',
+  'Agilidad',
+  'Confianza',
+  'Estabilidad',
+]
 
-const ACTIVITY_CATEGORY_MAP = {
-  excercise: ['ejercicios funcionales', 'ejercicios', 'funcionales', 'exercise', 'excercise'],
-  iniciacion: ['0 - todos', 'todos', '1 - iniciacion', 'iniciacion', 'calentamiento', 'juegos', 'juego'],
-  street_piso: ['2 - street - piso', 'street - piso', 'street piso', 'street-piso', 'piso'],
-  street_obstaculos: ['3 - street - obstaculos', 'street - obstaculos', 'street obstáculos', 'street obstaculos', 'street-obstaculos', 'obstaculos'],
-  vert_bowl: ['4 - bowl', 'bowl', 'vert-bowl', 'vert bowl', 'vert/bowl', 'vert'],
-  surf_skate: ['surf skate', 'surfskate', 'surf-skate', 'surf'],
-}
-
-const DIFFICULTY_MAP = {
-  beginner: ['0 - calentamiento', 'calentamiento', '1 - basics', 'basics', 'beginner', 'principiante', 'básico', 'basico'],
-  intermediate: ['2 - principiantes', 'principiantes', 'intermediate', 'intermedio'],
-  advanced: ['3 - intermedios', 'intermedios', 'advanced', 'avanzado', 'avanzados'],
-}
-
-function normalizeActivityCategory(dirigidoValue, tipoValue) {
-  const tipo = (tipoValue || '').toString().toLowerCase().trim()
-  if (tipo.includes('ejercicio') || tipo.includes('funcional') || tipo.includes('exercise') || tipo.includes('excercise')) {
-    return 'excercise'
-  }
-
-  if (!dirigidoValue || typeof dirigidoValue !== 'string') {
-    return 'iniciacion'
-  }
-  const v = dirigidoValue.toLowerCase().trim()
-  for (const [cat, aliases] of Object.entries(ACTIVITY_CATEGORY_MAP)) {
-    if (aliases.some(a => v.includes(a))) return cat
-  }
-  return 'iniciacion'
-}
-
-function normalizeDifficulty(value) {
-  if (!value || typeof value !== 'string') return 'beginner'
-  const v = value.toLowerCase().trim()
-  for (const [diff, aliases] of Object.entries(DIFFICULTY_MAP)) {
-    if (aliases.some(a => v === a || v.includes(a))) return diff
-  }
-  return 'beginner'
-}
-
-function findColumn(row, keys) {
-  for (let i = 0; i < row.length; i++) {
-    const cell = (row[i] || '').toString().toLowerCase().trim()
-    if (keys.some(k => cell.includes(k))) return i
+function findHeaderIndex(headerRow, ...keywords) {
+  for (let i = 0; i < headerRow.length; i++) {
+    const cell = (headerRow[i] || '').toString().trim().toLowerCase()
+    if (keywords.some(k => cell === k.toLowerCase() || cell.includes(k.toLowerCase()))) return i
   }
   return -1
 }
 
+function normalizeDifficulty(categoria) {
+  if (!categoria || typeof categoria !== 'string') return 'beginner'
+  const v = categoria.toLowerCase().trim()
+  if (/0\s*-\s*warmup|1\s*-\s*basics|warmup|basics/.test(v)) return 'beginner'
+  if (/2\s*-\s*principiantes|principiantes/.test(v)) return 'beginner'
+  if (/3\s*-\s*intermedios|intermedios/.test(v)) return 'intermediate'
+  if (/4\s*-\s*avanzados|avanzados/.test(v)) return 'advanced'
+  return 'beginner'
+}
+
+function normalizeCategory(program, tipo) {
+  const t = (tipo || '').toString().toLowerCase().trim()
+  if (/ejercicio|funcional|exercise/.test(t)) return 'excercise'
+  const p = (program || '').toString().toLowerCase().trim()
+  if (p === 'strength training') return 'excercise'
+  if (p === 'iniciacion') return 'iniciacion'
+  if (p === 'street') return 'street'
+  if (p === 'park/bowl') return 'vert_bowl'
+  return 'iniciacion'
+}
+
+function isChecked(val) {
+  if (val == null) return false
+  const s = (val + '').trim().toLowerCase()
+  if (!s) return false
+  if (/^[x1sísiy✓✔+]$/.test(s)) return true
+  if (s === 'yes' || s === 'true') return true
+  return s.length > 0 && s.length < 25
+}
+
 function main() {
   if (!existsSync(excelPath)) {
-    console.error('Excel file not found:', excelPath)
-    console.error('Place Niik_Plan_Clases.xlsx in data/Niik_trick_library/')
+    console.error('Excel not found. Tried: data/Niik_source/Niik_Plan_Clases.xlsx and data/Niik_Plan_Clases.xlsx')
     process.exit(1)
   }
 
   const workbook = XLSX.readFile(excelPath)
-  const sheetName = workbook.SheetNames.find(
-    n => n.toLowerCase().includes('manual') || n === SHEET_NAME
-  ) || workbook.SheetNames[0]
+  const sheetName = workbook.SheetNames.find(n => SHEET_MATCH.test(n)) || workbook.SheetNames[0]
+  console.log('Sheet:', sheetName)
 
   const sheet = workbook.Sheets[sheetName]
   const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
   if (raw.length < 2) {
-    console.error('Sheet has no data rows. Expected header + at least one trick.')
+    console.error('Sheet has no data rows.')
     process.exit(1)
   }
 
-  const headerRow = raw[0].map(c => (c || '').toString().trim())
-  const nameCol = findColumn(headerRow, NAME_KEYS)
-  const nameEsCol = findColumn(headerRow, NAME_ES_KEYS)
-  const descCol = findColumn(headerRow, DESC_KEYS)
-  const descEsCol = findColumn(headerRow, DESC_ES_KEYS)
-  const difficultyCol = findColumn(headerRow, DIFFICULTY_KEYS)
-  const dirigidoCol = findColumn(headerRow, DIRIGIDO_KEYS)
-  const newCategoryCol = findColumn(headerRow, NEW_CATEGORY_KEYS)
-  const typeCol = findColumn(headerRow, TYPE_KEYS)
-  const motorSkillsCol = findColumn(headerRow, MOTOR_SKILLS_KEYS)
-  const urlCol = findColumn(headerRow, URL_KEYS)
+  // Find row that contains "Truco" (header row)
+  let headerRow = null
+  let dataStartIndex = 0
+  for (let r = 0; r < Math.min(10, raw.length); r++) {
+    const row = raw[r].map(c => (c ?? '').toString().trim())
+    const idx = findHeaderIndex(row, 'Truco')
+    if (idx >= 0) {
+      headerRow = row
+      dataStartIndex = r + 1
+      break
+    }
+  }
 
-  if (nameCol < 0 && descCol < 0) {
-    console.error('Could not find name or description column. Header row:', headerRow)
+  if (!headerRow) {
+    console.error('Header row with "Truco" not found. First row cells:', raw[0]?.slice(0, 8))
     process.exit(1)
   }
+
+  const colTruco = findHeaderIndex(headerRow, 'Truco')
+  const colCategoria = findHeaderIndex(headerRow, 'Categoria', 'Categoría')
+  const colTipo = findHeaderIndex(headerRow, 'Tipo')
+  const colProgram = findHeaderIndex(headerRow, 'Program')
+  const colComentarios = findHeaderIndex(headerRow, 'Comentarios')
+  const colUrl = findHeaderIndex(headerRow, 'URL')
+
+  if (colTruco < 0) {
+    console.error('Column "Truco" not found.')
+    process.exit(1)
+  }
+
+  // Motor skill sub-columns: headers that match MOTOR_LABELS
+  const motorCols = []
+  for (let c = 0; c < headerRow.length; c++) {
+    const h = (headerRow[c] || '').trim()
+    const match = MOTOR_LABELS.find(l => h === l || h.toLowerCase().includes(l.toLowerCase()))
+    if (match) motorCols.push({ index: c, label: match })
+  }
+  console.log('Columns: Truco, Categoria, Tipo, Program, Comentarios, URL', motorCols.length ? ', motor:' + motorCols.map(m => m.label).join(', ') : '')
 
   const tricks = []
-  for (let i = 1; i < raw.length; i++) {
+  for (let i = dataStartIndex; i < raw.length; i++) {
     const row = raw[i]
-    const name = (row[nameCol] ?? row[0] ?? '').toString().trim()
-    const nameEs = (nameEsCol >= 0 ? row[nameEsCol] : '').toString().trim()
-    const description = (row[descCol] ?? row[1] ?? '').toString().trim()
-    const descriptionEs = (descEsCol >= 0 ? row[descEsCol] : '').toString().trim()
-    const newCategoryValue = newCategoryCol >= 0 ? (row[newCategoryCol] || '').toString().trim() : ''
-    const dirigidoValue = dirigidoCol >= 0 ? (row[dirigidoCol] || '').toString().trim() : ''
-    const tipoValue = typeCol >= 0 ? (row[typeCol] || '').toString().trim() : ''
-    const categoriaValue = difficultyCol >= 0 ? (row[difficultyCol] || '').toString().trim() : ''
-    const urlValue = urlCol >= 0 ? (row[urlCol] || '').toString().trim() : ''
-    const category = normalizeActivityCategory(newCategoryValue || dirigidoValue, tipoValue)
-    const difficulty = difficultyCol >= 0 ? normalizeDifficulty(row[difficultyCol]) : 'beginner'
-    
-    // Parse motor skills (body parts) - split by comma and clean up
-    let motorSkills = []
-    if (motorSkillsCol >= 0 && row[motorSkillsCol]) {
-      const rawMotorSkills = row[motorSkillsCol].toString().trim()
-      motorSkills = rawMotorSkills
-        .split(/[,،;]/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0 && s.length < 50) // Filter out empty or very long strings
+    const name = (row[colTruco] ?? '').toString().trim()
+    const desc = colComentarios >= 0 ? (row[colComentarios] ?? '').toString().trim() : ''
+    if (!name && !desc) continue
+
+    const categoriaRaw = colCategoria >= 0 ? (row[colCategoria] ?? '').toString().trim() : ''
+    const tipo = colTipo >= 0 ? (row[colTipo] ?? '').toString().trim() : ''
+    const program = colProgram >= 0 ? (row[colProgram] ?? '').toString().trim() : ''
+    const url = colUrl >= 0 ? (row[colUrl] ?? '').toString().trim() : ''
+
+    const motorSkills = []
+    for (const { index, label } of motorCols) {
+      if (isChecked(row[index])) motorSkills.push(label)
     }
 
-    if (!name && !description) continue
-
     tricks.push({
-      name: name || (nameEs || 'Unnamed trick'),
-      name_es: nameEs || name || undefined,
-      description: description || name || 'No description',
-      description_es: descriptionEs || undefined,
-      truco: name || undefined,
-      categoria: categoriaValue || undefined,
-      dirigido: dirigidoValue || undefined,
-      comentarios: description || undefined,
-      url: urlValue || undefined,
-      new_category: newCategoryValue || undefined,
-      habilidad_motriz_habilitada: motorSkills.length > 0 ? motorSkills : undefined,
-      difficulty,
-      category,
-      activity_type: tipoValue || undefined,
-      motor_skills: motorSkills.length > 0 ? motorSkills : undefined,
-      sort_order: i,
+      name: name || desc?.slice(0, 200) || 'Unnamed',
+      name_es: name || undefined,
+      description: desc || name || '',
+      comentarios: desc || undefined,
+      categoria: categoriaRaw || undefined,
+      difficulty: normalizeDifficulty(categoriaRaw),
+      category: normalizeCategory(program, tipo),
+      program: program || undefined,
+      url: url || undefined,
+      motor_skills: motorSkills.length ? motorSkills : undefined,
+      activity_type: tipo || undefined,
+      sort_order: tricks.length,
     })
   }
 
   const output = {
-    source: '1 - Manual de Trucos',
+    source: sheetName,
     sourceFile: 'Niik_Plan_Clases.xlsx',
     generatedAt: new Date().toISOString(),
     tricks,
@@ -173,6 +180,7 @@ function main() {
   const publicDataDir = join(projectRoot, 'public', 'data')
   if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
   if (!existsSync(publicDataDir)) mkdirSync(publicDataDir, { recursive: true })
+
   const jsonStr = JSON.stringify(output, null, 2)
   writeFileSync(outPath, jsonStr, 'utf8')
   writeFileSync(outPathPublic, jsonStr, 'utf8')
