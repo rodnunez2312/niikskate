@@ -17,6 +17,7 @@ const groups = ref<Array<{
   color: string | null
   sort_order: number
   is_active: boolean
+  is_system?: boolean
   created_by: string | null
   areas_count: number
   subgroups_count: number
@@ -56,7 +57,7 @@ onMounted(async () => {
 async function fetchGroups() {
   loading.value = true
   try {
-    const { data: groupsData } = await client.from('skill_groups').select('id, name, description, color, sort_order, is_active, created_by').order('sort_order')
+    const { data: groupsData } = await client.from('skill_groups').select('id, name, description, color, sort_order, is_active, is_system, created_by').order('sort_order')
     if (!groupsData?.length) {
       groups.value = []
       stats.value = { assessmentGroups: 0, subgroups: 0, individualSkills: 0, activeGroups: 0 }
@@ -95,7 +96,8 @@ function openGroup(id: string) {
   router.push(`/dashboard/skills/${id}`)
 }
 
-function canDeleteGroup(group: { created_by: string | null }) {
+function canDeleteGroup(group: { created_by: string | null; is_system?: boolean }) {
+  if (group.is_system) return false
   if (userRole.value === 'admin') return true
   if (userRole.value === 'coach' && user.value?.id) return group.created_by === user.value.id
   return false
