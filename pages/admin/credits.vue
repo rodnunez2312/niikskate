@@ -77,7 +77,17 @@ type GuestBookingRow = {
 const recentGuestBookings = ref<GuestBookingRow[]>([])
 const guestBookingProfiles = ref<Record<string, { full_name: string | null; email: string | null }>>({})
 
-const parseGuestBooking = (bd: Record<string, unknown>) => {
+const parseGuestBooking = (bd: Record<string, unknown> | null | undefined) => {
+  if (!bd || typeof bd !== 'object') {
+    return {
+      className: '—',
+      date: '—',
+      session: '—' as const,
+      totalMxn: '—',
+      payment: '—',
+      phone: null as string | null,
+    }
+  }
   const className = typeof bd.class_name === 'string' ? bd.class_name : '—'
   const date =
     typeof bd.date === 'string'
@@ -89,7 +99,7 @@ const parseGuestBooking = (bd: Record<string, unknown>) => {
   const totalMxn = bd.total_mxn ?? bd.total_usd ?? '—'
   const payment = typeof bd.payment_method === 'string' ? bd.payment_method : '—'
   const phone = typeof bd.contact_phone === 'string' ? bd.contact_phone : null
-  return { className, classType, date, session, totalMxn, payment, phone }
+  return { className, date, session, totalMxn, payment, phone }
 }
 
 const loadRecentGuestBookings = async () => {
@@ -132,8 +142,12 @@ const skaterLabel = (userId: string) => {
   return p.full_name || p.email || userId
 }
 
-const formatWhen = (iso: string) =>
-  format(new Date(iso), 'dd MMM yyyy HH:mm', { locale: language.value === 'es' ? es : undefined })
+const formatWhen = (iso: string | null | undefined) => {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return format(d, 'dd MMM yyyy HH:mm', { locale: language.value === 'es' ? es : undefined })
+}
 
 const approveCredit = async (c: UserCredit) => {
   processingId.value = c.id
