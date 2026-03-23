@@ -49,6 +49,10 @@ export default defineNuxtConfig({
     },
     // Server-only: for admin create user (use in server/api)
     supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    // Server-only: Twilio WhatsApp (https://www.twilio.com/docs/whatsapp)
+    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
+    twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
+    twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM || '',
   },
 
   // SSR configuration - disable for Capacitor mobile builds

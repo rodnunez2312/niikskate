@@ -35,7 +35,7 @@ const fetchCreditReservations = async () => {
       .from('class_reservations')
       .select('*')
       .eq('user_id', user.value.id)
-      .eq('status', 'active')
+      .or('status.eq.active,status.eq.pending_payment')
       .order('reservation_date', { ascending: true })
     
     console.log('Credit reservations:', data, 'Error:', error)
@@ -190,7 +190,10 @@ const getClassTypeColor = (classType: string) => {
             class="card p-4"
           >
             <div class="flex gap-4">
-              <div class="w-16 h-16 rounded-xl flex items-center justify-center text-2xl bg-green-500">
+              <div
+                class="w-16 h-16 rounded-xl flex items-center justify-center text-2xl"
+                :class="res.status === 'pending_payment' ? 'bg-amber-400' : 'bg-green-500'"
+              >
                 🛹
               </div>
               
@@ -199,7 +202,13 @@ const getClassTypeColor = (classType: string) => {
                   <h3 class="font-semibold text-gray-900 truncate">
                     {{ language === 'es' ? 'Clase Grupal' : 'Group Class' }}
                   </h3>
-                  <span class="badge text-xs bg-green-100 text-green-800">
+                  <span
+                    v-if="res.status === 'pending_payment'"
+                    class="badge text-xs bg-amber-100 text-amber-900"
+                  >
+                    {{ language === 'es' ? 'Pago pendiente' : 'Payment pending' }}
+                  </span>
+                  <span v-else class="badge text-xs bg-green-100 text-green-800">
                     {{ language === 'es' ? 'Confirmada' : 'Confirmed' }}
                   </span>
                 </div>

@@ -408,18 +408,25 @@ const clearSession = async (timeSlot: 'early' | 'late') => {
 // Save and send final roster (persists sent_at for this date)
 const savingAndSending = ref(false)
 const saveAndSendReport = async () => {
+  if (reportSentAt.value) return
   savingAndSending.value = true
   try {
     const dateStr = format(selectedDate.value, 'yyyy-MM-dd')
-    await client.from('attendance_report_sent').upsert(
+    const { error } = await client.from('attendance_report_sent').upsert(
       {
         class_date: dateStr,
         sent_at: new Date().toISOString(),
         sent_by: user.value?.id ?? null,
       },
-      { onConflict: 'class_date' }
+      { onConflict: 'class_date', ignoreDuplicates: true }
     )
-    reportSentAt.value = new Date().toISOString()
+    if (error) throw error
+    const { data: sentData } = await client
+      .from('attendance_report_sent')
+      .select('sent_at')
+      .eq('class_date', dateStr)
+      .single()
+    reportSentAt.value = sentData?.sent_at ?? null
   } catch (e) {
     console.error('Error saving/sending report:', e)
   } finally {
@@ -1160,15 +1167,26 @@ const navigateToNewEvaluation = (studentId: string) => {
             </div>
           </div>
 
-          <!-- Send report (one button for both sessions) -->
+          <!-- Send report (one button for both sessions; one submit per class date) -->
           <div class="mt-3">
             <button
               type="button"
               @click="saveAndSendReport"
-              :disabled="savingAndSending"
-              class="w-full py-3 px-4 rounded-xl font-bold text-sm bg-glass-green text-black hover:bg-glass-green/90 disabled:opacity-50 transition-colors"
+              :disabled="savingAndSending || !!reportSentAt"
+              class="w-full py-3 px-4 rounded-xl font-bold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              :class="
+                reportSentAt
+                  ? 'bg-gray-800 text-gray-400'
+                  : 'bg-glass-green text-black hover:bg-glass-green/90'
+              "
             >
-              {{ savingAndSending ? '...' : (language === 'es' ? 'Enviar reporte' : 'Send report') }}
+              {{
+                savingAndSending
+                  ? '...'
+                  : reportSentAt
+                    ? (language === 'es' ? 'Reporte enviado' : 'Report sent')
+                    : (language === 'es' ? 'Enviar reporte' : 'Send report')
+              }}
             </button>
           </div>
 

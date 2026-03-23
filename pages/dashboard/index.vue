@@ -482,6 +482,10 @@ const formatDate = (dateStr: string) => {
           </div>
         </div>
 
+        <div class="mt-10 mb-4">
+          <HomeNewsSection variant="section" />
+        </div>
+
         <!-- Emergency contacts popup -->
         <Teleport to="body">
           <div

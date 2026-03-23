@@ -60,6 +60,7 @@ const fetchCredits = async () => {
       .eq('user_id', user.value?.id)
       .gt('remaining_credits', 0)
       .gte('expiration_date', new Date().toISOString())
+      .or('payment_status.is.null,payment_status.eq.paid,payment_status.eq.approved')
       .order('expiration_date', { ascending: true })
 
     if (error) throw error
@@ -80,7 +81,7 @@ const fetchReservations = async () => {
       .from('class_reservations')
       .select('*')
       .eq('user_id', user.value?.id)
-      .eq('status', 'active')
+      .or('status.eq.active,status.eq.pending_payment')
       .gte('reservation_date', format(new Date(), 'yyyy-MM-dd'))
       .order('reservation_date', { ascending: true })
 

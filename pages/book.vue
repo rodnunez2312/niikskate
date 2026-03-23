@@ -58,8 +58,6 @@ const maxClassesForPackage = computed(() => {
     case 'monthly':
     case 'monthly_intermediate':
       return 8
-    case 'pkg_10':
-      return 10
     case 'pkg_5':
       return 5
     case 'pkg_3':
@@ -143,6 +141,10 @@ const countryCodes = [
 const paymentMethod = ref<'cash' | 'online' | null>(null)
 const isSubmitting = ref(false)
 const bookingConfirmed = ref(false)
+/** Blocks success: credit row did not insert (usually missing RLS on user_credits). */
+const submitBookingError = ref<string | null>(null)
+/** Non-blocking: credits OK but calendar rows failed or dates missing. */
+const submitBookingWarning = ref<string | null>(null)
 
 // Get the raw digits for validation (local number only, without country code)
 const phoneDigits = computed(() => customerPhone.value.replace(/\D/g, ''))
@@ -190,11 +192,6 @@ onMounted(() => {
       case 'pkg_5':
         classType.value = 'package'
         selectedClass.value = 'pkg_5'
-        currentStep.value = 3
-        break
-      case 'pkg_10':
-        classType.value = 'package'
-        selectedClass.value = 'pkg_10'
         currentStep.value = 3
         break
       case 'saturdays':
@@ -270,16 +267,6 @@ const packageOptions = computed(() => [
     icon: '5️⃣',
     color: 'from-yellow-400 to-yellow-600',
     badge: '15% OFF',
-  },
-  {
-    id: 'pkg_10',
-    name: language.value === 'es' ? 'Paquete 10 Clases' : '10 Classes Package',
-    description: language.value === 'es' ? '20% descuento • Válido 1 mes' : '20% off • Valid 1 month',
-    priceMXN: 1040,
-    priceUSD: 1600,
-    icon: '🔟',
-    color: 'from-glass-purple to-glass-blue',
-    badge: language.value === 'es' ? 'Mejor valor' : 'Best value',
   },
   {
     id: 'saturdays',
@@ -402,12 +389,23 @@ const selectDate = async (date: Date) => {
     // Single date selection
     selectedDate.value = date
   }
-  selectedSession.value = null
-  
-  // Get available coaches for this date
+
+  // Get available coaches for this date (use chosen session when set)
   const dateStr = format(date, 'yyyy-MM-dd')
-  availableCoachesForDate.value = await getAvailableCoaches(dateStr, 'early')
+  const slot = selectedSession.value || 'early'
+  availableCoachesForDate.value = await getAvailableCoaches(dateStr, slot)
 }
+
+// If user changes time slot after picking a date, refresh coach list for that date
+watch(selectedSession, async () => {
+  const d =
+    selectedDate.value ||
+    (selectedDates.value.length > 0 ? selectedDates.value[selectedDates.value.length - 1] : null)
+  if (!d) return
+  const dateStr = format(d, 'yyyy-MM-dd')
+  const slot = selectedSession.value || 'early'
+  availableCoachesForDate.value = await getAvailableCoaches(dateStr, slot)
+})
 
 // Get coach for date (for calendar hover)
 const getCoachForDate = (date: Date) => {
@@ -455,6 +453,63 @@ const selectSpecificClass = (classId: string) => {
   // Brief delay for visual feedback before advancing
   setTimeout(() => {
     nextStep()
+  }, 200)
+}
+
+/** Featured packages on step 1 — same offers as former home quick-buy; skips package picker (step 2). */
+const featuredQuickPackageIds = ['monthly_intermediate', 'pkg_3', 'pkg_5'] as const
+
+const featuredQuickPackages = computed(() => {
+  const borders: Record<string, string> = {
+    monthly_intermediate: 'border-glass-purple/50 hover:border-glass-purple',
+    pkg_3: 'border-glass-green/50 hover:border-glass-green',
+    pkg_5: 'border-gold-400/50 hover:border-gold-400',
+  }
+  const titles: Record<string, { es: string; en: string }> = {
+    monthly_intermediate: { es: '8 créditos (mensual)', en: '8 credits (monthly)' },
+    pkg_3: { es: 'Paquete 3 clases', en: '3-class package' },
+    pkg_5: { es: 'Paquete 5 clases', en: '5-class package' },
+  }
+  const subs: Record<string, { es: string; en: string }> = {
+    monthly_intermediate: { es: 'Programa intermedios', en: 'Intermediate program' },
+    pkg_3: { es: '10% descuento', en: '10% off' },
+    pkg_5: { es: '15% descuento', en: '15% off' },
+  }
+  const emojis: Record<string, string> = {
+    monthly_intermediate: '⭐',
+    pkg_3: '3️⃣',
+    pkg_5: '5️⃣',
+  }
+  return featuredQuickPackageIds.map(id => {
+    const opt = packageOptions.value.find(p => p.id === id)
+    if (!opt) return null
+    const isEs = language.value === 'es'
+    return {
+      id,
+      emoji: emojis[id],
+      title: isEs ? titles[id].es : titles[id].en,
+      subtitle: isEs ? subs[id].es : subs[id].en,
+      priceLabel: currency.value === 'USD' ? `$${opt.priceUSD} USD` : `$${opt.priceMXN} MXN`,
+      border: borders[id],
+    }
+  }).filter(Boolean) as Array<{
+    id: string
+    emoji: string
+    title: string
+    subtitle: string
+    priceLabel: string
+    border: string
+  }>
+})
+
+const selectFeaturedPackageFromStep1 = (classId: string) => {
+  classType.value = 'package'
+  selectedClass.value = classId
+  selectedDates.value = []
+  selectedDate.value = null
+  selectedSession.value = null
+  setTimeout(() => {
+    currentStep.value = 3
   }, 200)
 }
 
@@ -538,7 +593,6 @@ const getCreditType = (classSelection: string | null): string | null => {
     case 'monthly_intermediate': return 'monthly_intermediate'
     case 'pkg_3': return 'pkg_3'
     case 'pkg_5': return 'pkg_5'
-    case 'pkg_10': return 'pkg_10'
     case 'saturdays': return 'saturdays'
     case 'grouped': return 'single_group'
     case 'individual': return 'single_individual'
@@ -552,7 +606,6 @@ const getTotalCredits = (classSelection: string | null): number => {
     case 'monthly':
     case 'monthly_intermediate':
       return 8
-    case 'pkg_10': return 10
     case 'pkg_5': return 5
     case 'pkg_3': return 3
     case 'saturdays': return 4
@@ -563,11 +616,43 @@ const getTotalCredits = (classSelection: string | null): number => {
   }
 }
 
+/** E.164 for WhatsApp (Twilio), e.g. +523310001774 */
+const normalizeBookingWhatsAppTo = (): string | null => {
+  if (!skipEmail.value || phoneDigits.value.replace(/\D/g, '').length < 10) return null
+  const cc = selectedCountryCode.value.replace(/\s/g, '')
+  const digits = phoneDigits.value.replace(/\D/g, '')
+  const plus = cc.startsWith('+') ? cc : `+${cc}`
+  return `${plus}${digits}`
+}
+
+const sendBookingConfirmationWhatsApp = async () => {
+  const to = normalizeBookingWhatsAppTo()
+  if (!to) return
+  try {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData?.session?.access_token
+    if (!token) return
+    await $fetch('/api/booking/whatsapp-confirmation', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        to,
+        language: language.value,
+        summary: selectedClassDetails.value?.name || '',
+      },
+    })
+  } catch (e) {
+    console.warn('Booking WhatsApp not sent:', e)
+  }
+}
+
 // Submit booking
 const submitBooking = async () => {
   if (!canProceed.value) return
   
   isSubmitting.value = true
+  submitBookingError.value = null
+  submitBookingWarning.value = null
   
   // Build booking data
   const bookingData = {
@@ -608,25 +693,60 @@ const submitBooking = async () => {
       const totalCredits = getTotalCredits(selectedClass.value)
       
       if (creditType && totalCredits > 0) {
-        const expirationDate = addDays(new Date(), 30) // Credits expire in 30 days
-        
-        const { error: creditError } = await supabase
+        // Hold credits until admin confirms offline payment (RLS allows insert for own user_id)
+        const pendingExpiration = addDays(new Date(), 90)
+        const datesChosen: Date[] = isMultiDateSelection.value
+          ? [...selectedDates.value]
+          : selectedDate.value
+            ? [selectedDate.value]
+            : []
+
+        const { data: newCredit, error: creditError } = await supabase
           .from('user_credits')
           .insert({
             user_id: user.value.id,
             credit_type: creditType,
             total_credits: totalCredits,
-            remaining_credits: totalCredits,
+            remaining_credits: 0,
             purchase_date: new Date().toISOString(),
-            expiration_date: expirationDate.toISOString(),
+            expiration_date: pendingExpiration.toISOString(),
             price_paid_mxn: totalPriceMXN.value,
             price_paid_usd: currency.value === 'USD' ? displayTotal.value : null,
             payment_method: paymentMethod.value,
-            payment_status: paymentMethod.value === 'cash' ? 'pending' : 'pending'
+            payment_status: 'pending',
           })
-        
+          .select('id')
+          .single()
+
         if (creditError) {
           console.error('Error creating credits:', creditError)
+          const hint =
+            language.value === 'es'
+              ? 'No se guardaron los créditos. En Supabase, ejecuta la migración `guest_bookings_and_credits_rls_fix.sql` (política INSERT en user_credits).'
+              : 'Credits were not saved. In Supabase, run migration `guest_bookings_and_credits_rls_fix.sql` (user_credits INSERT policy).'
+          submitBookingError.value = `${hint} (${creditError.message || 'RLS'})`
+        } else if (newCredit?.id && selectedSession.value && datesChosen.length > 0) {
+          const reservationRows = datesChosen.map(d => ({
+            user_id: user.value!.id,
+            credit_id: newCredit.id,
+            reservation_date: format(d, 'yyyy-MM-dd'),
+            time_slot: selectedSession.value,
+            status: 'pending_payment' as const,
+          }))
+          const { error: resErr } = await supabase.from('class_reservations').insert(reservationRows)
+          if (resErr) {
+            console.error('Error creating pending class reservations:', resErr)
+            const hint =
+              language.value === 'es'
+                ? 'Los créditos quedaron pendientes pero no las fechas en el calendario. Ejecuta `class_reservations_pending_payment.sql` (enum pending_payment + trigger).'
+                : 'Credits are pending but calendar slots failed. Run `class_reservations_pending_payment.sql` (pending_payment enum + trigger).'
+            submitBookingWarning.value = `${hint} (${resErr.message})`
+          }
+        } else if (newCredit?.id && datesChosen.length === 0) {
+          submitBookingWarning.value =
+            language.value === 'es'
+              ? 'Créditos guardados sin fechas en el calendario (revisa el paso de fechas).'
+              : 'Credits saved without calendar dates (check the date step).'
         }
       }
     } else {
@@ -644,10 +764,21 @@ const submitBooking = async () => {
     
     // Simulate API delay for UX
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    bookingConfirmed.value = true
+
+    if (submitBookingError.value) {
+      bookingConfirmed.value = false
+    } else {
+      bookingConfirmed.value = true
+      if (user.value && skipEmail.value) {
+        await sendBookingConfirmationWhatsApp()
+      }
+    }
   } catch (error) {
     console.error('Booking error:', error)
+    submitBookingError.value =
+      language.value === 'es'
+        ? 'Error inesperado al reservar. Intenta de nuevo.'
+        : 'Unexpected booking error. Please try again.'
   } finally {
     isSubmitting.value = false
   }
@@ -805,6 +936,37 @@ const isDateBookable = (date: Date): boolean => {
               </svg>
             </div>
           </button>
+        </div>
+
+        <!-- Buy credits (popular packages) — continues to equipment / dates flow -->
+        <div class="pt-6 mt-6 border-t border-gray-800">
+          <h2 class="text-lg font-bold text-white mb-1">
+            {{ language === 'es' ? 'Comprar créditos' : 'Buy credits' }}
+          </h2>
+          <p class="text-gray-500 text-sm mb-3">
+            {{
+              language === 'es'
+                ? 'Acceso rápido a nuestros paquetes más pedidos'
+                : 'Quick access to our most popular packages'
+            }}
+          </p>
+          <div class="space-y-2">
+            <button
+              v-for="pkg in featuredQuickPackages"
+              :key="pkg.id"
+              type="button"
+              class="w-full flex items-center gap-3 bg-black/40 backdrop-blur-sm rounded-2xl p-4 border transition-all duration-200 text-left active:scale-[0.99]"
+              :class="pkg.border"
+              @click="selectFeaturedPackageFromStep1(pkg.id)"
+            >
+              <span class="text-2xl shrink-0">{{ pkg.emoji }}</span>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-white text-sm">{{ pkg.title }}</p>
+                <p class="text-xs text-gray-400">{{ pkg.subtitle }}</p>
+              </div>
+              <span class="text-gold-400 font-bold text-sm shrink-0">{{ pkg.priceLabel }}</span>
+            </button>
+          </div>
         </div>
 
         <!-- Visual hint -->
@@ -1040,6 +1202,35 @@ const isDateBookable = (date: Date): boolean => {
           </Transition>
         </div>
 
+        <!-- Time slot first (above calendar) -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+          <div class="space-y-3">
+            <p class="text-sm text-gray-400 text-center">
+              {{ language === 'es' ? 'Selecciona horario:' : 'Select time slot:' }}
+            </p>
+            <div class="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                @click="selectedSession = 'early'"
+                class="p-4 rounded-xl border-2 transition-all text-left"
+                :class="selectedSession === 'early' ? 'border-gold-400 bg-gold-400/20' : 'border-gray-700 bg-gray-800 hover:border-gray-600'"
+              >
+                <p class="font-bold text-white">5:30 PM</p>
+                <p class="text-sm text-gray-400">- 7:00 PM</p>
+              </button>
+              <button
+                type="button"
+                @click="selectedSession = 'late'"
+                class="p-4 rounded-xl border-2 transition-all text-left"
+                :class="selectedSession === 'late' ? 'border-gold-400 bg-gold-400/20' : 'border-gray-700 bg-gray-800 hover:border-gray-600'"
+              >
+                <p class="font-bold text-white">7:00 PM</p>
+                <p class="text-sm text-gray-400">- 8:30 PM</p>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Calendar -->
         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
           <!-- Month navigation -->
@@ -1210,33 +1401,6 @@ const isDateBookable = (date: Date): boolean => {
           </div>
         </Transition>
 
-        <!-- Session selection (shown when dates are selected) -->
-        <div v-if="(isMultiDateSelection && selectedDates.length > 0) || (!isMultiDateSelection && selectedDate)" class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-          <div class="space-y-2">
-            <p class="text-sm text-gray-400 text-center">
-              {{ language === 'es' ? 'Selecciona horario:' : 'Select session:' }}
-            </p>
-            <div class="grid grid-cols-2 gap-3">
-              <button
-                @click="selectedSession = 'early'"
-                class="p-4 rounded-xl border-2 transition-all"
-                :class="selectedSession === 'early' ? 'border-gold-400 bg-gold-400/20' : 'border-gray-700 bg-gray-800'"
-              >
-                <p class="font-bold text-white">5:30 PM</p>
-                <p class="text-sm text-gray-400">- 7:00 PM</p>
-              </button>
-              <button
-                @click="selectedSession = 'late'"
-                class="p-4 rounded-xl border-2 transition-all"
-                :class="selectedSession === 'late' ? 'border-gold-400 bg-gold-400/20' : 'border-gray-700 bg-gray-800'"
-              >
-                <p class="font-bold text-white">7:00 PM</p>
-                <p class="text-sm text-gray-400">- 8:30 PM</p>
-              </button>
-            </div>
-          </div>
-        </div>
-
         <!-- Ask for availability (for individual classes) -->
         <div v-if="selectedClass === 'individual'" class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
           <div class="flex items-center gap-3">
@@ -1264,6 +1428,19 @@ const isDateBookable = (date: Date): boolean => {
 
       <!-- STEP 5: Confirmation -->
       <div v-else-if="currentStep === 5" class="space-y-6">
+        <div
+          v-if="submitBookingError && !bookingConfirmed"
+          class="rounded-2xl border border-red-500/40 bg-red-950/40 p-4 text-left"
+        >
+          <p class="text-red-200 text-sm font-semibold">
+            {{
+              language === 'es'
+                ? 'No se pudo completar el registro de créditos o fechas'
+                : 'Could not save credits or calendar slots'
+            }}
+          </p>
+          <p class="text-red-200/85 text-xs mt-2 whitespace-pre-wrap break-words">{{ submitBookingError }}</p>
+        </div>
         <!-- Booking Confirmed State -->
         <div v-if="bookingConfirmed" class="text-center py-8">
           <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
@@ -1277,13 +1454,29 @@ const isDateBookable = (date: Date): boolean => {
           <p class="text-gray-400 mb-6">
             {{ skipEmail
               ? (language === 'es' 
-                  ? 'Te enviamos los detalles por SMS' 
-                  : 'We sent the details via SMS')
+                  ? 'Te enviamos un mensaje por WhatsApp' 
+                  : 'We sent you a WhatsApp message')
               : (language === 'es' 
                   ? 'Te enviamos los detalles a tu correo' 
                   : 'We sent the details to your email')
             }}
           </p>
+          <p
+            v-if="user && getCreditType(selectedClass)"
+            class="text-amber-400/95 text-sm mb-6 px-2 leading-relaxed"
+          >
+            {{
+              language === 'es'
+                ? 'Tus créditos se activarán cuando un administrador confirme que recibió tu pago. Verás el saldo en inicio y podrás reservar clases.'
+                : 'Your credits activate after an admin confirms payment. You’ll then see your balance on the home screen and can book classes.'
+            }}
+          </p>
+          <div
+            v-if="submitBookingWarning"
+            class="text-left mb-6 rounded-xl border border-amber-500/40 bg-amber-950/30 p-3 text-amber-100/95 text-xs whitespace-pre-wrap break-words"
+          >
+            {{ submitBookingWarning }}
+          </div>
           
           <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-left mb-6">
             <div class="space-y-3">
@@ -1507,7 +1700,7 @@ const isDateBookable = (date: Date): boolean => {
               </p>
             </div>
 
-            <!-- SMS Preference Checkbox -->
+            <!-- WhatsApp preference (uses same phone field; skips email confirmation copy) -->
             <label class="flex items-center gap-3 mt-4 cursor-pointer">
               <div 
                 @click="skipEmail = !skipEmail"
@@ -1520,10 +1713,10 @@ const isDateBookable = (date: Date): boolean => {
               </div>
               <div class="flex-1">
                 <span class="text-sm text-white">
-                  {{ language === 'es' ? 'Prefiero recibir confirmación por SMS' : 'I prefer to receive confirmation via SMS' }}
+                  {{ language === 'es' ? 'Prefiero recibir confirmación por WhatsApp' : 'I prefer confirmation via WhatsApp' }}
                 </span>
                 <p class="text-xs text-gray-500">
-                  {{ language === 'es' ? 'Ingresa tu número de teléfono' : 'Enter your phone number' }}
+                  {{ language === 'es' ? 'Ingresa tu número de WhatsApp (mismo formato que tu celular)' : 'Enter your WhatsApp number (same as your mobile)' }}
                 </p>
               </div>
               <span class="text-lg">📱</span>

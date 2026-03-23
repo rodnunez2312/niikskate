@@ -6,7 +6,7 @@ import type { GuestBooking, StudentProgress, Skill } from '~/types'
 const router = useRouter()
 const client = useSupabaseClient()
 const user = useSupabaseUser()
-const { language, t, currency } = useI18n()
+const { language } = useI18n()
 
 interface Profile {
   id: string
@@ -23,7 +23,6 @@ const profile = ref<Profile | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 const editMode = ref(false)
-const activeTab = ref<'overview' | 'bookings' | 'progress'>('overview')
 
 // Booking data
 const bookings = ref<GuestBooking[]>([])
@@ -220,13 +219,6 @@ const menuItems = computed(() => {
     path: '/user/tips',
     disabled: false,
   })
-  
-  items.push({
-    icon: '📰',
-    label: language.value === 'es' ? 'Noticias' : 'News',
-    path: '/user/news',
-    disabled: false,
-  })
 
   // Add coach links
   if (profile.value?.role === 'coach' || profile.value?.role === 'admin') {
@@ -315,8 +307,13 @@ const formatBookingDate = (dateStr: string) => {
         </div>
       </header>
 
-      <!-- Profile Card -->
+      <!-- Skate stats card (customers) — top of profile -->
       <div class="px-4 -mt-16 max-w-lg mx-auto pb-24 relative z-20">
+        <HomeSkaterProfileCard
+          v-if="!loading && profile?.role === 'customer'"
+          class="mb-4"
+        />
+
         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
           <!-- Loading State -->
           <div v-if="loading" class="animate-pulse">
@@ -439,33 +436,11 @@ const formatBookingDate = (dateStr: string) => {
         </template>
       </div>
 
-      <!-- Tabs -->
-      <div class="flex gap-2 mt-6 mb-4">
-        <button
-          @click="activeTab = 'overview'"
-          class="flex-1 py-2 px-4 rounded-xl font-semibold transition-all text-sm"
-          :class="activeTab === 'overview' ? 'bg-gold-400 text-black' : 'bg-gray-800 text-gray-400'"
-        >
-          {{ language === 'es' ? 'General' : 'Overview' }}
-        </button>
-        <button
-          @click="activeTab = 'bookings'"
-          class="flex-1 py-2 px-4 rounded-xl font-semibold transition-all text-sm"
-          :class="activeTab === 'bookings' ? 'bg-gold-400 text-black' : 'bg-gray-800 text-gray-400'"
-        >
-          {{ language === 'es' ? 'Reservas' : 'Bookings' }}
-        </button>
-        <button
-          @click="activeTab = 'progress'"
-          class="flex-1 py-2 px-4 rounded-xl font-semibold transition-all text-sm"
-          :class="activeTab === 'progress' ? 'bg-gold-400 text-black' : 'bg-gray-800 text-gray-400'"
-        >
-          {{ language === 'es' ? 'Progreso' : 'Progress' }}
-        </button>
-      </div>
-
-      <!-- Tab Content: Overview -->
-      <div v-if="activeTab === 'overview'" class="space-y-2">
+      <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wide mt-6 mb-3 px-1">
+        {{ language === 'es' ? 'Accesos' : 'Shortcuts' }}
+      </h2>
+      <!-- Menu & lists (no tabs) -->
+      <div class="space-y-2">
         <NuxtLink
           v-for="item in menuItems"
           :key="item.path"
@@ -492,8 +467,10 @@ const formatBookingDate = (dateStr: string) => {
         </NuxtLink>
       </div>
 
-      <!-- Tab Content: Bookings -->
-      <div v-else-if="activeTab === 'bookings'" class="space-y-3">
+      <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wide mt-8 mb-3 px-1">
+        {{ language === 'es' ? 'Reservas' : 'Bookings' }}
+      </h2>
+      <div class="space-y-3">
         <div v-if="loadingBookings" class="text-center py-8">
           <div class="animate-spin w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full mx-auto"></div>
         </div>
@@ -525,8 +502,10 @@ const formatBookingDate = (dateStr: string) => {
         </div>
       </div>
 
-      <!-- Tab Content: Progress -->
-      <div v-else-if="activeTab === 'progress'" class="space-y-3">
+      <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wide mt-8 mb-3 px-1">
+        {{ language === 'es' ? 'Progreso' : 'Progress' }}
+      </h2>
+      <div class="space-y-3">
         <div v-if="loadingProgress" class="text-center py-8">
           <div class="animate-spin w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full mx-auto"></div>
         </div>
