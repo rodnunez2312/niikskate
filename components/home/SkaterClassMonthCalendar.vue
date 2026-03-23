@@ -11,6 +11,7 @@ import {
   isToday,
   isBefore,
   startOfDay,
+  parseISO,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { ClassReservation } from '~/types'
@@ -19,6 +20,10 @@ const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language } = useI18n()
 const { isClassDay } = useClasses()
+
+const modalReservation = ref<ClassReservation | null>(null)
+const confirmLoading = ref(false)
+const confirmError = ref<string | null>(null)
 
 const calendarMonth = ref(new Date())
 const reservations = ref<ClassReservation[]>([])
@@ -114,7 +119,7 @@ const fetchMonth = async () => {
       .from('class_reservations')
       .select('*')
       .eq('user_id', user.value.id)
-      .or('status.eq.active,status.eq.pending_payment')
+      .or('status.eq.active,status.eq.pending_payment,status.eq.pending_skater_confirm')
       .gte('reservation_date', from)
       .lte('reservation_date', to)
       .order('reservation_date')
@@ -145,6 +150,68 @@ const dayClasses = (date: Date) => {
 }
 
 const isPastDay = (date: Date) => isBefore(startOfDay(date), startOfDay(new Date()))
+
+const canOpenConfirmModal = (r: ClassReservation) =>
+  Boolean(r.id && !String(r.id).startsWith('guest-overlay')) && r.status === 'pending_skater_confirm'
+
+const openConfirmModal = (r: ClassReservation) => {
+  if (!canOpenConfirmModal(r)) return
+  modalReservation.value = r
+  confirmError.value = null
+}
+
+const closeConfirmModal = () => {
+  modalReservation.value = null
+  confirmError.value = null
+}
+
+const submitSkaterConfirm = async () => {
+  if (!modalReservation.value) return
+  confirmLoading.value = true
+  confirmError.value = null
+  try {
+    const { data, error } = await client.rpc('confirm_class_reservation_skater', {
+      p_reservation_id: modalReservation.value.id,
+    })
+    if (error) throw error
+    const row = data as { ok?: boolean; error?: string } | null
+    if (!row?.ok) {
+      const code = row?.error
+      if (code === 'within_24h') {
+        confirmError.value =
+          language.value === 'es'
+            ? 'Debes confirmar al menos 24 horas antes del inicio de la clase (horario de la academia).'
+            : 'You must confirm at least 24 hours before class starts (academy schedule).'
+      } else if (code === 'class_started') {
+        confirmError.value =
+          language.value === 'es'
+            ? 'Esta fecha ya no se puede confirmar.'
+            : 'This date can no longer be confirmed.'
+      } else {
+        confirmError.value =
+          language.value === 'es'
+            ? 'No se pudo confirmar. Intenta de nuevo.'
+            : 'Could not confirm. Please try again.'
+      }
+      return
+    }
+    closeConfirmModal()
+    await fetchMonth()
+  } catch (e: unknown) {
+    confirmError.value = e instanceof Error ? e.message : 'Error'
+  } finally {
+    confirmLoading.value = false
+  }
+}
+
+const slotLabelLong = (slot: string) =>
+  slot === 'early'
+    ? language.value === 'es'
+      ? '5:30 PM – 7:00 PM (temprana)'
+      : '5:30 PM – 7:00 PM (early)'
+    : language.value === 'es'
+      ? '7:00 PM – 8:30 PM (tarde)'
+      : '7:00 PM – 8:30 PM (late)'
 </script>
 
 <template>
@@ -213,37 +280,95 @@ const isPastDay = (date: Date) => isBefore(startOfDay(date), startOfDay(new Date
           {{ format(date, 'd') }}
         </span>
         <div v-if="dayClasses(date).length" class="flex flex-wrap gap-0.5 justify-center mt-0.5 px-0.5 w-full">
-          <span
+          <button
             v-for="r in dayClasses(date)"
             :key="r.id"
-            class="text-[8px] font-bold px-1 rounded leading-tight max-w-full truncate"
+            type="button"
+            class="text-[8px] font-bold px-1 rounded leading-tight max-w-full truncate disabled:opacity-100"
             :class="
               isPastDay(date)
-                ? 'bg-gray-600/80 text-gray-300'
+                ? 'bg-gray-600/80 text-gray-300 cursor-default'
                 : r.status === 'pending_payment'
-                  ? 'bg-amber-500/35 text-amber-200 border border-amber-500/40'
-                  : 'bg-glass-green/40 text-glass-green'
+                  ? 'bg-amber-500/35 text-amber-200 border border-amber-500/40 cursor-default'
+                  : r.status === 'pending_skater_confirm'
+                    ? 'bg-cyan-500/30 text-cyan-100 border border-cyan-400/50 cursor-pointer hover:bg-cyan-500/45'
+                    : 'bg-glass-green/40 text-glass-green cursor-default'
             "
+            :disabled="!canOpenConfirmModal(r) || isPastDay(date)"
             :title="
               r.status === 'pending_payment'
-                ? (language === 'es' ? 'Pendiente de confirmación de pago' : 'Pending payment confirmation')
-                : r.time_slot === 'early'
-                  ? '5:30 PM – 7:00 PM'
-                  : '7:00 PM – 8:30 PM'
+                ? language === 'es'
+                  ? 'Pago pendiente de admin'
+                  : 'Payment pending admin'
+                : r.status === 'pending_skater_confirm'
+                  ? language === 'es'
+                    ? 'Toca para confirmar tu clase (24 h antes)'
+                    : 'Tap to confirm your class (24h notice)'
+                  : slotLabelLong(r.time_slot)
             "
+            @click="openConfirmModal(r)"
           >
             {{ slotShort(r.time_slot) }}
-          </span>
+          </button>
         </div>
       </div>
     </div>
 
-    <p class="text-[10px] text-gray-500 mt-3 text-center">
+    <p class="text-[10px] text-gray-500 mt-3 text-center leading-relaxed px-1">
       {{
         language === 'es'
-          ? 'Horarios: 5:30 (temprana) y 7:00 (tarde). Ámbar = pendiente de pago.'
-          : 'Times: 5:30 (early) and 7:00 (late). Amber = payment pending.'
+          ? '5:30 temprana · 7:00 tarde. Ámbar = pago pendiente · Cian = confirma tocando el día · Verde = confirmada.'
+          : '5:30 early · 7:00 late. Amber = payment pending · Cyan = tap to confirm · Green = confirmed.'
       }}
     </p>
+
+    <!-- Confirm class (after admin paid) -->
+    <Teleport to="body">
+      <div
+        v-if="modalReservation"
+        class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        @click.self="closeConfirmModal"
+      >
+        <div
+          class="w-full max-w-md rounded-2xl border border-cyan-500/40 bg-gray-950 p-5 shadow-2xl text-left"
+        >
+          <h3 class="text-lg font-bold text-white mb-2">
+            {{ language === 'es' ? 'Confirmar tu clase' : 'Confirm your class' }}
+          </h3>
+          <p class="text-sm text-gray-300 mb-1">
+            {{ format(parseISO(modalReservation.reservation_date), 'EEEE d MMMM yyyy', { locale: language === 'es' ? es : undefined }) }}
+          </p>
+          <p class="text-sm text-cyan-200/90 mb-4">{{ slotLabelLong(modalReservation.time_slot) }}</p>
+          <p class="text-xs text-gray-500 mb-4">
+            {{
+              language === 'es'
+                ? 'Al confirmar, el coach verá tu lugar reservado. Solo puedes confirmar si faltan al menos 24 horas para el inicio (horario Ciudad de México).'
+                : 'Once confirmed, coaches will see your spot. You can only confirm at least 24 hours before start (Mexico City time).'
+            }}
+          </p>
+          <p v-if="confirmError" class="text-sm text-red-300 mb-3">{{ confirmError }}</p>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="flex-1 py-3 rounded-xl bg-gray-800 text-gray-200 text-sm font-semibold"
+              :disabled="confirmLoading"
+              @click="closeConfirmModal"
+            >
+              {{ language === 'es' ? 'Cancelar' : 'Cancel' }}
+            </button>
+            <button
+              type="button"
+              class="flex-1 py-3 rounded-xl bg-cyan-600 text-white text-sm font-semibold disabled:opacity-50"
+              :disabled="confirmLoading"
+              @click="submitSkaterConfirm"
+            >
+              {{ confirmLoading ? '…' : language === 'es' ? 'Confirmar clase' : 'Confirm class' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

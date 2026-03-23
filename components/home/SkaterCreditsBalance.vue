@@ -8,10 +8,16 @@ const { language } = useI18n()
 
 const credits = ref<UserCredit[]>([])
 const pendingRows = ref<UserCredit[]>([])
+const skaterPendingConfirmCount = ref(0)
 const loading = ref(true)
 
 const totalRemaining = computed(() =>
   credits.value.reduce((sum, c) => sum + (c.remaining_credits || 0), 0)
+)
+
+/** Paid credits to spend + classes waiting for skater tap-to-confirm on calendar */
+const displayAvailableTotal = computed(
+  () => totalRemaining.value + skaterPendingConfirmCount.value
 )
 
 const pendingTotalClasses = computed(() =>
@@ -22,6 +28,7 @@ const fetchCredits = async () => {
   if (!user.value?.id) {
     credits.value = []
     pendingRows.value = []
+    skaterPendingConfirmCount.value = 0
     loading.value = false
     return
   }
@@ -52,6 +59,15 @@ const fetchCredits = async () => {
 
     if (e2) throw e2
     pendingRows.value = pend || []
+
+    const { count: skCount, error: e3 } = await client
+      .from('class_reservations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.value.id)
+      .eq('status', 'pending_skater_confirm')
+
+    if (e3) throw e3
+    skaterPendingConfirmCount.value = skCount ?? 0
   } catch (e) {
     console.error('SkaterCreditsBalance:', e)
   } finally {
@@ -100,18 +116,44 @@ const labelFor = (c: UserCredit) => {
       </div>
 
       <div class="flex items-baseline gap-2 mb-3">
-        <span class="text-4xl font-black text-glass-green">{{ totalRemaining }}</span>
+        <span
+          class="text-4xl font-black"
+          :class="displayAvailableTotal > 0 ? 'text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.35)]' : 'text-glass-green'"
+        >
+          {{ displayAvailableTotal }}
+        </span>
         <span class="text-gray-400 text-sm">
-          {{ language === 'es' ? 'clases disponibles' : 'classes available' }}
+          {{
+            language === 'es'
+              ? displayAvailableTotal === 1
+                ? 'clase disponible'
+                : 'clases disponibles'
+              : displayAvailableTotal === 1
+                ? 'class available'
+                : 'classes available'
+          }}
         </span>
       </div>
+      <p
+        v-if="skaterPendingConfirmCount > 0"
+        class="text-xs text-cyan-200/90 mb-3 -mt-1 leading-snug"
+      >
+        {{
+          language === 'es'
+            ? `Toca el día en «Mis clases» y confirma ${skaterPendingConfirmCount === 1 ? 'tu clase' : 'cada clase'} (mín. 24 h antes del horario).`
+            : `Tap the day under “My classes” to confirm ${skaterPendingConfirmCount === 1 ? 'your class' : 'each class'} (at least 24 h before start).`
+        }}
+      </p>
       <ul v-if="credits.length > 0" class="space-y-2 text-sm text-gray-300 border-t border-gray-800 pt-3">
         <li v-for="c in credits" :key="c.id" class="flex justify-between gap-2">
           <span class="truncate">{{ labelFor(c) }}</span>
           <span class="text-gold-400 font-bold shrink-0">{{ c.remaining_credits }}</span>
         </li>
       </ul>
-      <p v-else-if="pendingRows.length === 0" class="text-gray-500 text-sm">
+      <p
+        v-else-if="pendingRows.length === 0 && skaterPendingConfirmCount === 0"
+        class="text-gray-500 text-sm"
+      >
         {{ language === 'es' ? 'Sin créditos activos. Compra un paquete abajo.' : 'No active credits. Buy a package below.' }}
       </p>
     </template>

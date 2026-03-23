@@ -19,10 +19,6 @@ const rows = ref<UserCredit[]>([])
 const profilesById = ref<Record<string, { full_name: string | null; email: string | null }>>({})
 const processingId = ref<string | null>(null)
 const loadError = ref<string | null>(null)
-const recentGuestBookings = ref<
-  { id: string; created_at: string; linked_user_id: string | null; booking_data: Record<string, unknown> }[]
->([])
-
 onMounted(async () => {
   if (!user.value) {
     router.push('/auth/login?redirect=/admin/credits')
@@ -71,6 +67,31 @@ const loadPending = async () => {
   }
 }
 
+type GuestBookingRow = {
+  id: string
+  created_at: string
+  linked_user_id: string | null
+  booking_data: Record<string, unknown>
+}
+
+const recentGuestBookings = ref<GuestBookingRow[]>([])
+const guestBookingProfiles = ref<Record<string, { full_name: string | null; email: string | null }>>({})
+
+const parseGuestBooking = (bd: Record<string, unknown>) => {
+  const className = typeof bd.class_name === 'string' ? bd.class_name : '—'
+  const date =
+    typeof bd.date === 'string'
+      ? bd.date
+      : Array.isArray(bd.dates) && bd.dates.length
+        ? String(bd.dates[0])
+        : '—'
+  const session = bd.session === 'late' ? 'late' : bd.session === 'early' ? 'early' : '—'
+  const totalMxn = bd.total_mxn ?? bd.total_usd ?? '—'
+  const payment = typeof bd.payment_method === 'string' ? bd.payment_method : '—'
+  const phone = typeof bd.contact_phone === 'string' ? bd.contact_phone : null
+  return { className, classType, date, session, totalMxn, payment, phone }
+}
+
 const loadRecentGuestBookings = async () => {
   try {
     const { data, error } = await client
@@ -81,7 +102,19 @@ const loadRecentGuestBookings = async () => {
       .limit(15)
 
     if (error) throw error
-    recentGuestBookings.value = (data || []) as typeof recentGuestBookings.value
+    recentGuestBookings.value = (data || []) as GuestBookingRow[]
+
+    const ids = [...new Set(recentGuestBookings.value.map(g => g.linked_user_id).filter(Boolean) as string[])]
+    if (ids.length === 0) {
+      guestBookingProfiles.value = {}
+      return
+    }
+    const { data: profs } = await client.from('profiles').select('id, full_name, email').in('id', ids)
+    const map: Record<string, { full_name: string | null; email: string | null }> = {}
+    profs?.forEach((p: any) => {
+      map[p.id] = { full_name: p.full_name, email: p.email }
+    })
+    guestBookingProfiles.value = map
   } catch (e) {
     console.error('loadRecentGuestBookings:', e)
   }
@@ -101,11 +134,6 @@ const skaterLabel = (userId: string) => {
 
 const formatWhen = (iso: string) =>
   format(new Date(iso), 'dd MMM yyyy HH:mm', { locale: language.value === 'es' ? es : undefined })
-
-const summarizeBookingJson = (bd: Record<string, unknown>) => {
-  const s = JSON.stringify(bd)
-  return s.length > 420 ? `${s.slice(0, 420)}…` : s
-}
 
 const approveCredit = async (c: UserCredit) => {
   processingId.value = c.id
@@ -136,7 +164,7 @@ const approveCredit = async (c: UserCredit) => {
     if (pendingCount > 0) {
       const { error: actErr } = await client
         .from('class_reservations')
-        .update({ status: 'active' })
+        .update({ status: 'pending_skater_confirm' })
         .eq('credit_id', c.id)
         .eq('status', 'pending_payment')
       if (actErr) throw actErr
@@ -158,7 +186,7 @@ const rejectCredit = async (c: UserCredit) => {
       .from('class_reservations')
       .update({ status: 'cancelled' })
       .eq('credit_id', c.id)
-      .eq('status', 'pending_payment')
+      .in('status', ['pending_payment', 'pending_skater_confirm'])
 
     if (cancelResErr) throw cancelResErr
 
@@ -272,19 +300,56 @@ const rejectCredit = async (c: UserCredit) => {
         <p class="text-xs text-gray-600 mb-4">
           {{
             language === 'es'
-              ? 'Referencia: si ves una compra aquí pero no arriba, faltan políticas RLS o enum pending_payment.'
-              : 'Reference: if a checkout appears here but not above, fix RLS or pending_payment enum.'
+              ? 'Resumen legible de las últimas compras enlazadas a cuenta (referencia).'
+              : 'Readable summary of recent checkouts linked to a user account.'
           }}
         </p>
-        <ul v-if="recentGuestBookings.length" class="space-y-3 text-xs text-gray-400">
+        <ul v-if="recentGuestBookings.length" class="space-y-3 text-sm text-gray-300">
           <li
             v-for="g in recentGuestBookings"
             :key="g.id"
-            class="bg-gray-900/80 border border-gray-800 rounded-xl p-3 font-mono break-all"
+            class="bg-gray-900/80 border border-gray-800 rounded-xl p-4 space-y-2"
           >
-            <span class="text-gray-500">{{ g.created_at?.slice(0, 16) }}</span>
-            · user {{ g.linked_user_id?.slice(0, 8) }}…
-            <pre class="mt-2 text-[10px] text-gray-500 whitespace-pre-wrap">{{ summarizeBookingJson(g.booking_data) }}</pre>
+            <div class="flex justify-between gap-2 text-xs text-gray-500">
+              <span>{{ formatWhen(g.created_at) }}</span>
+              <span class="font-mono text-[10px] truncate max-w-[140px]" :title="g.linked_user_id || ''">
+                {{ g.linked_user_id ? g.linked_user_id.slice(0, 8) + '…' : '—' }}
+              </span>
+            </div>
+            <p class="font-semibold text-white">
+              {{
+                guestBookingProfiles[g.linked_user_id || '']?.full_name ||
+                  guestBookingProfiles[g.linked_user_id || '']?.email ||
+                  (language === 'es' ? 'Usuario' : 'User')
+              }}
+            </p>
+            <p v-if="guestBookingProfiles[g.linked_user_id || '']?.email" class="text-xs text-gray-500">
+              {{ guestBookingProfiles[g.linked_user_id || ''].email }}
+            </p>
+            <dl class="grid grid-cols-2 gap-x-2 gap-y-1 text-xs border-t border-gray-800 pt-2 mt-2">
+              <dt class="text-gray-500">{{ language === 'es' ? 'Clase' : 'Class' }}</dt>
+              <dd>{{ parseGuestBooking(g.booking_data).className }}</dd>
+              <dt class="text-gray-500">{{ language === 'es' ? 'Fecha' : 'Date' }}</dt>
+              <dd>{{ parseGuestBooking(g.booking_data).date }}</dd>
+              <dt class="text-gray-500">{{ language === 'es' ? 'Horario' : 'Slot' }}</dt>
+              <dd>
+                {{
+                  parseGuestBooking(g.booking_data).session === 'late'
+                    ? '7:00 (tarde)'
+                    : parseGuestBooking(g.booking_data).session === 'early'
+                      ? '5:30 (temprana)'
+                      : '—'
+                }}
+              </dd>
+              <dt class="text-gray-500">{{ language === 'es' ? 'Total' : 'Total' }}</dt>
+              <dd>{{ parseGuestBooking(g.booking_data).totalMxn }} MXN</dd>
+              <dt class="text-gray-500">{{ language === 'es' ? 'Pago' : 'Payment' }}</dt>
+              <dd class="capitalize">{{ parseGuestBooking(g.booking_data).payment }}</dd>
+              <template v-if="parseGuestBooking(g.booking_data).phone">
+                <dt class="text-gray-500">{{ language === 'es' ? 'Tel' : 'Phone' }}</dt>
+                <dd class="font-mono text-[11px]">{{ parseGuestBooking(g.booking_data).phone }}</dd>
+              </template>
+            </dl>
           </li>
         </ul>
         <p v-else class="text-xs text-gray-600">{{ language === 'es' ? 'Sin filas enlazadas.' : 'No linked rows.' }}</p>

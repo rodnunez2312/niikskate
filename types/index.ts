@@ -625,7 +625,13 @@ export type CreditType =
   | 'single_group'         // 1 group class
   | 'single_individual'    // 1 individual class
 
-export type CreditStatus = 'active' | 'pending_payment' | 'used' | 'expired' | 'cancelled'
+export type CreditStatus =
+  | 'active'
+  | 'pending_payment'
+  | 'pending_skater_confirm'
+  | 'used'
+  | 'expired'
+  | 'cancelled'
 
 export interface UserCredit {
   id: string

@@ -81,7 +81,7 @@ const fetchReservations = async () => {
       .from('class_reservations')
       .select('*')
       .eq('user_id', user.value?.id)
-      .or('status.eq.active,status.eq.pending_payment')
+      .or('status.eq.active,status.eq.pending_payment,status.eq.pending_skater_confirm')
       .gte('reservation_date', format(new Date(), 'yyyy-MM-dd'))
       .order('reservation_date', { ascending: true })
 

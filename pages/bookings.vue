@@ -35,7 +35,7 @@ const fetchCreditReservations = async () => {
       .from('class_reservations')
       .select('*')
       .eq('user_id', user.value.id)
-      .or('status.eq.active,status.eq.pending_payment')
+      .or('status.eq.active,status.eq.pending_payment,status.eq.pending_skater_confirm')
       .order('reservation_date', { ascending: true })
     
     console.log('Credit reservations:', data, 'Error:', error)
@@ -192,7 +192,13 @@ const getClassTypeColor = (classType: string) => {
             <div class="flex gap-4">
               <div
                 class="w-16 h-16 rounded-xl flex items-center justify-center text-2xl"
-                :class="res.status === 'pending_payment' ? 'bg-amber-400' : 'bg-green-500'"
+                :class="
+                  res.status === 'pending_payment'
+                    ? 'bg-amber-400'
+                    : res.status === 'pending_skater_confirm'
+                      ? 'bg-cyan-500'
+                      : 'bg-green-500'
+                "
               >
                 🛹
               </div>
@@ -207,6 +213,12 @@ const getClassTypeColor = (classType: string) => {
                     class="badge text-xs bg-amber-100 text-amber-900"
                   >
                     {{ language === 'es' ? 'Pago pendiente' : 'Payment pending' }}
+                  </span>
+                  <span
+                    v-else-if="res.status === 'pending_skater_confirm'"
+                    class="badge text-xs bg-cyan-100 text-cyan-900"
+                  >
+                    {{ language === 'es' ? 'Confirma en inicio' : 'Confirm on home' }}
                   </span>
                   <span v-else class="badge text-xs bg-green-100 text-green-800">
                     {{ language === 'es' ? 'Confirmada' : 'Confirmed' }}
