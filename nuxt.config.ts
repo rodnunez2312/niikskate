@@ -1,6 +1,21 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// OneDrive / cloud-sync folders: native FS watchers often fire bogus delete events on
+// `.nuxt/dist`, which makes Nuxt restart in a loop and the browser stays blank/spinning.
+const isWin = process.platform === 'win32'
+
 export default defineNuxtConfig({
   devtools: { enabled: true },
+
+  vite: {
+    ...(isWin
+      ? {
+          server: {
+            watch: { usePolling: true, interval: 1000 },
+          },
+        }
+      : {}),
+  },
 
   modules: [
     '@nuxtjs/tailwindcss',

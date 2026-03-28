@@ -68,46 +68,66 @@ const handleLogout = async () => {
   router.push('/')
 }
 
-const menuItems = computed(() => [
-  {
-    icon: '⚙️',
-    label: language.value === 'es' ? 'Panel de Admin' : 'Admin Panel',
-    path: '/admin',
-    description: language.value === 'es' ? 'Gestión completa del sistema' : 'Full system management'
-  },
-  {
-    icon: '👥',
-    label: language.value === 'es' ? 'Gestión de Usuarios' : 'User Management',
-    path: '/admin/users',
-    description: language.value === 'es' ? 'Administrar usuarios y roles' : 'Manage users and roles'
-  },
-  {
-    icon: '✅',
-    label: language.value === 'es' ? 'Aprobaciones' : 'Approvals',
-    path: '/admin/registrations',
-    description: language.value === 'es' ? 'Solicitudes pendientes' : 'Pending requests'
-  },
-  {
-    icon: '💰',
-    label: language.value === 'es' ? 'Pagos' : 'Payments',
-    path: '/admin/payments',
-    description: language.value === 'es' ? 'Ver y registrar pagos' : 'View and record payments'
-  },
-  {
-    icon: '📊',
-    label: language.value === 'es' ? 'Reportes' : 'Reports',
-    path: '/admin/reports',
-    description: language.value === 'es' ? 'Reportes financieros' : 'Financial reports',
-    disabled: true
-  },
-  {
-    icon: '❓',
-    label: language.value === 'es' ? 'Ayuda y Soporte' : 'Help & Support',
-    path: '/support',
-    description: language.value === 'es' ? 'Documentación y soporte' : 'Documentation and support',
-    disabled: true
-  },
-])
+const menuItems = computed(() => {
+  const items: Array<{
+    icon: string
+    label: string
+    path: string
+    description: string
+    disabled?: boolean
+  }> = [
+    {
+      icon: '⚙️',
+      label: language.value === 'es' ? 'Panel de Admin' : 'Admin Panel',
+      path: '/admin',
+      description: language.value === 'es' ? 'Gestión completa del sistema' : 'Full system management',
+    },
+    {
+      icon: '🛹',
+      label: language.value === 'es' ? 'Patinadores' : 'Skaters',
+      path: '/admin/users',
+      description: language.value === 'es' ? 'Niveles, programas y horarios' : 'Levels, programs, and schedules',
+    },
+    {
+      icon: '✅',
+      label: language.value === 'es' ? 'Aprobaciones' : 'Approvals',
+      path: '/admin/registrations',
+      description: language.value === 'es' ? 'Solicitudes pendientes' : 'Pending requests',
+    },
+    {
+      icon: '💰',
+      label: language.value === 'es' ? 'Pagos' : 'Payments',
+      path: '/admin/payments',
+      description: language.value === 'es' ? 'Ver y registrar pagos' : 'View and record payments',
+    },
+    {
+      icon: '📊',
+      label: language.value === 'es' ? 'Reportes' : 'Reports',
+      path: '/admin/reports',
+      description: language.value === 'es' ? 'Reportes financieros' : 'Financial reports',
+      disabled: true,
+    },
+    {
+      icon: '❓',
+      label: language.value === 'es' ? 'Ayuda y Soporte' : 'Help & Support',
+      path: '/support',
+      description: language.value === 'es' ? 'Documentación y soporte' : 'Documentation and support',
+      disabled: true,
+    },
+  ]
+
+  if (profile.value?.role === 'admin') {
+    items.splice(2, 0, {
+      icon: '📅',
+      label: language.value === 'es' ? 'Calendario escolar' : 'School calendar',
+      path: '/admin/calendar',
+      description:
+        language.value === 'es' ? 'Eventos, cierres y competencias' : 'Events, closures, and competitions',
+    })
+  }
+
+  return items
+})
 
 const roleLabels: Record<string, { en: string; es: string }> = {
   admin: { en: 'Administrator', es: 'Administrador' },

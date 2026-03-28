@@ -83,7 +83,7 @@ const adminNavItems = computed(() => [
     icon: 'home',
   },
   {
-    name: language.value === 'es' ? 'Alumnos' : 'Students',
+    name: language.value === 'es' ? 'Patinadores' : 'Skaters',
     path: '/dashboard/students',
     icon: 'students',
   },
@@ -93,9 +93,9 @@ const adminNavItems = computed(() => [
     icon: 'coaching',
   },
   {
-    name: language.value === 'es' ? 'Habilidades' : 'Skills',
+    name: language.value === 'es' ? 'Skate Program' : 'Skate Program',
     path: '/dashboard/skills',
-    icon: 'skills',
+    icon: 'skate-program',
   },
   {
     name: language.value === 'es' ? 'Tienda' : 'Store',
@@ -117,7 +117,7 @@ const coachNavItems = computed(() => [
     icon: 'home',
   },
   {
-    name: language.value === 'es' ? 'Alumnos' : 'Students',
+    name: language.value === 'es' ? 'Patinadores' : 'Skaters',
     path: '/dashboard/students',
     icon: 'students',
   },
@@ -127,9 +127,9 @@ const coachNavItems = computed(() => [
     icon: 'coaching',
   },
   {
-    name: language.value === 'es' ? 'Habilidades' : 'Skills',
+    name: language.value === 'es' ? 'Skate Program' : 'Skate Program',
     path: '/dashboard/skills',
-    icon: 'skills',
+    icon: 'skate-program',
   },
   {
     name: language.value === 'es' ? 'Perfil' : 'Profile',
@@ -230,6 +230,14 @@ const isActive = (path: string) => {
           <!-- Skills (groups / target) Icon -->
           <svg v-else-if="item.icon === 'skills'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+          </svg>
+
+          <!-- Skateboard (Skate Program) -->
+          <svg v-else-if="item.icon === 'skate-program'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.5 15.5c1.5 2 4.2 2.5 7.5 2.5s6-.5 7.5-2.5M6 12.5h12M7 9.5h10" />
+            <ellipse cx="7.5" cy="15.5" rx="1.6" ry="1.6" />
+            <ellipse cx="16.5" cy="15.5" rx="1.6" ry="1.6" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 10.5l-1.5-2M19 10.5l1.5-2" />
           </svg>
           
           <span class="text-xs font-medium">{{ item.name }}</span>

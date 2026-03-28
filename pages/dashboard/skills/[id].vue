@@ -226,8 +226,9 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 class="text-xl font-bold text-white">
-            {{ language === 'es' ? 'Habilidades' : 'Skills' }}
+          <h1 class="text-xl font-bold text-white flex items-center gap-2">
+            <span class="text-2xl" aria-hidden="true">🛹</span>
+            {{ language === 'es' ? 'Skate Program' : 'Skate Program' }}
           </h1>
           <div class="w-10" />
         </div>

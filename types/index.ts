@@ -15,6 +15,10 @@ export interface User {
   is_active: boolean
   created_at: string
   updated_at: string
+  /** Assigned skate program level (skill_groups). */
+  skill_group_id?: string | null
+  /** Admin-set weekly preference: { start, end, days[] } — days 0–6 Sun–Sat. */
+  skater_schedule?: { start?: string; end?: string; days?: number[] } | null
 }
 
 export type UserRole = 'admin' | 'coach' | 'customer'
@@ -624,6 +628,12 @@ export type CreditType =
   | 'saturdays'            // 4 classes (Saturdays only)
   | 'single_group'         // 1 group class
   | 'single_individual'    // 1 individual class
+  | 'golden_monthly'       // Pro monthly (golden token)
+  | 'golden_pkg_3'         // Pro package 3 (golden token)
+  | 'golden_pkg_5'         // Pro package 5 (golden token)
+  | 'golden_single'        // Pro single class (golden token)
+
+export type CreditTokenTier = 'regular' | 'golden'
 
 export type CreditStatus =
   | 'active'
@@ -646,6 +656,7 @@ export interface UserCredit {
   price_paid_usd?: number
   payment_method?: string
   payment_status?: string
+  guest_booking_id?: string | null
   notes?: string
   created_at: string
   updated_at: string
@@ -676,61 +687,102 @@ export const CREDIT_TYPE_INFO: Record<CreditType, {
   total_credits: number
   max_per_week: number | null
   saturdays_only: boolean
+  token_tier: CreditTokenTier
 }> = {
   monthly_beginner: { 
     name: 'Monthly Beginners', 
     name_es: 'Mensual Principiantes', 
     total_credits: 8, 
     max_per_week: 2,
-    saturdays_only: false 
+    saturdays_only: false,
+    token_tier: 'regular',
   },
   monthly_intermediate: { 
     name: 'Monthly Intermediate', 
     name_es: 'Mensual Intermedios', 
     total_credits: 8, 
     max_per_week: 2,
-    saturdays_only: false 
+    saturdays_only: false,
+    token_tier: 'regular',
   },
   pkg_3: { 
     name: '3 Class Package', 
     name_es: 'Paquete 3 Clases', 
     total_credits: 3, 
     max_per_week: null,
-    saturdays_only: false 
+    saturdays_only: false,
+    token_tier: 'regular',
   },
   pkg_5: { 
     name: '5 Class Package', 
     name_es: 'Paquete 5 Clases', 
     total_credits: 5, 
     max_per_week: null,
-    saturdays_only: false 
+    saturdays_only: false,
+    token_tier: 'regular',
   },
   pkg_10: { 
     name: '10 Class Package', 
     name_es: 'Paquete 10 Clases', 
     total_credits: 10, 
     max_per_week: null,
-    saturdays_only: false 
+    saturdays_only: false,
+    token_tier: 'regular',
   },
   saturdays: { 
     name: 'Saturdays Only', 
     name_es: 'Solo Sábados', 
     total_credits: 4, 
     max_per_week: null,
-    saturdays_only: true 
+    saturdays_only: true,
+    token_tier: 'regular',
   },
   single_group: { 
     name: 'Single Group Class', 
     name_es: 'Clase Grupal', 
     total_credits: 1, 
     max_per_week: null,
-    saturdays_only: false 
+    saturdays_only: false,
+    token_tier: 'regular',
   },
   single_individual: { 
     name: 'Single Individual Class', 
     name_es: 'Clase Individual', 
     total_credits: 1, 
     max_per_week: null,
-    saturdays_only: false 
+    saturdays_only: false,
+    token_tier: 'regular',
+  },
+  golden_monthly: {
+    name: 'Golden Monthly (Pro)',
+    name_es: 'Golden Mensual (Pro)',
+    total_credits: 8,
+    max_per_week: 2,
+    saturdays_only: false,
+    token_tier: 'golden',
+  },
+  golden_pkg_3: {
+    name: 'Golden Package 3 (Pro)',
+    name_es: 'Golden Paquete 3 (Pro)',
+    total_credits: 3,
+    max_per_week: null,
+    saturdays_only: false,
+    token_tier: 'golden',
+  },
+  golden_pkg_5: {
+    name: 'Golden Package 5 (Pro)',
+    name_es: 'Golden Paquete 5 (Pro)',
+    total_credits: 5,
+    max_per_week: null,
+    saturdays_only: false,
+    token_tier: 'golden',
+  },
+  golden_single: {
+    name: 'Golden Single Class (Pro)',
+    name_es: 'Golden Clase Individual (Pro)',
+    total_credits: 1,
+    max_per_week: null,
+    saturdays_only: false,
+    token_tier: 'golden',
   },
 }

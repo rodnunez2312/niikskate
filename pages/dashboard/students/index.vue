@@ -892,17 +892,17 @@ const navigateToNewEvaluation = (studentId: string) => {
     <header class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4 pt-safe pb-4">
       <div class="max-w-lg mx-auto pt-4">
         <h1 class="text-2xl font-bold text-white mb-4">
-          {{ language === 'es' ? 'Alumnos' : 'Students' }}
+          {{ language === 'es' ? 'Patinadores' : 'Skaters' }}
         </h1>
         
-        <!-- Tabs: Alumnos (main), Asistencia at the end -->
+        <!-- Tabs: Skaters (main), Asistencia at the end -->
         <div class="flex gap-2">
           <button
             @click="activeTab = 'students'"
             class="flex-1 py-2 px-3 rounded-xl font-semibold text-sm transition-all"
             :class="activeTab === 'students' ? 'bg-gold-400 text-black' : 'bg-gray-800 text-gray-400'"
           >
-            {{ language === 'es' ? 'Alumnos' : 'Students' }}
+            {{ language === 'es' ? 'Patinadores' : 'Skaters' }}
           </button>
           <button
             @click="activeTab = 'attendance'"

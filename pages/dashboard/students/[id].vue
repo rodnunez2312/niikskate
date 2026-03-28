@@ -16,10 +16,15 @@ const evaluationCount = ref(0)
 const loading = ref(true)
 const skills = ref<any[]>([])
 const studentProgress = ref<any[]>([])
-const studentPayments = ref<any[]>([])
 const studentReservations = ref<any[]>([])
 const studentAttendance = ref<any[]>([])
 const calendarMonth = ref(new Date())
+
+const assignedSkillGroup = ref<{ id: string; name: string; description: string | null } | null>(null)
+const assignedProgramName = ref<string | null>(null)
+const programSkillIds = ref<string[]>([])
+const individualProgramPct = ref(0)
+const groupAveragePct = ref(0)
 
 // Circular ratings (0–10 dots) for Skater Profile: Fundamentals, Skate IQ, Street, Vert, etc.
 const SKATER_RATING_ROWS = [
@@ -90,7 +95,6 @@ const loadStudent = async () => {
       countRes,
       skillsRes,
       progressRes,
-      creditsRes,
       reservationsRes,
       attendanceRes,
     ] = await Promise.allSettled([
@@ -98,7 +102,6 @@ const loadStudent = async () => {
       client.from('student_evaluations').select('*', { count: 'exact', head: true }).eq('student_id', id),
       client.from('skills_library').select('*').eq('is_active', true).order('sort_order'),
       client.from('student_progress').select('*, skill:skills_library(*)').eq('student_id', id),
-      client.from('user_credits').select('*').eq('user_id', id).order('purchase_date', { ascending: true }),
       client.from('class_reservations').select('*').eq('user_id', id).eq('status', 'active').order('reservation_date'),
       client.from('attendance').select('*').eq('student_id', id).order('class_date'),
     ])
@@ -109,9 +112,18 @@ const loadStudent = async () => {
     else evaluationCount.value = 0
     skills.value = skillsRes.status === 'fulfilled' ? (skillsRes.value?.data ?? []) : []
     studentProgress.value = progressRes.status === 'fulfilled' ? (progressRes.value?.data ?? []) : []
-    studentPayments.value = creditsRes.status === 'fulfilled' ? (creditsRes.value?.data ?? []) : []
     studentReservations.value = reservationsRes.status === 'fulfilled' ? (reservationsRes.value?.data ?? []) : []
     studentAttendance.value = attendanceRes.status === 'fulfilled' ? (attendanceRes.value?.data ?? []) : []
+    const { data: psRows } = await client.from('program_students').select('program_id').eq('student_id', id).limit(1)
+    const pid = psRows?.[0]?.program_id as string | undefined
+    if (pid) {
+      const { data: pr } = await client.from('programs').select('name').eq('id', pid).maybeSingle()
+      assignedProgramName.value = pr?.name ?? null
+    } else {
+      assignedProgramName.value = null
+    }
+
+    await loadProgramProgressForGroup()
   } catch (e) {
     console.error('Error loading student dashboard:', e)
   } finally {
@@ -164,44 +176,79 @@ const skillsByCategory = computed(() => {
   return grouped
 })
 
-const progressTimeline = computed(() => {
-  const timeline: any[] = []
-  studentPayments.value.forEach(payment => {
-    const paymentDate = new Date(payment.purchase_date)
-    const skillsAtTime = studentProgress.value.filter(p =>
-      new Date(p.learned_at || p.created_at) <= paymentDate
-    ).length
-    timeline.push({
-      date: payment.purchase_date,
-      type: 'payment',
-      title: payment.credit_type?.replace(/_/g, ' ').toUpperCase() || 'Paquete',
-      description: `${payment.total_credits} ${language.value === 'es' ? 'clases' : 'classes'}`,
-      skills_count: skillsAtTime,
-      progress_percentage: skills.value.length > 0 ? Math.round((skillsAtTime / skills.value.length) * 100) : 0
-    })
-  })
-  const sortedProgress = [...studentProgress.value].sort((a, b) =>
-    new Date(a.learned_at || a.created_at).getTime() - new Date(b.learned_at || b.created_at).getTime()
-  )
-  sortedProgress.forEach((progress, index) => {
-    if ((index + 1) % 5 === 0) {
-      timeline.push({
-        date: progress.learned_at || progress.created_at,
-        type: 'milestone',
-        title: `${index + 1} ${language.value === 'es' ? 'trucos aprendidos' : 'tricks learned'}`,
-        description: `${language.value === 'es' ? 'Último:' : 'Latest:'} ${progress.skill?.name || 'Unknown'}`,
-        skills_count: index + 1,
-        progress_percentage: skills.value.length > 0 ? Math.round(((index + 1) / skills.value.length) * 100) : 0
-      })
-    }
-  })
-  return timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-})
+const loadProgramProgressForGroup = async () => {
+  assignedSkillGroup.value = null
+  programSkillIds.value = []
+  individualProgramPct.value = 0
+  groupAveragePct.value = 0
+  const gid = student.value?.skill_group_id as string | undefined
+  const sid = studentId.value
+  if (!gid || !sid) return
 
-const formatTimelineDate = (dateStr: string) => {
-  const locale = language.value === 'es' ? es : undefined
-  return format(new Date(dateStr), 'd MMM yyyy', { locale })
+  const { data: grp } = await client.from('skill_groups').select('id,name,description').eq('id', gid).maybeSingle()
+  if (grp) assignedSkillGroup.value = grp
+
+  const { data: areas } = await client.from('skill_areas').select('id').eq('group_id', gid)
+  const areaIds = (areas || []).map((a: { id: string }) => a.id)
+  if (!areaIds.length) return
+
+  const { data: areaSkills } = await client.from('area_skills').select('skill_id').in('area_id', areaIds)
+  const ids = [...new Set((areaSkills || []).map((r: { skill_id: string }) => r.skill_id).filter(Boolean))]
+  programSkillIds.value = ids
+  if (!ids.length) return
+
+  const learned = studentProgress.value.filter(p => ids.includes(p.skill_id)).length
+  individualProgramPct.value = Math.round((learned / ids.length) * 100)
+
+  const { data: peers } = await client
+    .from('profiles')
+    .select('id')
+    .eq('role', 'customer')
+    .eq('skill_group_id', gid)
+    .neq('id', sid)
+
+  const peerIds = (peers || []).map((p: { id: string }) => p.id)
+  if (!peerIds.length) {
+    groupAveragePct.value = individualProgramPct.value
+    return
+  }
+
+  const { data: peerProg } = await client
+    .from('student_progress')
+    .select('student_id,skill_id')
+    .in('student_id', peerIds)
+    .in('skill_id', ids)
+
+  const learnedByPeer: Record<string, number> = {}
+  for (const row of peerProg || []) {
+    const r = row as { student_id: string; skill_id: string }
+    learnedByPeer[r.student_id] = (learnedByPeer[r.student_id] || 0) + 1
+  }
+  const pcts = peerIds.map((pid: string) => Math.round(((learnedByPeer[pid] || 0) / ids.length) * 100))
+  groupAveragePct.value = Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)
 }
+
+type SkaterSchedule = { start?: string; end?: string; days?: number[] }
+
+const skaterScheduleDisplay = computed(() => {
+  const raw = student.value?.skater_schedule as SkaterSchedule | null | undefined
+  if (!raw || typeof raw !== 'object') return null
+  const days = Array.isArray(raw.days) ? raw.days : []
+  const dayLabels =
+    language.value === 'es'
+      ? ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+      : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayStr = days
+    .filter((d: number) => d >= 0 && d <= 6)
+    .sort((a: number, b: number) => a - b)
+    .map((d: number) => dayLabels[d])
+    .join(', ')
+  return {
+    start: raw.start || '—',
+    end: raw.end || '—',
+    days: dayStr || (language.value === 'es' ? 'Sin días' : 'No days'),
+  }
+})
 
 const calendarDays = computed(() => {
   const start = startOfMonth(calendarMonth.value)
@@ -424,6 +471,91 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </div>
         </div>
 
+        <!-- Program / level progress vs group average -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-4">
+          <div class="flex items-center gap-2">
+            <span class="text-lg" aria-hidden="true">📈</span>
+            <h3 class="font-bold text-white">
+              {{ language === 'es' ? 'Progreso del programa (nivel)' : 'Program progress (level)' }}
+            </h3>
+          </div>
+          <p v-if="assignedProgramName" class="text-xs text-gray-500">
+            {{ language === 'es' ? 'Programa asignado:' : 'Assigned program:' }}
+            <span class="text-gray-300">{{ assignedProgramName }}</span>
+          </p>
+          <p v-if="!student.skill_group_id" class="text-sm text-gray-500">
+            {{
+              language === 'es'
+                ? 'Sin nivel asignado. Un admin puede asignarte un grupo en Gestión de patinadores.'
+                : 'No level assigned yet. An admin can assign a program group in Skater management.'
+            }}
+          </p>
+          <template v-else>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <div class="flex justify-between items-baseline gap-2">
+                  <span class="text-xs text-gray-500">{{ language === 'es' ? 'Progreso individual' : 'Individual progress' }}</span>
+                  <span class="text-lg font-bold text-sky-400">{{ individualProgramPct }}%</span>
+                </div>
+                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-sky-500 rounded-full transition-all"
+                    :style="{ width: `${individualProgramPct}%` }"
+                  />
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex justify-between items-baseline gap-2">
+                  <span class="text-xs text-gray-500 leading-tight">
+                    {{
+                      language === 'es' ? 'Promedio del grupo' : 'Group average'
+                    }}
+                    <span v-if="assignedSkillGroup?.name" class="block text-[10px] text-gray-600 mt-0.5">
+                      ({{ assignedSkillGroup.name }})
+                    </span>
+                  </span>
+                  <span class="text-lg font-bold text-indigo-300">{{ groupAveragePct }}%</span>
+                </div>
+                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-indigo-500/90 rounded-full transition-all"
+                    :style="{ width: `${groupAveragePct}%` }"
+                  />
+                </div>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-600">
+              {{
+                language === 'es'
+                  ? `Basado en ${programSkillIds.length} skills del nivel en el programa.`
+                  : `Based on ${programSkillIds.length} skills in this level track.`
+              }}
+            </p>
+          </template>
+        </div>
+
+        <!-- Preferred schedule (set by admin) -->
+        <div v-if="skaterScheduleDisplay" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+            <span>🗓️</span>
+            {{ language === 'es' ? 'Horario preferido' : 'Preferred schedule' }}
+          </h3>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p class="text-gray-500 text-xs">{{ language === 'es' ? 'Inicio' : 'Start' }}</p>
+              <p class="text-white font-semibold">{{ skaterScheduleDisplay.start }}</p>
+            </div>
+            <div>
+              <p class="text-gray-500 text-xs">{{ language === 'es' ? 'Fin' : 'End' }}</p>
+              <p class="text-white font-semibold">{{ skaterScheduleDisplay.end }}</p>
+            </div>
+            <div class="col-span-2">
+              <p class="text-gray-500 text-xs">{{ language === 'es' ? 'Días' : 'Days' }}</p>
+              <p class="text-gray-300">{{ skaterScheduleDisplay.days }}</p>
+            </div>
+          </div>
+        </div>
+
       <!-- Attendance calendar -->
       <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
         <h3 class="font-bold text-white mb-3 flex items-center gap-2">
@@ -487,49 +619,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
         </div>
       </div>
 
-      <!-- Progress timeline -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 class="font-bold text-white mb-3 flex items-center gap-2">
-          <span>📈</span>
-          {{ language === 'es' ? 'Historial de Progreso' : 'Progress Timeline' }}
-        </h3>
-        <div v-if="progressTimeline.length === 0" class="text-center py-4">
-          <p class="text-gray-500 text-sm">{{ language === 'es' ? 'Sin historial de pagos registrado' : 'No payment history recorded' }}</p>
-        </div>
-        <div v-else class="relative">
-          <div class="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-700"></div>
-          <div
-            v-for="(item, index) in progressTimeline"
-            :key="index"
-            class="relative pl-10 pb-4 last:pb-0"
-          >
-            <div
-              class="absolute left-2.5 w-3 h-3 rounded-full border-2 border-gray-900"
-              :class="item.type === 'payment' ? 'bg-glass-green' : 'bg-gold-400'"
-            />
-            <div class="bg-gray-800 rounded-lg p-3">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-xs text-gray-500">{{ formatTimelineDate(item.date) }}</span>
-                <span
-                  class="px-2 py-0.5 text-xs rounded-full"
-                  :class="item.type === 'payment' ? 'bg-glass-green/20 text-glass-green' : 'bg-gold-400/20 text-gold-400'"
-                >
-                  {{ item.type === 'payment' ? (language === 'es' ? 'Pago' : 'Payment') : (language === 'es' ? 'Progreso' : 'Progress') }}
-                </span>
-              </div>
-              <p class="text-white text-sm font-semibold">{{ item.title }}</p>
-              <p v-if="item.description" class="text-gray-400 text-xs mt-1">{{ item.description }}</p>
-              <div v-if="item.skills_count" class="mt-2 flex items-center gap-2">
-                <div class="h-1.5 flex-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div class="h-full bg-gold-400 rounded-full" :style="{ width: `${item.progress_percentage}%` }"></div>
-                </div>
-                <span class="text-xs text-gold-400 font-bold">{{ item.progress_percentage }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Skills by category -->
       <div v-for="(categorySkills, category) in skillsByCategory" :key="category" class="mb-4">
         <h3 class="font-bold text-white mb-2 capitalize flex items-center gap-2">
@@ -574,7 +663,7 @@ watch(studentId, () => loadStudent(), { immediate: false })
     <div v-else class="px-4 py-12 text-center">
       <p class="text-gray-400">{{ language === 'es' ? 'Alumno no encontrado' : 'Student not found' }}</p>
       <button @click="goBack" class="mt-4 text-gold-400 hover:underline">
-        {{ language === 'es' ? 'Volver a Alumnos' : 'Back to Students' }}
+        {{ language === 'es' ? 'Volver a patinadores' : 'Back to skaters' }}
       </button>
     </div>
   </div>

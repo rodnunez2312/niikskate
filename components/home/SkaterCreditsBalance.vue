@@ -146,7 +146,19 @@ const labelFor = (c: UserCredit) => {
       </p>
       <ul v-if="credits.length > 0" class="space-y-2 text-sm text-gray-300 border-t border-gray-800 pt-3">
         <li v-for="c in credits" :key="c.id" class="flex justify-between gap-2">
-          <span class="truncate">{{ labelFor(c) }}</span>
+          <span class="truncate inline-flex items-center gap-2">
+            {{ labelFor(c) }}
+            <span
+              class="text-[10px] px-1.5 py-0.5 rounded border"
+              :class="CREDIT_TYPE_INFO[c.credit_type as CreditType]?.token_tier === 'golden'
+                ? 'bg-gold-400/15 border-gold-400/40 text-gold-300'
+                : 'bg-gray-800 border-gray-700 text-gray-400'"
+            >
+              {{ CREDIT_TYPE_INFO[c.credit_type as CreditType]?.token_tier === 'golden'
+                ? (language === 'es' ? 'Golden' : 'Golden')
+                : (language === 'es' ? 'Regular' : 'Regular') }}
+            </span>
+          </span>
           <span class="text-gold-400 font-bold shrink-0">{{ c.remaining_credits }}</span>
         </li>
       </ul>

@@ -17,8 +17,22 @@ const { language } = useI18n()
 const isAdmin = ref(false)
 const loading = ref(true)
 const users = ref<User[]>([])
-const selectedRole = ref<'all' | 'admin' | 'coach' | 'customer'>('all')
+const selectedRole = ref<'all' | 'admin' | 'coach' | 'customer'>('customer')
 const searchQuery = ref('')
+
+const skillGroups = ref<Array<{ id: string; name: string; sort_order: number }>>([])
+const programsList = ref<Array<{ id: string; name: string }>>([])
+const programByStudent = ref<Record<string, string>>({})
+
+const expandedSkaterId = ref<string | null>(null)
+const skaterDraft = ref({
+  skill_group_id: '' as string,
+  program_id: '' as string,
+  start: '09:00',
+  end: '17:00',
+  days: [1, 2, 3, 4, 5] as number[],
+})
+const savingSkaterId = ref<string | null>(null)
 
 // Edit modal
 const showEditModal = ref(false)
@@ -61,8 +75,28 @@ onMounted(async () => {
   if (roleFromQuery && ['admin', 'coach', 'customer'].includes(roleFromQuery)) {
     selectedRole.value = roleFromQuery as any
   }
-  await loadUsers()
+  await Promise.all([loadUsers(), loadSkaterMeta()])
 })
+
+const loadSkaterMeta = async () => {
+  try {
+    const [g, p, ps] = await Promise.all([
+      client.from('skill_groups').select('id,name,sort_order').order('sort_order'),
+      client.from('programs').select('id,name').eq('is_active', true).order('name'),
+      client.from('program_students').select('student_id, program_id'),
+    ])
+    skillGroups.value = (g.data || []) as typeof skillGroups.value
+    programsList.value = (p.data || []) as typeof programsList.value
+    const map: Record<string, string> = {}
+    for (const row of ps.data || []) {
+      const r = row as { student_id: string; program_id: string }
+      map[r.student_id] = r.program_id
+    }
+    programByStudent.value = map
+  } catch (e) {
+    console.error('loadSkaterMeta:', e)
+  }
+}
 
 const loadUsers = async () => {
   loading.value = true
@@ -198,6 +232,99 @@ const formatDate = (dateStr: string) => {
   return format(date, 'dd MMM yyyy', { locale })
 }
 
+const weekdayToggles = computed(() => {
+  const es = language.value === 'es'
+  return [
+    { v: 1, label: es ? 'L' : 'M' },
+    { v: 2, label: es ? 'M' : 'T' },
+    { v: 3, label: es ? 'X' : 'W' },
+    { v: 4, label: es ? 'J' : 'Th' },
+    { v: 5, label: es ? 'V' : 'F' },
+    { v: 6, label: es ? 'S' : 'Sa' },
+    { v: 0, label: es ? 'D' : 'Su' },
+  ]
+})
+
+const toggleSkaterPanel = (u: User) => {
+  if (u.role !== 'customer') return
+  if (expandedSkaterId.value === u.id) {
+    expandedSkaterId.value = null
+    return
+  }
+  expandedSkaterId.value = u.id
+  const sched = u.skater_schedule
+  skaterDraft.value = {
+    skill_group_id: u.skill_group_id || '',
+    program_id: programByStudent.value[u.id] || '',
+    start: sched?.start || '09:00',
+    end: sched?.end || '17:00',
+    days: Array.isArray(sched?.days) && sched!.days!.length ? [...sched!.days!] : [1, 2, 3, 4, 5],
+  }
+}
+
+const toggleDraftDay = (d: number) => {
+  const arr = skaterDraft.value.days
+  const i = arr.indexOf(d)
+  if (i >= 0) arr.splice(i, 1)
+  else arr.push(d)
+  skaterDraft.value.days = [...arr].sort((a, b) => a - b)
+}
+
+const saveSkaterAssignments = async (u: User) => {
+  savingSkaterId.value = u.id
+  try {
+    const schedule =
+      skaterDraft.value.days.length > 0
+        ? {
+            start: skaterDraft.value.start || '09:00',
+            end: skaterDraft.value.end || '17:00',
+            days: [...skaterDraft.value.days].sort((a, b) => a - b),
+          }
+        : null
+
+    const { error: upErr } = await client
+      .from('profiles')
+      .update({
+        skill_group_id: skaterDraft.value.skill_group_id || null,
+        skater_schedule: schedule,
+      })
+      .eq('id', u.id)
+
+    if (upErr) throw upErr
+
+    await client.from('program_students').delete().eq('student_id', u.id)
+    if (skaterDraft.value.program_id) {
+      const { error: insErr } = await client.from('program_students').insert({
+        student_id: u.id,
+        program_id: skaterDraft.value.program_id,
+      })
+      if (insErr) throw insErr
+      programByStudent.value[u.id] = skaterDraft.value.program_id
+    } else {
+      delete programByStudent.value[u.id]
+    }
+
+    await loadUsers()
+  } catch (e) {
+    console.error('saveSkaterAssignments:', e)
+  } finally {
+    savingSkaterId.value = null
+  }
+}
+
+const scheduleSummary = (u: User) => {
+  const s = u.skater_schedule
+  if (!s || typeof s !== 'object' || !Array.isArray(s.days) || !s.days.length) return null
+  const es = language.value === 'es'
+  const labels = es ? ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const days = s.days
+    .filter((n: number) => n >= 0 && n <= 6)
+    .sort((a: number, b: number) => a - b)
+    .map((n: number) => labels[n])
+    .join(', ')
+  return `${s.start || '—'}–${s.end || '—'} · ${days}`
+}
+
 // Role labels
 const roleLabels: Record<string, { icon: string; color: string; label: { en: string; es: string } }> = {
   admin: { icon: '👑', color: 'bg-flame-600 text-white', label: { en: 'Admin', es: 'Admin' } },
@@ -219,10 +346,13 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
               </svg>
             </button>
             <div class="min-w-0">
-              <h1 class="text-xl font-bold text-white">
-                {{ language === 'es' ? 'Usuarios' : 'Users' }}
+              <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                <span class="text-2xl" aria-hidden="true">🛹</span>
+                {{ language === 'es' ? 'Patinadores' : 'Skaters' }}
               </h1>
-              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Gestionar usuarios y permisos' : 'Manage users and permissions' }}</p>
+              <p class="text-sm text-gray-400">
+                {{ language === 'es' ? 'Roles, programa, nivel y horario' : 'Roles, program, level, and schedule' }}
+              </p>
             </div>
           </div>
           <button
@@ -232,7 +362,7 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            {{ language === 'es' ? 'Nuevo usuario' : 'Add user' }}
+            {{ language === 'es' ? 'Añadir cuenta' : 'Add account' }}
           </button>
         </div>
       </div>
@@ -248,7 +378,7 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
         <input
           v-model="searchQuery"
           type="text"
-          :placeholder="language === 'es' ? 'Buscar usuarios...' : 'Search users...'"
+          :placeholder="language === 'es' ? 'Buscar patinadores...' : 'Search skaters...'"
           class="w-full pl-12 pr-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
         />
       </div>
@@ -305,7 +435,7 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
       <!-- Users List -->
       <div v-else-if="filteredUsers.length === 0" class="text-center py-12">
         <p class="text-4xl mb-3">👥</p>
-        <p class="text-gray-400">{{ language === 'es' ? 'No se encontraron usuarios' : 'No users found' }}</p>
+        <p class="text-gray-400">{{ language === 'es' ? 'No se encontraron personas' : 'No people found' }}</p>
       </div>
 
       <div v-else class="space-y-2">
@@ -334,10 +464,21 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
               </div>
               <p class="text-sm text-gray-400 truncate">{{ u.email }}</p>
               <p class="text-xs text-gray-500">{{ language === 'es' ? 'Desde' : 'Since' }} {{ formatDate(u.created_at) }}</p>
+              <p v-if="u.role === 'customer' && scheduleSummary(u)" class="text-[11px] text-gray-600 mt-1 truncate">
+                🗓️ {{ scheduleSummary(u) }}
+              </p>
             </div>
 
             <!-- Actions -->
             <div class="flex items-center gap-2">
+              <button
+                v-if="u.role === 'customer'"
+                type="button"
+                class="p-2 rounded-lg bg-gray-800 text-gold-400 hover:bg-gray-700 text-xs font-semibold px-3"
+                @click="toggleSkaterPanel(u)"
+              >
+                {{ expandedSkaterId === u.id ? (language === 'es' ? 'Cerrar' : 'Close') : (language === 'es' ? 'Asignar' : 'Assign') }}
+              </button>
               <NuxtLink
                 v-if="u.role === 'customer'"
                 :to="`/dashboard/students/${u.id}`"
@@ -371,6 +512,93 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
               </button>
             </div>
           </div>
+
+          <!-- Skater: program level + program + schedule -->
+          <div
+            v-if="u.role === 'customer' && expandedSkaterId === u.id"
+            class="border-t border-gray-800 px-4 py-4 space-y-4 bg-black/40"
+          >
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {{ language === 'es' ? 'Programa de skate (nivel)' : 'Skate program (level)' }}
+            </p>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">{{ language === 'es' ? 'Nivel / grupo' : 'Level / group' }}</label>
+              <select
+                v-model="skaterDraft.skill_group_id"
+                class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+              >
+                <option value="">{{ language === 'es' ? '— Sin asignar —' : '— Unassigned —' }}</option>
+                <option v-for="g in skillGroups" :key="g.id" :value="g.id">{{ g.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">{{ language === 'es' ? 'Programa' : 'Program' }}</label>
+              <select
+                v-model="skaterDraft.program_id"
+                class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+              >
+                <option value="">{{ language === 'es' ? '— Ninguno —' : '— None —' }}</option>
+                <option v-for="pr in programsList" :key="pr.id" :value="pr.id">{{ pr.name }}</option>
+              </select>
+            </div>
+            <div>
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                {{ language === 'es' ? 'Horario preferido' : 'Schedule' }}
+              </p>
+              <div class="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <label class="block text-[10px] text-gray-500 mb-0.5">{{ language === 'es' ? 'Inicio' : 'Start' }}</label>
+                  <input
+                    v-model="skaterDraft.start"
+                    type="time"
+                    class="w-full px-2 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="block text-[10px] text-gray-500 mb-0.5">{{ language === 'es' ? 'Fin' : 'End' }}</label>
+                  <input
+                    v-model="skaterDraft.end"
+                    type="time"
+                    class="w-full px-2 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+                  />
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="d in weekdayToggles"
+                  :key="d.v"
+                  type="button"
+                  class="w-9 h-9 rounded-lg text-xs font-bold transition-colors"
+                  :class="
+                    skaterDraft.days.includes(d.v)
+                      ? 'bg-white text-black'
+                      : 'bg-gray-800 text-gray-500 border border-gray-700'
+                  "
+                  @click="toggleDraftDay(d.v)"
+                >
+                  {{ d.label }}
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                class="flex-1 py-2.5 rounded-xl bg-white text-black font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                :disabled="savingSkaterId === u.id"
+                @click="saveSkaterAssignments(u)"
+              >
+                <span>✓</span>
+                {{ language === 'es' ? 'Guardar' : 'Save' }}
+              </button>
+              <button
+                type="button"
+                class="text-sm text-gray-500 hover:text-gray-300"
+                @click="expandedSkaterId = null"
+              >
+                {{ language === 'es' ? 'Cancelar' : 'Cancel' }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -381,7 +609,7 @@ const roleLabels: Record<string, { icon: string; color: string; label: { en: str
         <div class="absolute inset-0 bg-black/80" @click="showEditModal = false"></div>
         <div class="relative bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full">
           <h3 class="text-xl font-bold text-white mb-2">
-            {{ language === 'es' ? 'Editar Usuario' : 'Edit User' }}
+            {{ language === 'es' ? 'Editar perfil' : 'Edit profile' }}
           </h3>
           <p class="text-gray-400 mb-4">{{ editingUser?.full_name }} ({{ editingUser?.email }})</p>
 

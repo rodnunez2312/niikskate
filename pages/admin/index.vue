@@ -311,17 +311,36 @@ const formatDate = (date: string) => {
             </svg>
           </NuxtLink>
 
-          <!-- Users Management -->
+          <!-- Skaters / accounts -->
           <NuxtLink 
             to="/admin/users"
             class="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all"
           >
             <div class="w-12 h-12 rounded-xl bg-flame-600/20 flex items-center justify-center text-2xl">
-              👥
+              🛹
             </div>
             <div class="flex-1">
-              <p class="font-semibold text-white">{{ language === 'es' ? 'Usuarios' : 'Users' }}</p>
-              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Gestionar usuarios y permisos' : 'Manage users and permissions' }}</p>
+              <p class="font-semibold text-white">{{ language === 'es' ? 'Patinadores' : 'Skaters' }}</p>
+              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Niveles, programas y horarios' : 'Levels, programs, and schedules' }}</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </NuxtLink>
+
+          <!-- School calendar -->
+          <NuxtLink
+            to="/admin/calendar"
+            class="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all"
+          >
+            <div class="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center text-2xl">
+              📅
+            </div>
+            <div class="flex-1">
+              <p class="font-semibold text-white">{{ language === 'es' ? 'Calendario escolar' : 'School calendar' }}</p>
+              <p class="text-sm text-gray-400">
+                {{ language === 'es' ? 'Eventos, cierres y competencias' : 'Events, closures, and competitions' }}
+              </p>
             </div>
             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

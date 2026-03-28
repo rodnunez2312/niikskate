@@ -381,11 +381,21 @@ const selectCreditPack = (credit: UserCredit) => {
             >
               <div class="flex items-center justify-between">
                 <div>
-                  <h3 class="font-bold text-white">
+                  <h3 class="font-bold text-white inline-flex items-center gap-2">
                     {{ language === 'es' 
                       ? CREDIT_TYPE_INFO[credit.credit_type as CreditType]?.name_es 
                       : CREDIT_TYPE_INFO[credit.credit_type as CreditType]?.name 
                     }}
+                    <span
+                      class="text-[10px] px-1.5 py-0.5 rounded border"
+                      :class="CREDIT_TYPE_INFO[credit.credit_type as CreditType]?.token_tier === 'golden'
+                        ? 'bg-gold-400/15 border-gold-400/40 text-gold-300'
+                        : 'bg-gray-800 border-gray-700 text-gray-400'"
+                    >
+                      {{ CREDIT_TYPE_INFO[credit.credit_type as CreditType]?.token_tier === 'golden'
+                        ? (language === 'es' ? 'Golden' : 'Golden')
+                        : (language === 'es' ? 'Regular' : 'Regular') }}
+                    </span>
                   </h3>
                   <p class="text-sm text-gray-400">
                     {{ language === 'es' ? 'Expira:' : 'Expires:' }} 

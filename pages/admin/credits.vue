@@ -74,7 +74,18 @@ type GuestBookingRow = {
   booking_data: Record<string, unknown>
 }
 
-const recentGuestBookings = ref<GuestBookingRow[]>([])
+type CreditMatchRow = {
+  id: string
+  user_id: string
+  guest_booking_id: string | null
+  payment_status: string | null
+  price_paid_mxn: number | null
+  created_at: string
+}
+
+type GuestBookingWithCredit = GuestBookingRow & { matchedCredit?: CreditMatchRow }
+
+const recentGuestBookings = ref<GuestBookingWithCredit[]>([])
 const guestBookingProfiles = ref<Record<string, { full_name: string | null; email: string | null }>>({})
 
 const parseGuestBooking = (bd: Record<string, unknown> | null | undefined) => {
@@ -102,6 +113,52 @@ const parseGuestBooking = (bd: Record<string, unknown> | null | undefined) => {
   return { className, date, session, totalMxn, payment, phone }
 }
 
+const MATCH_WINDOW_MS = 6 * 60 * 1000
+
+const findCreditForGuest = (g: GuestBookingRow, credits: CreditMatchRow[]): CreditMatchRow | undefined => {
+  const byFk = credits.find(c => c.guest_booking_id === g.id)
+  if (byFk) return byFk
+  const uid = g.linked_user_id
+  if (!uid) return undefined
+  const t0 = new Date(g.created_at).getTime()
+  const parsed = parseGuestBooking(g.booking_data)
+  const wantMxn =
+    typeof parsed.totalMxn === 'number'
+      ? parsed.totalMxn
+      : typeof parsed.totalMxn === 'string' && parsed.totalMxn !== '—'
+        ? Number(parsed.totalMxn)
+        : null
+
+  const candidates = credits.filter(c => {
+    if (c.user_id !== uid) return false
+    const dt = Math.abs(new Date(c.created_at).getTime() - t0)
+    if (dt > MATCH_WINDOW_MS) return false
+    if (wantMxn != null && !Number.isNaN(wantMxn) && c.price_paid_mxn != null) {
+      return Math.abs(Number(c.price_paid_mxn) - wantMxn) < 0.02
+    }
+    return true
+  })
+  if (candidates.length === 0) return undefined
+  candidates.sort(
+    (a, b) =>
+      Math.abs(new Date(a.created_at).getTime() - t0) - Math.abs(new Date(b.created_at).getTime() - t0),
+  )
+  return candidates[0]
+}
+
+type HistoryOutcome = 'no_credit' | 'pending' | 'paid' | 'rejected' | 'failed'
+
+const historyOutcome = (g: GuestBookingWithCredit): HistoryOutcome => {
+  const c = g.matchedCredit
+  if (!c) return 'no_credit'
+  const s = (c.payment_status || 'pending').toLowerCase()
+  if (s === 'paid') return 'paid'
+  if (s === 'rejected') return 'rejected'
+  if (s === 'failed') return 'failed'
+  if (s === 'pending') return 'pending'
+  return 'pending'
+}
+
 const loadRecentGuestBookings = async () => {
   try {
     const { data, error } = await client
@@ -109,12 +166,38 @@ const loadRecentGuestBookings = async () => {
       .select('id, created_at, linked_user_id, booking_data')
       .not('linked_user_id', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(15)
+      .limit(35)
 
     if (error) throw error
-    recentGuestBookings.value = (data || []) as GuestBookingRow[]
+    const bookings = (data || []) as GuestBookingRow[]
 
-    const ids = [...new Set(recentGuestBookings.value.map(g => g.linked_user_id).filter(Boolean) as string[])]
+    const ids = [...new Set(bookings.map(g => g.linked_user_id).filter(Boolean) as string[])]
+    let credits: CreditMatchRow[] = []
+    if (ids.length > 0) {
+      const { data: credData, error: credErr } = await client
+        .from('user_credits')
+        .select('id, user_id, guest_booking_id, payment_status, price_paid_mxn, created_at')
+        .in('user_id', ids)
+        .order('created_at', { ascending: false })
+        .limit(250)
+
+      if (credErr) {
+        console.error('loadRecentGuestBookings credits:', credErr)
+      } else {
+        credits = (credData || []) as CreditMatchRow[]
+      }
+    }
+
+    const usedCreditIds = new Set<string>()
+    const withCredit: GuestBookingWithCredit[] = bookings.map(g => {
+      const pool = credits.filter(c => !usedCreditIds.has(c.id))
+      const m = findCreditForGuest(g, pool)
+      if (m) usedCreditIds.add(m.id)
+      return { ...g, matchedCredit: m }
+    })
+
+    recentGuestBookings.value = withCredit
+
     if (ids.length === 0) {
       guestBookingProfiles.value = {}
       return
@@ -140,6 +223,36 @@ const skaterLabel = (userId: string) => {
   const p = profilesById.value[userId]
   if (!p) return userId.slice(0, 8) + '…'
   return p.full_name || p.email || userId
+}
+
+const outcomeStatusLabel = (o: HistoryOutcome) => {
+  const es = language.value === 'es'
+  switch (o) {
+    case 'paid':
+      return es ? 'Pago exitoso' : 'Payment successful'
+    case 'rejected':
+      return es ? 'Pago rechazado' : 'Payment rejected'
+    case 'failed':
+      return es ? 'Pago fallido' : 'Payment failed'
+    case 'pending':
+      return es ? 'Pendiente de confirmar' : 'Awaiting confirmation'
+    default:
+      return es ? 'Sin crédito en BD' : 'No credit row'
+  }
+}
+
+const outcomeStatusClass = (o: HistoryOutcome) => {
+  switch (o) {
+    case 'paid':
+      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
+    case 'rejected':
+    case 'failed':
+      return 'bg-red-500/15 text-red-300 border-red-500/35'
+    case 'pending':
+      return 'bg-amber-500/15 text-amber-200 border-amber-500/35'
+    default:
+      return 'bg-gray-800 text-gray-400 border-gray-700'
+  }
 }
 
 const formatWhen = (iso: string | null | undefined) => {
@@ -184,7 +297,7 @@ const approveCredit = async (c: UserCredit) => {
       if (actErr) throw actErr
     }
 
-    await loadPending()
+    await Promise.all([loadPending(), loadRecentGuestBookings()])
   } catch (e) {
     console.error('approve credit:', e)
   } finally {
@@ -213,7 +326,7 @@ const rejectCredit = async (c: UserCredit) => {
       .eq('id', c.id)
 
     if (error) throw error
-    await loadPending()
+    await Promise.all([loadPending(), loadRecentGuestBookings()])
   } catch (e) {
     console.error('reject credit:', e)
   } finally {
@@ -314,8 +427,8 @@ const rejectCredit = async (c: UserCredit) => {
         <p class="text-xs text-gray-600 mb-4">
           {{
             language === 'es'
-              ? 'Resumen legible de las últimas compras enlazadas a cuenta (referencia).'
-              : 'Readable summary of recent checkouts linked to a user account.'
+              ? 'Estado según user_credits: exitoso, pendiente, rechazado o fallido. Las rechazadas siguen apareciendo aquí.'
+              : 'Status from user_credits: successful, pending, rejected, or failed. Rejected purchases stay in this list.'
           }}
         </p>
         <ul v-if="recentGuestBookings.length" class="space-y-3 text-sm text-gray-300">
@@ -329,6 +442,43 @@ const rejectCredit = async (c: UserCredit) => {
               <span class="font-mono text-[10px] truncate max-w-[140px]" :title="g.linked_user_id || ''">
                 {{ g.linked_user_id ? g.linked_user_id.slice(0, 8) + '…' : '—' }}
               </span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span
+                class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
+                :class="outcomeStatusClass(historyOutcome(g))"
+              >
+                {{ outcomeStatusLabel(historyOutcome(g)) }}
+              </span>
+              <span
+                v-if="g.matchedCredit?.id"
+                class="font-mono text-[10px] text-gray-600 truncate max-w-[200px]"
+                :title="g.matchedCredit.id"
+              >
+                credit {{ g.matchedCredit.id.slice(0, 8) }}…
+              </span>
+            </div>
+            <div class="flex gap-2">
+              <div
+                class="flex-1 py-2.5 rounded-xl text-center text-xs font-semibold border"
+                :class="
+                  historyOutcome(g) === 'paid'
+                    ? 'bg-emerald-900/40 border-emerald-500/45 text-emerald-200'
+                    : 'bg-gray-950/60 border-gray-800 text-gray-600'
+                "
+              >
+                {{ language === 'es' ? 'Aceptado' : 'Accepted' }}
+              </div>
+              <div
+                class="flex-1 py-2.5 rounded-xl text-center text-xs font-semibold border"
+                :class="
+                  historyOutcome(g) === 'rejected' || historyOutcome(g) === 'failed'
+                    ? 'bg-red-900/40 border-red-500/45 text-red-200'
+                    : 'bg-gray-950/60 border-gray-800 text-gray-600'
+                "
+              >
+                {{ language === 'es' ? 'Rechazado' : 'Rejected' }}
+              </div>
             </div>
             <p class="font-semibold text-white">
               {{

@@ -104,6 +104,7 @@ const isSkaterHome = computed(() => user.value && profileRole.value === 'custome
 
       <!-- 3. Calendario -->
       <HomeSkaterClassMonthCalendar v-if="isSkaterHome" />
+      <HomeGuestClassAvailabilityCalendar v-else />
 
       <!-- 4. Rampas -->
       <section>

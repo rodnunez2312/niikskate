@@ -36,7 +36,8 @@ const currentStep = ref(1)
 const totalSteps = 5
 
 // Step 1: Class type
-const classType = ref<'single' | 'package' | null>(null)
+const classType = ref<'single' | 'package' | 'pro' | null>(null)
+const lessonCategory = ref<'flat_street' | 'ramps_bowl' | 'surfskate' | null>(null)
 
 // Step 2: Specific class selection
 const selectedClass = ref<string | null>(null)
@@ -57,10 +58,17 @@ const maxClassesForPackage = computed(() => {
   switch (selectedClass.value) {
     case 'monthly':
     case 'monthly_intermediate':
+    case 'pro_monthly':
       return 8
     case 'pkg_5':
+    case 'ind_5':
+    case 'pro_group_5':
+    case 'pro_ind_5':
       return 5
     case 'pkg_3':
+    case 'ind_3':
+    case 'pro_group_3':
+    case 'pro_ind_3':
       return 3
     case 'saturdays':
       return 4
@@ -76,7 +84,7 @@ const isMultiDateSelection = computed(() => {
 
 // Check if this is a monthly program (max 2 classes per week)
 const isMonthlyProgram = computed(() => {
-  return selectedClass.value === 'monthly' || selectedClass.value === 'monthly_intermediate'
+  return ['monthly', 'monthly_intermediate', 'pro_monthly'].includes(selectedClass.value || '')
 })
 
 // Get week key for a date (year-week format)
@@ -138,7 +146,7 @@ const countryCodes = [
   { code: '+44', flag: '🇬🇧', name: 'United Kingdom', short: 'UK' },
   { code: '+58', flag: '🇻🇪', name: 'Venezuela', short: 'VE' },
 ]
-const paymentMethod = ref<'cash' | 'online' | null>(null)
+const paymentMethod = ref<'cash' | 'transfer' | null>(null)
 const isSubmitting = ref(false)
 const bookingConfirmed = ref(false)
 /** Blocks success: credit row did not insert (usually missing RLS on user_credits). */
@@ -209,8 +217,18 @@ const singleClassOptions = computed(() => [
   {
     id: 'grouped',
     name: language.value === 'es' ? 'Clase Grupal' : 'Group Class',
-    description: language.value === 'es' ? 'Aprende con otros estudiantes' : 'Learn with other students',
-    priceMXN: 130,
+    description: language.value === 'es'
+      ? lessonCategory.value === 'flat_street'
+        ? 'Flatground/Street'
+        : lessonCategory.value === 'ramps_bowl'
+          ? 'Ramps/Bowl'
+          : 'Surfskate'
+      : lessonCategory.value === 'flat_street'
+        ? 'Flatground/Street'
+        : lessonCategory.value === 'ramps_bowl'
+          ? 'Ramps/Bowl'
+          : 'Surfskate',
+    priceMXN: 150,
     priceUSD: 200,
     icon: '👥',
     color: 'from-green-400 to-green-600',
@@ -218,11 +236,41 @@ const singleClassOptions = computed(() => [
   {
     id: 'individual',
     name: language.value === 'es' ? 'Clase Individual' : 'Individual Class',
-    description: language.value === 'es' ? 'Entrenamiento personalizado' : 'Personalized coaching',
-    priceMXN: 200,
+    description: language.value === 'es'
+      ? lessonCategory.value === 'flat_street'
+        ? 'Entrenamiento Flatground/Street'
+        : lessonCategory.value === 'ramps_bowl'
+          ? 'Entrenamiento Ramps/Bowl'
+          : 'Entrenamiento Surfskate'
+      : lessonCategory.value === 'flat_street'
+        ? 'Flatground/Street coaching'
+        : lessonCategory.value === 'ramps_bowl'
+          ? 'Ramps/Bowl coaching'
+          : 'Surfskate coaching',
+    priceMXN: 250,
     priceUSD: 200,
     icon: '👤',
     color: 'from-purple-400 to-purple-600',
+  },
+  {
+    id: 'ind_3',
+    name: language.value === 'es' ? 'Paquete Individual 3 clases' : '3 Individual Classes Package',
+    description: language.value === 'es' ? 'Precio regular $750 • descuento $675' : 'Regular $750 • discount $675',
+    priceMXN: 675,
+    priceUSD: 65,
+    icon: '3️⃣',
+    color: 'from-purple-400 to-purple-600',
+    badge: '10% OFF',
+  },
+  {
+    id: 'ind_5',
+    name: language.value === 'es' ? 'Paquete Individual 5 clases' : '5 Individual Classes Package',
+    description: language.value === 'es' ? 'Precio regular $1,250 • descuento $1,000' : 'Regular $1,250 • discount $1,000',
+    priceMXN: 1000,
+    priceUSD: 95,
+    icon: '5️⃣',
+    color: 'from-purple-500 to-purple-700',
+    badge: '20% OFF',
   },
 ])
 
@@ -232,7 +280,7 @@ const packageOptions = computed(() => [
     id: 'monthly',
     name: language.value === 'es' ? 'Programa Mensual Principiantes' : 'Monthly Beginners Program',
     description: language.value === 'es' ? '8 clases grupales' : '8 group classes',
-    priceMXN: 600,
+    priceMXN: 800,
     priceUSD: 35,
     icon: '🏆',
     color: 'from-gold-400 to-gold-600',
@@ -240,9 +288,9 @@ const packageOptions = computed(() => [
   },
   {
     id: 'monthly_intermediate',
-    name: language.value === 'es' ? 'Programa Mensual Intermedios' : 'Monthly Intermediate Program',
+    name: language.value === 'es' ? 'Programa Mensual Competitivo' : 'Monthly Competitive Program',
     description: language.value === 'es' ? '8 clases • Bowl, Street, Surf Skate' : '8 classes • Bowl, Street, Surf Skate',
-    priceMXN: 800,
+    priceMXN: 1000,
     priceUSD: 50,
     icon: '⭐',
     color: 'from-purple-400 to-blue-600',
@@ -251,8 +299,8 @@ const packageOptions = computed(() => [
   {
     id: 'pkg_3',
     name: language.value === 'es' ? 'Paquete 3 Clases' : '3 Classes Package',
-    description: language.value === 'es' ? '10% descuento • Válido 1 mes' : '10% off • Valid 1 month',
-    priceMXN: 350,
+    description: language.value === 'es' ? 'Precio regular $450 • descuento $405' : 'Regular $450 • discount $405',
+    priceMXN: 405,
     priceUSD: 540,
     icon: '3️⃣',
     color: 'from-green-400 to-green-600',
@@ -261,8 +309,8 @@ const packageOptions = computed(() => [
   {
     id: 'pkg_5',
     name: language.value === 'es' ? 'Paquete 5 Clases' : '5 Classes Package',
-    description: language.value === 'es' ? '15% descuento • Válido 1 mes' : '15% off • Valid 1 month',
-    priceMXN: 560,
+    description: language.value === 'es' ? 'Precio regular $750 • descuento $600' : 'Regular $750 • discount $600',
+    priceMXN: 600,
     priceUSD: 850,
     icon: '5️⃣',
     color: 'from-yellow-400 to-yellow-600',
@@ -276,6 +324,76 @@ const packageOptions = computed(() => [
     priceUSD: 35,
     icon: '🗓️',
     color: 'from-orange-400 to-orange-600',
+  },
+])
+
+const proClassOptions = computed(() => [
+  {
+    id: 'pro_monthly',
+    name: language.value === 'es' ? 'Mensual (4 clases por semana)' : 'Monthly (4 classes per week)',
+    description: language.value === 'es' ? 'Programa pro con coach invitado' : 'Pro program with guest coach',
+    priceMXN: 5000,
+    priceUSD: 300,
+    icon: '🏆',
+    color: 'from-gold-400 to-gold-600',
+  },
+  {
+    id: 'pro_group_single',
+    name: language.value === 'es' ? 'Sesión grupal' : 'Single group session',
+    description: language.value === 'es' ? 'Clase pro grupal' : 'Pro group class',
+    priceMXN: 350,
+    priceUSD: 22,
+    icon: '👥',
+    color: 'from-gold-400 to-glass-green',
+  },
+  {
+    id: 'pro_max_single',
+    name: language.value === 'es' ? 'Sesión individual' : 'Single individual session',
+    description: language.value === 'es' ? 'Clase pro individual' : 'Pro individual class',
+    priceMXN: 250,
+    priceUSD: 16,
+    icon: '👤',
+    color: 'from-gold-400 to-glass-orange',
+  },
+  {
+    id: 'pro_group_3',
+    name: language.value === 'es' ? 'Grupal 3 sesiones' : 'Group 3 sessions',
+    description: language.value === 'es' ? 'Precio regular $1,050 • descuento $945' : 'Regular $1,050 • discount $945',
+    priceMXN: 945,
+    priceUSD: 58,
+    icon: '3️⃣',
+    color: 'from-gold-400 to-glass-orange',
+    badge: '10% OFF',
+  },
+  {
+    id: 'pro_group_5',
+    name: language.value === 'es' ? 'Grupal 5 sesiones' : 'Group 5 sessions',
+    description: language.value === 'es' ? 'Precio regular $1,750 • descuento $1,400' : 'Regular $1,750 • discount $1,400',
+    priceMXN: 1400,
+    priceUSD: 86,
+    icon: '5️⃣',
+    color: 'from-gold-500 to-glass-orange',
+    badge: '20% OFF',
+  },
+  {
+    id: 'pro_ind_3',
+    name: language.value === 'es' ? 'Individual 3 sesiones' : 'Individual 3 sessions',
+    description: language.value === 'es' ? 'Precio regular $1,200 • descuento $1,080' : 'Regular $1,200 • discount $1,080',
+    priceMXN: 1080,
+    priceUSD: 67,
+    icon: '3️⃣',
+    color: 'from-purple-400 to-gold-500',
+    badge: '10% OFF',
+  },
+  {
+    id: 'pro_ind_5',
+    name: language.value === 'es' ? 'Individual 5 sesiones' : 'Individual 5 sessions',
+    description: language.value === 'es' ? 'Precio regular $2,000 • descuento $1,600' : 'Regular $2,000 • discount $1,600',
+    priceMXN: 1600,
+    priceUSD: 98,
+    icon: '5️⃣',
+    color: 'from-purple-500 to-gold-500',
+    badge: '20% OFF',
   },
 ])
 
@@ -439,13 +557,18 @@ const prevStep = () => {
 }
 
 // Auto-advance selection functions
-const selectClassType = (type: 'single' | 'package') => {
+const selectClassType = (type: 'single' | 'package' | 'pro') => {
   classType.value = type
+  lessonCategory.value = null
   selectedClass.value = null
   // Brief delay for visual feedback before advancing
   setTimeout(() => {
     nextStep()
   }, 200)
+}
+
+const selectLessonCategory = (category: 'flat_street' | 'ramps_bowl' | 'surfskate') => {
+  lessonCategory.value = category
 }
 
 const selectSpecificClass = (classId: string) => {
@@ -457,60 +580,17 @@ const selectSpecificClass = (classId: string) => {
 }
 
 /** Featured packages on step 1 — same offers as former home quick-buy; skips package picker (step 2). */
-const featuredQuickPackageIds = ['monthly_intermediate', 'pkg_3', 'pkg_5'] as const
-
-const featuredQuickPackages = computed(() => {
-  const borders: Record<string, string> = {
-    monthly_intermediate: 'border-glass-purple/50 hover:border-glass-purple',
-    pkg_3: 'border-glass-green/50 hover:border-glass-green',
-    pkg_5: 'border-gold-400/50 hover:border-gold-400',
+const handleBack = () => {
+  if (currentStep.value === 2 && classType.value !== 'pro' && lessonCategory.value) {
+    lessonCategory.value = null
+    selectedClass.value = null
+    return
   }
-  const titles: Record<string, { es: string; en: string }> = {
-    monthly_intermediate: { es: '8 créditos (mensual)', en: '8 credits (monthly)' },
-    pkg_3: { es: 'Paquete 3 clases', en: '3-class package' },
-    pkg_5: { es: 'Paquete 5 clases', en: '5-class package' },
+  if (currentStep.value > 1) {
+    prevStep()
+    return
   }
-  const subs: Record<string, { es: string; en: string }> = {
-    monthly_intermediate: { es: 'Programa intermedios', en: 'Intermediate program' },
-    pkg_3: { es: '10% descuento', en: '10% off' },
-    pkg_5: { es: '15% descuento', en: '15% off' },
-  }
-  const emojis: Record<string, string> = {
-    monthly_intermediate: '⭐',
-    pkg_3: '3️⃣',
-    pkg_5: '5️⃣',
-  }
-  return featuredQuickPackageIds.map(id => {
-    const opt = packageOptions.value.find(p => p.id === id)
-    if (!opt) return null
-    const isEs = language.value === 'es'
-    return {
-      id,
-      emoji: emojis[id],
-      title: isEs ? titles[id].es : titles[id].en,
-      subtitle: isEs ? subs[id].es : subs[id].en,
-      priceLabel: currency.value === 'USD' ? `$${opt.priceUSD} USD` : `$${opt.priceMXN} MXN`,
-      border: borders[id],
-    }
-  }).filter(Boolean) as Array<{
-    id: string
-    emoji: string
-    title: string
-    subtitle: string
-    priceLabel: string
-    border: string
-  }>
-})
-
-const selectFeaturedPackageFromStep1 = (classId: string) => {
-  classType.value = 'package'
-  selectedClass.value = classId
-  selectedDates.value = []
-  selectedDate.value = null
-  selectedSession.value = null
-  setTimeout(() => {
-    currentStep.value = 3
-  }, 200)
+  router.push('/')
 }
 
 const canProceed = computed(() => {
@@ -518,7 +598,8 @@ const canProceed = computed(() => {
     case 1:
       return classType.value !== null
     case 2:
-      return selectedClass.value !== null
+      if (classType.value === 'pro') return selectedClass.value !== null
+      return lessonCategory.value !== null && selectedClass.value !== null
     case 3:
       return true // Equipment is optional
     case 4:
@@ -544,6 +625,8 @@ const selectedClassDetails = computed(() => {
   
   if (classType.value === 'single') {
     return singleClassOptions.value.find(c => c.id === selectedClass.value)
+  } else if (classType.value === 'pro') {
+    return proClassOptions.value.find(c => c.id === selectedClass.value)
   } else {
     return packageOptions.value.find(c => c.id === selectedClass.value)
   }
@@ -593,6 +676,18 @@ const getCreditType = (classSelection: string | null): string | null => {
     case 'monthly_intermediate': return 'monthly_intermediate'
     case 'pkg_3': return 'pkg_3'
     case 'pkg_5': return 'pkg_5'
+    case 'ind_3': return 'pkg_3'
+    case 'ind_5': return 'pkg_5'
+    case 'pro_monthly': return 'golden_monthly'
+    case 'pro_group_3':
+    case 'pro_ind_3':
+      return 'golden_pkg_3'
+    case 'pro_group_5':
+    case 'pro_ind_5':
+      return 'golden_pkg_5'
+    case 'pro_group_single':
+    case 'pro_max_single':
+      return 'golden_single'
     case 'saturdays': return 'saturdays'
     case 'grouped': return 'single_group'
     case 'individual': return 'single_individual'
@@ -608,6 +703,18 @@ const getTotalCredits = (classSelection: string | null): number => {
       return 8
     case 'pkg_5': return 5
     case 'pkg_3': return 3
+    case 'ind_5': return 5
+    case 'ind_3': return 3
+    case 'pro_monthly': return 8
+    case 'pro_group_5':
+    case 'pro_ind_5':
+      return 5
+    case 'pro_group_3':
+    case 'pro_ind_3':
+      return 3
+    case 'pro_group_single':
+    case 'pro_max_single':
+      return 1
     case 'saturdays': return 4
     case 'grouped':
     case 'individual':
@@ -623,6 +730,17 @@ const normalizeBookingWhatsAppTo = (): string | null => {
   const digits = phoneDigits.value.replace(/\D/g, '')
   const plus = cc.startsWith('+') ? cc : `+${cc}`
   return `${plus}${digits}`
+}
+
+const transferAccount = '25605606032'
+const transferClabe = '044180256056060326'
+
+const copyText = async (payload: string) => {
+  try {
+    await navigator.clipboard.writeText(payload)
+  } catch (e) {
+    console.warn('Clipboard copy failed:', e)
+  }
 }
 
 const sendBookingConfirmationWhatsApp = async () => {
@@ -658,6 +776,7 @@ const submitBooking = async () => {
   const bookingData = {
     class_type: selectedClass.value,
     class_name: selectedClassDetails.value?.name || '',
+    class_style: lessonCategory.value,
     date: selectedDate.value ? format(selectedDate.value, 'yyyy-MM-dd') : '',
     dates: selectedDates.value.map(d => format(d, 'yyyy-MM-dd')),
     session: selectedSession.value,
@@ -673,7 +792,7 @@ const submitBooking = async () => {
   try {
     if (user.value) {
       // Logged in user - save booking to database
-      const { error: bookingError } = await supabase
+      const { data: insertedGuestBooking, error: bookingError } = await supabase
         .from('guest_bookings')
         .insert({
           email: user.value.email,
@@ -683,7 +802,9 @@ const submitBooking = async () => {
           linked_user_id: user.value.id,
           linked_at: new Date().toISOString()
         })
-      
+        .select('id')
+        .single()
+
       if (bookingError) {
         console.error('Error saving booking:', bookingError)
       }
@@ -714,6 +835,7 @@ const submitBooking = async () => {
             price_paid_usd: currency.value === 'USD' ? displayTotal.value : null,
             payment_method: paymentMethod.value,
             payment_status: 'pending',
+            guest_booking_id: insertedGuestBooking?.id ?? null,
           })
           .select('id')
           .single()
@@ -827,7 +949,7 @@ const isDateBookable = (date: Date): boolean => {
     <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40 pt-safe">
       <div class="px-4 py-4 max-w-lg mx-auto">
         <div class="flex items-center justify-between">
-          <button @click="currentStep > 1 ? prevStep() : router.push('/')" class="p-2 -ml-2">
+          <button @click="handleBack" class="p-2 -ml-2">
             <svg class="w-6 h-6 text-gold-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
@@ -892,7 +1014,7 @@ const isDateBookable = (date: Date): boolean => {
                   {{ language === 'es' ? 'Grupal o Individual' : 'Group or Individual' }}
                 </p>
                 <p class="text-gold-400 font-semibold mt-1">
-                  {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(130) }}
+                  {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(150) }}
                 </p>
               </div>
               <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -928,7 +1050,7 @@ const isDateBookable = (date: Date): boolean => {
                   {{ language === 'es' ? 'Mensual o paquetes' : 'Monthly or packages' }}
                 </p>
                 <p class="text-glass-green font-semibold mt-1">
-                  {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(350) }}
+                  {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(405) }}
                 </p>
               </div>
               <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -936,37 +1058,43 @@ const isDateBookable = (date: Date): boolean => {
               </svg>
             </div>
           </button>
-        </div>
 
-        <!-- Buy credits (popular packages) — continues to equipment / dates flow -->
-        <div class="pt-6 mt-6 border-t border-gray-800">
-          <h2 class="text-lg font-bold text-white mb-1">
-            {{ language === 'es' ? 'Comprar créditos' : 'Buy credits' }}
-          </h2>
-          <p class="text-gray-500 text-sm mb-3">
-            {{
-              language === 'es'
-                ? 'Acceso rápido a nuestros paquetes más pedidos'
-                : 'Quick access to our most popular packages'
-            }}
-          </p>
-          <div class="space-y-2">
-            <button
-              v-for="pkg in featuredQuickPackages"
-              :key="pkg.id"
-              type="button"
-              class="w-full flex items-center gap-3 bg-black/40 backdrop-blur-sm rounded-2xl p-4 border transition-all duration-200 text-left active:scale-[0.99]"
-              :class="pkg.border"
-              @click="selectFeaturedPackageFromStep1(pkg.id)"
-            >
-              <span class="text-2xl shrink-0">{{ pkg.emoji }}</span>
-              <div class="flex-1 min-w-0">
-                <p class="font-bold text-white text-sm">{{ pkg.title }}</p>
-                <p class="text-xs text-gray-400">{{ pkg.subtitle }}</p>
+          <!-- Pro Coach Option -->
+          <button
+            @click="selectClassType('pro')"
+            class="relative overflow-hidden rounded-3xl p-6 text-left transition-all duration-300 transform active:scale-95"
+            :class="[
+              classType === 'pro'
+                ? 'ring-4 ring-gold-400 bg-gradient-to-br from-gold-400/20 to-glass-orange/20 scale-[1.02]'
+                : 'bg-gray-900 border border-gold-400/50 hover:border-gold-400 hover:bg-gray-800'
+            ]"
+          >
+            <div class="absolute top-3 right-12">
+              <span class="px-2 py-1 bg-gold-400 text-black text-xs font-bold rounded-full">
+                {{ language === 'es' ? 'Pro Coach' : 'Pro Coach' }}
+              </span>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold-400 to-glass-orange flex items-center justify-center shadow-lg shadow-gold-400/30">
+                <span class="text-2xl">🏅</span>
               </div>
-              <span class="text-gold-400 font-bold text-sm shrink-0">{{ pkg.priceLabel }}</span>
-            </button>
-          </div>
+              <div class="flex-1">
+                <h3 class="text-xl font-bold text-white">
+                  {{ language === 'es' ? 'Pro Skater Coach' : 'Pro Skater Coach' }}
+                </h3>
+                <p class="text-gray-400 text-sm">
+                  {{ language === 'es' ? 'Perfil y clases de Max Barrera' : 'Max Barrera profile and classes' }}
+                </p>
+                <p class="text-gold-400 font-semibold mt-1">
+                  {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(250) }}
+                </p>
+              </div>
+              <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </button>
+
         </div>
 
         <!-- Visual hint -->
@@ -978,14 +1106,81 @@ const isDateBookable = (date: Date): boolean => {
       <!-- STEP 2: Specific Class Selection - Auto advance -->
       <div v-else-if="currentStep === 2" class="space-y-6">
         <div class="text-center mb-6">
-          <h1 class="text-2xl font-bold text-white mb-2">
-            {{ classType === 'single' 
-              ? (language === 'es' ? '¿Qué clase prefieres?' : 'Which class do you prefer?')
-              : (language === 'es' ? 'Elige tu paquete' : 'Choose your package') 
+          <template v-if="classType !== 'pro'">
+            <h1 class="text-2xl font-bold text-white mb-2">
+              {{ language === 'es' ? '¿Qué estilo prefieres?' : 'Which style do you prefer?' }}
+            </h1>
+            <p class="text-gray-400">
+              {{ language === 'es' ? 'Elige el estilo de skate' : 'Choose your skate style' }}
+            </p>
+          </template>
+          <template v-else-if="classType === 'pro'">
+            <h1 class="text-2xl font-bold text-white mb-2">
+              {{ language === 'es' ? 'Pro Coach • Max Barrera' : 'Pro Coach • Max Barrera' }}
+            </h1>
+            <p class="text-gray-400">
+              {{ language === 'es' ? 'Selecciona tipo de clase y precio' : 'Select class type and price' }}
+            </p>
+          </template>
+          <template v-else>
+            <h1 class="text-2xl font-bold text-white mb-2">
+              {{ classType === 'single'
+                ? (language === 'es' ? '¿Qué clase prefieres?' : 'Which class do you prefer?')
+                : (language === 'es' ? 'Elige tu paquete' : 'Choose your package')
+              }}
+            </h1>
+            <p class="text-gray-400">
+              {{
+                lessonCategory === 'flat_street'
+                  ? (language === 'es' ? 'Flatground/Street' : 'Flatground/Street')
+                  : lessonCategory === 'ramps_bowl'
+                    ? (language === 'es' ? 'Ramps/Bowl' : 'Ramps/Bowl')
+                    : (language === 'es' ? 'Surfskate' : 'Surfskate')
+              }}
+            </p>
+          </template>
+        </div>
+
+        <div v-if="classType !== 'pro'" class="space-y-4">
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              class="rounded-xl p-3 text-center border transition-all"
+              :class="lessonCategory === 'flat_street'
+                ? 'border-gold-400 bg-gold-400/15 text-white'
+                : 'bg-gray-900 border-gray-800 hover:border-gold-400/50 text-gray-300'"
+              @click="selectLessonCategory('flat_street')"
+            >
+              <p class="font-bold text-sm">Flatground/Street</p>
+            </button>
+            <button
+              type="button"
+              class="rounded-xl p-3 text-center border transition-all"
+              :class="lessonCategory === 'ramps_bowl'
+                ? 'border-gold-400 bg-gold-400/15 text-white'
+                : 'bg-gray-900 border-gray-800 hover:border-gold-400/50 text-gray-300'"
+              @click="selectLessonCategory('ramps_bowl')"
+            >
+              <p class="font-bold text-sm">Ramps/Bowl</p>
+            </button>
+            <button
+              type="button"
+              class="rounded-xl p-3 text-center border transition-all"
+              :class="lessonCategory === 'surfskate'
+                ? 'border-gold-400 bg-gold-400/15 text-white'
+                : 'bg-gray-900 border-gray-800 hover:border-gold-400/50 text-gray-300'"
+              @click="selectLessonCategory('surfskate')"
+            >
+              <p class="font-bold text-sm">Surfskate</p>
+            </button>
+          </div>
+
+          <p class="text-xs text-gray-500 text-center">
+            {{
+              lessonCategory
+                ? (language === 'es' ? 'Estilo seleccionado. Ahora elige tu clase.' : 'Style selected. Now choose your class.')
+                : (language === 'es' ? 'Selecciona estilo y luego tu clase.' : 'Select a style, then your class.')
             }}
-          </h1>
-          <p class="text-gray-400">
-            {{ language === 'es' ? 'Toca para seleccionar' : 'Tap to select' }}
           </p>
         </div>
 
@@ -995,13 +1190,19 @@ const isDateBookable = (date: Date): boolean => {
             v-for="option in singleClassOptions"
             :key="option.id"
             @click="selectSpecificClass(option.id)"
-            class="w-full rounded-2xl p-5 text-left transition-all duration-300 transform active:scale-95"
+            class="w-full rounded-2xl p-5 text-left transition-all duration-300 transform active:scale-95 relative"
             :class="[
               selectedClass === option.id
                 ? 'ring-4 ring-gold-400 bg-gradient-to-br from-gold-400/20 to-glass-orange/20 scale-[1.02]'
                 : 'bg-gray-900 border border-gray-800 hover:border-gold-400/50'
             ]"
           >
+            <span
+              v-if="option.badge"
+              class="absolute top-3 right-12 px-2 py-0.5 rounded-full text-xs font-bold bg-gold-400 text-black"
+            >
+              {{ option.badge }}
+            </span>
             <div class="flex items-center gap-4">
               <div 
                 class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl bg-gradient-to-br shadow-lg"
@@ -1021,6 +1222,61 @@ const isDateBookable = (date: Date): boolean => {
               </div>
             </div>
           </button>
+        </div>
+
+        <!-- Pro Coach Options -->
+        <div v-else-if="classType === 'pro'" class="space-y-4">
+          <div class="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl p-4 border border-gold-400/40 shadow-2xl">
+            <div class="flex gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-700/50">
+                  <span class="text-gold-400 font-black text-lg uppercase tracking-wide truncate">MAX BARRERA</span>
+                  <span class="px-2 py-0.5 bg-glass-blue/30 text-glass-blue text-[10px] font-bold rounded uppercase shrink-0">PRO COACH</span>
+                </div>
+                <p class="text-gray-300 text-sm">
+                  {{ language === 'es'
+                    ? 'Pro skater invitado para sesiones premium de técnica, estilo y preparación para competencia.'
+                    : 'Guest pro skater for premium sessions focused on technique, style, and competition prep.' }}
+                </p>
+              </div>
+              <div class="flex flex-col items-center shrink-0">
+                <div class="w-20 h-20 rounded-xl border-2 border-dashed border-gold-400/50 bg-gray-800 flex items-center justify-center text-[10px] text-gray-400 text-center px-1">
+                  {{ language === 'es' ? 'Foto Max\n(placeholder)' : 'Max photo\n(placeholder)' }}
+                </div>
+                <p class="mt-2 text-gold-400 font-black text-sm">PRO</p>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <button
+              v-for="option in proClassOptions"
+              :key="option.id"
+              @click="selectSpecificClass(option.id)"
+              class="w-full rounded-2xl p-5 text-left transition-all duration-300 transform active:scale-95 relative bg-gray-900 border border-gold-400/30 hover:border-gold-400/60"
+            >
+              <span
+                v-if="option.badge"
+                class="absolute top-3 right-12 px-2 py-0.5 rounded-full text-xs font-bold bg-gold-400 text-black"
+              >
+                {{ option.badge }}
+              </span>
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl bg-gradient-to-br shadow-lg text-white" :class="option.color">
+                  {{ option.icon }}
+                </div>
+                <div class="flex-1">
+                  <h3 class="font-bold text-white text-lg">{{ option.name }}</h3>
+                  <p class="text-gray-400 text-sm">{{ option.description }}</p>
+                </div>
+                <div class="text-right flex items-center gap-2">
+                  <p class="font-bold text-xl text-gold-400">{{ currency === 'USD' ? `$${option.priceUSD} USD` : `$${option.priceMXN} MXN` }}</p>
+                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+          </div>
         </div>
 
         <!-- Package Options - Auto advance -->
@@ -1499,8 +1755,8 @@ const isDateBookable = (date: Date): boolean => {
                 <span class="font-semibold text-white">
                   {{ paymentMethod === 'cash' 
                     ? (language === 'es' ? 'Efectivo' : 'Cash')
-                    : paymentMethod === 'online'
-                      ? (language === 'es' ? 'En línea' : 'Online')
+                    : paymentMethod === 'transfer'
+                      ? (language === 'es' ? 'Transferencia' : 'Bank transfer')
                       : '-'
                   }}
                 </span>
@@ -1756,22 +2012,59 @@ const isDateBookable = (date: Date): boolean => {
                 </div>
               </button>
 
-              <!-- Online Payment (Disabled) -->
-              <div
-                class="w-full p-4 rounded-xl border-2 border-gray-800 bg-gray-800/50 flex items-center gap-4 opacity-50 cursor-not-allowed"
+              <!-- Bank Transfer -->
+              <button
+                @click="paymentMethod = 'transfer'"
+                class="w-full p-4 rounded-xl border-2 transition-all flex items-center gap-4"
+                :class="paymentMethod === 'transfer' ? 'border-gold-400 bg-gold-400/10' : 'border-gray-700 bg-gray-800'"
               >
-                <div class="w-12 h-12 rounded-xl bg-gray-700/50 flex items-center justify-center text-2xl grayscale">
-                  💳
+                <div class="w-12 h-12 rounded-xl bg-glass-blue/20 flex items-center justify-center text-2xl">
+                  🏦
                 </div>
                 <div class="flex-1 text-left">
-                  <p class="font-semibold text-gray-500">
-                    {{ language === 'es' ? 'Pago en Línea' : 'Pay Online' }}
+                  <p class="font-semibold text-white">
+                    {{ language === 'es' ? 'Transferencia' : 'Bank transfer' }}
                   </p>
-                  <p class="text-sm text-gray-600">
-                    {{ language === 'es' ? 'Próximamente' : 'Coming soon' }}
+                  <p class="text-sm text-gray-400">
+                    {{ language === 'es' ? 'Transferencia bancaria' : 'Bank transfer payment' }}
                   </p>
                 </div>
-                <div class="w-6 h-6 rounded-full border-2 border-gray-700 flex items-center justify-center">
+                <div
+                  class="w-6 h-6 rounded-full border-2 flex items-center justify-center"
+                  :class="paymentMethod === 'transfer' ? 'border-gold-400 bg-gold-400' : 'border-gray-600'"
+                >
+                  <svg v-if="paymentMethod === 'transfer'" class="w-4 h-4 text-black" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+              </button>
+
+              <div v-if="paymentMethod === 'transfer'" class="rounded-xl border border-glass-blue/40 bg-glass-blue/10 p-4 text-left">
+                <p class="text-white font-semibold mb-2">ScotiaBank</p>
+                <p class="text-gray-300 text-sm mb-1">Rodrigo Sanchez</p>
+                <div class="flex items-center justify-between gap-3 py-1">
+                  <p class="text-gray-200 text-sm">
+                    Cuenta Scotiabank: <span class="font-mono">{{ transferAccount }}</span>
+                  </p>
+                  <button
+                    type="button"
+                    @click="copyText(transferAccount)"
+                    class="px-2 py-1 rounded-md bg-gold-400 text-black text-xs font-semibold shrink-0"
+                  >
+                    {{ language === 'es' ? 'Copiar' : 'Copy' }}
+                  </button>
+                </div>
+                <div class="flex items-center justify-between gap-3 py-1">
+                  <p class="text-gray-200 text-sm">
+                    CLABE: <span class="font-mono">{{ transferClabe }}</span>
+                  </p>
+                  <button
+                    type="button"
+                    @click="copyText(transferClabe)"
+                    class="px-2 py-1 rounded-md bg-gold-400 text-black text-xs font-semibold shrink-0"
+                  >
+                    {{ language === 'es' ? 'Copiar' : 'Copy' }}
+                  </button>
                 </div>
               </div>
             </div>
