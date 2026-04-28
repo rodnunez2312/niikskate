@@ -84,7 +84,9 @@ export const useBookings = () => {
       
       if (scheduleError) throw scheduleError
 
-      const price = scheduleData?.price_override || scheduleData?.skate_class?.price || 0
+      const sc = scheduleData?.skate_class as { price?: number } | { price?: number }[] | null | undefined
+      const priceFromClass = Array.isArray(sc) ? sc[0]?.price : sc?.price
+      const price = scheduleData?.price_override || priceFromClass || 0
 
       // Create the booking
       const { data, error: insertError } = await client

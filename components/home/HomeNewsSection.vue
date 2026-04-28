@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import type { MetaFeedResponse, SocialStorySlide } from '~/types'
 
 const props = withDefaults(
   defineProps<{
@@ -18,6 +19,9 @@ interface NewsItem {
   title: string
   content: string
   excerpt: string
+  title_en?: string | null
+  content_en?: string | null
+  excerpt_en?: string | null
   image_url?: string
   video_url?: string
   category: string
@@ -41,12 +45,21 @@ interface SocialAccount {
 const loading = ref(true)
 const news = ref<NewsItem[]>([])
 const socialAccounts = ref<SocialAccount[]>([])
+const metaFeed = ref<MetaFeedResponse>({ instagram: [], facebook: [] })
 const selectedArticle = ref<NewsItem | null>(null)
 const showArticleModal = ref(false)
 
 onMounted(async () => {
-  await Promise.all([fetchNews(), fetchSocialAccounts()])
+  await Promise.all([fetchNews(), fetchSocialAccounts(), loadMetaFeed()])
 })
+
+async function loadMetaFeed() {
+  try {
+    metaFeed.value = await $fetch<MetaFeedResponse>('/api/social/meta-feed')
+  } catch {
+    metaFeed.value = { instagram: [], facebook: [] }
+  }
+}
 
 const fetchNews = async () => {
   loading.value = true
@@ -86,6 +99,57 @@ const fetchSocialAccounts = async () => {
 const featuredNews = computed(() => news.value.filter(n => n.is_featured))
 const regularNews = computed(() => news.value.filter(n => !n.is_featured))
 
+/** Instagram-style strip: news items with media + optional Meta Graph items */
+const storySlides = computed((): SocialStorySlide[] => {
+  const out: SocialStorySlide[] = []
+
+  for (const n of news.value) {
+    const url = n.video_url || n.image_url
+    if (!url) continue
+    out.push({
+      id: `news-${n.id}`,
+      source: 'news',
+      mediaType: n.video_url ? 'video' : 'image',
+      mediaUrl: (n.video_url || n.image_url) as string,
+      thumbnailUrl: n.image_url || null,
+      title: articleTitle(n),
+      caption: articleExcerpt(n) || null,
+      permalink: n.instagram_url || n.facebook_url || n.external_link || null,
+      at: new Date(n.publish_date).getTime(),
+    })
+  }
+
+  for (const ig of metaFeed.value.instagram) {
+    out.push({
+      id: `ig-${ig.id}`,
+      source: 'instagram',
+      mediaType: ig.mediaType,
+      mediaUrl: ig.mediaUrl,
+      thumbnailUrl: ig.thumbnailUrl,
+      title: language.value === 'es' ? 'Instagram' : 'Instagram',
+      caption: ig.caption,
+      permalink: ig.permalink,
+      at: new Date(ig.timestamp).getTime(),
+    })
+  }
+
+  for (const fb of metaFeed.value.facebook) {
+    out.push({
+      id: `fb-${fb.id}`,
+      source: 'facebook',
+      mediaType: 'image',
+      mediaUrl: fb.imageUrl,
+      thumbnailUrl: null,
+      title: language.value === 'es' ? 'Facebook' : 'Facebook',
+      caption: fb.message,
+      permalink: fb.permalink,
+      at: new Date(fb.createdTime).getTime(),
+    })
+  }
+
+  return out.sort((a, b) => b.at - a.at).slice(0, 36)
+})
+
 const openArticle = (article: NewsItem) => {
   selectedArticle.value = article
   showArticleModal.value = true
@@ -118,11 +182,28 @@ const getCategoryLabel = (category: string) => {
   return labels[category]?.[language.value] || category
 }
 
+/** English columns from DB when set; otherwise Spanish copy */
+const articleTitle = (article: NewsItem) => {
+  if (language.value === 'en' && article.title_en?.trim()) return article.title_en.trim()
+  return article.title
+}
+
+const articleExcerpt = (article: NewsItem) => {
+  if (language.value === 'en' && article.excerpt_en?.trim()) return article.excerpt_en.trim()
+  return article.excerpt
+}
+
+const articleContent = (article: NewsItem) => {
+  if (language.value === 'en' && article.content_en?.trim()) return article.content_en.trim()
+  return article.content
+}
+
 const getSocialIcon = (platform: string) => {
   const icons: Record<string, string> = {
     instagram: '📸',
     facebook: '📘',
     youtube: '🎬',
+    twitter: '𝕏',
     tiktok: '🎵',
   }
   return icons[platform] || '🔗'
@@ -132,10 +213,19 @@ const getSocialColor = (platform: string) => {
   const colors: Record<string, string> = {
     instagram: 'from-purple-500 via-pink-500 to-orange-500',
     facebook: 'from-blue-600 to-blue-700',
-    youtube: 'from-red-600 to-red-700',
+    youtube: 'from-red-600 to-red-800',
+    twitter: 'from-neutral-900 to-black',
     tiktok: 'from-black to-gray-900',
   }
   return colors[platform] || 'from-gray-600 to-gray-700'
+}
+
+const socialPlatformLabel = (platform: string) => {
+  if (platform === 'twitter') {
+    return language.value === 'es' ? 'X (Twitter)' : 'X (Twitter)'
+  }
+  if (platform === 'youtube') return 'YouTube'
+  return platform.charAt(0).toUpperCase() + platform.slice(1)
 }
 </script>
 
@@ -168,6 +258,8 @@ const getSocialColor = (platform: string) => {
         {{ language === 'es' ? 'Noticias' : 'News' }}
       </h2>
 
+      <NewsStoriesStrip :slides="storySlides" :language="language" />
+
       <div v-if="socialAccounts.length > 0" class="mb-6">
         <h3 class="text-white font-bold mb-3 flex items-center gap-2">
           <span>📱</span>
@@ -185,7 +277,7 @@ const getSocialColor = (platform: string) => {
           >
             <span class="text-2xl">{{ getSocialIcon(account.platform) }}</span>
             <div>
-              <p class="font-bold text-white capitalize">{{ account.platform }}</p>
+              <p class="font-bold text-white">{{ socialPlatformLabel(account.platform) }}</p>
               <p class="text-white/70 text-sm">@{{ account.account_name }}</p>
             </div>
           </a>
@@ -212,7 +304,7 @@ const getSocialColor = (platform: string) => {
           @click="openArticle(article)"
         >
           <div v-if="article.image_url" class="aspect-video bg-gray-800">
-            <img :src="article.image_url" :alt="article.title" class="w-full h-full object-cover" />
+            <img :src="article.image_url" :alt="articleTitle(article)" class="w-full h-full object-cover" />
           </div>
           <div class="p-4">
             <div class="flex items-center gap-2 mb-2">
@@ -221,8 +313,8 @@ const getSocialColor = (platform: string) => {
               </span>
               <span class="text-xs text-gray-500">{{ formatDate(article.publish_date) }}</span>
             </div>
-            <h3 class="font-bold text-white text-lg mb-2">{{ article.title }}</h3>
-            <p class="text-gray-400 text-sm line-clamp-2">{{ article.excerpt }}</p>
+            <h3 class="font-bold text-white text-lg mb-2">{{ articleTitle(article) }}</h3>
+            <p class="text-gray-400 text-sm line-clamp-2">{{ articleExcerpt(article) }}</p>
           </div>
         </div>
       </div>
@@ -241,7 +333,7 @@ const getSocialColor = (platform: string) => {
           >
             <div class="flex gap-3">
               <div v-if="article.image_url" class="w-20 h-20 rounded-lg bg-gray-800 shrink-0 overflow-hidden">
-                <img :src="article.image_url" :alt="article.title" class="w-full h-full object-cover" />
+                <img :src="article.image_url" :alt="articleTitle(article)" class="w-full h-full object-cover" />
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
@@ -249,7 +341,7 @@ const getSocialColor = (platform: string) => {
                     {{ getCategoryLabel(article.category) }}
                   </span>
                 </div>
-                <h3 class="font-bold text-white text-sm mb-1 line-clamp-2">{{ article.title }}</h3>
+                <h3 class="font-bold text-white text-sm mb-1 line-clamp-2">{{ articleTitle(article) }}</h3>
                 <p class="text-gray-500 text-xs">{{ formatDate(article.publish_date) }}</p>
               </div>
             </div>
@@ -286,7 +378,7 @@ const getSocialColor = (platform: string) => {
 
             <article class="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800">
               <div v-if="selectedArticle.image_url" class="aspect-video bg-gray-800">
-                <img :src="selectedArticle.image_url" :alt="selectedArticle.title" class="w-full h-full object-cover" />
+                <img :src="selectedArticle.image_url" :alt="articleTitle(selectedArticle)" class="w-full h-full object-cover" />
               </div>
 
               <div class="p-6">
@@ -297,10 +389,10 @@ const getSocialColor = (platform: string) => {
                   <span class="text-xs text-gray-500">{{ formatDate(selectedArticle.publish_date) }}</span>
                 </div>
 
-                <h1 class="text-2xl font-bold text-white mb-4">{{ selectedArticle.title }}</h1>
+                <h1 class="text-2xl font-bold text-white mb-4">{{ articleTitle(selectedArticle) }}</h1>
 
                 <div class="prose prose-invert prose-sm max-w-none">
-                  <div v-html="selectedArticle.content.replace(/\n/g, '<br>')"></div>
+                  <div v-html="articleContent(selectedArticle).replace(/\n/g, '<br>')"></div>
                 </div>
 
                 <div

@@ -260,7 +260,8 @@ const submitReservations = async () => {
       credit_id: selectedCredit.value!.id,
       reservation_date: format(date, 'yyyy-MM-dd'),
       time_slot: selectedSession.value,
-      status: 'active'
+      status: 'active',
+      workflow_status: 'requested' as const,
     }))
     
     const { error } = await client

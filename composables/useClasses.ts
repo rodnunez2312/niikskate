@@ -8,8 +8,8 @@ const DEMO_COACHES: User[] = [
     email: 'rod@niikskate.com',
     full_name: 'Coach Rod',
     role: 'coach',
-    avatar_url: null,
-    phone: null,
+    avatar_url: undefined,
+    phone: undefined,
     bio: 'Experto en Vert y Street tricks con más de 10 años de experiencia.',
     specialties: ['Vert', 'Street'],
     hourly_rate: 250,
@@ -22,8 +22,8 @@ const DEMO_COACHES: User[] = [
     email: 'leo@niikskate.com',
     full_name: 'Coach Leo',
     role: 'coach',
-    avatar_url: null,
-    phone: null,
+    avatar_url: undefined,
+    phone: undefined,
     bio: 'Especialista en Vert y Street, campeón regional.',
     specialties: ['Vert', 'Street'],
     hourly_rate: 250,
@@ -36,8 +36,8 @@ const DEMO_COACHES: User[] = [
     email: 'itza@niikskate.com',
     full_name: 'Coach Itza',
     role: 'coach',
-    avatar_url: null,
-    phone: null,
+    avatar_url: undefined,
+    phone: undefined,
     bio: 'Especialista en fundamentos y técnica básica para principiantes.',
     specialties: ['Fundamentos'],
     hourly_rate: 200,
@@ -84,14 +84,10 @@ export const useClasses = () => {
     error.value = null
     
     try {
-      const { data, error: fetchError } = await client
-        .from('profiles')
-        .select('*')
-        .eq('role', 'coach')
-        .eq('is_active', true)
-        .order('full_name')
-      
-      if (fetchError) throw fetchError
+      const data = await fetchCoachDirectoryProfiles(client, {
+        select: '*',
+        activeOnly: true,
+      })
       // Use database coaches if available, otherwise keep demo coaches
       if (data && data.length > 0) {
         coaches.value = data as User[]
@@ -250,7 +246,7 @@ export const useClasses = () => {
         ?.filter(a => !unavailableCoachIds.has(a.coach_id))
         .map(a => a.coach) || []
       
-      return availableCoaches as User[]
+      return availableCoaches as unknown as User[]
     } catch (e) {
       console.error('Error fetching available coaches:', e)
       return []

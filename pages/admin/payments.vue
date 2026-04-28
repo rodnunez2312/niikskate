@@ -60,14 +60,10 @@ onMounted(async () => {
 
 const loadCoaches = async () => {
   try {
-    const { data } = await client
-      .from('profiles')
-      .select('id, full_name, email')
-      .eq('role', 'coach')
-      .eq('is_active', true)
-      .order('full_name')
-    
-    coaches.value = data || []
+    coaches.value = await fetchCoachDirectoryProfiles(client, {
+      select: 'id, full_name, email',
+      activeOnly: true,
+    })
   } catch (e) {
     console.error('Error loading coaches:', e)
   }
@@ -283,7 +279,7 @@ const stats = computed(() => {
                   v-for="cat in paymentCategories"
                   :key="cat.id"
                   type="button"
-                  @click="newPayment.category = cat.id; if (cat.id !== 'coaches') newPayment.coach_id = ''"
+                  @click="newPayment.category = cat.id as typeof newPayment.category; if (cat.id !== 'coaches') newPayment.coach_id = ''"
                   class="py-3 px-3 rounded-xl font-semibold transition-all flex items-center gap-2"
                   :class="newPayment.category === cat.id ? 'bg-gold-400 text-black' : 'bg-gray-800 text-gray-400'"
                 >

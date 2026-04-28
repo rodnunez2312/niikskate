@@ -180,7 +180,7 @@ async function createGroup() {
           </button>
           <h1 class="text-xl font-bold text-white flex items-center gap-2">
             <span class="text-2xl" aria-hidden="true">🛹</span>
-            {{ language === 'es' ? 'Skate Program' : 'Skate Program' }}
+            Program
           </h1>
           <div class="w-10" />
         </div>

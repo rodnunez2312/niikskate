@@ -34,7 +34,7 @@ const customerNavItems = computed(() => {
       icon: 'home',
     },
     {
-      name: language.value === 'es' ? 'Reservar' : 'Book',
+      name: t('nav.book'),
       path: '/book',
       icon: 'calendar',
     },
@@ -61,12 +61,12 @@ const customerNavItems = computed(() => {
   } else {
     // Guest: show News and Login
     items.push({
-      name: language.value === 'es' ? 'Noticias' : 'News',
+      name: t('nav.news'),
       path: '/news',
       icon: 'news',
     })
     items.push({
-      name: language.value === 'es' ? 'Entrar' : 'Login',
+      name: t('nav.login'),
       path: '/auth/login',
       icon: 'login',
     })
@@ -75,12 +75,12 @@ const customerNavItems = computed(() => {
   return items
 })
 
-// Admin navigation (includes Store + Evaluations - everything coach has plus Store)
+// Admin navigation (Tienda opens from Perfil → Pagos y tienda; same items as coach + profile)
 const adminNavItems = computed(() => [
   {
     name: language.value === 'es' ? 'Inicio' : 'Home',
     path: '/dashboard',
-    icon: 'home',
+    icon: 'star',
   },
   {
     name: language.value === 'es' ? 'Patinadores' : 'Skaters',
@@ -93,14 +93,9 @@ const adminNavItems = computed(() => [
     icon: 'coaching',
   },
   {
-    name: language.value === 'es' ? 'Skate Program' : 'Skate Program',
+    name: 'Program',
     path: '/dashboard/skills',
     icon: 'skate-program',
-  },
-  {
-    name: language.value === 'es' ? 'Tienda' : 'Store',
-    path: '/dashboard/store',
-    icon: 'store',
   },
   {
     name: language.value === 'es' ? 'Perfil' : 'Profile',
@@ -114,7 +109,7 @@ const coachNavItems = computed(() => [
   {
     name: language.value === 'es' ? 'Inicio' : 'Home',
     path: '/dashboard',
-    icon: 'home',
+    icon: 'star',
   },
   {
     name: language.value === 'es' ? 'Patinadores' : 'Skaters',
@@ -127,7 +122,7 @@ const coachNavItems = computed(() => [
     icon: 'coaching',
   },
   {
-    name: language.value === 'es' ? 'Skate Program' : 'Skate Program',
+    name: 'Program',
     path: '/dashboard/skills',
     icon: 'skate-program',
   },
@@ -173,9 +168,14 @@ const isActive = (path: string) => {
               : 'text-gray-500 hover:text-gray-400'
           ]"
         >
-          <!-- Home Icon -->
+          <!-- Home Icon (guest / customer) -->
           <svg v-if="item.icon === 'home'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+          </svg>
+
+          <!-- Star (coach / admin dashboard home) -->
+          <svg v-else-if="item.icon === 'star'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.562.562 0 00.475-.345L11.48 3.5Z" />
           </svg>
           
           <!-- Calendar Icon -->
@@ -208,9 +208,11 @@ const isActive = (path: string) => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
           </svg>
           
-          <!-- Students Icon -->
+          <!-- Skaters: skate helmet -->
           <svg v-else-if="item.icon === 'students'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 14.25c0-4.25 2.6-8 6-8.25 3.4.25 6 4 6 8.25V16a2 2 0 01-2 2H8a2 2 0 01-2-2v-1.75z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.25 16.75c1.15-.85 2.75-1.25 4.75-1.25s3.6.4 4.75 1.25" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 9.75h4M12 7.75v4" />
           </svg>
           
           <!-- Store Admin Icon -->
@@ -218,13 +220,10 @@ const isActive = (path: string) => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
           </svg>
           
-          <!-- Coaching (skateboard helmet) Icon -->
+          <!-- Coaching: checklist -->
           <svg v-else-if="item.icon === 'coaching'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3c-4.5 0-8 3.2-8 7.2 0 2.2.9 4.1 2.2 5.5L5.5 19h13l-.7-3.3c1.3-1.4 2.2-3.3 2.2-5.5 0-4-3.5-7.2-8-7.2z" />
-            <circle cx="9" cy="10" r="0.75" stroke="currentColor" fill="none" stroke-width="1.5" />
-            <circle cx="12" cy="9" r="0.75" stroke="currentColor" fill="none" stroke-width="1.5" />
-            <circle cx="15" cy="10" r="0.75" stroke="currentColor" fill="none" stroke-width="1.5" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 17.5h1.5M14.5 17.5H16M11 18v1" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5.25H5.25A2.25 2.25 0 003 7.5v12.75A2.25 2.25 0 005.25 22.5h11.25a2.25 2.25 0 002.25-2.25V9.75L14.25 5.25H9z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.25 5.25v4.5H18.75M9 12.75l1.5 1.5L13.5 11M9 16.5h6M9 19.5h4.5" />
           </svg>
           
           <!-- Skills (groups / target) Icon -->
@@ -232,12 +231,13 @@ const isActive = (path: string) => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
           </svg>
 
-          <!-- Skateboard (Skate Program) -->
+          <!-- Program: skateboard (deck + trucks + wheels) -->
           <svg v-else-if="item.icon === 'skate-program'" class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.5 15.5c1.5 2 4.2 2.5 7.5 2.5s6-.5 7.5-2.5M6 12.5h12M7 9.5h10" />
-            <ellipse cx="7.5" cy="15.5" rx="1.6" ry="1.6" />
-            <ellipse cx="16.5" cy="15.5" rx="1.6" ry="1.6" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 10.5l-1.5-2M19 10.5l1.5-2" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.5 12.75c1.35 2.4 4.05 3.75 7.5 3.75s6.15-1.35 7.5-3.75" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5.25 11.25h13.5a.75.75 0 01.53 1.28l-1.06 1.06a.75.75 0 01-.53.22H6.11a.75.75 0 01-.53-.22l-1.06-1.06a.75.75 0 01.53-1.28z" />
+            <circle cx="7.75" cy="16.25" r="1.35" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="16.25" cy="16.25" r="1.35" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 9.75L5.25 7.5M17.25 9.75l1.5-2.25" />
           </svg>
           
           <span class="text-xs font-medium">{{ item.name }}</span>

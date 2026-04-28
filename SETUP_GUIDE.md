@@ -1,5 +1,7 @@
 # NiikSkate Academy - Setup & Deployment Guide
 
+**Current release:** see the `VERSION` file (e.g. `1.2.0`). **What shipped in each bump:** see `CHANGELOG.md`.
+
 ## 1. Database Setup (Supabase)
 
 ### Step 1: Create a Supabase Project
@@ -37,7 +39,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 1. Open your [Supabase Dashboard](https://supabase.com/dashboard) and select your project.
 2. In the left sidebar, click **SQL Editor**.
 3. Click **New query** (or use the existing query box).
-4. Open the migration file from your project (e.g. `c:\Scheduling\supabase\migrations\add_programs_structure.sql`) in a text editor.
+4. Open the migration file from your project (e.g. `...\niikskate\supabase\migrations\add_programs_structure.sql`) in a text editor.
 5. **Copy the entire contents** of the file (Ctrl+A, Ctrl+C).
 6. **Paste** into the SQL Editor (Ctrl+V).
 7. Click **Run** (or press Ctrl+Enter).
@@ -59,8 +61,11 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 | 9 | `add_attendance_confirmed.sql` | Attendance confirmation table |
 | 10 | `add_attendance_report_sent_and_unconfirm.sql` | Report-sent tracking |
 | 11 | `add_skill_groups_structure.sql` | Skill groups, areas, subgroups (Skills page) |
+| 12 | `add_profiles_name_dob_age.sql` | Optional roster fields: `first_name`, `last_name`, `date_of_birth`, `age` on `profiles` |
 
 **Tip:** If a migration fails with "already exists", that part is already in your database; you can skip that file or run only the new statements. For "add column if not exists" style migrations, running them again is safe.
+
+Operational SQL for admins (users, credits, payments) is documented in **`supabase/SQL_MANUAL.md`**. One-off scripts live under **`supabase/scripts/`** (review before running in SQL Editor).
 
 ### Step 5: Fix RLS for Skills Sync
 Run this SQL to allow coaches to update skills:
@@ -87,7 +92,7 @@ When you change **Niik_Plan_Clases.xlsx** (Program, Categoria, Tipo, new tricks,
 
 ### Step 1: Put the Excel in the right place
 
-The parse script looks for the file in either location (inside your project folder, e.g. `c:\Scheduling\`):
+The parse script looks for the file in either location (inside your project folder):
 
 - `data\Niik_source\Niik_Plan_Clases.xlsx`
 - `data\Niik_Plan_Clases.xlsx`
@@ -139,59 +144,75 @@ So: **after every Excel change, run `npm run niik:parse`**, then refresh the Tru
 
 ---
 
-## 3. Publishing Your App Online
+## 3. Publishing your app (GitHub + Vercel)
 
-### Option A: Vercel (Recommended - Free)
+This is the recommended path for the **online** NiikSkate app. Your Capacitor mobile build can use the same repo; native store releases are separate.
 
-1. **Push to GitHub**:
+### 3.1 One-time: connect GitHub and Vercel
+
+1. **Repository on GitHub**  
+   If the project is not on GitHub yet:
    ```bash
    git init
    git add .
    git commit -m "Initial commit"
-   git remote add origin https://github.com/YOUR_USERNAME/niikskate-academy.git
+   git branch -M main
+   git remote add origin https://github.com/YOUR_USERNAME/niikskate.git
    git push -u origin main
    ```
+   If it already exists, ensure `origin` points at your repo (`git remote -v`).
 
-2. **Deploy to Vercel**:
-   - Go to [vercel.com](https://vercel.com)
-   - Sign up with GitHub
-   - Click "Import Project"
-   - Select your repository
-   - Add Environment Variables:
-     - `SUPABASE_URL` = your project URL
-     - `SUPABASE_KEY` = your anon key
-   - Click "Deploy"
+2. **Import into Vercel**  
+   - Go to [vercel.com](https://vercel.com) and sign in (e.g. with GitHub).  
+   - **Add New… → Project** → **Import** your repository.  
+   - Framework Preset: **Nuxt.js** (usually auto-detected).  
+   - **Build Command:** `npm run build` (default).  
+   - **Output Directory:** leave default for Nuxt 3 on Vercel.
 
-3. **Done!** Your app will be live at `https://your-project.vercel.app`
+3. **Environment variables (Production)** — **Project → Settings → Environment Variables**
 
-### Updating your live Vercel app (push new version)
+   | Name | Value | Notes |
+   |------|--------|--------|
+   | `SUPABASE_URL` | `https://xxx.supabase.co` | Project URL |
+   | `SUPABASE_KEY` | anon **public** key | Browser-safe |
+   | `NUXT_PUBLIC_SUPABASE_URL` | same as URL | If your build uses public runtime config |
+   | `NUXT_PUBLIC_SUPABASE_ANON_KEY` | same as anon key | Common Nuxt + Supabase pattern |
 
-When you’ve made changes locally and want the same version live:
+   Apply to **Production** (and **Preview** if you want PR previews).  
+   **Never** expose `SUPABASE_SERVICE_ROLE_KEY` in client or `NUXT_PUBLIC_*`. Use service role only on the server (API routes, scripts, CI).
 
-1. **If you edit in a different folder than your Git repo (e.g. C:\\Scheduling vs OneDrive\\GitHub\\niikskate):**  
-   Run `sync-to-onedrive.bat` from the project folder. It copies your code into the OneDrive repo (excluding `node_modules`, `.nuxt`, `.git`). Then open GitHub Desktop and you’ll see the changes.
+4. **Deploy** — First URL: `https://your-project.vercel.app`.
 
-2. **Commit and push to GitHub** (from your OneDrive repo in GitHub Desktop, or from terminal in that folder):
-   - In GitHub Desktop: review changes → write summary → **Commit to main** → **Push origin**.
-   - Or in terminal: `git add .` → `git commit -m "Your message"` → `git push origin main`.
+### 3.2 Every release: version, commit, push → auto-deploy
 
-3. **Vercel** will detect the new push and start a new deployment. Check the [Vercel Dashboard](https://vercel.com/dashboard) → your project → **Deployments** to see the build and when it’s live.
+1. Bump **`VERSION`** and write **`CHANGELOG.md`**.
+2. Commit and push:
+   ```powershell
+   git add -A
+   git commit -m "chore(release): v1.2.0 — short description"
+   git push origin main
+   ```
+3. **Vercel → Deployments** — wait until **Ready**. Fix build logs if needed.
+4. Smoke-test production (login, booking, coach flows).
 
-4. **Optional:** If you added env vars (e.g. in `.env`) that the live app needs, add them in Vercel: **Project → Settings → Environment Variables**, then redeploy.
+**Tip:** Commit `public/data/niik-trick-library.json` when tricks change, or sync from the app as admin after deploy.
 
-**Tip:** Make sure `public/data/niik-trick-library.json` is committed so the live app has trick data. If you prefer to sync from the app instead, run “Sincronizar desde Excel” once as admin after deploy.
+### 3.3 Production security (real students)
 
-### Option B: Netlify (Also Free)
+- **Secrets:** Only the **anon** key in the client. Service role **only** server-side / CI.
+- **Supabase Auth:** Configure providers; consider **email confirmation** for production.
+- **RLS:** Keep Row Level Security on; apply any pending migrations from this repo.
+- **HTTPS:** Default on Vercel.
+- **Git:** Never commit `.env`.
 
-1. Push to GitHub (same as above)
-2. Go to [netlify.com](https://netlify.com)
-3. Click "Add new site" → "Import existing project"
-4. Connect GitHub and select your repo
-5. Build settings:
-   - Build command: `npm run generate`
-   - Publish directory: `.output/public`
-6. Add environment variables (same as Vercel)
-7. Click "Deploy"
+Sensitive dashboard routes (planning, program hub) use **`middleware: ['auth']`** so URLs cannot be opened without login.
+
+### Option B: Netlify
+
+1. Push to GitHub (same as above).
+2. [netlify.com](https://netlify.com) → Import repo.
+3. Build: `npm run generate`, publish: `.output/public` (verify against current Nuxt docs if build fails).
+4. Add the same env vars as Vercel.
 
 ---
 
@@ -214,12 +235,13 @@ When you’ve made changes locally and want the same version live:
 ## 5. Quick Checklist
 
 - [ ] Supabase project created
-- [ ] `.env` file configured with correct keys
-- [ ] Database migrations run in SQL Editor
-- [ ] RLS policies updated for skills sync
-- [ ] Code pushed to GitHub
-- [ ] Deployed to Vercel/Netlify
-- [ ] Environment variables added to deployment
+- [ ] `.env` locally: `SUPABASE_URL`, `SUPABASE_KEY` (anon); service role only for server/scripts
+- [ ] Database migrations run in SQL Editor (see table in §1)
+- [ ] RLS policies updated for skills sync (and other tables you use)
+- [ ] `VERSION` / `CHANGELOG.md` updated for each production release
+- [ ] Code pushed to GitHub (`main` or your production branch)
+- [ ] Vercel (or Netlify) **Production** env vars match `.env` (never commit `.env`)
+- [ ] Deployment green; smoke-test login and coach/admin flows
 
 ---
 

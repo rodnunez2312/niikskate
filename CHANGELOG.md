@@ -1,125 +1,47 @@
 # Changelog
 
-All notable changes to NiikSkate Academy app will be documented in this file.
+All notable changes to this project are documented here. The format follows semantic-style versioning (`VERSION` file).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.2.0] – 2026-04-26
 
----
+### Summary
+Production-oriented release: **program coaching hub**, fixed **class planning routes**, **skater roster fields** in the database, **navigation/UI polish**, operational **SQL docs/scripts**, and **auth middleware** on sensitive dashboard pages. Intended for real students with coaches and admins.
 
-## [1.1.0] - 2026-02-03
+### Security
+- **`auth` middleware** on `/dashboard/planning` (all tabs), `/dashboard/planning/programs`, and `/dashboard/planning/programs/[id]` so unauthenticated users cannot open coaching/planning tools by URL.
+- **Production checklist** added to `SETUP_GUIDE.md` (secrets, RLS, Supabase Auth, Vercel env).
 
-### 🎫 Credit/Token System & Reservations
+### Class planning & programs
+- **Route fix:** `pages/dashboard/planning.vue` moved to `pages/dashboard/planning/index.vue` so nested route `/dashboard/planning/programs` registers correctly in Nuxt.
+- **Program resource hub** at `/dashboard/planning/programs`: 90-minute session template (15′ warm-up / 15′ games / 45′ focused drills / 15′ closure), teaching pillars (safety, control, balance, strength), program list, calendar of **planned sessions** from `class_plans` (per coach, month navigation).
+- **Per-program page** `/dashboard/planning/programs/[id]`: description, coaches, athletes (read-only note for coaches).
+- **`ProgramPedagogyBlock`** shared component for pedagogy content.
+- **Programs stat card** on Planning → Programas: skateboard icon, opens hub via **`navigateTo`** (reliable in WebView/Capacitor).
 
-#### New Features
-- **User Credits System** - Purchase class packages to receive credits/tokens
-- **My Reservations Page** (`/user/reservations`) - Use credits to book specific class dates
-- **Monthly Program Rules** - Max 2 classes per week for monthly beginner/intermediate programs
-- **Credit Expiration** - Credits expire 30 days after purchase
+### Navigation & UI
+- Bottom nav (coach/admin): **Inicio** = star, **Patinadores** = helmet, **Coaching** = checklist, **Program** = skateboard (was “Skate Program”; label shortened to **Program**).
+- Skills pages: header title **Program** (was Skate Program).
 
-#### Credit Types
-| Package | Credits | Weekly Limit |
-|---------|---------|--------------|
-| Monthly Beginner | 8 | 2 per week |
-| Monthly Intermediate | 8 | 2 per week |
-| 5-Class Package | 5 | None |
-| 3-Class Package | 3 | None |
-| Saturdays Only | 4 | Saturdays only |
-| Single Group | 1 | None |
-| Single Individual | 1 | None |
+### Data & Supabase (repo artifacts)
+- **Migration** `add_profiles_name_dob_age.sql`: `first_name`, `last_name`, `date_of_birth`, `age` on `profiles` with sensible age check.
+- **Script** `sync_skater_roster_2026.sql`: roster-driven profile updates (full names, levels, DOB handling).
+- **Scripts:** onboarding users SQL, Fernanda→Valentina merge/delete SQL, **`SQL_MANUAL.md`** for admin queries.
+- Additional migrations present in repo (news, reservations workflow, social accounts, skill focus, avatar storage, etc.) — apply only what your project still needs in Supabase SQL Editor.
 
-#### Database Changes
-- Added `user_credits` table - Tracks purchased credit packs
-- Added `class_reservations` table - Tracks individual class bookings
-- Added triggers for automatic credit deduction and restoration on cancellation
+### Types & composables
+- **`User`** type extended with optional `first_name`, `last_name`, `date_of_birth`, `age`.
+- Various composables and pages updated across booking, classes, coach directory, admin, home, profile (see git history for full file list).
 
-#### UI Updates
-- Highlighted "Mis Reservas" link in profile menu
-- Visual indicators for weekly limits on calendar
-- Success messages for reservation confirmations
+### Documentation
+- **`SETUP_GUIDE.md`:** expanded **GitHub + Vercel** deployment workflow and **production security** steps.
+- **`CHANGELOG.md`:** this file.
 
----
-
-## [1.0.0] - 2026-02-03
-
-### 🎉 Initial Release - Role-Based Dashboard System
-
-#### Core Features
-- **Multi-step Booking Wizard** - 5-step booking flow with class selection, packages, equipment rental, date/time selection, and payment
-- **Bilingual Support** - English/Spanish language toggle with linked USD/MXN currency
-- **Dark Theme UI** - Modern stained-glass inspired design with gold accents
-
-#### Class System
-- **Class Types**: Group Beginner, Group Intermediate, Individual
-- **Packages**: Monthly programs (8 classes), 3-class pack, 5-class pack, Saturdays Only (4 classes)
-- **Equipment Rental**: Helmet, knee/elbow pads, skateboard with bundle pricing
-- **Booking Window**: 30-day advance booking limit
-
-#### User Dashboard
-- Profile page with booking history and monthly summary
-- Progress tracking with skill checklist
-- Tips & Tricks library (28 predefined skills across 5 categories)
-- News & Events feed
-
-#### Coach Dashboard
-- Availability management
-- Booking calendar view
-- Student progress marking (skill proficiency 1-5 stars)
-- Class planning with skill selection and notes
-- Payment history (read-only)
-
-#### Admin Dashboard
-- Registration approval workflow (pending → approved/rejected)
-- User management with role assignment (Admin, Coach, Customer)
-- Attendance tracking by date and session
-- Payment recording and history
-- Quick stats overview
-
-#### Database Schema
-New tables added:
-- `skills_library` - 28 predefined tricks with categories and difficulty
-- `student_progress` - Track skills learned by students
-- `guest_bookings` - Store bookings for non-logged-in users
-- `registration_requests` - Admin approval workflow
-- `attendance` - Class attendance tracking
-- `class_plans` - Coach lesson planning
-- `coach_payments` - Coach compensation records
-- `news_events` - News and announcements
-
-#### Pricing (MXN / USD)
-| Item | MXN | USD |
-|------|-----|-----|
-| Monthly Beginners (8 classes) | $600 | $35 |
-| Monthly Intermediate (8 classes) | $800 | $50 |
-| Single Group Class | $130 | $10 |
-| Individual Class | $250 | $20 |
-| 3-Class Package | $350 | $20 |
-| 5-Class Package | $520 | $30 |
-| Saturdays Only (4 classes) | $420 | $25 |
-| Equipment (each) | $50 | $5 |
-| Equipment Bundle (all 3) | $100 | $10 |
-
-#### Coaches
-- **Rod** - Vert & Street specialist
-- **Leo** - Vert & Street specialist  
-- **Itza** - Fundamentals specialist
+### Compared to [1.1.0]
+- Prior baseline (`1.1.0`): booking flow, pricing, payments, guest availability (per last tagged theme in git).
+- **`1.2.0`** adds structured **program/coaching UX**, **DB roster fields**, **planning route correctness**, **stronger route protection** for planning pages, and **deployment/security documentation** for going live with real students.
 
 ---
 
-## Version History Summary
+## [1.1.0] – earlier
 
-| Version | Date | Description |
-|---------|------|-------------|
-| 1.0.0 | 2026-02-03 | Initial release with role-based dashboards |
-
----
-
-## Upcoming Features (Planned)
-
-- [ ] Online payment integration (Stripe/PayPal)
-- [ ] Email notifications for bookings and approvals
-- [ ] Push notifications via Capacitor
-- [ ] Google Calendar integration
-- [ ] Equipment store with inventory management
-- [ ] Financial reports export (CSV/PDF)
-- [ ] Student attendance analytics
+See git history (`git log`) for commits before this changelog file existed.

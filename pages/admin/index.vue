@@ -55,13 +55,7 @@ onMounted(async () => {
 
 const loadDashboardData = async () => {
   // Coaches count (for stat card)
-  const { count: coachesCount } = await client
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('role', 'coach')
-    .eq('is_active', true)
-
-  stats.value.activeCoaches = coachesCount || 0
+  stats.value.activeCoaches = await countActiveCoachDirectoryProfiles(client)
 
   // Load total customers
   const { count: customersCount } = await client

@@ -31,6 +31,59 @@ const { fetchCoaches, coaches, isClassDay, getAvailableCoaches } = useClasses()
 const user = useSupabaseUser()
 const supabase = useSupabaseClient()
 
+const isLoggedIn = computed(() => !!user.value)
+
+const loginUrl = computed(() => `/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+const registerUrl = computed(() => `/auth/register?redirect=${encodeURIComponent(route.fullPath)}`)
+
+/** Avoid acting before Supabase has read the session from storage (prevents brief wrong step / guest save). */
+const authSessionChecked = ref(false)
+
+/** Step 2 cards: never show price hints in copy for visitors. */
+function guestOptionDescription(optionId: string): string {
+  const es = language.value === 'es'
+  const m: Record<string, { es: string; en: string }> = {
+    grouped: { es: 'Varios alumnos por sesión', en: 'Multiple students per session' },
+    individual: { es: 'Sesión personalizada uno a uno', en: 'One-on-one coaching' },
+    ind_3: { es: 'Tres clases individuales', en: 'Three individual classes' },
+    ind_5: { es: 'Cinco clases individuales', en: 'Five individual classes' },
+    monthly: { es: 'Ocho clases grupales al mes', en: 'Eight group classes per month' },
+    monthly_intermediate: { es: 'Ocho clases (Bowl, Street, Surfskate)', en: 'Eight classes (Bowl, Street, Surfskate)' },
+    pkg_3: { es: 'Paquete de tres clases', en: 'Three-class package' },
+    pkg_5: { es: 'Paquete de cinco clases', en: 'Five-class package' },
+    saturdays: { es: 'Cuatro clases en sábados del mes', en: 'Four Saturday classes per month' },
+    pro_group_single: { es: 'Sesión grupal con coach pro', en: 'Pro coach group session' },
+    pro_max_single: { es: 'Sesión individual con coach pro', en: 'Pro coach private session' },
+    pro_group_3: { es: 'Tres sesiones grupales pro', en: 'Three pro group sessions' },
+    pro_group_5: { es: 'Cinco sesiones grupales pro', en: 'Five pro group sessions' },
+    pro_ind_3: { es: 'Tres sesiones individuales pro', en: 'Three pro private sessions' },
+    pro_ind_5: { es: 'Cinco sesiones individuales pro', en: 'Five pro private sessions' },
+    pro_monthly: { es: 'Programa mensual con coach pro', en: 'Monthly program with pro coach' },
+  }
+  const row = m[optionId]
+  if (!row) return es ? 'Opción de clase' : 'Class option'
+  return es ? row.es : row.en
+}
+
+function resetWizardForGuest() {
+  currentStep.value = 1
+  classType.value = null
+  lessonCategory.value = null
+  selectedClass.value = null
+  selectedEquipment.value = []
+  selectedDate.value = null
+  selectedDates.value = []
+  selectedSession.value = null
+  customerEmail.value = ''
+  customerPhone.value = ''
+  skipEmail.value = false
+  paymentMethod.value = null
+  bookingConfirmed.value = false
+  submitBookingError.value = null
+  submitBookingWarning.value = null
+  queryPreloadDone.value = false
+}
+
 // Wizard state
 const currentStep = ref(1)
 const totalSteps = 5
@@ -163,53 +216,77 @@ const fullPhoneNumber = computed(() => {
   return `${selectedCountryCode.value}${phoneDigits.value}`
 })
 
-// Load coaches on mount and handle query params
-onMounted(() => {
-  fetchCoaches()
-  
-  // Check if class was pre-selected from home page
-  const preSelectedClass = route.query.class as string
-  if (preSelectedClass) {
-    // Map query param to class selection
-    switch (preSelectedClass) {
-      case 'monthly_beginner':
-        classType.value = 'package'
-        selectedClass.value = 'monthly'
-        currentStep.value = 3 // Skip to equipment selection
-        break
-      case 'monthly_intermediate':
-        classType.value = 'package'
-        selectedClass.value = 'monthly_intermediate'
-        currentStep.value = 3
-        break
-      case 'grouped':
-        classType.value = 'single'
-        selectedClass.value = 'grouped'
-        currentStep.value = 3
-        break
-      case 'individual':
-        classType.value = 'single'
-        selectedClass.value = 'individual'
-        currentStep.value = 3
-        break
-      case 'pkg_3':
-        classType.value = 'package'
-        selectedClass.value = 'pkg_3'
-        currentStep.value = 3
-        break
-      case 'pkg_5':
-        classType.value = 'package'
-        selectedClass.value = 'pkg_5'
-        currentStep.value = 3
-        break
-      case 'saturdays':
-      case 'pkg_saturday':
-        classType.value = 'package'
-        selectedClass.value = 'saturdays'
-        currentStep.value = 3
-        break
-    }
+/** Deep-link from home (?class=…): requires login first, then skip to step 3 */
+const queryPreloadDone = ref(false)
+
+function applyPreselectedClassFromQuery(classKey: string) {
+  switch (classKey) {
+    case 'monthly_beginner':
+      classType.value = 'package'
+      selectedClass.value = 'monthly'
+      currentStep.value = 3
+      break
+    case 'monthly_intermediate':
+      classType.value = 'package'
+      selectedClass.value = 'monthly_intermediate'
+      currentStep.value = 3
+      break
+    case 'grouped':
+      classType.value = 'single'
+      selectedClass.value = 'grouped'
+      currentStep.value = 3
+      break
+    case 'individual':
+      classType.value = 'single'
+      selectedClass.value = 'individual'
+      currentStep.value = 3
+      break
+    case 'pkg_3':
+      classType.value = 'package'
+      selectedClass.value = 'pkg_3'
+      currentStep.value = 3
+      break
+    case 'pkg_5':
+      classType.value = 'package'
+      selectedClass.value = 'pkg_5'
+      currentStep.value = 3
+      break
+    case 'saturdays':
+    case 'pkg_saturday':
+      classType.value = 'package'
+      selectedClass.value = 'saturdays'
+      currentStep.value = 3
+      break
+    default:
+      break
   }
+}
+
+watchEffect(() => {
+  const pre = route.query.class
+  if (!pre || typeof pre !== 'string') return
+  if (!user.value) {
+    router.replace(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
+  if (queryPreloadDone.value) return
+  queryPreloadDone.value = true
+  applyPreselectedClassFromQuery(pre)
+})
+
+watch(
+  [authSessionChecked, user, currentStep],
+  ([ready, u, step]) => {
+    if (!ready) return
+    if (!u && step > 1) resetWizardForGuest()
+  },
+  { flush: 'post' }
+)
+
+onMounted(async () => {
+  await supabase.auth.getSession()
+  authSessionChecked.value = true
+  fetchCoaches()
 })
 
 // Single class options (with dual pricing: MXN and USD)
@@ -329,15 +406,6 @@ const packageOptions = computed(() => [
 
 const proClassOptions = computed(() => [
   {
-    id: 'pro_monthly',
-    name: language.value === 'es' ? 'Mensual (4 clases por semana)' : 'Monthly (4 classes per week)',
-    description: language.value === 'es' ? 'Programa pro con coach invitado' : 'Pro program with guest coach',
-    priceMXN: 5000,
-    priceUSD: 300,
-    icon: '🏆',
-    color: 'from-gold-400 to-gold-600',
-  },
-  {
     id: 'pro_group_single',
     name: language.value === 'es' ? 'Sesión grupal' : 'Single group session',
     description: language.value === 'es' ? 'Clase pro grupal' : 'Pro group class',
@@ -350,8 +418,8 @@ const proClassOptions = computed(() => [
     id: 'pro_max_single',
     name: language.value === 'es' ? 'Sesión individual' : 'Single individual session',
     description: language.value === 'es' ? 'Clase pro individual' : 'Pro individual class',
-    priceMXN: 250,
-    priceUSD: 16,
+    priceMXN: 400,
+    priceUSD: 26,
     icon: '👤',
     color: 'from-gold-400 to-glass-orange',
   },
@@ -394,6 +462,15 @@ const proClassOptions = computed(() => [
     icon: '5️⃣',
     color: 'from-purple-500 to-gold-500',
     badge: '20% OFF',
+  },
+  {
+    id: 'pro_monthly',
+    name: language.value === 'es' ? 'Mensual (4 clases por semana)' : 'Monthly (4 classes per week)',
+    description: language.value === 'es' ? 'Programa pro con coach invitado' : 'Pro program with guest coach',
+    priceMXN: 5000,
+    priceUSD: 300,
+    icon: '🏆',
+    color: 'from-gold-400 to-gold-600',
   },
 ])
 
@@ -440,6 +517,10 @@ const equipmentTotal = computed(() => equipmentTotalMXN.value)
 
 // Toggle equipment
 const toggleEquipment = (id: string) => {
+  if (!user.value) {
+    router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
   if (selectedEquipment.value.includes(id)) {
     selectedEquipment.value = selectedEquipment.value.filter(e => e !== id)
   } else {
@@ -545,6 +626,10 @@ const goToNextMonth = () => {
 
 // Step navigation
 const nextStep = () => {
+  if (!user.value) {
+    router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
   if (currentStep.value < totalSteps) {
     currentStep.value++
   }
@@ -558,22 +643,32 @@ const prevStep = () => {
 
 // Auto-advance selection functions
 const selectClassType = (type: 'single' | 'package' | 'pro') => {
+  if (!user.value) {
+    router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
   classType.value = type
   lessonCategory.value = null
   selectedClass.value = null
-  // Brief delay for visual feedback before advancing
   setTimeout(() => {
     nextStep()
   }, 200)
 }
 
 const selectLessonCategory = (category: 'flat_street' | 'ramps_bowl' | 'surfskate') => {
+  if (!user.value) {
+    router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
   lessonCategory.value = category
 }
 
 const selectSpecificClass = (classId: string) => {
+  if (!user.value) {
+    router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
   selectedClass.value = classId
-  // Brief delay for visual feedback before advancing
   setTimeout(() => {
     nextStep()
   }, 200)
@@ -609,6 +704,7 @@ const canProceed = computed(() => {
       }
       return selectedDate.value !== null && selectedSession.value !== null
     case 5:
+      if (!user.value) return false
       // If skipping email, phone is required (10 digits local number). Otherwise email is required.
       const hasValidContact = skipEmail.value 
         ? phoneDigits.value.length >= 10 
@@ -766,6 +862,10 @@ const sendBookingConfirmationWhatsApp = async () => {
 
 // Submit booking
 const submitBooking = async () => {
+  if (!user.value) {
+    router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    return
+  }
   if (!canProceed.value) return
   
   isSubmitting.value = true
@@ -854,6 +954,7 @@ const submitBooking = async () => {
             reservation_date: format(d, 'yyyy-MM-dd'),
             time_slot: selectedSession.value,
             status: 'pending_payment' as const,
+            workflow_status: 'requested' as const,
           }))
           const { error: resErr } = await supabase.from('class_reservations').insert(reservationRows)
           if (resErr) {
@@ -871,17 +972,6 @@ const submitBooking = async () => {
               : 'Credits saved without calendar dates (check the date step).'
         }
       }
-    } else {
-      // Guest user - save to localStorage
-      const guestBookings = JSON.parse(localStorage.getItem('guest_bookings') || '[]')
-      guestBookings.push({
-        id: crypto.randomUUID(),
-        email: bookingData.contact_email,
-        phone: bookingData.contact_phone,
-        booking_data: bookingData,
-        created_at: new Date().toISOString()
-      })
-      localStorage.setItem('guest_bookings', JSON.stringify(guestBookings))
     }
     
     // Simulate API delay for UX
@@ -987,7 +1077,11 @@ const isDateBookable = (date: Date): boolean => {
             {{ language === 'es' ? '¿Qué tipo de clase?' : 'What type of class?' }}
           </h1>
           <p class="text-gray-400">
-            {{ language === 'es' ? 'Toca para seleccionar' : 'Tap to select' }}
+            {{
+              isLoggedIn
+                ? (language === 'es' ? 'Toca para seleccionar' : 'Tap to select')
+                : (language === 'es' ? 'Inicia sesión o crea una cuenta para continuar' : 'Sign in or create an account to continue')
+            }}
           </p>
         </div>
 
@@ -1013,7 +1107,7 @@ const isDateBookable = (date: Date): boolean => {
                 <p class="text-gray-400 text-sm">
                   {{ language === 'es' ? 'Grupal o Individual' : 'Group or Individual' }}
                 </p>
-                <p class="text-gold-400 font-semibold mt-1">
+                <p v-if="isLoggedIn" class="text-gold-400 font-semibold mt-1">
                   {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(150) }}
                 </p>
               </div>
@@ -1033,7 +1127,7 @@ const isDateBookable = (date: Date): boolean => {
                 : 'bg-gray-900 border border-gray-800 hover:border-glass-green/50 hover:bg-gray-800'
             ]"
           >
-            <div class="absolute top-3 right-12">
+            <div v-if="isLoggedIn" class="absolute top-3 right-12">
               <span class="px-2 py-1 bg-glass-green text-white text-xs font-bold rounded-full">
                 {{ language === 'es' ? '¡Ahorra!' : 'Save!' }}
               </span>
@@ -1049,7 +1143,7 @@ const isDateBookable = (date: Date): boolean => {
                 <p class="text-gray-400 text-sm">
                   {{ language === 'es' ? 'Mensual o paquetes' : 'Monthly or packages' }}
                 </p>
-                <p class="text-glass-green font-semibold mt-1">
+                <p v-if="isLoggedIn" class="text-glass-green font-semibold mt-1">
                   {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(405) }}
                 </p>
               </div>
@@ -1085,8 +1179,8 @@ const isDateBookable = (date: Date): boolean => {
                 <p class="text-gray-400 text-sm">
                   {{ language === 'es' ? 'Perfil y clases de Max Barrera' : 'Max Barrera profile and classes' }}
                 </p>
-                <p class="text-gold-400 font-semibold mt-1">
-                  {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(250) }}
+                <p v-if="isLoggedIn" class="text-gold-400 font-semibold mt-1">
+                  {{ language === 'es' ? 'Desde' : 'From' }} {{ formatPrice(400) }}
                 </p>
               </div>
               <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1097,9 +1191,42 @@ const isDateBookable = (date: Date): boolean => {
 
         </div>
 
+        <div
+          v-if="!isLoggedIn"
+          class="mt-2 rounded-2xl border border-gold-400/25 bg-gray-950/80 p-4 space-y-3"
+        >
+          <p class="text-sm text-gray-300 text-center leading-relaxed">
+            {{
+              language === 'es'
+                ? 'Los precios solo se muestran con sesión iniciada. Inicia sesión para reservar. Si eres nuevo, crea una cuenta y espera la aprobación de un administrador.'
+                : 'Prices are shown after you sign in. Log in to book. If you are new, register and wait for an admin to approve your access.'
+            }}
+          </p>
+          <div class="flex flex-col gap-2">
+            <NuxtLink
+              :to="loginUrl"
+              class="block w-full py-3.5 rounded-xl bg-gold-400 text-black font-bold text-center text-sm"
+            >
+              {{ language === 'es' ? 'Iniciar sesión' : 'Log in' }}
+            </NuxtLink>
+            <NuxtLink
+              :to="registerUrl"
+              class="block w-full py-3 rounded-xl border border-gray-600 text-gray-200 font-semibold text-center text-sm"
+            >
+              {{ language === 'es' ? 'Crear cuenta y solicitar acceso' : 'Create account and request access' }}
+            </NuxtLink>
+          </div>
+        </div>
+
         <!-- Visual hint -->
         <p class="text-center text-xs text-gray-500 mt-4">
-          {{ language === 'es' ? '👆 Toca una opción para continuar' : '👆 Tap an option to continue' }}
+          {{
+            isLoggedIn
+              ? (language === 'es' ? '👆 Toca una opción para continuar' : '👆 Tap an option to continue')
+              : (language === 'es'
+                ? '👆 Inicia sesión arriba o toca una opción para ir al inicio de sesión'
+                : '👆 Sign in above, or tap an option to go to login')
+          }}
         </p>
       </div>
 
@@ -1119,7 +1246,11 @@ const isDateBookable = (date: Date): boolean => {
               {{ language === 'es' ? 'Pro Coach • Max Barrera' : 'Pro Coach • Max Barrera' }}
             </h1>
             <p class="text-gray-400">
-              {{ language === 'es' ? 'Selecciona tipo de clase y precio' : 'Select class type and price' }}
+              {{
+                language === 'es'
+                  ? (isLoggedIn ? 'Selecciona tipo de clase y precio' : 'Selecciona tipo de clase')
+                  : (isLoggedIn ? 'Select class type and price' : 'Select class type')
+              }}
             </p>
           </template>
           <template v-else>
@@ -1198,7 +1329,7 @@ const isDateBookable = (date: Date): boolean => {
             ]"
           >
             <span
-              v-if="option.badge"
+              v-if="option.badge && isLoggedIn"
               class="absolute top-3 right-12 px-2 py-0.5 rounded-full text-xs font-bold bg-gold-400 text-black"
             >
               {{ option.badge }}
@@ -1212,10 +1343,10 @@ const isDateBookable = (date: Date): boolean => {
               </div>
               <div class="flex-1">
                 <h3 class="font-bold text-white text-lg">{{ option.name }}</h3>
-                <p class="text-gray-400 text-sm">{{ option.description }}</p>
+                <p class="text-gray-400 text-sm">{{ isLoggedIn ? option.description : guestOptionDescription(option.id) }}</p>
               </div>
               <div class="text-right flex items-center gap-2">
-                <p class="font-bold text-xl text-gold-400">{{ currency === 'USD' ? `$${option.priceUSD} USD` : `$${option.priceMXN} MXN` }}</p>
+                <p v-if="isLoggedIn" class="font-bold text-xl text-gold-400">{{ currency === 'USD' ? `$${option.priceUSD} USD` : `$${option.priceMXN} MXN` }}</p>
                 <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
@@ -1255,7 +1386,7 @@ const isDateBookable = (date: Date): boolean => {
               class="w-full rounded-2xl p-5 text-left transition-all duration-300 transform active:scale-95 relative bg-gray-900 border border-gold-400/30 hover:border-gold-400/60"
             >
               <span
-                v-if="option.badge"
+                v-if="option.badge && isLoggedIn"
                 class="absolute top-3 right-12 px-2 py-0.5 rounded-full text-xs font-bold bg-gold-400 text-black"
               >
                 {{ option.badge }}
@@ -1266,10 +1397,10 @@ const isDateBookable = (date: Date): boolean => {
                 </div>
                 <div class="flex-1">
                   <h3 class="font-bold text-white text-lg">{{ option.name }}</h3>
-                  <p class="text-gray-400 text-sm">{{ option.description }}</p>
+                  <p class="text-gray-400 text-sm">{{ isLoggedIn ? option.description : guestOptionDescription(option.id) }}</p>
                 </div>
                 <div class="text-right flex items-center gap-2">
-                  <p class="font-bold text-xl text-gold-400">{{ currency === 'USD' ? `$${option.priceUSD} USD` : `$${option.priceMXN} MXN` }}</p>
+                  <p v-if="isLoggedIn" class="font-bold text-xl text-gold-400">{{ currency === 'USD' ? `$${option.priceUSD} USD` : `$${option.priceMXN} MXN` }}</p>
                   <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                   </svg>
@@ -1292,7 +1423,7 @@ const isDateBookable = (date: Date): boolean => {
                 : 'bg-gray-900 border border-gray-800 hover:border-glass-green/50'
             ]"
           >
-            <span v-if="option.badge" class="absolute top-3 right-12 px-2 py-0.5 rounded-full text-xs font-bold"
+            <span v-if="option.badge && isLoggedIn" class="absolute top-3 right-12 px-2 py-0.5 rounded-full text-xs font-bold"
               :class="option.badge === 'Popular' ? 'bg-gold-400 text-black' : 'bg-glass-green text-white'">
               {{ option.badge }}
             </span>
@@ -1305,10 +1436,10 @@ const isDateBookable = (date: Date): boolean => {
               </div>
               <div class="flex-1">
                 <h3 class="font-bold text-white text-lg">{{ option.name }}</h3>
-                <p class="text-gray-400 text-sm">{{ option.description }}</p>
+                <p class="text-gray-400 text-sm">{{ isLoggedIn ? option.description : guestOptionDescription(option.id) }}</p>
               </div>
               <div class="text-right flex items-center gap-2">
-                <p class="font-bold text-xl text-glass-green">{{ currency === 'USD' ? `$${option.priceUSD} USD` : `$${option.priceMXN} MXN` }}</p>
+                <p v-if="isLoggedIn" class="font-bold text-xl text-glass-green">{{ currency === 'USD' ? `$${option.priceUSD} USD` : `$${option.priceMXN} MXN` }}</p>
                 <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
@@ -1349,7 +1480,7 @@ const isDateBookable = (date: Date): boolean => {
           >
             <div class="text-4xl mb-2">{{ item.image }}</div>
             <p class="font-semibold text-white text-sm">{{ item.name }}</p>
-            <p class="text-gold-400 font-bold text-sm">{{ currency === 'USD' ? `$${item.priceUSD} USD` : `$${item.priceMXN} MXN` }}</p>
+            <p v-if="isLoggedIn" class="text-gold-400 font-bold text-sm">{{ currency === 'USD' ? `$${item.priceUSD} USD` : `$${item.priceMXN} MXN` }}</p>
             <div
               v-if="selectedEquipment.includes(item.id)"
               class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gold-400 flex items-center justify-center"
@@ -1362,7 +1493,7 @@ const isDateBookable = (date: Date): boolean => {
         </div>
 
         <!-- Equipment total -->
-        <div v-if="selectedEquipment.length > 0" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div v-if="selectedEquipment.length > 0 && isLoggedIn" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <div class="flex justify-between items-center">
             <span class="text-gray-400">
               {{ language === 'es' ? 'Renta de equipo:' : 'Equipment rental:' }}
@@ -1761,7 +1892,7 @@ const isDateBookable = (date: Date): boolean => {
                   }}
                 </span>
               </div>
-              <div class="border-t border-gray-700 pt-3 flex justify-between">
+              <div v-if="isLoggedIn" class="border-t border-gray-700 pt-3 flex justify-between">
                 <span class="font-bold text-white">Total</span>
                 <span class="font-bold text-gold-400 text-xl">{{ formattedDisplayTotal }}</span>
               </div>
@@ -1832,7 +1963,7 @@ const isDateBookable = (date: Date): boolean => {
                   <p class="text-xs text-gray-400">{{ language === 'es' ? 'Clase' : 'Class' }}</p>
                   <p class="font-semibold text-white">{{ selectedClassDetails?.name || '-' }}</p>
                 </div>
-                <span class="text-gold-400 font-semibold">{{ currency === 'USD' ? `$${selectedClassDetails?.priceUSD || 0} USD` : `$${selectedClassDetails?.priceMXN || 0} MXN` }}</span>
+                <span v-if="isLoggedIn" class="text-gold-400 font-semibold">{{ currency === 'USD' ? `$${selectedClassDetails?.priceUSD || 0} USD` : `$${selectedClassDetails?.priceMXN || 0} MXN` }}</span>
               </div>
 
               <!-- Equipment -->
@@ -1853,8 +1984,8 @@ const isDateBookable = (date: Date): boolean => {
                     }}
                   </p>
                 </div>
-                <span v-if="equipmentTotal > 0" class="text-gold-400 font-semibold">{{ currency === 'USD' ? `$${equipmentTotalUSD} USD` : `$${equipmentTotalMXN} MXN` }}</span>
-                <span v-else class="text-gray-500 font-semibold">$0</span>
+                <span v-if="equipmentTotal > 0 && isLoggedIn" class="text-gold-400 font-semibold">{{ currency === 'USD' ? `$${equipmentTotalUSD} USD` : `$${equipmentTotalMXN} MXN` }}</span>
+                <span v-else-if="isLoggedIn" class="text-gray-500 font-semibold">$0</span>
               </div>
 
               <!-- Date -->
@@ -1886,7 +2017,7 @@ const isDateBookable = (date: Date): boolean => {
               </div>
 
               <!-- Total -->
-              <div class="border-t border-gray-700 pt-4 mt-4 flex justify-between items-center">
+              <div v-if="isLoggedIn" class="border-t border-gray-700 pt-4 mt-4 flex justify-between items-center">
                 <span class="font-bold text-white text-lg">Total</span>
                 <span class="font-bold text-gold-400 text-2xl">{{ formattedDisplayTotal }}</span>
               </div>
@@ -2103,7 +2234,12 @@ const isDateBookable = (date: Date): boolean => {
             {{ language === 'es' ? 'Reservando...' : 'Booking...' }}
           </span>
           <span v-else>
-            {{ language === 'es' ? 'Confirmar Reserva' : 'Confirm Booking' }} • {{ formattedDisplayTotal }}
+            <template v-if="isLoggedIn">
+              {{ language === 'es' ? 'Confirmar Reserva' : 'Confirm Booking' }} • {{ formattedDisplayTotal }}
+            </template>
+            <template v-else>
+              {{ language === 'es' ? 'Confirmar Reserva' : 'Confirm Booking' }}
+            </template>
           </span>
         </button>
       </div>

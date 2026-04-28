@@ -189,7 +189,7 @@ const individualClassOptions = computed(() => [
     id: 'pro_max_single',
     name: language.value === 'es' ? 'Clase Pro Skater - Max Barrera' : 'Pro Skater Class - Max Barrera',
     description: language.value === 'es' ? 'Disponibilidad limitada' : 'Limited availability',
-    price: 250,
+    price: 400,
     color: 'bg-amber-500',
     capacity: 1,
   },

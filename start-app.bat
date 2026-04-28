@@ -81,8 +81,23 @@ if /i "%NIIK_SKIP_CLEAN%"=="1" (
   if exist "node_modules\.cache" rmdir /s /q "node_modules\.cache" 2>nul
 )
 
+:: Fix "Cannot find module ...\.nuxt\dist\server\server.mjs" — dev stub without Nitro bundle ^(OneDrive / killed node^).
+if exist ".nuxt\dev\index.mjs" if not exist ".nuxt\dist\server\server.mjs" (
+  echo   Nuxt dev cache incomplete — removing .nuxt so the server bundle rebuilds.
+  if exist ".nuxt" rmdir /s /q ".nuxt" 2>nul
+)
+
 echo [3/4] Cache step done.
 echo.
+
+echo [3b/4] Nuxt prepare ^(types / stubs^)...
+call "%NPM_CMD%" exec nuxi prepare
+if errorlevel 1 (
+  color 0C
+  echo   nuxi prepare failed. Fix errors above, then try again.
+  pause
+  exit /b 1
+)
 
 echo [4/4] Starting development server...
 echo.

@@ -212,7 +212,7 @@ async function removeSkillFromArea(areaSkillId: string) {
 
 function skillDisplayName(skill: { name: string; name_es: string | null } | null) {
   if (!skill) return '—'
-  return language === 'es' ? (skill.name_es || skill.name) : skill.name
+  return language.value === 'es' ? (skill.name_es || skill.name) : skill.name
 }
 </script>
 
@@ -228,7 +228,7 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
           </button>
           <h1 class="text-xl font-bold text-white flex items-center gap-2">
             <span class="text-2xl" aria-hidden="true">🛹</span>
-            {{ language === 'es' ? 'Skate Program' : 'Skate Program' }}
+            Program
           </h1>
           <div class="w-10" />
         </div>

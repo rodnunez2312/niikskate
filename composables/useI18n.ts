@@ -11,6 +11,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.home': 'Home',
     'nav.schedule': 'Schedule',
     'nav.shop': 'Shop',
+    'nav.book': 'Book',
+    'nav.news': 'News',
+    'nav.login': 'Login',
     'nav.bookings': 'Bookings',
     'nav.profile': 'Profile',
     
@@ -208,6 +211,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.home': 'Inicio',
     'nav.schedule': 'Horario',
     'nav.shop': 'Tienda',
+    'nav.book': 'Reservar',
+    'nav.news': 'Noticias',
+    'nav.login': 'Entrar',
     'nav.bookings': 'Reservas',
     'nav.profile': 'Perfil',
     

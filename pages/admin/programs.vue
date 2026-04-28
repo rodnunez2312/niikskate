@@ -66,8 +66,8 @@ const fetchPrograms = async () => {
 const isDefaultProgram = (name: string) => DEFAULT_PROGRAM_NAMES.includes(name)
 
 const deleteProgram = async (id: string, name: string) => {
-  if (isDefaultProgram(name) && !confirm(language === 'es' ? 'Este es un programa por defecto. ¿Eliminar de todos modos?' : 'This is a default program. Delete anyway?')) return
-  if (!confirm(language === 'es' ? '¿Eliminar este programa?' : 'Delete this program?')) return
+  if (isDefaultProgram(name) && !confirm(language.value === 'es' ? 'Este es un programa por defecto. ¿Eliminar de todos modos?' : 'This is a default program. Delete anyway?')) return
+  if (!confirm(language.value === 'es' ? '¿Eliminar este programa?' : 'Delete this program?')) return
   try {
     const { error } = await client.from('programs').delete().eq('id', id)
     if (error) throw error

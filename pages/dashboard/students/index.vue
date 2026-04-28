@@ -171,6 +171,14 @@ const getAttendanceRate = (studentId: string) => {
   return Math.round((stats.attended / stats.total) * 100)
 }
 
+const attendanceBadgeClass = (studentId: string) => {
+  const r = getAttendanceRate(studentId)
+  if (r == null) return ''
+  if (r >= 80) return 'bg-glass-green/20 text-glass-green'
+  if (r >= 50) return 'bg-gold-400/20 text-gold-400'
+  return 'bg-flame-600/20 text-flame-600'
+}
+
 // Reservations for both time slots
 const earlyReservations = ref<any[]>([])
 const lateReservations = ref<any[]>([])
@@ -748,6 +756,7 @@ const confirmRosterSelection = async (student: any) => {
         reservation_date: dateStr,
         time_slot: timeSlot,
         status: 'active',
+        workflow_status: 'admin_confirmed',
         notes: 'Added from roster (walk-in)'
       })
     }
@@ -773,6 +782,7 @@ const addStudentToClass = async (student: any, timeSlot: 'early' | 'late') => {
         reservation_date: dateStr,
         time_slot: timeSlot,
         status: 'active',
+        workflow_status: 'admin_confirmed',
         notes: 'Added from roster (walk-in)'
       })
     await fetchReservations()
@@ -1256,11 +1266,7 @@ const navigateToNewEvaluation = (studentId: string) => {
                   <span 
                     v-if="getAttendanceRate(student.id) !== null"
                     class="px-1.5 py-0.5 text-[10px] rounded-full shrink-0"
-                    :class="getAttendanceRate(student.id) >= 80 
-                      ? 'bg-glass-green/20 text-glass-green' 
-                      : getAttendanceRate(student.id) >= 50 
-                        ? 'bg-gold-400/20 text-gold-400' 
-                        : 'bg-flame-600/20 text-flame-600'"
+                    :class="attendanceBadgeClass(student.id)"
                   >
                     📊 {{ getAttendanceRate(student.id) }}%
                   </span>

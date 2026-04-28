@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { Skill, StudentProgress } from '~/types'
 
-const client = useSupabaseClient()
 const user = useSupabaseUser()
+const client = useSupabaseClient()
 const { language } = useI18n()
 
 const skills = ref<Skill[]>([])
 const progress = ref<StudentProgress[]>([])
-const profile = ref<{ full_name?: string } | null>(null)
+const profile = ref<{ full_name?: string; email?: string | null; avatar_url?: string | null } | null>(null)
 const loading = ref(true)
 
 const statCategories = [
@@ -45,6 +45,10 @@ const stats = computed(() => {
   return { total, learned, percentage }
 })
 
+const displayEmail = computed(
+  () => profile.value?.email || user.value?.email || '',
+)
+
 onMounted(async () => {
   if (!user.value?.id) {
     loading.value = false
@@ -53,7 +57,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const [{ data: profileData }, { data: skillsData }, { data: progressData }] = await Promise.all([
-      client.from('profiles').select('full_name').eq('id', user.value.id).single(),
+      client.from('profiles').select('full_name, email, avatar_url').eq('id', user.value.id).single(),
       client.from('skills_library').select('*').eq('is_active', true).order('sort_order'),
       client.from('student_progress').select('*').eq('student_id', user.value.id),
     ])
@@ -80,13 +84,18 @@ onMounted(async () => {
     <template v-else>
       <div class="flex gap-4">
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-700/50">
-            <span class="text-gold-400 font-black text-lg uppercase tracking-wide truncate">
-              {{ profile?.full_name || 'Skater' }}
-            </span>
-            <span class="px-2 py-0.5 bg-glass-blue/30 text-glass-blue text-[10px] font-bold rounded uppercase shrink-0">
-              {{ language === 'es' ? 'Patinador' : 'Skater' }}
-            </span>
+          <div class="mb-3 pb-2 border-b border-gray-700/50">
+            <div class="flex items-center gap-2">
+              <span class="text-gold-400 font-black text-lg uppercase tracking-wide truncate">
+                {{ profile?.full_name || 'Skater' }}
+              </span>
+              <span class="px-2 py-0.5 bg-glass-blue/30 text-glass-blue text-[10px] font-bold rounded uppercase shrink-0">
+                {{ language === 'es' ? 'Patinador' : 'Skater' }}
+              </span>
+            </div>
+            <p v-if="displayEmail" class="text-white text-[11px] sm:text-xs mt-1.5 truncate leading-snug">
+              {{ displayEmail }}
+            </p>
           </div>
           <div class="space-y-1.5">
             <div
@@ -108,11 +117,21 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+
         <div class="flex flex-col items-center shrink-0">
           <div
-            class="w-20 h-20 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-4xl shadow-lg ring-2 ring-gold-400/30"
+            class="w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-4xl shadow-lg ring-2 ring-gold-400/30"
           >
-            {{ profile?.full_name?.charAt(0)?.toUpperCase() || '🛹' }}
+            <img
+              v-if="profile?.avatar_url"
+              :src="profile.avatar_url"
+              alt=""
+              class="w-full h-full object-cover"
+              loading="lazy"
+            />
+            <span v-else class="text-white font-black">
+              {{ profile?.full_name?.charAt(0)?.toUpperCase() || '🛹' }}
+            </span>
           </div>
           <div class="mt-2 text-center">
             <p class="text-[10px] text-gray-500 uppercase">{{ language === 'es' ? 'Nivel' : 'Level' }}</p>

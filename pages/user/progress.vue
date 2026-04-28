@@ -13,6 +13,23 @@ const progress = ref<StudentProgress[]>([])
 const loading = ref(true)
 const profile = ref<any>(null)
 
+const {
+  uploadingAvatar,
+  fileInputRef,
+  onAvatarFileChange,
+  openAvatarPicker,
+  removeAvatar,
+} = useSkaterAvatarUpload(profile)
+
+/** Coach-assigned practice targets (library skills) */
+const skillFocus = ref<Array<{
+  id: string
+  skill_id: string
+  coach_note: string | null
+  skill?: Skill
+}>>([])
+const updatingFocusId = ref<string | null>(null)
+
 // Filters
 const selectedCategory = ref<SkillCategory | 'all'>('all')
 const selectedDifficulty = ref<SkillDifficulty | 'all'>('all')
@@ -96,10 +113,40 @@ const fetchData = async () => {
 
     if (progressError) throw progressError
     progress.value = progressData || []
+
+    const { data: focusData, error: focusError } = await client
+      .from('student_skill_focus')
+      .select('id, skill_id, coach_note, skill:skills_library(*)')
+      .eq('student_id', user.value?.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+
+    if (!focusError) {
+      skillFocus.value = (focusData || []) as unknown as typeof skillFocus.value
+    }
   } catch (e) {
     console.error('Error fetching data:', e)
   } finally {
     loading.value = false
+  }
+}
+
+const markFocusCompleted = async (id: string) => {
+  updatingFocusId.value = id
+  try {
+    const { error } = await client
+      .from('student_skill_focus')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+    if (error) throw error
+    skillFocus.value = skillFocus.value.filter(f => f.id !== id)
+  } catch (e) {
+    console.error(e)
+  } finally {
+    updatingFocusId.value = null
   }
 }
 
@@ -246,11 +293,57 @@ const difficultyColors: Record<SkillDifficulty, string> = {
               </div>
             </div>
 
-            <!-- Avatar Section (Right) -->
-            <div class="flex flex-col items-center">
-              <div class="w-20 h-20 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-4xl shadow-lg ring-2 ring-gold-400/30">
-                {{ profile?.full_name?.charAt(0)?.toUpperCase() || '🛹' }}
-              </div>
+            <!-- Avatar: tap to choose library or camera (one photo) -->
+            <div class="flex flex-col items-center shrink-0 w-[5.5rem]">
+              <input
+                ref="fileInputRef"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="onAvatarFileChange"
+              />
+              <button
+                type="button"
+                class="relative w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-4xl shadow-lg ring-2 ring-gold-400/30 transition-transform active:scale-[0.97] disabled:opacity-70"
+                :disabled="uploadingAvatar || !profile"
+                :aria-label="language === 'es' ? 'Cambiar foto de perfil' : 'Change profile photo'"
+                @click="openAvatarPicker"
+              >
+                <img
+                  v-if="profile?.avatar_url"
+                  :src="profile.avatar_url"
+                  alt=""
+                  class="w-full h-full object-cover"
+                />
+                <span v-else class="text-white font-black">
+                  {{ profile?.full_name?.charAt(0)?.toUpperCase() || '🛹' }}
+                </span>
+                <div
+                  v-if="uploadingAvatar"
+                  class="absolute inset-0 bg-black/55 flex items-center justify-center"
+                >
+                  <svg class="w-8 h-8 animate-spin text-gold-300" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              </button>
+              <p class="text-[9px] text-gray-500 text-center mt-1 leading-tight px-0.5">
+                {{
+                  language === 'es'
+                    ? 'Toca para foto o cámara'
+                    : 'Tap for photo or camera'
+                }}
+              </p>
+              <button
+                v-if="profile?.avatar_url"
+                type="button"
+                class="text-[10px] text-red-400/90 hover:text-red-300 mt-0.5 underline underline-offset-2"
+                :disabled="uploadingAvatar"
+                @click.stop="removeAvatar"
+              >
+                {{ language === 'es' ? 'Quitar foto' : 'Remove photo' }}
+              </button>
               <div class="mt-2 text-center">
                 <p class="text-[10px] text-gray-500 uppercase">{{ language === 'es' ? 'Nivel' : 'Level' }}</p>
                 <p class="text-gold-400 font-black text-sm">
@@ -480,6 +573,53 @@ const difficultyColors: Record<SkillDifficulty, string> = {
             {{ language === 'es' ? 'Limpiar filtros' : 'Clear filters' }}
           </button>
         </div>
+      </div>
+
+      <!-- Coach-assigned practice focus -->
+      <div v-if="skillFocus.length > 0" class="mt-8 bg-gradient-to-br from-gold-400/10 to-glass-orange/5 border border-gold-400/25 rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xl">🎯</span>
+          <h3 class="font-bold text-white">
+            {{ language === 'es' ? 'Enfoque del coach' : 'Coach focus' }}
+          </h3>
+        </div>
+        <p class="text-xs text-gray-400 mb-4">
+          {{
+            language === 'es'
+              ? 'Practica estos trucos para desbloquearlos en clase con tu coach.'
+              : 'Practice these tricks to unlock them in class with your coach.'
+          }}
+        </p>
+        <ul class="space-y-3">
+          <li
+            v-for="row in skillFocus"
+            :key="row.id"
+            class="bg-gray-900/80 border border-gray-800 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-3"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-white">
+                {{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}
+              </p>
+              <p v-if="row.coach_note" class="text-sm text-gray-400 mt-1">{{ row.coach_note }}</p>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 px-4 py-2 rounded-lg bg-gold-400/20 text-gold-400 text-sm font-semibold hover:bg-gold-400/30 disabled:opacity-50"
+              :disabled="updatingFocusId === row.id"
+              @click="markFocusCompleted(row.id)"
+            >
+              {{
+                updatingFocusId === row.id
+                  ? language === 'es'
+                    ? '…'
+                    : '…'
+                  : language === 'es'
+                    ? 'Lo practiqué'
+                    : 'I practiced this'
+              }}
+            </button>
+          </li>
+        </ul>
       </div>
 
       <!-- Note for students -->

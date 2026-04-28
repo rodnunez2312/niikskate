@@ -20,6 +20,14 @@ const studentReservations = ref<any[]>([])
 const studentAttendance = ref<any[]>([])
 const calendarMonth = ref(new Date())
 
+const skillFocusRows = ref<any[]>([])
+const newFocusSkillId = ref('')
+const newFocusNote = ref('')
+const savingFocus = ref(false)
+const focusError = ref<string | null>(null)
+
+const user = useSupabaseUser()
+
 const assignedSkillGroup = ref<{ id: string; name: string; description: string | null } | null>(null)
 const assignedProgramName = ref<string | null>(null)
 const programSkillIds = ref<string[]>([])
@@ -124,10 +132,61 @@ const loadStudent = async () => {
     }
 
     await loadProgramProgressForGroup()
+
+    const { data: focusData } = await client
+      .from('student_skill_focus')
+      .select('*, skill:skills_library(*)')
+      .eq('student_id', id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+    skillFocusRows.value = focusData || []
   } catch (e) {
     console.error('Error loading student dashboard:', e)
   } finally {
     loading.value = false
+  }
+}
+
+const addSkillFocus = async () => {
+  if (!studentId.value || !newFocusSkillId.value) return
+  savingFocus.value = true
+  focusError.value = null
+  try {
+    const { error } = await client.from('student_skill_focus').insert({
+      student_id: studentId.value,
+      skill_id: newFocusSkillId.value,
+      assigned_by: user.value?.id ?? null,
+      coach_note: newFocusNote.value.trim() || null,
+      status: 'active',
+    })
+    if (error) {
+      focusError.value =
+        error.code === '23505'
+          ? language.value === 'es'
+            ? 'Ese truco ya está en la lista.'
+            : 'That trick is already on the list.'
+          : error.message
+      return
+    }
+    newFocusSkillId.value = ''
+    newFocusNote.value = ''
+    await loadStudent()
+  } catch (e: any) {
+    focusError.value = e?.message || 'Error'
+  } finally {
+    savingFocus.value = false
+  }
+}
+
+const dismissSkillFocus = async (focusId: string) => {
+  try {
+    await client
+      .from('student_skill_focus')
+      .update({ status: 'dismissed' })
+      .eq('id', focusId)
+    await loadStudent()
+  } catch (e) {
+    console.error(e)
   }
 }
 
@@ -308,7 +367,6 @@ const calendarStats = computed(() => ({
   }).length
 }))
 
-const user = useSupabaseUser()
 const userRole = ref<string | null>(null)
 onMounted(async () => {
   if (user.value) {
@@ -469,6 +527,74 @@ watch(studentId, () => loadStudent(), { immediate: false })
               :style="{ width: skills.length > 0 ? `${(studentProgress.length / skills.length) * 100}%` : '0%' }"
             ></div>
           </div>
+        </div>
+
+        <!-- Coach-assigned practice focus (shows on skater Progress page) -->
+        <div class="bg-gray-900 border border-amber-500/30 rounded-xl p-4 space-y-4">
+          <div class="flex items-center gap-2">
+            <span class="text-lg" aria-hidden="true">🎯</span>
+            <h3 class="font-bold text-white">
+              {{ language === 'es' ? 'Enfoque de práctica' : 'Practice focus' }}
+            </h3>
+          </div>
+          <p class="text-xs text-gray-500">
+            {{
+              language === 'es'
+                ? 'Asigna un truco de la biblioteca para que el patinador lo trabaje antes de desbloquearlo en clase.'
+                : 'Assign a library trick for the skater to work on before unlocking it in class.'
+            }}
+          </p>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <select
+              v-model="newFocusSkillId"
+              class="flex-1 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+            >
+              <option value="">{{ language === 'es' ? 'Seleccionar truco…' : 'Select trick…' }}</option>
+              <option
+                v-for="s in skills.filter(sk => !skillFocusRows.some(f => f.skill_id === sk.id))"
+                :key="s.id"
+                :value="s.id"
+              >
+                {{ language === 'es' ? s.name_es || s.name : s.name }}
+              </option>
+            </select>
+            <input
+              v-model="newFocusNote"
+              type="text"
+              class="flex-1 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm placeholder-gray-500"
+              :placeholder="language === 'es' ? 'Nota (opcional)' : 'Note (optional)'"
+            />
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg bg-amber-500 text-black text-sm font-bold disabled:opacity-50"
+              :disabled="!newFocusSkillId || savingFocus"
+              @click="addSkillFocus"
+            >
+              {{ savingFocus ? '…' : language === 'es' ? 'Asignar' : 'Assign' }}
+            </button>
+          </div>
+          <p v-if="focusError" class="text-sm text-flame-500">{{ focusError }}</p>
+          <ul v-if="skillFocusRows.length" class="space-y-2">
+            <li
+              v-for="f in skillFocusRows"
+              :key="f.id"
+              class="flex items-start justify-between gap-2 bg-gray-800/80 rounded-lg p-3 text-sm"
+            >
+              <div>
+                <p class="font-medium text-white">
+                  {{ language === 'es' ? f.skill?.name_es || f.skill?.name : f.skill?.name }}
+                </p>
+                <p v-if="f.coach_note" class="text-gray-400 text-xs mt-1">{{ f.coach_note }}</p>
+              </div>
+              <button
+                type="button"
+                class="text-xs text-gray-500 hover:text-flame-500 shrink-0"
+                @click="dismissSkillFocus(f.id)"
+              >
+                {{ language === 'es' ? 'Quitar' : 'Remove' }}
+              </button>
+            </li>
+          </ul>
         </div>
 
         <!-- Program / level progress vs group average -->

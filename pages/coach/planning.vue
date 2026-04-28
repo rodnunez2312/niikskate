@@ -114,7 +114,7 @@ const loadData = async () => {
 
     skills.value = skillsData || []
     
-    const uniqueCats = [...new Set(skills.value.map(s => s.categoria).filter(Boolean))]
+    const uniqueCats = [...new Set(skills.value.map(s => s.category).filter(Boolean))]
     console.log('Categorias in database:', uniqueCats)
 
     // Load existing plans
@@ -457,8 +457,8 @@ watch([selectedDate, selectedSession], () => {
                 {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
               </span>
               <div class="flex gap-1">
-                <span v-if="skill.categoria" class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300">
-                  {{ skill.categoria }}
+                <span v-if="skill.category" class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300">
+                  {{ skill.category }}
                 </span>
                 <span class="px-1.5 py-0.5 rounded text-[10px] bg-green-500/20 text-green-400">
                   {{ difficultyStars(skill.difficulty) }}
@@ -571,9 +571,9 @@ watch([selectedDate, selectedSession], () => {
             :key="obstacle"
             class="bg-gray-800 rounded-lg p-3"
           >
-            <h4 class="font-semibold text-gold-400 capitalize mb-2">{{ obstacle.replace(/_/g, ' ') }}</h4>
+            <h4 class="font-semibold text-gold-400 capitalize mb-2">{{ String(obstacle).replace(/_/g, ' ') }}</h4>
             <div v-for="(tricks, classKey) in classes" :key="classKey" class="mb-2 last:mb-0">
-              <p class="text-xs text-gray-500 mb-1">{{ classKey.replace('_', ' ').toUpperCase() }}</p>
+              <p class="text-xs text-gray-500 mb-1">{{ String(classKey).replace('_', ' ').toUpperCase() }}</p>
               <div class="flex flex-wrap gap-1">
                 <span 
                   v-for="trick in tricks" 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { format, startOfMonth, endOfMonth } from 'date-fns'
-import { es } from 'date-fns/locale'
-import type { GuestBooking, StudentProgress, Skill } from '~/types'
+import { startOfDay, format } from 'date-fns'
+import type { DayBookingState } from '~/components/profile/AttendanceMonthMini.vue'
+import SkaterProfileCard from '~/components/home/SkaterProfileCard.vue'
 
 const router = useRouter()
 const client = useSupabaseClient()
@@ -24,14 +24,14 @@ const loading = ref(true)
 const saving = ref(false)
 const editMode = ref(false)
 
-// Booking data
-const bookings = ref<GuestBooking[]>([])
-const loadingBookings = ref(false)
+/** Full calendar: attended (green) > admin_confirmed (blue) > requested (yellow) */
+const calendarDayStates = ref<Map<string, DayBookingState>>(new Map())
+const loadingAttendance = ref(false)
 
-// Progress data
-const progress = ref<StudentProgress[]>([])
-const skills = ref<Skill[]>([])
-const loadingProgress = ref(false)
+/** Quick summary (non-interactive) */
+const summaryReserved = ref(0)
+const summaryAttended = ref(0)
+const summaryMissed = ref(0)
 
 const editForm = ref({
   full_name: '',
@@ -45,15 +45,105 @@ watch(user, (newUser) => {
   }
 }, { immediate: true })
 
-onMounted(async () => {
-  if (user.value) {
-    await Promise.all([
-      fetchProfile(),
-      fetchBookings(),
-      fetchProgress()
-    ])
-  }
+const loadProfilePageData = async () => {
+  if (!user.value?.id) return
+  await Promise.all([fetchProfile(), fetchCalendarDayStates()])
+}
+
+onMounted(() => {
+  loadProfilePageData()
 })
+
+// Supabase user can hydrate after first paint; ensure fetches run once session exists
+watch(
+  () => user.value?.id,
+  (id, prev) => {
+    if (id && id !== prev) loadProfilePageData()
+  },
+  { immediate: false },
+)
+
+const fetchCalendarDayStates = async () => {
+  if (!user.value?.id) return
+  loadingAttendance.value = true
+  try {
+    const uid = user.value.id
+    const [attAllRes, resvResFull] = await Promise.all([
+      client.from('attendance').select('class_date, attended').eq('student_id', uid),
+      client.from('class_reservations').select('reservation_date, workflow_status, status').eq('user_id', uid),
+    ])
+
+    if (attAllRes.error) throw attAllRes.error
+
+    let rows = resvResFull.data
+    if (resvResFull.error) {
+      const fallback = await client.from('class_reservations').select('reservation_date, status').eq('user_id', uid)
+      if (fallback.error) throw fallback.error
+      rows = (fallback.data || []).map((r: { reservation_date: string; status: string }) => ({
+        ...r,
+        workflow_status: null as string | null,
+      }))
+    }
+
+    const attByDate = new Map<string, boolean>()
+    for (const a of attAllRes.data || []) {
+      const d = a.class_date as string
+      if (attByDate.get(d) === true) continue
+      attByDate.set(d, a.attended === true)
+    }
+
+    const m = new Map<string, DayBookingState>()
+    const todayStr = format(startOfDay(new Date()), 'yyyy-MM-dd')
+
+    for (const r of rows || []) {
+      const row = r as { reservation_date: string; status: string; workflow_status?: string | null }
+      if (row.status === 'cancelled') continue
+      const k = row.reservation_date
+      let wf: 'admin_confirmed' | 'requested' = 'requested'
+      if (row.workflow_status === 'admin_confirmed') wf = 'admin_confirmed'
+      else if (!row.workflow_status && ['active', 'pending_skater_confirm'].includes(row.status)) {
+        wf = 'admin_confirmed'
+      }
+      const cur = m.get(k)
+      if (cur === 'attended') continue
+      if (!cur) m.set(k, wf)
+      else if (cur === 'requested' && wf === 'admin_confirmed') m.set(k, 'admin_confirmed')
+    }
+
+    for (const [d, went] of attByDate) {
+      if (went) m.set(d, 'attended')
+    }
+
+    const missed = new Set<string>()
+    const reservedDates = new Set<string>()
+    for (const r of rows || []) {
+      const row = r as { reservation_date: string; status: string }
+      if (row.status === 'cancelled') continue
+      const d = row.reservation_date
+      reservedDates.add(d)
+      const went = attByDate.get(d)
+      if (went === true) continue
+      if (went === false) {
+        missed.add(d)
+        continue
+      }
+      if (d < todayStr) missed.add(d)
+    }
+
+    calendarDayStates.value = m
+    summaryReserved.value = reservedDates.size
+    summaryAttended.value = [...attByDate].filter(([, went]) => went === true).length
+    summaryMissed.value = missed.size
+  } catch (e) {
+    console.error('Error fetching calendar state:', e)
+    calendarDayStates.value = new Map()
+    summaryReserved.value = 0
+    summaryAttended.value = 0
+    summaryMissed.value = 0
+  } finally {
+    loadingAttendance.value = false
+  }
+}
 
 
 const fetchProfile = async () => {
@@ -75,68 +165,6 @@ const fetchProfile = async () => {
     console.error('Error fetching profile:', e)
   } finally {
     loading.value = false
-  }
-}
-
-const fetchBookings = async () => {
-  loadingBookings.value = true
-  try {
-    // Fetch from guest_bookings (where bookings are stored)
-    const { data, error } = await client
-      .from('guest_bookings')
-      .select('*')
-      .eq('linked_user_id', user.value?.id)
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
-    bookings.value = data || []
-    
-    // Also check localStorage for any unlinked bookings
-    const localBookings = JSON.parse(localStorage.getItem('guest_bookings') || '[]')
-    const userEmail = user.value?.email
-    const unlinkedBookings = localBookings.filter((b: any) => 
-      b.email === userEmail && !bookings.value.some((db: any) => db.id === b.id)
-    )
-    
-    // Merge unlinked bookings
-    if (unlinkedBookings.length > 0) {
-      bookings.value = [...bookings.value, ...unlinkedBookings]
-    }
-  } catch (e) {
-    console.error('Error fetching bookings:', e)
-  } finally {
-    loadingBookings.value = false
-  }
-}
-
-const fetchProgress = async () => {
-  loadingProgress.value = true
-  try {
-    // Fetch skills learned
-    const { data: progressData, error: progressError } = await client
-      .from('student_progress')
-      .select(`
-        *,
-        skill:skills_library(*)
-      `)
-      .eq('student_id', user.value?.id)
-      .order('learned_at', { ascending: false })
-
-    if (progressError) throw progressError
-    progress.value = progressData || []
-    
-    // Fetch all skills for reference
-    const { data: skillsData } = await client
-      .from('skills_library')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order')
-    
-    skills.value = skillsData || []
-  } catch (e) {
-    console.error('Error fetching progress:', e)
-  } finally {
-    loadingProgress.value = false
   }
 }
 
@@ -167,58 +195,9 @@ const handleLogout = async () => {
   router.push('/')
 }
 
-// Computed: Stats for this month
-const monthlyStats = computed(() => {
-  const now = new Date()
-  const monthStart = startOfMonth(now)
-  const monthEnd = endOfMonth(now)
-  
-  const thisMonthBookings = bookings.value.filter(b => {
-    const bookingDate = new Date(b.created_at)
-    return bookingDate >= monthStart && bookingDate <= monthEnd
-  })
-  
-  return {
-    classes_this_month: thisMonthBookings.length,
-    classes_total: bookings.value.length,
-    skills_learned: progress.value.length,
-    total_skills: skills.value.length
-  }
-})
-
-// Computed: Progress percentage
-const progressPercentage = computed(() => {
-  if (skills.value.length === 0) return 0
-  return Math.round((progress.value.length / skills.value.length) * 100)
-})
-
-// Menu items based on role
+// Accesos: coach/admin tools only (Tips & Help shortcuts removed per request)
 const menuItems = computed(() => {
-  const items = []
-
-  // Reservations (use credits to book)
-  items.push({
-    icon: '🎫',
-    label: language.value === 'es' ? 'Mis Reservas' : 'My Reservations',
-    path: '/user/reservations',
-    disabled: false,
-    highlight: true,
-  })
-
-  // User dashboard items
-  items.push({
-    icon: '📈',
-    label: language.value === 'es' ? 'Mi Progreso' : 'My Progress',
-    path: '/user/progress',
-    disabled: false,
-  })
-  
-  items.push({
-    icon: '📚',
-    label: language.value === 'es' ? 'Tips & Trucos' : 'Tips & Tricks',
-    path: '/user/tips',
-    disabled: false,
-  })
+  const items: { icon: string; label: string; path: string; disabled: boolean }[] = []
 
   // Add coach links
   if (profile.value?.role === 'coach' || profile.value?.role === 'admin') {
@@ -252,13 +231,6 @@ const menuItems = computed(() => {
     })
   }
 
-  items.push({
-    icon: '❓',
-    label: language.value === 'es' ? 'Ayuda y Soporte' : 'Help & Support',
-    path: '/support',
-    disabled: true,
-  })
-
   return items
 })
 
@@ -274,12 +246,6 @@ const roleBadgeColors: Record<string, string> = {
   customer: 'bg-glass-blue text-white',
 }
 
-// Format booking date
-const formatBookingDate = (dateStr: string) => {
-  const date = new Date(dateStr)
-  const locale = language.value === 'es' ? es : undefined
-  return format(date, 'dd MMM yyyy', { locale })
-}
 </script>
 
 <template>
@@ -295,7 +261,7 @@ const formatBookingDate = (dateStr: string) => {
           <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold">{{ language === 'es' ? 'Perfil' : 'Profile' }}</h1>
             <button
-              v-if="!editMode && !loading"
+              v-if="!editMode && !loading && profile?.role && profile.role !== 'customer'"
               @click="editMode = true"
               class="text-white/80 hover:text-white"
             >
@@ -307,14 +273,60 @@ const formatBookingDate = (dateStr: string) => {
         </div>
       </header>
 
-      <!-- Skate stats card (customers) — top of profile -->
       <div class="px-4 -mt-16 max-w-lg mx-auto pb-24 relative z-20">
-        <HomeSkaterProfileCard
+        <!-- Tony Hawk–style skater card (progress / tap → full progress page) -->
+        <SkaterProfileCard
           v-if="!loading && profile?.role === 'customer'"
           class="mb-4"
         />
 
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
+        <!-- Reservations panel: summary + full calendar -->
+        <template v-if="profile?.role === 'customer'">
+          <div
+            class="mb-4 rounded-2xl border border-gray-800 bg-gray-900/95 p-4 shadow-2xl backdrop-blur-sm ring-1 ring-white/5"
+          >
+            <div class="mb-4 grid grid-cols-3 gap-2">
+              <div class="rounded-xl bg-gray-800/90 px-2 py-3 text-center ring-1 ring-gold-400/25">
+                <p class="text-xl font-black text-gold-400 tabular-nums">{{ loadingAttendance ? '—' : summaryReserved }}</p>
+                <span class="mt-1 block text-[9px] font-bold uppercase leading-tight text-gray-400">
+                  {{ language === 'es' ? 'Reservadas' : 'Reserved' }}
+                </span>
+              </div>
+              <div class="rounded-xl bg-gray-800/90 px-2 py-3 text-center ring-1 ring-glass-green/30">
+                <p class="text-xl font-black text-glass-green tabular-nums">{{ loadingAttendance ? '—' : summaryAttended }}</p>
+                <span class="mt-1 block text-[9px] font-bold uppercase leading-tight text-gray-400">
+                  {{ language === 'es' ? 'Asistidas' : 'Attended' }}
+                </span>
+              </div>
+              <div class="rounded-xl bg-gray-800/90 px-2 py-3 text-center ring-1 ring-rose-500/30">
+                <p class="text-xl font-black text-rose-300 tabular-nums">{{ loadingAttendance ? '—' : summaryMissed }}</p>
+                <span class="mt-1 block text-[9px] font-bold uppercase leading-tight text-gray-400">
+                  {{ language === 'es' ? 'No asistió' : 'Not attended' }}
+                </span>
+              </div>
+            </div>
+            <div v-if="loadingAttendance" class="h-40 rounded-xl bg-gray-800 animate-pulse" />
+            <ProfileAttendanceMonthMini
+              v-else
+              embedded
+              :day-states="calendarDayStates"
+              calendar-mode="reserved"
+              class="mt-1"
+            />
+            <NuxtLink
+              to="/bookings"
+              class="mt-3 block text-center text-gold-400/90 text-xs font-semibold hover:text-gold-300 transition-colors"
+            >
+              {{ language === 'es' ? 'Toca para ver mis reservas →' : 'Tap to view my reservations →' }}
+            </NuxtLink>
+          </div>
+        </template>
+
+        <!-- Duplicate profile card: hidden for skaters (Tony Hawk card + summary above). Coach/admin keep full card. -->
+        <div
+          v-if="profile && (profile.role !== 'customer' || editMode)"
+          class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl"
+        >
           <!-- Loading State -->
           <div v-if="loading" class="animate-pulse">
             <div class="flex items-center gap-4 mb-4">
@@ -326,69 +338,38 @@ const formatBookingDate = (dateStr: string) => {
             </div>
           </div>
 
-          <!-- Profile Info -->
-          <template v-else-if="profile && !editMode">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-3xl ring-4 ring-gold-400/30">
-              {{ profile.full_name?.charAt(0)?.toUpperCase() || '🛹' }}
+          <!-- Profile Info (staff only — skaters use SkaterProfileCard) -->
+          <template v-else-if="profile && !editMode && profile.role !== 'customer'">
+            <div class="flex items-center gap-4 mb-6">
+              <div class="w-20 h-20 rounded-full bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-3xl ring-4 ring-gold-400/30">
+                {{ profile.full_name?.charAt(0)?.toUpperCase() || '🛹' }}
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-white">{{ profile.full_name }}</h2>
+                <p class="text-gray-400">{{ profile.email }}</p>
+                <span :class="['px-3 py-1 rounded-full text-xs font-bold mt-2 inline-block', roleBadgeColors[profile.role] || 'bg-gray-700 text-white']">
+                  {{ roleLabels[profile.role]?.[language] || profile.role }}
+                </span>
+              </div>
             </div>
-            <div>
-              <h2 class="text-xl font-bold text-white">{{ profile.full_name }}</h2>
-              <p class="text-gray-400">{{ profile.email }}</p>
-              <span :class="['px-3 py-1 rounded-full text-xs font-bold mt-2 inline-block', roleBadgeColors[profile.role] || 'bg-gray-700 text-white']">
-                {{ roleLabels[profile.role]?.[language] || profile.role }}
-              </span>
-            </div>
-          </div>
 
-          <!-- Quick Stats -->
-          <div class="grid grid-cols-3 gap-3 mb-6">
-            <div class="bg-gray-800 rounded-xl p-3 text-center">
-              <p class="text-2xl font-bold text-gold-400">{{ monthlyStats.classes_this_month }}</p>
-              <p class="text-xs text-gray-400">{{ language === 'es' ? 'Este mes' : 'This month' }}</p>
+            <div class="space-y-3 border-t border-gray-800 pt-4">
+              <div class="flex items-center gap-3 text-gray-300">
+                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span>{{ profile.email }}</span>
+              </div>
+              <div class="flex items-center gap-3 text-gray-300">
+                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                <span>{{ profile.phone || (language === 'es' ? 'Sin teléfono' : 'No phone added') }}</span>
+              </div>
             </div>
-            <div class="bg-gray-800 rounded-xl p-3 text-center">
-              <p class="text-2xl font-bold text-glass-green">{{ monthlyStats.classes_total }}</p>
-              <p class="text-xs text-gray-400">{{ language === 'es' ? 'Total clases' : 'Total classes' }}</p>
-            </div>
-            <div class="bg-gray-800 rounded-xl p-3 text-center">
-              <p class="text-2xl font-bold text-glass-purple">{{ monthlyStats.skills_learned }}</p>
-              <p class="text-xs text-gray-400">{{ language === 'es' ? 'Trucos' : 'Skills' }}</p>
-            </div>
-          </div>
+          </template>
 
-          <!-- Progress Bar -->
-          <div class="mb-6">
-            <div class="flex justify-between text-sm mb-2">
-              <span class="text-gray-400">{{ language === 'es' ? 'Progreso general' : 'Overall progress' }}</span>
-              <span class="text-gold-400 font-bold">{{ progressPercentage }}%</span>
-            </div>
-            <div class="h-3 bg-gray-800 rounded-full overflow-hidden">
-              <div 
-                class="h-full bg-gradient-to-r from-gold-400 to-gold-600 rounded-full transition-all duration-500"
-                :style="{ width: `${progressPercentage}%` }"
-              ></div>
-            </div>
-          </div>
-
-          <!-- Contact Info -->
-          <div class="space-y-3 border-t border-gray-800 pt-4">
-            <div class="flex items-center gap-3 text-gray-300">
-              <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <span>{{ profile.email }}</span>
-            </div>
-            <div class="flex items-center gap-3 text-gray-300">
-              <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              <span>{{ profile.phone || (language === 'es' ? 'Sin teléfono' : 'No phone added') }}</span>
-            </div>
-          </div>
-        </template>
-
-        <!-- Edit Form -->
+        <!-- Edit Form (skaters: name/phone only in this card; staff: same) -->
         <template v-else-if="editMode">
           <form @submit.prevent="saveProfile" class="space-y-4">
             <div>
@@ -436,110 +417,28 @@ const formatBookingDate = (dateStr: string) => {
         </template>
       </div>
 
-      <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wide mt-6 mb-3 px-1">
-        {{ language === 'es' ? 'Accesos' : 'Shortcuts' }}
-      </h2>
-      <!-- Menu & lists (no tabs) -->
-      <div class="space-y-2">
-        <NuxtLink
-          v-for="item in menuItems"
-          :key="item.path"
-          :to="item.disabled ? '#' : item.path"
-          class="rounded-xl p-4 flex items-center gap-4"
-          :class="[
-            item.disabled 
-              ? 'bg-gray-900 border border-gray-800 opacity-50 cursor-not-allowed' 
-              : item.highlight 
-                ? 'bg-gradient-to-r from-gold-400/20 to-glass-orange/20 border-2 border-gold-400/50'
-                : 'bg-gray-900 border border-gray-800'
-          ]"
-          @click.prevent="item.disabled && null"
-        >
-          <span class="text-2xl">{{ item.icon }}</span>
-          <span class="font-medium text-white flex-1">{{ item.label }}</span>
-          <span v-if="item.disabled" class="text-xs text-gray-500">{{ language === 'es' ? 'Próximamente' : 'Coming soon' }}</span>
-          <span v-else-if="item.highlight" class="px-2 py-1 bg-gold-400 text-black text-xs font-bold rounded-full">
-            {{ language === 'es' ? 'Usar créditos' : 'Use credits' }}
-          </span>
-          <svg v-else class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-        </NuxtLink>
-      </div>
-
-      <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wide mt-8 mb-3 px-1">
-        {{ language === 'es' ? 'Reservas' : 'Bookings' }}
-      </h2>
-      <div class="space-y-3">
-        <div v-if="loadingBookings" class="text-center py-8">
-          <div class="animate-spin w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full mx-auto"></div>
-        </div>
-        
-        <div v-else-if="bookings.length === 0" class="text-center py-8">
-          <p class="text-4xl mb-3">📅</p>
-          <p class="text-gray-400">{{ language === 'es' ? 'No tienes reservas aún' : 'No bookings yet' }}</p>
-          <NuxtLink to="/book" class="inline-block mt-4 px-6 py-2 bg-gold-400 text-black font-bold rounded-xl">
-            {{ language === 'es' ? 'Reservar Clase' : 'Book a Class' }}
+      <template v-if="menuItems.length > 0">
+        <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wide mt-6 mb-3 px-1">
+          {{ language === 'es' ? 'Accesos' : 'Shortcuts' }}
+        </h2>
+        <div class="space-y-2">
+          <NuxtLink
+            v-for="item in menuItems"
+            :key="item.path"
+            :to="item.disabled ? '#' : item.path"
+            class="rounded-xl p-4 flex items-center gap-4 bg-gray-900 border border-gray-800"
+            :class="item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-700'"
+            @click.prevent="item.disabled && null"
+          >
+            <span class="text-2xl">{{ item.icon }}</span>
+            <span class="font-medium text-white flex-1">{{ item.label }}</span>
+            <span v-if="item.disabled" class="text-xs text-gray-500">{{ language === 'es' ? 'Próximamente' : 'Coming soon' }}</span>
+            <svg v-else class="w-5 h-5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
           </NuxtLink>
         </div>
-        
-        <div v-else v-for="booking in bookings" :key="booking.id" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <div class="flex items-start justify-between mb-2">
-            <div>
-              <h4 class="font-bold text-white">{{ booking.booking_data?.class_name || 'Class' }}</h4>
-              <p class="text-sm text-gray-400">{{ formatBookingDate(booking.created_at) }}</p>
-            </div>
-            <span class="px-2 py-1 bg-glass-green/20 text-glass-green text-xs font-bold rounded-full">
-              {{ language === 'es' ? 'Reservado' : 'Booked' }}
-            </span>
-          </div>
-          <div class="flex items-center gap-4 text-sm text-gray-400">
-            <span>🕐 {{ booking.booking_data?.session === 'early' ? '5:30 PM' : '7:00 PM' }}</span>
-            <span v-if="booking.booking_data?.equipment?.length">
-              🛡️ {{ booking.booking_data.equipment.length }} {{ language === 'es' ? 'equipos' : 'items' }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wide mt-8 mb-3 px-1">
-        {{ language === 'es' ? 'Progreso' : 'Progress' }}
-      </h2>
-      <div class="space-y-3">
-        <div v-if="loadingProgress" class="text-center py-8">
-          <div class="animate-spin w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full mx-auto"></div>
-        </div>
-        
-        <div v-else-if="progress.length === 0" class="text-center py-8">
-          <p class="text-4xl mb-3">🎯</p>
-          <p class="text-gray-400">{{ language === 'es' ? 'Aún no tienes trucos aprendidos' : 'No skills learned yet' }}</p>
-          <p class="text-sm text-gray-500 mt-2">{{ language === 'es' ? 'Tus coaches marcarán tu progreso' : 'Your coaches will mark your progress' }}</p>
-        </div>
-        
-        <div v-else v-for="item in progress" :key="item.id" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-glass-green flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-              </svg>
-            </div>
-            <div class="flex-1">
-              <h4 class="font-bold text-white">{{ language === 'es' ? item.skill?.name_es || item.skill?.name : item.skill?.name }}</h4>
-              <p class="text-sm text-gray-400">{{ formatBookingDate(item.learned_at) }}</p>
-            </div>
-            <div class="flex gap-1">
-              <span v-for="i in 5" :key="i" class="text-sm" :class="i <= item.proficiency ? 'text-gold-400' : 'text-gray-600'">★</span>
-            </div>
-          </div>
-        </div>
-        
-        <NuxtLink 
-          to="/user/progress" 
-          class="block text-center py-3 text-gold-400 font-semibold"
-        >
-          {{ language === 'es' ? 'Ver todo mi progreso →' : 'View all my progress →' }}
-        </NuxtLink>
-      </div>
+      </template>
 
       <!-- Logout Button -->
       <button

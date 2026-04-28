@@ -2,6 +2,8 @@
 
 A mobile-first app for managing skateboard classes, coach schedules, and equipment sales. Built with Nuxt 3, Supabase, and Capacitor.
 
+**Release:** version is in [`VERSION`](VERSION); release notes in [`CHANGELOG.md`](CHANGELOG.md). Setup, deploy, and security: [`SETUP_GUIDE.md`](SETUP_GUIDE.md).
+
 ## Features
 
 ### 🛹 Student Dashboard (Skater Card)
@@ -244,11 +246,9 @@ npm run cap:open:ios     # or cap:open:android
 3. Make your changes
 4. Submit a pull request
 
-## Local Sync Workflow
+## Local workflow
 
-If you edit in `C:\Scheduling` but commit from a different OneDrive Git repo path, use:
-
-- `SYNC_C_TO_ONEDRIVE_GIT.md`
+Work in your Git clone, then commit and push (GitHub Desktop or `git`). Vercel deploys from the repo.
 
 ## License
 

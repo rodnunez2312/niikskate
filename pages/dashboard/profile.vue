@@ -68,39 +68,72 @@ const handleLogout = async () => {
   router.push('/')
 }
 
-const menuItems = computed(() => {
-  const items: Array<{
-    icon: string
-    label: string
-    path: string
-    description: string
-    disabled?: boolean
-  }> = [
+type MenuRow =
+  | {
+      kind: 'link'
+      icon: string
+      label: string
+      path: string
+      description: string
+      disabled?: boolean
+    }
+  | {
+      kind: 'group'
+      key: string
+      title: string
+      children: Array<{
+        icon: string
+        label: string
+        path: string
+        description: string
+      }>
+    }
+
+const menuItems = computed((): MenuRow[] => {
+  const items: MenuRow[] = [
     {
+      kind: 'link',
       icon: '⚙️',
       label: language.value === 'es' ? 'Panel de Admin' : 'Admin Panel',
       path: '/admin',
       description: language.value === 'es' ? 'Gestión completa del sistema' : 'Full system management',
     },
     {
+      kind: 'link',
       icon: '🛹',
       label: language.value === 'es' ? 'Patinadores' : 'Skaters',
       path: '/admin/users',
       description: language.value === 'es' ? 'Niveles, programas y horarios' : 'Levels, programs, and schedules',
     },
     {
+      kind: 'link',
       icon: '✅',
       label: language.value === 'es' ? 'Aprobaciones' : 'Approvals',
       path: '/admin/registrations',
       description: language.value === 'es' ? 'Solicitudes pendientes' : 'Pending requests',
     },
     {
-      icon: '💰',
-      label: language.value === 'es' ? 'Pagos' : 'Payments',
-      path: '/admin/payments',
-      description: language.value === 'es' ? 'Ver y registrar pagos' : 'View and record payments',
+      kind: 'group',
+      key: 'payments-tienda',
+      title: language.value === 'es' ? 'Pagos y tienda' : 'Payments & store',
+      children: [
+        {
+          icon: '💰',
+          label: language.value === 'es' ? 'Pagos' : 'Payments',
+          path: '/admin/payments',
+          description: language.value === 'es' ? 'Ver y registrar pagos' : 'View and record payments',
+        },
+        {
+          icon: '🛒',
+          label: language.value === 'es' ? 'Tienda' : 'Store',
+          path: '/dashboard/store',
+          description:
+            language.value === 'es' ? 'Inventario, ventas y catálogo POS' : 'Inventory, sales & POS catalog',
+        },
+      ],
     },
     {
+      kind: 'link',
       icon: '📊',
       label: language.value === 'es' ? 'Reportes' : 'Reports',
       path: '/admin/reports',
@@ -108,6 +141,7 @@ const menuItems = computed(() => {
       disabled: true,
     },
     {
+      kind: 'link',
       icon: '❓',
       label: language.value === 'es' ? 'Ayuda y Soporte' : 'Help & Support',
       path: '/support',
@@ -118,6 +152,7 @@ const menuItems = computed(() => {
 
   if (profile.value?.role === 'admin') {
     items.splice(2, 0, {
+      kind: 'link',
       icon: '📅',
       label: language.value === 'es' ? 'Calendario escolar' : 'School calendar',
       path: '/admin/calendar',
@@ -325,28 +360,52 @@ const isCoachOrAdmin = computed(() => {
         </svg>
       </button>
 
-      <!-- Menu Items -->
+      <!-- Menu Items (Tienda is grouped with Pagos — see Payments & store card) -->
       <div class="mt-6 space-y-2">
-        <NuxtLink
-          v-for="item in menuItems"
-          :key="item.path"
-          :to="item.disabled ? '#' : item.path"
-          class="bg-gray-900/95 border border-gray-800 rounded-xl p-4 flex items-center gap-4 backdrop-blur-sm"
-          :class="{ 'opacity-50 cursor-not-allowed': item.disabled }"
-          @click.prevent="item.disabled && null"
-        >
-          <span class="text-2xl">{{ item.icon }}</span>
-          <div class="flex-1">
-            <p class="font-semibold text-white">{{ item.label }}</p>
-            <p class="text-xs text-gray-500">{{ item.description }}</p>
+        <template v-for="item in menuItems" :key="item.kind === 'group' ? item.key : item.path">
+          <div
+            v-if="item.kind === 'group'"
+            class="bg-gray-900/95 border border-gray-800 rounded-xl overflow-hidden backdrop-blur-sm divide-y divide-gray-800/80"
+          >
+            <p class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+              {{ item.title }}
+            </p>
+            <NuxtLink
+              v-for="sub in item.children"
+              :key="sub.path"
+              :to="sub.path"
+              class="p-4 flex items-center gap-4 hover:bg-gray-800/50 transition-colors"
+            >
+              <span class="text-2xl">{{ sub.icon }}</span>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-white">{{ sub.label }}</p>
+                <p class="text-xs text-gray-500">{{ sub.description }}</p>
+              </div>
+              <svg class="w-5 h-5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </NuxtLink>
           </div>
-          <span v-if="item.disabled" class="text-xs text-gray-500">
-            {{ language === 'es' ? 'Próximamente' : 'Soon' }}
-          </span>
-          <svg v-else class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-        </NuxtLink>
+          <NuxtLink
+            v-else
+            :to="item.disabled ? '#' : item.path"
+            class="bg-gray-900/95 border border-gray-800 rounded-xl p-4 flex items-center gap-4 backdrop-blur-sm"
+            :class="{ 'opacity-50 cursor-not-allowed': item.disabled }"
+            @click.prevent="item.disabled && null"
+          >
+            <span class="text-2xl">{{ item.icon }}</span>
+            <div class="flex-1">
+              <p class="font-semibold text-white">{{ item.label }}</p>
+              <p class="text-xs text-gray-500">{{ item.description }}</p>
+            </div>
+            <span v-if="item.disabled" class="text-xs text-gray-500">
+              {{ language === 'es' ? 'Próximamente' : 'Soon' }}
+            </span>
+            <svg v-else class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </NuxtLink>
+        </template>
       </div>
 
       <!-- Switch to Customer View -->

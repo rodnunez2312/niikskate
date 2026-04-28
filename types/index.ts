@@ -6,6 +6,12 @@ export interface User {
   id: string
   email: string
   full_name: string
+  /** Roster / display split (optional until backfilled). */
+  first_name?: string | null
+  last_name?: string | null
+  date_of_birth?: string | null
+  /** Years; may be null when unknown or prefer DOB-derived age in UI. */
+  age?: number | null
   avatar_url?: string
   role: UserRole
   phone?: string
@@ -587,6 +593,45 @@ export interface NewsEvent {
   updated_at: string
 }
 
+/** Home news “Instagram-style” story strip (news + optional Meta API) */
+export type SocialStorySource = 'news' | 'instagram' | 'facebook'
+
+export interface SocialStorySlide {
+  id: string
+  source: SocialStorySource
+  mediaType: 'image' | 'video'
+  mediaUrl: string
+  thumbnailUrl?: string | null
+  title: string
+  caption?: string | null
+  permalink?: string | null
+  at: number
+}
+
+/** Response from GET /api/social/meta-feed (Instagram + Facebook Graph when env is set) */
+export interface MetaInstagramFeedItem {
+  id: string
+  mediaType: 'video' | 'image'
+  mediaUrl: string
+  thumbnailUrl: string | null
+  permalink: string
+  caption: string | null
+  timestamp: string
+}
+
+export interface MetaFacebookFeedItem {
+  id: string
+  imageUrl: string
+  permalink: string
+  message: string | null
+  createdTime: string
+}
+
+export interface MetaFeedResponse {
+  instagram: MetaInstagramFeedItem[]
+  facebook: MetaFacebookFeedItem[]
+}
+
 // =====================================================
 // DASHBOARD STATS TYPES
 // =====================================================
@@ -643,6 +688,9 @@ export type CreditStatus =
   | 'expired'
   | 'cancelled'
 
+/** Admin pipeline for class_reservations (calendar colors on profile) */
+export type ReservationWorkflow = 'requested' | 'admin_confirmed'
+
 export interface UserCredit {
   id: string
   user_id: string
@@ -672,6 +720,7 @@ export interface ClassReservation {
   time_slot: TimeSlot
   class_type?: ClassType
   status: CreditStatus
+  workflow_status?: ReservationWorkflow
   equipment_rental?: string[]
   coach_id?: string
   coach?: User

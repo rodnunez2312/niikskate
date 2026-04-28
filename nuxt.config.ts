@@ -68,6 +68,12 @@ export default defineNuxtConfig({
     twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
     twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM || '',
+    /** Meta Graph: Instagram Business media (optional; see server/api/social/meta-feed.get.ts) */
+    metaInstagramUserToken: process.env.META_INSTAGRAM_USER_TOKEN || '',
+    metaInstagramBusinessId: process.env.META_INSTAGRAM_BUSINESS_ID || '',
+    /** Meta Graph: Facebook Page feed with full_picture (optional) */
+    metaFacebookPageToken: process.env.META_FACEBOOK_PAGE_TOKEN || '',
+    metaFacebookPageId: process.env.META_FACEBOOK_PAGE_ID || '',
   },
 
   // SSR configuration - disable for Capacitor mobile builds

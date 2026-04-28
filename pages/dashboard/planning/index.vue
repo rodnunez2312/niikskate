@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { format, addDays, isTuesday, isThursday, isSaturday } from 'date-fns'
 import { es } from 'date-fns/locale'
+import classPlanningData from '~/data/class-planning.json'
+
+definePageMeta({
+  middleware: ['auth'],
+})
 
 const client = useSupabaseClient()
 const user = useSupabaseUser()
@@ -23,6 +28,55 @@ const plan = ref({
   main_activity_notes: '',
   planned_skills: [] as string[]
 })
+
+type WarmupExerciseRow = {
+  id: number
+  name: string
+  name_en?: string
+  strength_training?: boolean
+  skills?: string[]
+}
+
+const allWarmupExercises = classPlanningData.warmup_exercises as WarmupExerciseRow[]
+const strengthWarmupExercises = computed(() => allWarmupExercises.filter(e => e.strength_training === true))
+const selectedStrengthWarmupIds = ref<number[]>([])
+
+function warmupExerciseLabel(e: WarmupExerciseRow) {
+  return language.value === 'es' ? e.name : (e.name_en || e.name)
+}
+
+function syncWarmupNotesFromSelection() {
+  const list = strengthWarmupExercises.value
+    .filter(e => selectedStrengthWarmupIds.value.includes(e.id))
+    .sort((a, b) => a.id - b.id)
+  plan.value.warmup_notes = list.map(e => warmupExerciseLabel(e)).join('\n')
+}
+
+function parseWarmupNotesToSelection(notes: string) {
+  if (!notes?.trim()) {
+    selectedStrengthWarmupIds.value = []
+    return
+  }
+  const norm = (s: string) => s.trim().toLowerCase()
+  const lines = notes.split('\n').map(l => l.trim()).filter(Boolean)
+  const ids: number[] = []
+  for (const line of lines) {
+    const ex = allWarmupExercises.find(
+      e =>
+        e.strength_training &&
+        (norm(e.name) === norm(line) || (e.name_en && norm(e.name_en) === norm(line))),
+    )
+    if (ex && !ids.includes(ex.id)) ids.push(ex.id)
+  }
+  selectedStrengthWarmupIds.value = ids
+}
+
+function toggleStrengthWarmup(id: number) {
+  const i = selectedStrengthWarmupIds.value.indexOf(id)
+  if (i >= 0) selectedStrengthWarmupIds.value.splice(i, 1)
+  else selectedStrengthWarmupIds.value.push(id)
+  syncWarmupNotesFromSelection()
+}
 
 // Current user role (admin-only: sync from Excel)
 const userRole = ref<'admin' | 'coach' | 'customer' | null>(null)
@@ -88,6 +142,16 @@ const PROGRAM_COLORS = [
   { value: '#db2777', label: 'Pink' },
 ]
 
+/** Program coach picker: Rodrigo is included via coachDirectory; exclude admin-only ops (e.g. Marina Reyes). */
+const PROGRAM_COACH_EXCLUDE_EMAILS = new Set(
+  ADMIN_ONLY_EXCLUDE_FROM_PROGRAM_COACH_EMAILS.map((e) => e.trim().toLowerCase()),
+)
+function isEligibleProgramCoach(p: { email?: string | null }) {
+  const e = (p.email || '').trim().toLowerCase()
+  if (e && PROGRAM_COACH_EXCLUDE_EMAILS.has(e)) return false
+  return true
+}
+
 // Edit Program modal
 const showEditProgramModal = ref(false)
 const editProgramId = ref<string | null>(null)
@@ -145,6 +209,180 @@ const saveEditProgram = async () => {
 
 const allCoaches = ref<Array<{ id: string; full_name: string; email?: string }>>([])
 const allStudents = ref<Array<{ id: string; full_name: string; email?: string }>>([])
+
+// Admin: assign athletes to a program (program_students)
+const showAssignAthletesModal = ref(false)
+const assignAthletesProgramId = ref<string | null>(null)
+const assignAthletesProgramName = ref('')
+const assignAthleteSearch = ref('')
+const assigningAthleteId = ref<string | null>(null)
+const removingAthleteId = ref<string | null>(null)
+
+const programNameByStudentId = computed(() => {
+  const m: Record<string, string> = {}
+  for (const p of programsList.value) {
+    for (const s of p.students) {
+      m[s.id] = p.name
+    }
+  }
+  return m
+})
+
+const openAssignAthletesModal = (prog: { id: string; name: string }) => {
+  assignAthletesProgramId.value = prog.id
+  assignAthletesProgramName.value = prog.name
+  assignAthleteSearch.value = ''
+  showAssignAthletesModal.value = true
+}
+const closeAssignAthletesModal = () => {
+  showAssignAthletesModal.value = false
+  assignAthletesProgramId.value = null
+  assignAthletesProgramName.value = ''
+  assignAthleteSearch.value = ''
+}
+
+const assignModalStudents = computed(() => {
+  const pid = assignAthletesProgramId.value
+  if (!pid) return []
+  const prog = programsList.value.find((p) => p.id === pid)
+  const inThis = new Set((prog?.students || []).map((s) => s.id))
+  const q = assignAthleteSearch.value.trim().toLowerCase()
+  return allStudents.value
+    .filter((s) => !inThis.has(s.id))
+    .filter(
+      (s) =>
+        !q ||
+        (s.full_name || '').toLowerCase().includes(q) ||
+        (s.email || '').toLowerCase().includes(q)
+    )
+})
+
+const addStudentToProgram = async (studentId: string) => {
+  if (userRole.value !== 'admin' || !assignAthletesProgramId.value) return
+  assigningAthleteId.value = studentId
+  try {
+    await client.from('program_students').delete().eq('student_id', studentId)
+    const { error } = await client.from('program_students').insert({
+      program_id: assignAthletesProgramId.value,
+      student_id: studentId,
+    })
+    if (error) throw error
+    await fetchPrograms()
+  } catch (e: any) {
+    console.error('addStudentToProgram:', e)
+    alert(e?.message || (language.value === 'es' ? 'No se pudo asignar' : 'Could not assign'))
+  } finally {
+    assigningAthleteId.value = null
+  }
+}
+
+const removeStudentFromProgram = async (programId: string, studentId: string) => {
+  if (userRole.value !== 'admin') return
+  removingAthleteId.value = studentId
+  try {
+    const { error } = await client
+      .from('program_students')
+      .delete()
+      .eq('program_id', programId)
+      .eq('student_id', studentId)
+    if (error) throw error
+    await fetchPrograms()
+  } catch (e: any) {
+    console.error('removeStudentFromProgram:', e)
+    alert(e?.message || (language.value === 'es' ? 'No se pudo quitar' : 'Could not remove'))
+  } finally {
+    removingAthleteId.value = null
+  }
+}
+
+/** Coaches may appear in several programs; RLS allows coach + admin to edit program_coaches */
+const canManageProgramCoaches = computed(
+  () => userRole.value === 'admin' || userRole.value === 'coach'
+)
+
+const showAssignCoachesModal = ref(false)
+const assignCoachesProgramId = ref<string | null>(null)
+const assignCoachesProgramName = ref('')
+const assignCoachSearch = ref('')
+const assigningCoachId = ref<string | null>(null)
+const removingCoachId = ref<string | null>(null)
+
+const programNamesByCoachId = computed(() => {
+  const m: Record<string, string[]> = {}
+  for (const p of programsList.value) {
+    for (const c of p.coaches) {
+      if (!m[c.id]) m[c.id] = []
+      m[c.id].push(p.name)
+    }
+  }
+  return m
+})
+
+const openAssignCoachesModal = (prog: { id: string; name: string }) => {
+  assignCoachesProgramId.value = prog.id
+  assignCoachesProgramName.value = prog.name
+  assignCoachSearch.value = ''
+  showAssignCoachesModal.value = true
+}
+const closeAssignCoachesModal = () => {
+  showAssignCoachesModal.value = false
+  assignCoachesProgramId.value = null
+  assignCoachesProgramName.value = ''
+  assignCoachSearch.value = ''
+}
+
+const assignModalCoaches = computed(() => {
+  const pid = assignCoachesProgramId.value
+  if (!pid) return []
+  const prog = programsList.value.find((p) => p.id === pid)
+  const inThis = new Set((prog?.coaches || []).map((c) => c.id))
+  const q = assignCoachSearch.value.trim().toLowerCase()
+  return allCoaches.value
+    .filter((c) => !inThis.has(c.id))
+    .filter(
+      (c) =>
+        !q ||
+        (c.full_name || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q)
+    )
+})
+
+const addCoachToProgram = async (coachId: string) => {
+  if (!canManageProgramCoaches.value || !assignCoachesProgramId.value) return
+  assigningCoachId.value = coachId
+  try {
+    const { error } = await client.from('program_coaches').insert({
+      program_id: assignCoachesProgramId.value,
+      coach_id: coachId,
+    })
+    if (error) throw error
+    await fetchPrograms()
+  } catch (e: any) {
+    console.error('addCoachToProgram:', e)
+    alert(e?.message || (language.value === 'es' ? 'No se pudo asignar' : 'Could not assign'))
+  } finally {
+    assigningCoachId.value = null
+  }
+}
+
+const removeCoachFromProgram = async (programId: string, coachId: string) => {
+  if (!canManageProgramCoaches.value) return
+  removingCoachId.value = coachId
+  try {
+    const { error } = await client
+      .from('program_coaches')
+      .delete()
+      .eq('program_id', programId)
+      .eq('coach_id', coachId)
+    if (error) throw error
+    await fetchPrograms()
+  } catch (e: any) {
+    console.error('removeCoachFromProgram:', e)
+    alert(e?.message || (language.value === 'es' ? 'No se pudo quitar' : 'Could not remove'))
+  } finally {
+    removingCoachId.value = null
+  }
+}
 
 // Program Schedule modal (clock icon)
 const showScheduleModal = ref(false)
@@ -207,7 +445,7 @@ const schedulePreviewText = computed(() => {
   const start = timeToDisplay(scheduleStartTime.value)
   const end = timeToDisplay(scheduleEndTime.value)
   const dayNames = scheduleDays.value.map(d => DAYS_OF_WEEK.find(x => x.value === d)).filter(Boolean) as { en: string; es: string }[]
-  const daysStr = dayNames.map(d => language === 'es' ? d.es : d.en).join(', ') || (language === 'es' ? '—' : '—')
+  const daysStr = dayNames.map(d => language.value === 'es' ? d.es : d.en).join(', ') || (language.value === 'es' ? '—' : '—')
   return { start, end, daysStr }
 })
 const saveProgramSchedule = async () => {
@@ -270,9 +508,12 @@ const fetchPrograms = async () => {
 
 const fetchAllCoachesAndStudents = async () => {
   try {
-    const { data: coaches } = await client.from('profiles').select('id, full_name, email').eq('role', 'coach').eq('is_active', true)
+    const coaches = await fetchCoachDirectoryProfiles(client, {
+      select: 'id, full_name, email',
+      activeOnly: true,
+    })
     const { data: students } = await client.from('profiles').select('id, full_name, email').eq('role', 'customer').eq('is_active', true)
-    allCoaches.value = coaches || []
+    allCoaches.value = coaches.filter(isEligibleProgramCoach)
     allStudents.value = students || []
   } catch (e) {
     console.error('Error fetching coaches/students:', e)
@@ -319,12 +560,15 @@ const createProgram = async () => {
     if (newId && newProgramCopyFromProgram.value && newProgramCopyFromProgramId.value) {
       const copyId = newProgramCopyFromProgramId.value
       const { data: coaches } = await client.from('program_coaches').select('coach_id').eq('program_id', copyId)
-      const { data: students } = await client.from('program_students').select('student_id').eq('program_id', copyId)
       if (coaches?.length) {
         await client.from('program_coaches').insert(coaches.map((c: any) => ({ program_id: newId, coach_id: c.coach_id })))
       }
-      if (students?.length) {
-        await client.from('program_students').insert(students.map((s: any) => ({ program_id: newId, student_id: s.student_id })))
+      // Copying athletes requires admin (RLS); coaches may still copy coaches only
+      if (userRole.value === 'admin') {
+        const { data: students } = await client.from('program_students').select('student_id').eq('program_id', copyId)
+        if (students?.length) {
+          await client.from('program_students').insert(students.map((s: any) => ({ program_id: newId, student_id: s.student_id })))
+        }
       }
     }
     closeCreateProgramModal()
@@ -475,6 +719,7 @@ const loadExistingPlan = async () => {
       planned_skills: []
     }
   }
+  parseWarmupNotesToSelection(plan.value.warmup_notes)
 }
 
 // Check if date is a class day
@@ -515,6 +760,7 @@ const toggleSkill = (skillId: string) => {
 const savePlan = async () => {
   saving.value = true
   try {
+    syncWarmupNotesFromSelection()
     const dateStr = format(selectedDate.value, 'yyyy-MM-dd')
     
     const { error } = await client
@@ -732,9 +978,17 @@ const categoryTagClass = (category?: string) => {
 
 // Watch session changes
 watch(selectedSession, () => loadExistingPlan())
+watch(language, () => {
+  if (selectedStrengthWarmupIds.value.length > 0) syncWarmupNotesFromSelection()
+})
 watch(activeTab, () => {
   if (activeTab.value !== 'tricks') closeTrickDetail()
 })
+
+/** Opens program resource hub (explicit navigateTo — reliable in WebView / nested routes). */
+function goProgramResourceHub() {
+  void navigateTo('/dashboard/planning/programs')
+}
 </script>
 
 <template>
@@ -778,11 +1032,38 @@ watch(activeTab, () => {
       <div v-if="activeTab === 'programs'">
         <!-- Stat cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-            <span class="text-2xl block mb-1">⚙️</span>
+          <button
+            type="button"
+            class="w-full bg-gray-900 border border-gray-800 rounded-xl p-4 text-center block hover:border-gold-500/50 hover:bg-gray-800/50 transition-colors focus:outline-none focus:ring-2 focus:ring-gold-500/50 cursor-pointer"
+            :title="language === 'es' ? 'Centro de recursos del programa' : 'Open program resource hub'"
+            :aria-label="language === 'es' ? 'Abrir centro de programas' : 'Open program resource hub'"
+            @click="goProgramResourceHub"
+          >
+            <span class="w-7 h-7 block mx-auto mb-1 text-gray-200">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M4.5 12.75c1.35 2.4 4.05 3.75 7.5 3.75s6.15-1.35 7.5-3.75"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M5.25 11.25h13.5a.75.75 0 01.53 1.28l-1.06 1.06a.75.75 0 01-.53.22H6.11a.75.75 0 01-.53-.22l-1.06-1.06a.75.75 0 01.53-1.28z"
+                />
+                <circle cx="7.75" cy="16.25" r="1.35" fill="none" stroke="currentColor" stroke-width="1.5" />
+                <circle cx="16.25" cy="16.25" r="1.35" fill="none" stroke="currentColor" stroke-width="1.5" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 9.75L5.25 7.5M17.25 9.75l1.5-2.25" />
+              </svg>
+            </span>
             <p class="text-2xl font-bold text-white">{{ programStats.totalPrograms }}</p>
             <p class="text-xs text-gray-400">{{ language === 'es' ? 'Programas' : 'Total Programs' }}</p>
-          </div>
+            <p class="text-[10px] text-gold-500/80 mt-1">
+              {{ language === 'es' ? 'Toca el centro' : 'Tap to open' }}
+            </p>
+          </button>
           <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
             <span class="text-2xl block mb-1">👤</span>
             <p class="text-2xl font-bold text-white">{{ programStats.totalCoaches }}</p>
@@ -874,9 +1155,19 @@ watch(activeTab, () => {
             <div v-if="expandedProgramId === prog.id" class="border-t border-gray-800 px-4 pb-4 pt-2">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h4 class="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-1">
-                    <span>👤</span> {{ language === 'es' ? 'Coaches' : 'Coaches' }} ({{ prog.coaches.length }})
-                  </h4>
+                  <div class="flex items-start justify-between gap-2 mb-2">
+                    <h4 class="text-sm font-semibold text-gray-300 flex items-center gap-1">
+                      <span>👤</span> {{ language === 'es' ? 'Coaches' : 'Coaches' }} ({{ prog.coaches.length }})
+                    </h4>
+                    <button
+                      v-if="canManageProgramCoaches"
+                      type="button"
+                      class="shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-gold-500/20 text-gold-400 border border-gold-500/40 hover:bg-gold-500/30 transition-colors"
+                      @click.stop="openAssignCoachesModal(prog)"
+                    >
+                      + {{ language === 'es' ? 'Asignar' : 'Assign' }}
+                    </button>
+                  </div>
                   <div v-if="prog.coaches.length === 0" class="text-sm text-gray-500">
                     {{ language === 'es' ? 'Sin coaches asignados' : 'No coaches assigned' }}
                   </div>
@@ -893,16 +1184,39 @@ watch(activeTab, () => {
                         <p class="text-white text-sm font-medium truncate">{{ c.full_name }}</p>
                         <p class="text-xs text-gray-500">coach</p>
                       </div>
-                      <NuxtLink :to="`/dashboard/students`" class="text-sm text-blue-400 hover:underline">
-                        {{ language === 'es' ? 'Gestionar' : 'Manage' }}
-                      </NuxtLink>
+                      <button
+                        v-if="canManageProgramCoaches"
+                        type="button"
+                        class="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-700/80 transition-colors disabled:opacity-40"
+                        :disabled="removingCoachId === c.id"
+                        :title="language === 'es' ? 'Quitar del programa' : 'Remove from program'"
+                        @click.stop="removeCoachFromProgram(prog.id, c.id)"
+                      >
+                        <svg v-if="removingCoachId !== c.id" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span v-else class="inline-block w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                      </button>
                     </div>
                   </div>
                 </div>
                 <div>
-                  <h4 class="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-1">
-                    <span>👥</span> {{ language === 'es' ? 'Atletas' : 'Athletes' }} ({{ prog.students.length }})
-                  </h4>
+                  <div class="flex items-start justify-between gap-2 mb-2">
+                    <h4 class="text-sm font-semibold text-gray-300 flex items-center gap-1">
+                      <span>👥</span> {{ language === 'es' ? 'Atletas' : 'Athletes' }} ({{ prog.students.length }})
+                    </h4>
+                    <button
+                      v-if="userRole === 'admin'"
+                      type="button"
+                      class="shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-gold-500/20 text-gold-400 border border-gold-500/40 hover:bg-gold-500/30 transition-colors"
+                      @click.stop="openAssignAthletesModal(prog)"
+                    >
+                      + {{ language === 'es' ? 'Asignar' : 'Assign' }}
+                    </button>
+                  </div>
+                  <p v-if="userRole === 'coach'" class="text-[11px] text-gray-600 mb-2">
+                    {{ language === 'es' ? 'Solo un administrador puede asignar atletas a un programa.' : 'Only an administrator can assign athletes to a program.' }}
+                  </p>
                   <div v-if="prog.students.length === 0" class="text-sm text-gray-500">
                     {{ language === 'es' ? 'Sin atletas asignados' : 'No athletes assigned' }}
                   </div>
@@ -916,6 +1230,19 @@ watch(activeTab, () => {
                         {{ initials(s.full_name) }}
                       </div>
                       <p class="flex-1 text-white text-sm font-medium truncate">{{ s.full_name }}</p>
+                      <button
+                        v-if="userRole === 'admin'"
+                        type="button"
+                        class="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-700/80 transition-colors disabled:opacity-40"
+                        :disabled="removingAthleteId === s.id"
+                        :title="language === 'es' ? 'Quitar del programa' : 'Remove from program'"
+                        @click.stop="removeStudentFromProgram(prog.id, s.id)"
+                      >
+                        <svg v-if="removingAthleteId !== s.id" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span v-else class="inline-block w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -923,6 +1250,162 @@ watch(activeTab, () => {
             </div>
           </div>
         </div>
+
+        <!-- Assign coaches (coach + admin; program_coaches RLS) -->
+        <Teleport to="body">
+          <div
+            v-if="showAssignCoachesModal"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            @click.self="closeAssignCoachesModal"
+          >
+            <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col">
+              <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                <div>
+                  <h3 class="text-lg font-bold text-white">
+                    {{ language === 'es' ? 'Asignar coaches' : 'Assign coaches' }}
+                  </h3>
+                  <p class="text-xs text-gray-500 mt-0.5 truncate max-w-[240px]">{{ assignCoachesProgramName }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                  aria-label="Close"
+                  @click="closeAssignCoachesModal"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div class="p-4 border-b border-gray-800 shrink-0">
+                <input
+                  v-model="assignCoachSearch"
+                  type="search"
+                  :placeholder="language === 'es' ? 'Buscar por nombre o correo…' : 'Search by name or email…'"
+                  class="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 text-sm"
+                />
+              </div>
+              <div class="flex-1 overflow-y-auto p-2 min-h-[120px] max-h-[50vh]">
+                <p v-if="assignModalCoaches.length === 0" class="text-sm text-gray-500 text-center py-8 px-4">
+                  {{
+                    language === 'es'
+                      ? 'No hay coaches para agregar (todos ya están en este programa).'
+                      : 'No coaches to add (everyone is already in this program).'
+                  }}
+                </p>
+                <div v-else class="space-y-1">
+                  <div
+                    v-for="c in assignModalCoaches"
+                    :key="c.id"
+                    class="flex items-center gap-3 p-3 rounded-xl bg-gray-800/60 border border-gray-800"
+                  >
+                    <div class="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      {{ initials(c.full_name) }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-white text-sm font-medium truncate">{{ c.full_name }}</p>
+                      <p v-if="c.email" class="text-xs text-gray-500 truncate">{{ c.email }}</p>
+                      <p
+                        v-if="(programNamesByCoachId[c.id] || []).length > 0"
+                        class="text-[10px] text-amber-500/90 mt-0.5"
+                      >
+                        {{
+                          language === 'es'
+                            ? 'También en: ' + programNamesByCoachId[c.id].join(', ')
+                            : 'Also in: ' + programNamesByCoachId[c.id].join(', ')
+                        }}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gold-500/20 text-gold-400 border border-gold-500/40 hover:bg-gold-500/30 disabled:opacity-40"
+                      :disabled="assigningCoachId === c.id"
+                      @click="addCoachToProgram(c.id)"
+                    >
+                      {{ assigningCoachId === c.id ? '…' : language === 'es' ? 'Agregar' : 'Add' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Teleport>
+
+        <!-- Assign athletes (admin only) -->
+        <Teleport to="body">
+          <div
+            v-if="showAssignAthletesModal"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            @click.self="closeAssignAthletesModal"
+          >
+            <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col">
+              <div class="flex items-center justify-between p-4 border-b border-gray-800 shrink-0">
+                <div>
+                  <h3 class="text-lg font-bold text-white">
+                    {{ language === 'es' ? 'Asignar atletas' : 'Assign athletes' }}
+                  </h3>
+                  <p class="text-xs text-gray-500 mt-0.5 truncate max-w-[240px]">{{ assignAthletesProgramName }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                  aria-label="Close"
+                  @click="closeAssignAthletesModal"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div class="p-4 border-b border-gray-800 shrink-0">
+                <input
+                  v-model="assignAthleteSearch"
+                  type="search"
+                  :placeholder="language === 'es' ? 'Buscar por nombre o correo…' : 'Search by name or email…'"
+                  class="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 text-sm"
+                />
+              </div>
+              <div class="flex-1 overflow-y-auto p-2 min-h-[120px] max-h-[50vh]">
+                <p v-if="assignModalStudents.length === 0" class="text-sm text-gray-500 text-center py-8 px-4">
+                  {{
+                    language === 'es'
+                      ? 'No hay patinadores para agregar (todos ya están en este programa).'
+                      : 'No skaters to add (everyone is already in this program).'
+                  }}
+                </p>
+                <div v-else class="space-y-1">
+                  <div
+                    v-for="s in assignModalStudents"
+                    :key="s.id"
+                    class="flex items-center gap-3 p-3 rounded-xl bg-gray-800/60 border border-gray-800"
+                  >
+                    <div class="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      {{ initials(s.full_name) }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-white text-sm font-medium truncate">{{ s.full_name }}</p>
+                      <p v-if="s.email" class="text-xs text-gray-500 truncate">{{ s.email }}</p>
+                      <p
+                        v-if="programNameByStudentId[s.id]"
+                        class="text-[10px] text-amber-500/90 mt-0.5"
+                      >
+                        {{ language === 'es' ? 'En' : 'In' }}: {{ programNameByStudentId[s.id] }}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gold-500/20 text-gold-400 border border-gold-500/40 hover:bg-gold-500/30 disabled:opacity-40"
+                      :disabled="assigningAthleteId === s.id"
+                      @click="addStudentToProgram(s.id)"
+                    >
+                      {{ assigningAthleteId === s.id ? '…' : language === 'es' ? 'Agregar' : 'Add' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Teleport>
 
         <!-- Create New Program Modal -->
         <Teleport to="body">
@@ -1014,7 +1497,12 @@ watch(activeTab, () => {
                     </span>
                   </label>
                   <p class="text-xs text-gray-500 ml-7">
-                    {{ language === 'es' ? 'Copia coaches y atletas asignados del programa seleccionado.' : 'Copies assigned coaches and athletes from the selected program.' }}
+                    <template v-if="userRole === 'admin'">
+                      {{ language === 'es' ? 'Copia coaches y atletas del programa seleccionado.' : 'Copies assigned coaches and athletes from the selected program.' }}
+                    </template>
+                    <template v-else>
+                      {{ language === 'es' ? 'Copia coaches del programa seleccionado (los atletas solo los asigna un admin).' : 'Copies coaches from the selected program (only admins assign athletes).' }}
+                    </template>
                   </p>
                   <select
                     v-if="newProgramCopyFromProgram"
@@ -1349,17 +1837,60 @@ watch(activeTab, () => {
             />
           </div>
 
-          <!-- Warmup -->
+          <!-- Warmup: strength training exercises only (from class-planning.json) -->
           <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <label class="block text-sm text-gray-400 mb-2">
-              🔥 {{ language === 'es' ? 'Calentamiento' : 'Warmup' }}
+            <label class="block text-sm text-gray-400 mb-1">
+              💪 {{ language === 'es' ? 'Calentamiento (fuerza)' : 'Warmup (strength)' }}
             </label>
-            <textarea
-              v-model="plan.warmup_notes"
-              rows="3"
-              :placeholder="language === 'es' ? 'Ejercicios de calentamiento...' : 'Warmup exercises...'"
-              class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500"
-            ></textarea>
+            <p class="text-xs text-gray-600 mb-3">
+              {{
+                language === 'es'
+                  ? 'Solo ejercicios de entrenamiento de fuerza; el plan guarda los nombres elegidos.'
+                  : 'Strength training exercises only; the saved plan stores the names you pick.'
+              }}
+            </p>
+            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <button
+                v-for="exercise in strengthWarmupExercises"
+                :key="exercise.id"
+                type="button"
+                class="w-full p-3 rounded-lg flex items-center gap-3 transition-all text-left"
+                :class="selectedStrengthWarmupIds.includes(exercise.id)
+                  ? 'bg-glass-green/20 border border-glass-green/50'
+                  : 'bg-gray-800 border border-gray-700 hover:border-gray-600'"
+                @click="toggleStrengthWarmup(exercise.id)"
+              >
+                <div
+                  class="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+                  :class="selectedStrengthWarmupIds.includes(exercise.id) ? 'bg-glass-green' : 'bg-gray-700'"
+                >
+                  <svg
+                    v-if="selectedStrengthWarmupIds.includes(exercise.id)"
+                    class="w-4 h-4 text-white"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <span v-else class="text-xs text-gray-400">{{ exercise.id }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p
+                    class="text-sm font-medium truncate"
+                    :class="selectedStrengthWarmupIds.includes(exercise.id) ? 'text-white' : 'text-gray-300'"
+                  >
+                    {{ language === 'es' ? exercise.name : (exercise.name_en || exercise.name) }}
+                  </p>
+                  <p v-if="exercise.skills?.length" class="text-xs text-gray-500 truncate">
+                    {{ exercise.skills.join(', ') }}
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
 
           <!-- Selected Tricks -->

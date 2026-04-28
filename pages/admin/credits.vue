@@ -18,7 +18,76 @@ const loading = ref(true)
 const rows = ref<UserCredit[]>([])
 const profilesById = ref<Record<string, { full_name: string | null; email: string | null }>>({})
 const processingId = ref<string | null>(null)
+const processingWorkflowId = ref<string | null>(null)
 const loadError = ref<string | null>(null)
+
+type PendingWorkflowReservation = {
+  id: string
+  user_id: string
+  reservation_date: string
+  time_slot: string | null
+  status: string
+  credit_id: string | null
+}
+
+const pendingWorkflowReservations = ref<PendingWorkflowReservation[]>([])
+const workflowProfilesById = ref<Record<string, { full_name: string | null; email: string | null }>>({})
+
+const loadPendingWorkflow = async () => {
+  try {
+    const { data, error } = await client
+      .from('class_reservations')
+      .select('id, user_id, reservation_date, time_slot, status, credit_id')
+      .eq('workflow_status', 'requested')
+      .neq('status', 'cancelled')
+      .order('reservation_date', { ascending: true })
+
+    if (error) throw error
+    pendingWorkflowReservations.value = (data || []) as PendingWorkflowReservation[]
+
+    const ids = [...new Set(pendingWorkflowReservations.value.map(r => r.user_id))]
+    if (ids.length === 0) {
+      workflowProfilesById.value = {}
+      return
+    }
+    const { data: profs } = await client.from('profiles').select('id, full_name, email').in('id', ids)
+    const map: Record<string, { full_name: string | null; email: string | null }> = {}
+    profs?.forEach((p: any) => {
+      map[p.id] = { full_name: p.full_name, email: p.email }
+    })
+    workflowProfilesById.value = map
+  } catch (e) {
+    console.error('loadPendingWorkflow:', e)
+  }
+}
+
+const slotLabel = (slot: string | null) => {
+  if (slot === 'late') return language.value === 'es' ? '7:00 (tarde)' : '7:00 (late)'
+  if (slot === 'early') return language.value === 'es' ? '5:30 (temprana)' : '5:30 (early)'
+  return slot || '—'
+}
+
+const workflowSkaterLabel = (userId: string) => {
+  const p = workflowProfilesById.value[userId]
+  if (!p) return userId.slice(0, 8) + '…'
+  return p.full_name || p.email || userId
+}
+
+const confirmWorkflowSlot = async (row: PendingWorkflowReservation) => {
+  processingWorkflowId.value = row.id
+  try {
+    const { error } = await client
+      .from('class_reservations')
+      .update({ workflow_status: 'admin_confirmed' })
+      .eq('id', row.id)
+    if (error) throw error
+    await loadPendingWorkflow()
+  } catch (e) {
+    console.error('confirmWorkflowSlot:', e)
+  } finally {
+    processingWorkflowId.value = null
+  }
+}
 onMounted(async () => {
   if (!user.value) {
     router.push('/auth/login?redirect=/admin/credits')
@@ -30,7 +99,7 @@ onMounted(async () => {
     return
   }
   isAdmin.value = true
-  await Promise.all([loadPending(), loadRecentGuestBookings()])
+  await Promise.all([loadPending(), loadRecentGuestBookings(), loadPendingWorkflow()])
 })
 
 const loadPending = async () => {
@@ -291,13 +360,13 @@ const approveCredit = async (c: UserCredit) => {
     if (pendingCount > 0) {
       const { error: actErr } = await client
         .from('class_reservations')
-        .update({ status: 'pending_skater_confirm' })
+        .update({ status: 'pending_skater_confirm', workflow_status: 'admin_confirmed' })
         .eq('credit_id', c.id)
         .eq('status', 'pending_payment')
       if (actErr) throw actErr
     }
 
-    await Promise.all([loadPending(), loadRecentGuestBookings()])
+    await Promise.all([loadPending(), loadRecentGuestBookings(), loadPendingWorkflow()])
   } catch (e) {
     console.error('approve credit:', e)
   } finally {
@@ -326,7 +395,7 @@ const rejectCredit = async (c: UserCredit) => {
       .eq('id', c.id)
 
     if (error) throw error
-    await Promise.all([loadPending(), loadRecentGuestBookings()])
+    await Promise.all([loadPending(), loadRecentGuestBookings(), loadPendingWorkflow()])
   } catch (e) {
     console.error('reject credit:', e)
   } finally {
@@ -365,18 +434,7 @@ const rejectCredit = async (c: UserCredit) => {
         <div class="w-10 h-10 border-2 border-gold-400 border-t-transparent rounded-full animate-spin"></div>
       </div>
 
-      <div v-else-if="rows.length === 0" class="text-center py-8 text-gray-500 space-y-4">
-        <p>{{ language === 'es' ? 'No hay filas en user_credits pendientes.' : 'No pending user_credits rows.' }}</p>
-        <p class="text-xs text-gray-600 max-w-sm mx-auto">
-          {{
-            language === 'es'
-              ? 'Si el patinador compró pero aquí no aparece nada, el INSERT a user_credits falló (RLS). Ejecuta guest_bookings_and_credits_rls_fix.sql en Supabase.'
-              : 'If the skater checked out but nothing appears here, user_credits INSERT failed (RLS). Run guest_bookings_and_credits_rls_fix.sql in Supabase.'
-          }}
-        </p>
-      </div>
-
-      <div v-else class="space-y-4">
+      <div v-else-if="rows.length > 0" class="space-y-4">
         <div
           v-for="c in rows"
           :key="c.id"
@@ -419,6 +477,52 @@ const rejectCredit = async (c: UserCredit) => {
           </div>
         </div>
       </div>
+
+      <section v-if="!loading" class="mt-10 pt-8 border-t border-gray-800">
+        <h2 class="text-sm font-bold text-gray-400 mb-2">
+          {{ language === 'es' ? 'Cupos por confirmar (solicitud del patinador)' : 'Slots to confirm (skater request)' }}
+        </h2>
+        <p class="text-xs text-gray-600 mb-4">
+          {{
+            language === 'es'
+              ? 'Amarillo en el calendario hasta que confirmes que el horario está disponible; luego azul hasta asistencia.'
+              : 'Calendar stays yellow until you confirm the slot is available; then blue until attendance is marked.'
+          }}
+        </p>
+        <ul v-if="pendingWorkflowReservations.length" class="space-y-3 mb-2">
+          <li
+            v-for="r in pendingWorkflowReservations"
+            :key="r.id"
+            class="bg-gray-900 border border-amber-500/25 rounded-2xl p-4 space-y-2"
+          >
+            <div class="flex justify-between gap-2">
+              <div>
+                <p class="font-bold text-white">{{ workflowSkaterLabel(r.user_id) }}</p>
+                <p class="text-xs text-gray-500 truncate max-w-[220px]">
+                  {{ workflowProfilesById[r.user_id]?.email || '' }}
+                </p>
+              </div>
+              <span class="text-[10px] uppercase text-amber-400/90 shrink-0">{{ r.status }}</span>
+            </div>
+            <p class="text-sm text-gray-300">
+              {{ r.reservation_date }}
+              <span class="text-gray-500"> · </span>
+              {{ slotLabel(r.time_slot) }}
+            </p>
+            <button
+              type="button"
+              class="w-full py-3 rounded-xl bg-sky-900/50 border border-sky-500/35 text-sky-100 font-semibold text-sm disabled:opacity-50"
+              :disabled="processingWorkflowId === r.id"
+              @click="confirmWorkflowSlot(r)"
+            >
+              {{ language === 'es' ? 'Confirmar cupo disponible' : 'Confirm slot available' }}
+            </button>
+          </li>
+        </ul>
+        <p v-else class="text-xs text-gray-600">
+          {{ language === 'es' ? 'No hay solicitudes de cupo pendientes.' : 'No pending slot requests.' }}
+        </p>
+      </section>
 
       <section v-if="!loading" class="mt-10 pt-8 border-t border-gray-800">
         <h2 class="text-sm font-bold text-gray-400 mb-3">

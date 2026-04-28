@@ -16,6 +16,9 @@ interface NewsItem {
   title: string
   content: string
   excerpt: string
+  title_en?: string | null
+  content_en?: string | null
+  excerpt_en?: string | null
   image_url?: string
   category: string
   is_published: boolean
@@ -42,6 +45,9 @@ const form = ref({
   title: '',
   content: '',
   excerpt: '',
+  title_en: '',
+  content_en: '',
+  excerpt_en: '',
   image_url: '',
   category: 'general',
   is_published: false,
@@ -105,6 +111,9 @@ const openModal = (item?: NewsItem) => {
       title: item.title,
       content: item.content,
       excerpt: item.excerpt || '',
+      title_en: item.title_en || '',
+      content_en: item.content_en || '',
+      excerpt_en: item.excerpt_en || '',
       image_url: item.image_url || '',
       category: item.category,
       is_published: item.is_published,
@@ -119,6 +128,9 @@ const openModal = (item?: NewsItem) => {
       title: '',
       content: '',
       excerpt: '',
+      title_en: '',
+      content_en: '',
+      excerpt_en: '',
       image_url: '',
       category: 'general',
       is_published: false,
@@ -138,6 +150,9 @@ const saveNews = async () => {
       title: form.value.title,
       content: form.value.content,
       excerpt: form.value.excerpt || form.value.content.substring(0, 200),
+      title_en: form.value.title_en.trim() || null,
+      content_en: form.value.content_en.trim() || null,
+      excerpt_en: form.value.excerpt_en.trim() || null,
       image_url: form.value.image_url || null,
       category: form.value.category,
       is_published: form.value.is_published,
@@ -359,9 +374,16 @@ const formatDate = (date: string) => {
             </div>
 
             <form @submit.prevent="saveNews" class="space-y-4">
+              <p class="text-xs text-gray-500">
+                {{
+                  language === 'es'
+                    ? 'El idioma principal es español (título, texto, resumen). El inglés es opcional para la app en inglés.'
+                    : 'Primary language is Spanish (title, body, excerpt). English fields are optional for English users.'
+                }}
+              </p>
               <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">
-                  {{ language === 'es' ? 'Título' : 'Title' }} *
+                  {{ language === 'es' ? 'Título (español)' : 'Title (Spanish)' }} *
                 </label>
                 <input
                   v-model="form.title"
@@ -373,12 +395,57 @@ const formatDate = (date: string) => {
 
               <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">
-                  {{ language === 'es' ? 'Contenido' : 'Content' }} *
+                  {{ language === 'es' ? 'Título (inglés, opcional)' : 'Title (English, optional)' }}
+                </label>
+                <input
+                  v-model="form.title_en"
+                  type="text"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
+                  placeholder="Welcome to…"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  {{ language === 'es' ? 'Contenido (español)' : 'Content (Spanish)' }} *
                 </label>
                 <textarea
                   v-model="form.content"
                   required
                   rows="6"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none resize-none"
+                ></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  {{ language === 'es' ? 'Contenido (inglés, opcional)' : 'Content (English, optional)' }}
+                </label>
+                <textarea
+                  v-model="form.content_en"
+                  rows="6"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none resize-none"
+                ></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  {{ language === 'es' ? 'Resumen / excerpt (español, opcional)' : 'Excerpt (Spanish, optional)' }}
+                </label>
+                <textarea
+                  v-model="form.excerpt"
+                  rows="2"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none resize-none"
+                ></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  {{ language === 'es' ? 'Resumen (inglés, opcional)' : 'Excerpt (English, optional)' }}
+                </label>
+                <textarea
+                  v-model="form.excerpt_en"
+                  rows="2"
                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none resize-none"
                 ></textarea>
               </div>
