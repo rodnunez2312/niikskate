@@ -2,19 +2,10 @@
  * Admin-only: create a new user with email/password and set profile (full_name, role).
  * Requires SUPABASE_SERVICE_ROLE_KEY in .env (Dashboard → Settings → API → service_role).
  */
-import { createClient } from '@supabase/supabase-js'
+import { requireAdmin } from '~/server/utils/requireAdmin'
 
 export default defineEventHandler(async (event) => {
-  const config = useRuntimeConfig()
-  const serviceKey = config.supabaseServiceKey
-  const supabaseUrl = config.public.supabaseUrl as string
-
-  if (!serviceKey || !supabaseUrl) {
-    throw createError({
-      statusCode: 500,
-      message: 'Server missing Supabase service role configuration',
-    })
-  }
+  const { adminClient: supabase } = await requireAdmin(event)
 
   const body = await readBody(event)
   const { email, password, full_name, role, phone } = body || {}
@@ -31,17 +22,13 @@ export default defineEventHandler(async (event) => {
       message: 'Password is required (min 6 characters)',
     })
   }
-  const validRoles = ['admin', 'coach', 'customer']
+  const validRoles = ['coach', 'customer']
   if (!role || !validRoles.includes(role)) {
     throw createError({
       statusCode: 400,
-      message: 'Role must be one of: admin, coach, customer',
+      message: 'Role must be coach or customer (new admins cannot be created)',
     })
   }
-
-  const supabase = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
 
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email: email.trim(),

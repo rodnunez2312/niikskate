@@ -14,6 +14,8 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { ClassSchedule, TimeSlot, User } from '~/types'
+import { TIME_SLOT_LABELS } from '~/types'
+import { CLASS_WEEKDAY_NUMBERS, slotsForDate } from '~/utils/classSchedule'
 
 const router = useRouter()
 const { t, formatPrice, language } = useI18n()
@@ -151,13 +153,25 @@ const weekDays = computed(() => {
   return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 })
 
-const classDayNums = [2, 4, 6] // Tue, Thu, Sat
+const classDayNums = CLASS_WEEKDAY_NUMBERS
 
-// Time slot display
-const timeSlotLabels = computed(() => ({
-  early: { display: '5:30 PM - 7:00 PM', label: language.value === 'es' ? 'Sesión 1' : 'Session 1' },
-  late: { display: '7:00 PM - 8:30 PM', label: language.value === 'es' ? 'Sesión 2' : 'Session 2' },
-}))
+const timeSlotLabels = computed(() => {
+  if (!selectedDate.value) return {} as Record<string, { display: string; label: string }>
+  const es = language.value === 'es'
+  const labels: Record<string, { display: string; label: string }> = {}
+  for (const slot of slotsForDate(selectedDate.value)) {
+    labels[slot] = {
+      display: TIME_SLOT_LABELS[slot].display,
+      label:
+        slot === 'monday'
+          ? es ? 'Lunes' : 'Monday'
+          : slot === 'early'
+            ? es ? 'Sesión 1' : 'Session 1'
+            : es ? 'Sesión 2' : 'Session 2',
+    }
+  }
+  return labels
+})
 
 // Individual class options
 const individualClassOptions = computed(() => [
@@ -400,7 +414,7 @@ const formattedSelectedDate = computed(() => {
           <!-- Time Slot Selection -->
           <div class="mb-4">
             <p class="text-sm text-gray-500 mb-2">{{ t('schedule.selectTimeSlot') }}</p>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid gap-2" :class="Object.keys(timeSlotLabels).length > 1 ? 'grid-cols-2' : 'grid-cols-1'">
               <button
                 v-for="(slot, key) in timeSlotLabels"
                 :key="key"

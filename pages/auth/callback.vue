@@ -13,10 +13,10 @@ watch(user, async (newUser) => {
       return
     }
     if (data.role === 'coach' || data.role === 'admin') {
-      router.push('/dashboard')
+      router.push('/member')
       return
     }
-    router.push('/')
+    router.push('/member')
   }
 }, { immediate: true })
 

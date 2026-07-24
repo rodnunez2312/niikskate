@@ -77,11 +77,7 @@ watch(user, async (newUser) => {
         router.push(explicitRedirect)
         return
       }
-      if (role === 'coach' || role === 'admin') {
-        router.push('/dashboard')
-      } else {
-        router.push('/')
-      }
+      router.push('/member')
     } catch (e) {
       error.value = e instanceof Error ? e.message : (language.value === 'es' ? 'Error al iniciar sesión' : 'Sign-in error')
     }
@@ -94,26 +90,41 @@ const handleLogin = async () => {
 
   try {
     const email = await resolveEmailFromIdentifier(identifier.value)
-    const { error: authError } = await client.auth.signInWithPassword({
+    const { data: signInData, error: authError } = await client.auth.signInWithPassword({
       email,
       password: password.value,
     })
 
     if (authError) throw authError
 
-    const role = await ensureProfileApproved(user.value!.id)
+    const signedInId = signInData.user?.id
+    if (!signedInId) {
+      throw new Error(language.value === 'es'
+        ? 'No se pudo obtener la sesión. Vuelve a intentar.'
+        : 'Could not load session. Try again.')
+    }
+
+    const role = await ensureProfileApproved(signedInId)
     const explicitRedirect = route.query.redirect as string
     if (explicitRedirect) {
       router.push(explicitRedirect)
       return
     }
-    if (role === 'coach' || role === 'admin') {
-      router.push('/dashboard')
-    } else {
-      router.push('/')
-    }
+    router.push('/member')
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to sign in'
+    const raw = e instanceof Error ? e.message : String(e)
+    const isNetwork =
+      raw === 'Failed to fetch' ||
+      raw.includes('NetworkError') ||
+      raw.includes('Load failed')
+    if (isNetwork) {
+      error.value =
+        language.value === 'es'
+          ? 'Sin conexión al servidor de datos. Revisa tu red; en Vercel, confirma SUPABASE_URL y SUPABASE_KEY y redeploy; en Supabase, que el proyecto no esté pausado.'
+          : 'Cannot reach the data server. Check your network; on Vercel set SUPABASE_URL and SUPABASE_KEY and redeploy; in Supabase, ensure the project is not paused.'
+    } else {
+      error.value = raw || (language.value === 'es' ? 'Error al iniciar sesión' : 'Failed to sign in')
+    }
   } finally {
     loading.value = false
   }

@@ -226,7 +226,7 @@ const menuItems = computed(() => {
     items.push({
       icon: '⚙️',
       label: language.value === 'es' ? 'Panel de Admin' : 'Admin Dashboard',
-      path: '/admin',
+      path: '/member/admin/academy/dashboard',
       disabled: false,
     })
   }

@@ -15,7 +15,36 @@ Use this in the **Supabase Dashboard → SQL Editor**. Queries run there typical
 
 Most operational queries start from **`profiles`** and join to **`auth.users`** only when you need auth-only fields (e.g. `last_sign_in_at`, `email_confirmed_at`).
 
+**If you insert into `auth.users` with raw SQL** (not the Admin API), set `confirmation_token`, `email_change`, `email_change_token_new`, and `recovery_token` to `''` (empty string), not `NULL`, or password sign-in can fail with *Database error querying schema* ([auth#1940](https://github.com/supabase/auth/issues/1940)). To fix existing rows, run `supabase/scripts/fix_auth_users_null_token_columns.sql` in the SQL Editor.
+
 **Roles** (enum `user_role`): `admin`, `coach`, `customer`.
+
+### Family crew (parents + children)
+
+| Table | Purpose |
+|--------|---------|
+| `crew_members` | Skaters managed by a guardian (`guardian_user_id` → `profiles.id`). Children without their own login. |
+| `class_session_enrollments.crew_member_id` | Which crew skater is enrolled; `NULL` = account holder enrolled for self. |
+
+Run migration: `supabase/migrations/add_crew_members.sql`
+
+Run migration: `supabase/migrations/add_monday_slot_and_audience_categories.sql` (monday slot + audience columns)
+
+Run migration: `supabase/migrations/add_program_age_skill_bands.sql` (**required after monday script** — allows `tots_5_7` / `kids_7_12` / `teens_13_17` used by the admin UI)
+
+Run migration: `supabase/migrations/add_morning_slot_program_series.sql` (morning slot, program series, max 6 cap)
+
+Run migration: `supabase/migrations/add_birthday_and_class_individual.sql` (birthday events + individual class programs)
+
+Run migration: `supabase/migrations/seed_mexico_holidays_2026_2027.sql` (national holidays 2026–2027; also auto-seeded when opening admin calendar)
+
+```sql
+-- List a parent's crew
+SELECT id, first_name, last_name, date_of_birth, age
+FROM crew_members
+WHERE guardian_user_id = 'PARENT_PROFILE_UUID'
+ORDER BY sort_order, created_at;
+```
 
 ---
 

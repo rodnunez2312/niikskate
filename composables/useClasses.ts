@@ -1,5 +1,6 @@
 import type { SkateClass, ClassSchedule, ClassType, TimeSlot, DayOfWeek, User } from '~/types'
 import { startOfMonth, endOfMonth, eachDayOfInterval, getDay, format, parseISO } from 'date-fns'
+import { isClassDay, jsDayToDayOfWeek, slotsForWeekday } from '~/utils/classSchedule'
 
 // Static coach data for demo
 const DEMO_COACHES: User[] = [
@@ -105,11 +106,8 @@ export const useClasses = () => {
   
   // Get coaches available for a specific day (demo logic)
   const getCoachesForDay = (dayOfWeek: number): User[] => {
-    // All coaches available on class days (Tue=2, Thu=4, Sat=6)
-    if (dayOfWeek === 2 || dayOfWeek === 4 || dayOfWeek === 6) {
-      return DEMO_COACHES
-    }
-    return []
+    if (!slotsForWeekday(dayOfWeek).length) return []
+    return DEMO_COACHES
   }
 
   // Fetch schedules for a specific month
@@ -180,29 +178,16 @@ export const useClasses = () => {
     const endDate = endOfMonth(startDate)
     const allDays = eachDayOfInterval({ start: startDate, end: endDate })
     
-    // Filter to only Tuesday (2), Thursday (4), Saturday (6)
-    return allDays.filter(day => {
-      const dayNum = getDay(day)
-      return dayNum === 2 || dayNum === 4 || dayNum === 6
-    })
+    // Filter to class days (Mon, Tue, Thu, Sat)
+    return allDays.filter(day => isClassDay(day))
   }
 
-  // Convert JS day number to our DayOfWeek type
   const getDayOfWeek = (date: Date): DayOfWeek | null => {
-    const dayNum = getDay(date)
-    switch (dayNum) {
-      case 2: return 'tuesday'
-      case 4: return 'thursday'
-      case 6: return 'saturday'
-      default: return null
-    }
+    return jsDayToDayOfWeek(getDay(date)) as DayOfWeek | null
   }
 
-  // Check if a date is a class day
-  const isClassDay = (date: Date): boolean => {
-    const dayNum = getDay(date)
-    return dayNum === 2 || dayNum === 4 || dayNum === 6
-  }
+  // Check if a date is a class day (Mon, Tue, Thu, Sat)
+  const isClassDayCheck = (date: Date): boolean => isClassDay(date)
 
   // Get available coaches for a specific date and time slot
   const getAvailableCoaches = async (date: string, timeSlot: TimeSlot) => {
@@ -266,7 +251,8 @@ export const useClasses = () => {
     loading.value = true
     error.value = null
     
-    const timeSlotTimes = {
+    const timeSlotTimes: Record<TimeSlot, { start: string; end: string }> = {
+      monday: { start: '16:30:00', end: '18:00:00' },
       early: { start: '17:30:00', end: '19:00:00' },
       late: { start: '19:00:00', end: '20:30:00' },
     }
@@ -305,7 +291,7 @@ export const useClasses = () => {
     fetchDaySchedules,
     getClassDaysForMonth,
     getDayOfWeek,
-    isClassDay,
+    isClassDay: isClassDayCheck,
     getAvailableCoaches,
     getCoachesForDay,
     createSchedule,

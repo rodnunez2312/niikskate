@@ -16,6 +16,10 @@ import {
   getWeek
 } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { TIME_SLOT_LABELS, type TimeSlot } from '~/types'
+import { slotsForDate } from '~/utils/classSchedule'
+
+const SESSION_OPTIONS: TimeSlot[] = ['monday', 'early', 'late']
 
 // Use blank layout - no bottom navigation
 definePageMeta({
@@ -102,7 +106,7 @@ const selectedEquipment = ref<string[]>([])
 const currentDate = ref(new Date())
 const selectedDate = ref<Date | null>(null)
 const selectedDates = ref<Date[]>([]) // For packages with multiple classes
-const selectedSession = ref<'early' | 'late' | null>(null)
+const selectedSession = ref<TimeSlot | null>(null)
 const availableCoachesForDate = ref<any[]>([])
 
 // Get max classes for selected package
@@ -589,9 +593,15 @@ const selectDate = async (date: Date) => {
     selectedDate.value = date
   }
 
+  // Align session with the weekday (Mon → monday slot; Tue/Thu/Sat → early/late)
+  const daySlots = slotsForDate(date)
+  if (!selectedSession.value || !daySlots.includes(selectedSession.value)) {
+    selectedSession.value = daySlots[0] ?? null
+  }
+
   // Get available coaches for this date (use chosen session when set)
   const dateStr = format(date, 'yyyy-MM-dd')
-  const slot = selectedSession.value || 'early'
+  const slot = selectedSession.value || daySlots[0] || 'early'
   availableCoachesForDate.value = await getAvailableCoaches(dateStr, slot)
 }
 
@@ -1025,11 +1035,17 @@ const isBeyond30Days = (date: Date): boolean => {
   return isAfter(startOfDay(date), maxBookingDate.value)
 }
 
-// Check if a date is bookable (class day, not in past, within 30 days)
+// Check if a date is bookable (class day, not in past, within 30 days, matches selected session)
 const isDateBookable = (date: Date): boolean => {
-  return isClassDay(date) && 
-         !isBefore(date, startOfDay(new Date())) && 
-         !isBeyond30Days(date)
+  if (!isClassDay(date) ||
+      isBefore(date, startOfDay(new Date())) ||
+      isBeyond30Days(date)) {
+    return false
+  }
+  if (selectedSession.value) {
+    return slotsForDate(date).includes(selectedSession.value)
+  }
+  return true
 }
 </script>
 
@@ -1531,7 +1547,7 @@ const isDateBookable = (date: Date): boolean => {
             {{ language === 'es' ? 'Elige fecha y hora' : 'Choose date & time' }}
           </h1>
           <p class="text-gray-400">
-            {{ language === 'es' ? 'Martes, Jueves y Sábados' : 'Tuesday, Thursday & Saturday' }}
+            {{ language === 'es' ? 'Lunes, Martes, Jueves y Sábados' : 'Monday, Tuesday, Thursday & Saturday' }}
           </p>
         </div>
 
@@ -1595,24 +1611,16 @@ const isDateBookable = (date: Date): boolean => {
             <p class="text-sm text-gray-400 text-center">
               {{ language === 'es' ? 'Selecciona horario:' : 'Select time slot:' }}
             </p>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid gap-3" :class="SESSION_OPTIONS.length > 2 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'">
               <button
+                v-for="slot in SESSION_OPTIONS"
+                :key="slot"
                 type="button"
-                @click="selectedSession = 'early'"
+                @click="selectedSession = slot"
                 class="p-4 rounded-xl border-2 transition-all text-left"
-                :class="selectedSession === 'early' ? 'border-gold-400 bg-gold-400/20' : 'border-gray-700 bg-gray-800 hover:border-gray-600'"
+                :class="selectedSession === slot ? 'border-gold-400 bg-gold-400/20' : 'border-gray-700 bg-gray-800 hover:border-gray-600'"
               >
-                <p class="font-bold text-white">5:30 PM</p>
-                <p class="text-sm text-gray-400">- 7:00 PM</p>
-              </button>
-              <button
-                type="button"
-                @click="selectedSession = 'late'"
-                class="p-4 rounded-xl border-2 transition-all text-left"
-                :class="selectedSession === 'late' ? 'border-gold-400 bg-gold-400/20' : 'border-gray-700 bg-gray-800 hover:border-gray-600'"
-              >
-                <p class="font-bold text-white">7:00 PM</p>
-                <p class="text-sm text-gray-400">- 8:30 PM</p>
+                <p class="font-bold text-white">{{ TIME_SLOT_LABELS[slot].display }}</p>
               </button>
             </div>
           </div>
@@ -1641,7 +1649,7 @@ const isDateBookable = (date: Date): boolean => {
               v-for="(day, index) in weekDays" 
               :key="day" 
               class="text-center text-xs font-medium py-2"
-              :class="[2, 4, 6].includes(index) ? 'text-gold-400' : 'text-gray-500'"
+              :class="[1, 2, 4, 6].includes(index) ? 'text-gold-400' : 'text-gray-500'"
             >
               {{ day }}
             </div>
@@ -1878,7 +1886,7 @@ const isDateBookable = (date: Date): boolean => {
               <div class="flex justify-between">
                 <span class="text-gray-400">{{ language === 'es' ? 'Hora' : 'Time' }}</span>
                 <span class="font-semibold text-white">
-                  {{ selectedSession === 'early' ? '5:30 PM - 7:00 PM' : selectedSession === 'late' ? '7:00 PM - 8:30 PM' : '-' }}
+                  {{ selectedSession ? TIME_SLOT_LABELS[selectedSession].display : '-' }}
                 </span>
               </div>
               <div class="flex justify-between">
@@ -2011,7 +2019,7 @@ const isDateBookable = (date: Date): boolean => {
                 <div class="flex-1">
                   <p class="text-xs text-gray-400">{{ language === 'es' ? 'Horario' : 'Time' }}</p>
                   <p class="font-semibold text-white">
-                    {{ selectedSession === 'early' ? '5:30 PM - 7:00 PM' : selectedSession === 'late' ? '7:00 PM - 8:30 PM' : '-' }}
+                    {{ selectedSession ? TIME_SLOT_LABELS[selectedSession].display : '-' }}
                   </p>
                 </div>
               </div>

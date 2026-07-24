@@ -241,7 +241,21 @@ Sensitive dashboard routes (planning, program hub) use **`middleware: ['auth']`*
 - [ ] `VERSION` / `CHANGELOG.md` updated for each production release
 - [ ] Code pushed to GitHub (`main` or your production branch)
 - [ ] Vercel (or Netlify) **Production** env vars match `.env` (never commit `.env`)
-- [ ] Deployment green; smoke-test login and coach/admin flows
+- [ ] Deployment green; smoke-test login and coach/admin flows (see **§5.1**)
+
+### 5.1 Production smoke test (before student rollout)
+
+Run in a **private browser window** (or sign out first) and use a test skater account where possible.
+
+| Step | What to check |
+|------|----------------|
+| 1 | **Login** — email + password; lands on home or dashboard by role; no red error banner. |
+| 2 | **Planning / program hub** — open `/dashboard/planning` (coach/admin); stat card opens **Programs**; open a program detail page; back navigation works. |
+| 3 | **Booking** — `/book` or schedule flow: pick a slot, confirm no console/network errors (even if you cancel before pay). |
+| 4 | **Admin** — `/admin` (admin only): news, programs, credits load without blank errors. |
+| 5 | **Student paths** — `/profile`, `/user/reservations` (or your production equivalents) load while logged in as skater. |
+
+Record pass/fail and any browser console errors for quick triage.
 
 ---
 
@@ -255,6 +269,9 @@ Sensitive dashboard routes (planning, program hub) use **`middleware: ['auth']`*
 ### "Database connection failed"
 - Check `.env` has correct SUPABASE_URL and SUPABASE_KEY
 - Restart dev server after changing `.env`
+
+### "Database error querying schema" on login (especially SQL-created users)
+- Supabase Auth expects non-null **token columns** on `auth.users` (`confirmation_token`, `recovery_token`, `email_change`, `email_change_token_new`). Raw SQL inserts often leave them `NULL`, which breaks password login. Run `supabase/scripts/fix_auth_users_null_token_columns.sql` in the Supabase SQL Editor once. Prefer **`auth.admin.createUser()`** (service role) or Dashboard **Authentication → Users → Invite** for new accounts when possible. Details: `supabase/SQL_MANUAL.md` (paragraph after the profiles/auth.users table list).
 
 ### "App won't build"
 - Run `npm install` to ensure all dependencies

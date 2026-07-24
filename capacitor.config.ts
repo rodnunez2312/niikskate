@@ -1,12 +1,12 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
-  appId: 'com.sportsscheduler.app',
-  appName: 'Sports Scheduler',
+  appId: 'com.niikskate.member',
+  appName: 'NiikSkate',
   webDir: '.output/public',
   server: {
     // For development, you can use your local server
-    // url: 'http://192.168.1.x:3000',
+    // url: 'http://192.168.1.x:3000/member',
     // cleartext: true,
     androidScheme: 'https',
   },

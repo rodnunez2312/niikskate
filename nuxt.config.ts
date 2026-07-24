@@ -43,7 +43,7 @@ export default defineNuxtConfig({
         { rel: 'manifest', href: '/manifest.json' },
       ],
     },
-    pageTransition: { name: 'page', mode: 'out-in' },
+    pageTransition: { name: 'page' },
   },
 
   // Supabase configuration
@@ -52,7 +52,7 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/auth/login',
       callback: '/auth/confirm',
-      exclude: ['/', '/classes', '/equipment', '/equipment/*'],
+      exclude: ['/', '/classes', '/niik-method', '/skate-programs', '/community', '/shop', '/shop/*', '/equipment', '/equipment/*'],
     },
   },
 
@@ -61,6 +61,9 @@ export default defineNuxtConfig({
     public: {
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseKey: process.env.SUPABASE_KEY,
+      memberAppIosUrl: process.env.NUXT_PUBLIC_MEMBER_APP_IOS_URL || '',
+      memberAppAndroidUrl: process.env.NUXT_PUBLIC_MEMBER_APP_ANDROID_URL || '',
+      memberAppDeepLink: process.env.NUXT_PUBLIC_MEMBER_APP_DEEP_LINK || 'niikskate://member',
     },
     // Server-only: for admin create user (use in server/api)
     supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',

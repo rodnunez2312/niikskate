@@ -11,6 +11,7 @@ import {
   max,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { isClassDay as isSkateClassDay } from '~/utils/classSchedule'
 
 export type DayBookingState = 'attended' | 'admin_confirmed' | 'requested' | 'missed'
 
@@ -56,11 +57,6 @@ const stateFor = (d: Date | null): DayBookingState | null => {
   return props.dayStates.get(dayKey(d)) ?? null
 }
 
-const isClassDay = (d: Date | null) => {
-  if (!d) return false
-  const n = getDay(d)
-  return n === 2 || n === 4 || n === 6
-}
 
 const cellClass = (d: Date | null) => {
   const st = stateFor(d)
@@ -77,7 +73,7 @@ const cellClass = (d: Date | null) => {
   if (st === 'missed') {
     return 'bg-rose-900/40 text-rose-200 font-semibold ring-1 ring-rose-500/45'
   }
-  return isClassDay(d) ? 'bg-gray-800/80 text-gray-400' : 'text-gray-600'
+  return isSkateClassDay(d) ? 'bg-gray-800/80 text-gray-400' : 'text-gray-600'
 }
 </script>
 

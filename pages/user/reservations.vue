@@ -493,7 +493,7 @@ const selectCreditPack = (credit: UserCredit) => {
                 v-for="(day, index) in weekDays" 
                 :key="day" 
                 class="text-center text-xs font-medium py-2"
-                :class="[2, 4, 6].includes(index) ? 'text-gold-400' : 'text-gray-500'"
+                :class="[1, 2, 4, 6].includes(index) ? 'text-gold-400' : 'text-gray-500'"
               >
                 {{ day }}
               </div>

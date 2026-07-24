@@ -115,6 +115,13 @@ echo.
 set "CHOKIDAR_USEPOLLING=1"
 set "CHOKIDAR_INTERVAL=1000"
 
+:: Corporate VPN/proxy ^(e.g. AMDOCS^): Node rejects Supabase HTTPS while the browser works.
+:: scripts/dev-server.mjs applies the same on Windows; this covers nuxi prepare above too.
+if /i not "%NIIK_ALLOW_INSECURE_TLS%"=="0" (
+  echo   TLS: allowing local dev through corporate proxy certs ^(NIIK_ALLOW_INSECURE_TLS=0 to disable^)
+  set "NODE_TLS_REJECT_UNAUTHORIZED=0"
+)
+
 :: MUST use CALL: npm.cmd is a batch file — without CALL, when npm exits, CMD may
 :: skip the rest of this script ^(window closes; you never see errors^).
 call "%NPM_CMD%" run dev -- --port 3062

@@ -1,5 +1,3 @@
-<template>
-  <div class="min-h-screen bg-black pb-24">
-    <HomeNewsSection variant="page" />
-  </div>
-</template>
+<script setup lang="ts">
+await navigateTo('/community', { redirectCode: 301 })
+</script>

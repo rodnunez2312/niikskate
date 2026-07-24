@@ -10,8 +10,8 @@ export const useCoachAvailability = () => {
   const error = ref<string | null>(null)
 
   // Days and time slots for the schedule
-  const classDays: DayOfWeek[] = ['tuesday', 'thursday', 'saturday']
-  const timeSlots: TimeSlot[] = ['early', 'late']
+  const classDays: DayOfWeek[] = ['monday', 'tuesday', 'thursday', 'saturday', 'sunday']
+  const timeSlots: TimeSlot[] = ['monday', 'morning', 'early', 'late']
 
   // Fetch coach's availability for a specific month
   const fetchMonthlyAvailability = async (coachId: string, year: number, month: number) => {

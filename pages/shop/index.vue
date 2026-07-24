@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'public' })
+
 import type { ProductCategory } from '~/types'
 
 const route = useRoute()

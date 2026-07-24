@@ -48,19 +48,399 @@ export interface SkateClass {
 
 export type ClassType = 'grouped_beginner' | 'grouped_intermediate' | 'individual'
 
-export type TimeSlot = 'early' | 'late' // early = 5:30-7:00, late = 7:00-8:30
+export type TimeSlot = 'monday' | 'morning' | 'early' | 'late'
 
-export type DayOfWeek = 'tuesday' | 'thursday' | 'saturday'
+export type DayOfWeek = 'monday' | 'tuesday' | 'thursday' | 'saturday' | 'sunday'
 
 export const TIME_SLOT_LABELS: Record<TimeSlot, { start: string; end: string; display: string }> = {
+  monday: { start: '16:30', end: '18:00', display: '4:30 PM - 6:00 PM' },
+  morning: { start: '07:00', end: '08:30', display: '7:00 AM - 8:30 AM' },
   early: { start: '17:30', end: '19:00', display: '5:30 PM - 7:00 PM' },
   late: { start: '19:00', end: '20:30', display: '7:00 PM - 8:30 PM' },
 }
 
+/** Slots admins can pick when building a recurring program. */
+export const PROGRAM_SESSION_SLOTS: TimeSlot[] = ['morning', 'early', 'late']
+
+export type AudienceCategory =
+  | 'tots_5_7'
+  | 'kids_7_12'
+  | 'teens_13_17'
+  | 'adults_18_plus'
+  /** @deprecated legacy — still accepted from DB */
+  | 'tots_3_5'
+  | 'principiantes_6_12'
+  | 'principiantes_13_17'
+  | 'intermedios_under_12'
+  | 'intermedios_over_13'
+  | 'everyone'
+
+/** Age bands for class scheduling (pick one or more). */
+export const PROGRAM_AGE_BANDS: Array<{
+  id: Extract<AudienceCategory, 'tots_5_7' | 'kids_7_12' | 'teens_13_17' | 'adults_18_plus'>
+  emoji: string
+  label: { en: string; es: string }
+  minAge: number
+  maxAge: number | null
+}> = [
+  {
+    id: 'tots_5_7',
+    emoji: '🛹',
+    label: { en: '5–7 Skater Tots', es: '5–7 Skater Tots' },
+    minAge: 5,
+    maxAge: 7,
+  },
+  {
+    id: 'kids_7_12',
+    emoji: '🌱',
+    label: { en: '7–12 Kids', es: '7–12 Niños' },
+    minAge: 7,
+    maxAge: 12,
+  },
+  {
+    id: 'teens_13_17',
+    emoji: '⚡',
+    label: { en: '13–17 Teens', es: '13–17 Adolescentes' },
+    minAge: 13,
+    maxAge: 17,
+  },
+  {
+    id: 'adults_18_plus',
+    emoji: '👊',
+    label: { en: '18+ Adults', es: '18+ Adultos' },
+    minAge: 18,
+    maxAge: null,
+  },
+]
+
+/** Skill track for class scheduling (not the fine-grained library levels). */
+export type ProgramSkillTrack = 'beginner' | 'intermediate' | 'advanced'
+
+export const PROGRAM_SKILL_TRACKS: Array<{
+  id: ProgramSkillTrack
+  skillLevelId: SkateSkillLevelId
+  emoji: string
+  label: { en: string; es: string }
+  comingSoon?: boolean
+}> = [
+  {
+    id: 'beginner',
+    skillLevelId: 'beginner_1',
+    emoji: '🌱',
+    label: { en: 'Beginner', es: 'Principiante' },
+  },
+  {
+    id: 'intermediate',
+    skillLevelId: 'intermediate_3',
+    emoji: '🚀',
+    label: { en: 'Intermediate', es: 'Intermedio' },
+  },
+  {
+    id: 'advanced',
+    skillLevelId: 'advanced_5',
+    emoji: '🏆',
+    label: { en: 'Advanced / Competition', es: 'Avanzado / Competencia' },
+  },
+]
+
+export function skillTrackFromLevelId(id: string | null | undefined): ProgramSkillTrack {
+  if (!id) return 'beginner'
+  if (id.startsWith('advanced')) return 'advanced'
+  if (id.startsWith('intermediate')) return 'intermediate'
+  return 'beginner'
+}
+
+export function skillLevelIdFromTrack(track: ProgramSkillTrack): SkateSkillLevelId {
+  return PROGRAM_SKILL_TRACKS.find(t => t.id === track)?.skillLevelId ?? 'beginner_1'
+}
+
+/** Public Skate Programs catalog (purpose-first, not live session prices). */
+export const SKATE_PROGRAM_OFFERINGS: Array<{
+  id: string
+  emoji: string
+  ageLabel: { en: string; es: string }
+  title: { en: string; es: string }
+  purpose: { en: string; es: string }
+  skillTrack: ProgramSkillTrack
+  comingSoon?: boolean
+}> = [
+  {
+    id: 'skater_tots',
+    emoji: '🛹',
+    ageLabel: { en: 'Ages 5–7', es: 'Edades 5–7' },
+    title: { en: 'Skater Tots', es: 'Skater Tots' },
+    purpose: {
+      en: 'Building balance through play',
+      es: 'Construyendo equilibrio a través del juego',
+    },
+    skillTrack: 'beginner',
+  },
+  {
+    id: 'foundations',
+    emoji: '🌱',
+    ageLabel: { en: 'Ages 7–12', es: 'Edades 7–12' },
+    title: { en: 'Foundations', es: 'Fundamentos' },
+    purpose: {
+      en: 'Learn the fundamentals of skateboarding',
+      es: 'Aprende los fundamentos del skate',
+    },
+    skillTrack: 'beginner',
+  },
+  {
+    id: 'teen_foundations',
+    emoji: '⚡',
+    ageLabel: { en: 'Ages 13–17', es: 'Edades 13–17' },
+    title: { en: 'Teen Foundations', es: 'Fundamentos Teen' },
+    purpose: {
+      en: 'Develop confidence and core skate skills',
+      es: 'Desarrolla confianza y habilidades base',
+    },
+    skillTrack: 'beginner',
+  },
+  {
+    id: 'adult_foundations',
+    emoji: '👊',
+    ageLabel: { en: 'Ages 18+', es: 'Edades 18+' },
+    title: { en: 'Adult Foundations', es: 'Fundamentos Adultos' },
+    purpose: {
+      en: "It's never too late to start skating",
+      es: 'Nunca es tarde para empezar a patinar',
+    },
+    skillTrack: 'beginner',
+  },
+  {
+    id: 'progression',
+    emoji: '🚀',
+    ageLabel: { en: 'Ages 7–14', es: 'Edades 7–14' },
+    title: { en: 'Progression', es: 'Progresión' },
+    purpose: {
+      en: 'Intermediate skills and trick development',
+      es: 'Habilidades intermedias y desarrollo de trucos',
+    },
+    skillTrack: 'intermediate',
+  },
+  {
+    id: 'competition_team',
+    emoji: '🏆',
+    ageLabel: { en: 'By invitation', es: 'Por invitación' },
+    title: { en: 'Competition Team', es: 'Equipo de Competencia' },
+    purpose: {
+      en: 'Structured training for contests and CONADE',
+      es: 'Entrenamiento estructurado para competencias y CONADE',
+    },
+    skillTrack: 'advanced',
+  },
+]
+
+/** Audience chips shown in admin UI (age bands only). */
+export const AUDIENCE_CATEGORIES = PROGRAM_AGE_BANDS.map(b => ({
+  id: b.id as AudienceCategory,
+  label: b.label,
+  minAge: b.minAge as number | null,
+  maxAge: b.maxAge,
+  emoji: b.emoji,
+}))
+
+const LEGACY_AUDIENCE_LABELS: Record<string, { en: string; es: string; minAge: number | null; maxAge: number | null }> = {
+  tots_3_5: { en: 'Tots (3–5)', es: 'Tots (3–5)', minAge: 3, maxAge: 5 },
+  principiantes_6_12: { en: 'Beginners (6–12)', es: 'Principiantes (6–12)', minAge: 6, maxAge: 12 },
+  principiantes_13_17: { en: 'Beginners (13–17)', es: 'Principiantes (13–17)', minAge: 13, maxAge: 17 },
+  intermedios_under_12: { en: 'Intermediate (under 12)', es: 'Intermedios (<12)', minAge: 6, maxAge: 11 },
+  intermedios_over_13: { en: 'Intermediate (13+)', es: 'Intermedios (13+)', minAge: 13, maxAge: 17 },
+  everyone: { en: 'Everyone', es: 'Todos', minAge: 3, maxAge: 99 },
+}
+
+export function audienceAgeRange(id: AudienceCategory | string | null | undefined) {
+  const row = AUDIENCE_CATEGORIES.find(c => c.id === id)
+  if (row) return { minAge: row.minAge, maxAge: row.maxAge }
+  const legacy = id ? LEGACY_AUDIENCE_LABELS[id] : null
+  return legacy
+    ? { minAge: legacy.minAge, maxAge: legacy.maxAge }
+    : { minAge: null, maxAge: null }
+}
+
+export function parseAudienceCategories(row: {
+  audience_categories?: string[] | null
+  audience_category?: string | null
+}): AudienceCategory[] {
+  if (row.audience_categories?.length) {
+    return row.audience_categories.filter(Boolean) as AudienceCategory[]
+  }
+  if (row.audience_category) return [row.audience_category as AudienceCategory]
+  return []
+}
+
+export function mergedAudienceAgeRange(categories: AudienceCategory[]): {
+  minAge: number | null
+  maxAge: number | null
+} {
+  if (!categories.length) return { minAge: null, maxAge: null }
+  if (categories.includes('everyone')) return { minAge: 3, maxAge: 99 }
+
+  let minAge: number | null = null
+  let maxAge: number | null = null
+  for (const id of categories) {
+    const r = audienceAgeRange(id)
+    if (r.minAge != null) minAge = minAge == null ? r.minAge : Math.min(minAge, r.minAge)
+    if (r.maxAge != null) {
+      maxAge = maxAge == null ? r.maxAge : Math.max(maxAge, r.maxAge)
+    } else if (r.minAge != null && r.minAge >= 18) {
+      maxAge = maxAge == null ? 99 : Math.max(maxAge, 99)
+    }
+  }
+  return { minAge, maxAge }
+}
+
+export function audienceCategoryLabel(
+  id: AudienceCategory | string,
+  lang: 'en' | 'es',
+): string {
+  const row = AUDIENCE_CATEGORIES.find(c => c.id === id)
+  if (row) return row.label[lang]
+  const legacy = LEGACY_AUDIENCE_LABELS[id]
+  return legacy ? legacy[lang] : String(id)
+}
+
+export function audienceCategoryEmoji(id: AudienceCategory | string): string {
+  const row = PROGRAM_AGE_BANDS.find(c => c.id === id)
+  return row?.emoji ?? '🛹'
+}
+
 export const DAY_LABELS: Record<DayOfWeek, string> = {
+  monday: 'Monday',
   tuesday: 'Tuesday',
   thursday: 'Thursday',
   saturday: 'Saturday',
+  sunday: 'Sunday',
+}
+
+export interface SkateProgramCard {
+  id: string
+  programSeriesId: string | null
+  title: string
+  audienceLabel: string
+  minAge: number | null
+  maxAge: number | null
+  skatepark: string
+  priceMxn: number | null
+  sessionCount: number
+  nextSessionDate: string | null
+  nextSessionId: string | null
+  timeSlot: TimeSlot | null
+  enrolled: number
+  maxCapacity: number
+  spotsLeft: number
+  status: SessionAvailabilityStatus
+}
+
+export type SkateSkillLevelId =
+  | 'beginner_1'
+  | 'beginner_2'
+  | 'intermediate_3'
+  | 'intermediate_4'
+  | 'advanced_5'
+  | 'advanced_6'
+
+export const SKATE_SKILL_LEVELS: Array<{
+  id: SkateSkillLevelId
+  title: { en: string; es: string }
+  description: { en: string; es: string }
+}> = [
+  {
+    id: 'beginner_1',
+    title: { en: 'Beginner 1', es: 'Principiante 1' },
+    description: {
+      en: 'First-time skater working on pushing, steering, balance, and coordination.',
+      es: 'Primera vez en patineta: empuje, dirección, equilibrio y coordinación.',
+    },
+  },
+  {
+    id: 'beginner_2',
+    title: { en: 'Beginner 2', es: 'Principiante 2' },
+    description: {
+      en: 'Can push, roll, and turn on flat ground; learning ramps at moderate speeds.',
+      es: 'Empuja, rueda y gira en plano; aprende rampas a velocidad moderada.',
+    },
+  },
+  {
+    id: 'intermediate_3',
+    title: { en: 'Intermediate 3', es: 'Intermedio 3' },
+    description: {
+      en: 'Navigates the skatepark independently; working on ollie, drop-in, and manual.',
+      es: 'Recorre el skatepark solo; trabaja ollie, drop-in y manual.',
+    },
+  },
+  {
+    id: 'intermediate_4',
+    title: { en: 'Intermediate 4', es: 'Intermedio 4' },
+    description: {
+      en: 'Drops in on a 4 ft halfpipe or bowl; basic lip tricks; ollie while rolling.',
+      es: 'Drop-in en halfpipe o bowl de 4 ft; trucos de coping básicos; ollie en movimiento.',
+    },
+  },
+  {
+    id: 'advanced_5',
+    title: { en: 'Advanced 5', es: 'Avanzado 5' },
+    description: {
+      en: 'Rides halfpipes and bowls; ollies small obstacles; starting flips, slides, and grinds.',
+      es: 'Halfpipes y bowls; ollie sobre obstáculos; inicia flips, slides y grinds.',
+    },
+  },
+  {
+    id: 'advanced_6',
+    title: { en: 'Advanced 6', es: 'Avanzado 6' },
+    description: {
+      en: 'Strong fundamentals on all terrain; lines and combos; sets independent goals.',
+      es: 'Fundamentos sólidos en todo el terreno; líneas y combos; metas propias.',
+    },
+  },
+]
+
+export const DEFAULT_SKATEPARK = 'Skatepark La Plancha'
+
+/** Standard La Plancha class pricing (MXN). */
+export const MONTHLY_PROGRAM_PRICE_MXN = 1000
+export const DROP_IN_CLASS_PRICE_MXN = 150
+
+/** Venues available when creating calendar events (expand later). */
+export const EVENT_LOCATIONS = [DEFAULT_SKATEPARK] as const
+
+export type SessionAvailabilityStatus = 'open' | 'almost_full' | 'full' | 'no_coaches'
+
+export interface BookableClassSession {
+  id: string
+  title: string
+  start_date: string
+  time_slot: TimeSlot | null
+  audience_category?: string | null
+  audience_categories?: string[] | null
+  skill_level: string | null
+  min_age: number | null
+  max_age: number | null
+  skatepark: string | null
+  price_mxn: number | null
+  location: string | null
+  description: string | null
+  coachCount: number
+  enrolled: number
+  maxCapacity: number
+  spotsLeft: number
+  status: SessionAvailabilityStatus
+  isEnrolled?: boolean
+}
+
+export interface CrewMember {
+  id: string
+  guardian_user_id: string
+  first_name: string
+  last_name: string | null
+  full_name: string | null
+  date_of_birth: string | null
+  age: number | null
+  avatar_url: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
 }
 
 export const CLASS_TYPE_LABELS: Record<ClassType, { name: string; shortName: string; color: string }> = {

@@ -1,0 +1,154 @@
+import { createClient } from '@supabase/supabase-js'
+import { getHeader } from 'h3'
+import {
+  capacityFromCoaches,
+  countCoachesForSlot,
+  countEnrollments,
+  enrichSession,
+  getServiceSupabase,
+  resolveMaxCapacity,
+} from '~/server/utils/bookableSessions'
+import {
+  computeAgeFromDob,
+  ineligibilityReason,
+  isAgeEligibleForSession,
+} from '~/utils/ageEligibility'
+
+export default defineEventHandler(async (event) => {
+  const config = useRuntimeConfig()
+  const supabaseUrl = config.public.supabaseUrl as string
+  const supabaseAnon = config.public.supabaseKey as string
+
+  const authHeader = getHeader(event, 'authorization') || ''
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  if (!accessToken) {
+    throw createError({ statusCode: 401, message: 'Sign in to join a class' })
+  }
+
+  const sessionClient = createClient(supabaseUrl, supabaseAnon)
+  const { data: userData, error: userErr } = await sessionClient.auth.getUser(accessToken)
+  if (userErr || !userData?.user) {
+    throw createError({ statusCode: 401, message: 'Invalid session' })
+  }
+  const userId = userData.user.id
+
+  const body = await readBody(event)
+  const eventId = typeof body?.eventId === 'string' ? body.eventId.trim() : ''
+  const childAge = typeof body?.childAge === 'number' ? body.childAge : Number(body?.childAge)
+  const crewMemberId =
+    typeof body?.crewMemberId === 'string' && body.crewMemberId.trim()
+      ? body.crewMemberId.trim()
+      : null
+
+  if (!eventId) {
+    throw createError({ statusCode: 400, message: 'eventId is required' })
+  }
+
+  const supabase = getServiceSupabase()
+
+  const { data: row, error: evErr } = await supabase
+    .from('school_calendar_events')
+    .select(
+      'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, visible_to_parents, max_capacity_override',
+    )
+    .eq('id', eventId)
+    .single()
+
+  if (evErr || !row) {
+    throw createError({ statusCode: 404, message: 'Class session not found' })
+  }
+  if (!row.is_bookable || !row.visible_to_parents) {
+    throw createError({ statusCode: 400, message: 'This session is not open for booking' })
+  }
+  if (!row.time_slot) {
+    throw createError({ statusCode: 400, message: 'Session has no time slot configured' })
+  }
+  if (row.start_date < new Date().toISOString().slice(0, 10)) {
+    throw createError({ statusCode: 400, message: 'This session is in the past' })
+  }
+
+  let skaterAge: number | null = Number.isFinite(childAge) && childAge > 0 ? childAge : null
+
+  if (crewMemberId) {
+    const { data: crewRow, error: crewErr } = await supabase
+      .from('crew_members')
+      .select('id, guardian_user_id, date_of_birth, age, first_name')
+      .eq('id', crewMemberId)
+      .single()
+    if (crewErr || !crewRow) {
+      throw createError({ statusCode: 404, message: 'Crew member not found' })
+    }
+    if (crewRow.guardian_user_id !== userId) {
+      throw createError({ statusCode: 403, message: 'Not your crew member' })
+    }
+    skaterAge = computeAgeFromDob(crewRow.date_of_birth, crewRow.age)
+  } else {
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('date_of_birth, age')
+      .eq('id', userId)
+      .single()
+    skaterAge = computeAgeFromDob(profileRow?.date_of_birth ?? null, profileRow?.age ?? skaterAge)
+  }
+
+  if (!isAgeEligibleForSession(skaterAge, row)) {
+    const reason = ineligibilityReason(skaterAge, row, 'es')
+    throw createError({
+      statusCode: 400,
+      message: reason || 'This skater is not eligible for this class',
+    })
+  }
+
+  const enriched = await enrichSession(supabase, row)
+  if (enriched.maxCapacity <= 0) {
+    throw createError({ statusCode: 400, message: 'No coaches scheduled for this session yet' })
+  }
+  if (enriched.spotsLeft <= 0) {
+    throw createError({ statusCode: 409, message: 'This class is full' })
+  }
+
+  let existingQuery = supabase
+    .from('class_session_enrollments')
+    .select('id, status')
+    .eq('calendar_event_id', eventId)
+    .eq('user_id', userId)
+
+  existingQuery = crewMemberId
+    ? existingQuery.eq('crew_member_id', crewMemberId)
+    : existingQuery.is('crew_member_id', null)
+
+  const { data: existing } = await existingQuery.maybeSingle()
+
+  if (existing?.status === 'confirmed') {
+    return { ok: true, alreadyEnrolled: true, session: enriched }
+  }
+
+  const coachCount = await countCoachesForSlot(supabase, row.start_date, row.time_slot)
+  const enrolled = await countEnrollments(supabase, eventId)
+  const maxCapacity = resolveMaxCapacity(coachCount, row.max_capacity_override)
+  if (enrolled >= maxCapacity) {
+    throw createError({ statusCode: 409, message: 'This class is full' })
+  }
+
+  const payload = {
+    calendar_event_id: eventId,
+    user_id: userId,
+    crew_member_id: crewMemberId,
+    child_age: skaterAge,
+    status: 'confirmed',
+  }
+
+  if (existing) {
+    const { error: upErr } = await supabase
+      .from('class_session_enrollments')
+      .update({ status: 'confirmed', child_age: payload.child_age })
+      .eq('id', existing.id)
+    if (upErr) throw createError({ statusCode: 400, message: upErr.message })
+  } else {
+    const { error: insErr } = await supabase.from('class_session_enrollments').insert(payload)
+    if (insErr) throw createError({ statusCode: 400, message: insErr.message })
+  }
+
+  const updated = await enrichSession(supabase, row)
+  return { ok: true, alreadyEnrolled: false, session: updated }
+})

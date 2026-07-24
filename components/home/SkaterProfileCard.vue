@@ -74,7 +74,7 @@ onMounted(async () => {
 
 <template>
   <NuxtLink
-    to="/user/progress"
+    to="/member/student/progress"
     class="block bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl p-4 border border-gray-700/50 shadow-2xl hover:border-gold-400/40 transition-colors"
   >
     <div v-if="loading" class="animate-pulse space-y-3">
