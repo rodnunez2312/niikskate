@@ -48,8 +48,8 @@ function formatMissingPriceLine(i: BulkImportIssue, es: boolean): string {
   const raw = i.rawValue?.trim()
   if (i.detail === 'inch_csv_shift') {
     return es
-      ? `Fila ${i.row}, ${col}${namePart}: en Excel se ve precio, pero la talla tiene comillas de pulgadas (ej. 8.75") y al guardar CSV el precio se desplaza. En columna talla usa 8.75 in o 8.75 sin comilla, guarda de nuevo como CSV y sube otra vez.`
-      : `Row ${i.row}, ${col}${namePart}: price looks fine in Excel, but the size uses inch quotes (e.g. 8.75") and the CSV shifts columns. Use 8.75 in or 8.75 without " in the size column, re-save as CSV, and upload again.`
+      ? `Fila ${i.row}, ${col}${namePart}: en Excel se ve precio, pero la talla con comillas de pulgadas (ej. 8.75") puede fallar. Usa 8.75 in o 8.75 sin comilla en columna size.`
+      : `Row ${i.row}, ${col}${namePart}: price may look fine, but inch quotes in size (e.g. 8.75") can fail. Use 8.75 in or 8.75 without " in the size column.`
   }
   if (raw) {
     return es
@@ -57,8 +57,8 @@ function formatMissingPriceLine(i: BulkImportIssue, es: boolean): string {
       : `Row ${i.row}, ${col}${namePart}: could not read price. Cell value: «${raw}». Remove currency format and enter digits only (e.g. 1200), no $ or MXN.`
   }
   return es
-    ? `Fila ${i.row}, ${col}${namePart}: la celda está vacía en el CSV (aunque en Excel se vea bien). Revisa comillas en nombre/talla (usa 8.75 in en lugar de 8.75") y vuelve a guardar como CSV UTF-8.`
-    : `Row ${i.row}, ${col}${namePart}: cell is empty in the CSV (even if Excel looks fine). Check quotes in name/size (use 8.75 in instead of 8.75") and re-save as CSV UTF-8.`
+    ? `Fila ${i.row}, ${col}${namePart}: falta precio en el Excel. Revisa la columna price_mxn.`
+    : `Row ${i.row}, ${col}${namePart}: missing price in Excel. Check the price_mxn column.`
 }
 
 function formatBadPriceLine(i: BulkImportIssue, es: boolean): string {
@@ -82,8 +82,8 @@ function formatUnknownCategoryLine(i: BulkImportIssue, es: boolean): string {
     const read = i.rawValue?.trim()
     const readPart = read ? (es ? ` (leyó «${read}» en categoría)` : ` (read «${read}» as category)`) : ''
     return es
-      ? `Fila ${i.row}${namePart}: el nombre lleva coma (ej. «Modelo: …») y al guardar CSV las columnas se corren${readPart}. Guarda como CSV UTF-8 desde Excel (pon comillas al nombre) o quita comas del nombre; PROTECCIONES debe quedar en columna category.`
-      : `Row ${i.row}${namePart}: the name contains a comma and CSV columns shifted${readPart}. Save as CSV UTF-8 (quoted name) or remove commas from the name; PROTECCIONES must stay in the category column.`
+      ? `Fila ${i.row}${namePart}: revisa la columna category (playera, tabla, PROTECCIONES…). Si el nombre tiene comas, no debería pasar con .xlsx; confirma que category no quedó vacía.`
+      : `Row ${i.row}${namePart}: check the category column (playera, tabla, PROTECCIONES…). Commas in names are fine in .xlsx; make sure category is filled.`
   }
   const tipo = i.detail ?? i.rawValue ?? '?'
   return es
@@ -101,8 +101,8 @@ export function summarizeBulkImportIssues(
   const header = issues.filter(i => i.kind === 'header')
   if (header.length) {
     const msg = es
-      ? 'No se leyeron las columnas del archivo. Descarga la plantilla otra vez, pega tus productos debajo de la fila de títulos y guarda como CSV UTF-8.'
-      : 'Could not read column headers. Download the template again, paste products under the title row, and save as CSV UTF-8.'
+      ? 'No se leyeron las columnas del Excel. Descarga la plantilla, pega tus productos debajo de la fila de títulos y guarda como .xlsx.'
+      : 'Could not read Excel columns. Download the template, paste products under the title row, and save as .xlsx.'
     return {
       summary: [msg, ...(header[0]?.detail ? [header[0].detail] : [])],
       details: [],

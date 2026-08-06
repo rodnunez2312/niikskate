@@ -5,12 +5,11 @@ definePageMeta({
 })
 
 import type { ProductCategory } from '~/types'
+import type { ParseShopProductCsvResult } from '~/utils/shopProductBulk'
 import {
-  parseShopProductCsv,
   validateRowsForImport,
   buildBulkImportPayloads,
   bulkProductMatchKey,
-  productsToCsv,
 } from '~/utils/shopProductBulk'
 import {
   summarizeBulkImportIssues,
@@ -48,7 +47,7 @@ const uploadingBrand = ref<string | null>(null)
 const brandFileInput = ref<HTMLInputElement | null>(null)
 const brandUploadTarget = ref<string | null>(null)
 const bulkImporting = ref(false)
-const bulkPreview = ref<ReturnType<typeof parseShopProductCsv> | null>(null)
+const bulkPreview = ref<ParseShopProductCsvResult | null>(null)
 const bulkImportErrors = ref<string[]>([])
 const bulkImportErrorDetails = ref<string[]>([])
 const bulkImportWarnings = ref<string | null>(null)
@@ -492,32 +491,27 @@ async function onBulkFileSelected(event: Event) {
   const file = input.files?.[0]
   if (!file) return
   bulkSelectedFileName.value = file.name
-  const isXlsx = /\.xlsx$/i.test(file.name)
-  const isCsv = /\.csv$/i.test(file.name) || file.type.includes('csv') || file.type.includes('text')
-  let parsed: ReturnType<typeof parseShopProductCsv>
+  if (!/\.xlsx$/i.test(file.name)) {
+    bulkPreview.value = null
+    applyBulkIssueFeedback(
+      [
+        {
+          row: 0,
+          kind: 'other',
+          detail: es.value
+            ? 'Solo archivos Excel (.xlsx). Guarda el libro como «Libro de Excel (.xlsx)» y vuelve a subirlo.'
+            : 'Excel (.xlsx) files only. Save the workbook as «Excel Workbook (.xlsx)» and upload again.',
+        },
+      ],
+      0,
+    )
+    if (bulkFileInput.value) bulkFileInput.value.value = ''
+    return
+  }
+  let parsed: ParseShopProductCsvResult
   try {
-    if (isXlsx) {
-      const { parseShopProductXlsx } = await import('~/utils/shopProductBulkXlsx')
-      parsed = await parseShopProductXlsx(await file.arrayBuffer())
-    } else if (isCsv || !/\.xls$/i.test(file.name)) {
-      parsed = parseShopProductCsv(await file.text())
-    } else {
-      bulkPreview.value = null
-      applyBulkIssueFeedback(
-        [
-          {
-            row: 0,
-            kind: 'other',
-            detail: es.value
-              ? 'Formato no soportado. Usa .xlsx (Excel) o .csv.'
-              : 'Unsupported format. Use .xlsx (Excel) or .csv.',
-          },
-        ],
-        0,
-      )
-      if (bulkFileInput.value) bulkFileInput.value.value = ''
-      return
-    }
+    const { parseShopProductXlsx } = await import('~/utils/shopProductBulkXlsx')
+    parsed = await parseShopProductXlsx(await file.arrayBuffer())
   } catch {
     bulkPreview.value = null
     applyBulkIssueFeedback(
@@ -526,8 +520,8 @@ async function onBulkFileSelected(event: Event) {
           row: 0,
           kind: 'other',
           detail: es.value
-            ? 'No se pudo leer el archivo. Prueba guardar de nuevo como .xlsx o CSV UTF-8.'
-            : 'Could not read the file. Try saving again as .xlsx or UTF-8 CSV.',
+            ? 'No se pudo leer el Excel. Cierra el archivo en Excel, guarda de nuevo como .xlsx e intenta otra vez.'
+            : 'Could not read the Excel file. Close it in Excel, save again as .xlsx, and retry.',
         },
       ],
       0,
@@ -587,24 +581,25 @@ async function runBulkImport() {
   }
 }
 
-function downloadCatalogExport() {
-  const csv = productsToCsv(products.value)
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `skateshop-catalog-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+async function downloadCatalogExport() {
+  const { catalogToXlsxBlob, triggerBlobDownload } = await import('~/utils/shopProductBulkXlsx')
+  const blob = await catalogToXlsxBlob(products.value)
+  triggerBlobDownload(blob, `skateshop-catalog-${new Date().toISOString().slice(0, 10)}.xlsx`)
   bulkMessage.value = es.value
-    ? 'CSV exportado. Edítalo en Excel y vuelve a importar.'
-    : 'CSV exported. Edit in Excel and re-import.'
+    ? 'Excel exportado. Edítalo y vuelve a importar el .xlsx.'
+    : 'Excel exported. Edit it and re-import the .xlsx.'
+}
+
+async function downloadSkateshopTemplate() {
+  const { skateshopTemplateXlsxBlob, triggerBlobDownload } = await import('~/utils/shopProductBulkXlsx')
+  const blob = await skateshopTemplateXlsxBlob()
+  triggerBlobDownload(blob, 'skateshop-products-template.xlsx')
 }
 
 const productPhotoUploadHint = computed(() =>
   es.value
-    ? `Fotos aquí (no en CSV). Máx. ${PRODUCT_PHOTO_UPLOAD.maxWidth}px.`
-    : `Photos here (not in CSV). Max ${PRODUCT_PHOTO_UPLOAD.maxWidth}px.`,
+    ? `Fotos aquí (no van en el Excel). Máx. ${PRODUCT_PHOTO_UPLOAD.maxWidth}px.`
+    : `Photos here (not in the Excel file). Max ${PRODUCT_PHOTO_UPLOAD.maxWidth}px.`,
 )
 </script>
 
@@ -693,8 +688,8 @@ const productPhotoUploadHint = computed(() =>
           <p class="mt-2 leading-relaxed">
             {{
               es
-                ? 'Recomendado: guarda tu catálogo como .xlsx y súbelo directo (sin exportar CSV). También aceptamos .csv. Fila 1 = encabezados (name, brand, category…).'
-                : 'Recommended: save your catalog as .xlsx and upload it directly (no CSV export). We also accept .csv. Row 1 = headers (name, brand, category…).'
+                ? 'Sube solo .xlsx. Fila 1 = encabezados (name, brand, category…). Fotos se agregan en esta pantalla, no en el Excel.'
+                : 'Upload .xlsx only. Row 1 = headers (name, brand, category…). Add photos on this screen, not in Excel.'
             }}
           </p>
         </details>
@@ -705,29 +700,21 @@ const productPhotoUploadHint = computed(() =>
             :disabled="!products.length"
             @click="downloadCatalogExport"
           >
-            {{ es ? 'Exportar catálogo CSV' : 'Export catalog CSV' }}
+            {{ es ? 'Exportar catálogo Excel' : 'Export catalog Excel' }}
           </button>
-          <a
-            href="/templates/skateshop-products-template.csv"
-            download="skateshop-products-template.csv"
+          <button
+            type="button"
             class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold hover:bg-gold-400/10"
+            @click="downloadSkateshopTemplate"
           >
-            {{ es ? 'Plantilla CSV' : 'CSV template' }}
-          </a>
-          <a
-            href="/templates/skateshop-products-template-excel-mx.csv"
-            download="skateshop-products-template-excel-mx.csv"
-            class="px-4 py-2 rounded-xl border border-white/15 text-gray-400 text-xs font-bold hover:border-gold-400/40 hover:text-gold-400"
-            :title="es ? 'Si Excel abre la otra plantilla en una sola columna' : 'If Excel opens the other template as one column'"
-          >
-            {{ es ? 'Plantilla Excel (MX ;)' : 'Excel template (MX ;)' }}
-          </a>
+            {{ es ? 'Plantilla Excel' : 'Excel template' }}
+          </button>
           <label class="px-4 py-2 rounded-xl bg-gray-800 text-sm font-bold text-gray-200 cursor-pointer hover:text-white">
-            {{ es ? 'Elegir archivo…' : 'Choose file…' }}
+            {{ es ? 'Elegir Excel…' : 'Choose Excel…' }}
             <input
               ref="bulkFileInput"
               type="file"
-              accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               class="hidden"
               @change="onBulkFileSelected"
             />
@@ -743,7 +730,7 @@ const productPhotoUploadHint = computed(() =>
         </div>
         <p v-if="bulkSelectedFileName" class="text-[11px] text-gray-500 truncate" :title="bulkSelectedFileName">
           {{ es ? 'Archivo' : 'File' }}: {{ bulkSelectedFileName }}
-          <span v-if="/\(\d+\)(?=\.csv$)/i.test(bulkSelectedFileName)" class="text-gray-600">
+          <span v-if="/\(\d+\)(?=\.xlsx$)/i.test(bulkSelectedFileName)" class="text-gray-600">
             — {{ es ? 'copia Windows; OK' : 'Windows copy; OK' }}
           </span>
         </p>
