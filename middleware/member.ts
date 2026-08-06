@@ -20,7 +20,11 @@ export default defineNuxtRouteMiddleware(async to => {
   if (coachOnly && role !== 'coach' && role !== 'admin') {
     return navigateTo('/member/student')
   }
-  if (adminOnly && role !== 'admin') {
+  // Coaches may open competitions (Skate Program sidebar) but not other admin tools.
+  const coachSharedAdmin =
+    to.path === '/member/admin/competitions' || to.path.startsWith('/member/admin/competitions/')
+
+  if (adminOnly && role !== 'admin' && !(role === 'coach' && coachSharedAdmin)) {
     return navigateTo(role === 'coach' ? '/member/coach/home' : '/member/student')
   }
 })

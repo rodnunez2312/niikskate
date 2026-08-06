@@ -13,9 +13,9 @@ const { language } = useI18n()
     />
     <div class="flex flex-col gap-2 mt-4">
       <NuxtLink to="/member/coach/library" class="text-center text-gold-400 text-sm font-semibold underline">
-        {{ language === 'es' ? 'Ir a la librería de trucos →' : 'Go to trick library →' }}
+        {{ language === 'es' ? 'Ir a Programas →' : 'Go to Programs →' }}
       </NuxtLink>
-      <NuxtLink to="/member/coach/knowledge-base" class="text-center text-gray-400 text-sm underline">
+      <NuxtLink to="/member/coach/plans?tab=tips" class="text-center text-gray-400 text-sm underline">
         {{ language === 'es' ? 'Tips y trucos →' : 'Tips & tricks →' }}
       </NuxtLink>
     </div>

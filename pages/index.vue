@@ -2,100 +2,627 @@
 definePageMeta({ layout: 'public' })
 
 const { language } = useI18n()
-const user = useSupabaseUser()
+const es = computed(() => language.value === 'es')
+
+const seasons = computed(() => [
+  {
+    name: es.value ? 'Primavera' : 'Spring',
+    dates: es.value ? 'Feb – May' : 'Feb – May',
+    status: es.value ? 'Abierto' : 'Open',
+  },
+  {
+    name: es.value ? 'Verano' : 'Summer',
+    dates: es.value ? 'Jun – Ago' : 'Jun – Aug',
+    status: es.value ? 'Inscripciones' : 'Enrolling',
+  },
+  {
+    name: es.value ? 'Otoño' : 'Fall',
+    dates: es.value ? 'Sep – Nov' : 'Sep – Nov',
+    status: es.value ? 'Pronto' : 'Soon',
+  },
+  {
+    name: es.value ? 'Invierno' : 'Winter',
+    dates: es.value ? 'Dic – Ene' : 'Dec – Jan',
+    status: es.value ? 'Pronto' : 'Soon',
+  },
+])
+
+const donateAmounts = [100, 250, 500, 1000]
+const selectedDonate = ref(250)
+const customDonate = ref('')
+
+const donateTotal = computed(() => {
+  const custom = Number(customDonate.value)
+  if (customDonate.value && !Number.isNaN(custom) && custom > 0) return custom
+  return selectedDonate.value
+})
+
+function selectDonate(amount: number) {
+  selectedDonate.value = amount
+  customDonate.value = ''
+}
+
+const pillars = computed(() => [
+  {
+    n: '01',
+    title: es.value ? 'Exposición' : 'Exposure',
+    body: es.value
+      ? 'El patinador sube a la tabla — a menudo por primera vez. Encuentra un reto real en un entorno seguro y apoyado.'
+      : 'Kids step on a board — often for the first time. They face real challenge in a low-stakes, supportive space.',
+  },
+  {
+    n: '02',
+    title: es.value ? 'Habilidades mentales' : 'Mental skills',
+    body: es.value
+      ? 'Respiración, self-talk y reframing junto a ollies y drops. Aprenden a manejar miedo, frustración y fallo en tiempo real.'
+      : 'Breathing, self-talk, and reframing alongside ollies and drops. They learn to manage fear, frustration, and failure in real time.',
+  },
+  {
+    n: '03',
+    title: es.value ? 'Competencia' : 'Competence',
+    body: es.value
+      ? 'Con repetición y coaching ganan skills reales. Aterrizar un truco después de 50 caídas cambia cómo ven el esfuerzo.'
+      : 'Through repetition and coaching they earn real skills. Landing a trick after 50 falls rewires how they think about effort.',
+  },
+  {
+    n: '04',
+    title: es.value ? 'Confianza' : 'Confidence',
+    body: es.value
+      ? 'La competencia genera confianza. Empiezan a creer que pueden hacer cosas difíciles — porque lo demostraron.'
+      : 'Competence breeds confidence. They start to believe they can do hard things — because they proved it.',
+  },
+  {
+    n: '05',
+    title: es.value ? 'Resiliencia' : 'Resilience',
+    body: es.value
+      ? 'Las skills mentales de la tabla se llevan a la escuela, amistades y la vida. Eso es el Método Niik.'
+      : 'Mental skills from the board transfer to school, friendships, and life. That’s the Niik Method.',
+  },
+])
+
+const impactStats = computed(() => [
+  {
+    value: '92%',
+    label: es.value ? 'Se sienten más resilientes' : 'Feel more resilient',
+  },
+  {
+    value: '88%',
+    label: es.value ? 'Más confianza en la tabla' : 'More confident on the board',
+  },
+  {
+    value: '95%',
+    label: es.value ? 'Sienten que pertenecen' : 'Felt they belonged',
+  },
+  {
+    value: '90%',
+    label: es.value ? 'Los coaches de verdad cuidan' : 'Coaches truly cared',
+  },
+])
+
+const parentQuotes = computed(() => [
+  {
+    quote: es.value
+      ? 'La paciencia y el ánimo de los coaches es increíble. Mi hijo ganó mucha confianza. No puedo agradecerles lo suficiente.'
+      : 'The coaching staff’s patience and kindness is unbelievable. My son has grown so much confidence. We can’t thank you enough.',
+  },
+  {
+    quote: es.value
+      ? 'Es el primer deporte al que llega emocionado cada semana. Ya convenció a su hermano de unirse la próxima temporada.'
+      : 'This was the first sport he’s ever been excited to go to every week. He talked his brother into joining next season.',
+  },
+  {
+    quote: es.value
+      ? 'Nuestra hija ahora dice “hay que ser resiliente” cuando algo se pone difícil. Tiene cinco años.'
+      : 'Our daughter now says “you need to be resilient” when something gets hard. She’s five.',
+  },
+])
+
+type Collaborator = {
+  id: string
+  name: string
+  logo: string
+  url?: string | null
+  tone?: string
+}
+
+const { data: collaboratorsData } = await useFetch<{ collaborators: Collaborator[] }>(
+  '/data/collaborators.json',
+  { default: () => ({ collaborators: [] }) },
+)
+
+const communityDecks = computed(() => collaboratorsData.value?.collaborators || [])
+
+const quoteIndex = ref(0)
+
+function nextQuote() {
+  quoteIndex.value = (quoteIndex.value + 1) % parentQuotes.value.length
+}
+
+function prevQuote() {
+  quoteIndex.value = (quoteIndex.value - 1 + parentQuotes.value.length) % parentQuotes.value.length
+}
+
+watch(parentQuotes, () => {
+  quoteIndex.value = 0
+})
 </script>
 
 <template>
-  <div>
-    <section class="relative overflow-hidden">
-      <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
-        <img src="/Niik_StainedGlass.png" alt="" class="h-[min(90vh,720px)] w-auto object-contain" />
+  <div class="bg-black text-white">
+    <!-- Section 1: Hero video / image -->
+    <section class="relative min-h-[88vh] flex items-end overflow-hidden">
+      <div class="absolute inset-0">
+        <img
+          src="/Niik_StainedGlass.png"
+          alt=""
+          class="absolute inset-0 w-full h-full object-cover object-center scale-105 opacity-55"
+        />
+        <div class="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/25" />
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,rgba(0,0,0,0.65)_100%)]" />
       </div>
-      <div class="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
-        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-4">
-          <span class="text-gold-400">Niik</span>Skate Academy
+
+      <div class="relative w-full max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24 pt-28">
+        <p class="text-[11px] sm:text-xs font-bold uppercase tracking-[0.28em] text-gold-400 mb-4 animate-[fadeUp_0.7s_ease-out_both]">
+          {{ es ? 'Academia de skate' : 'Skate academy' }}
+        </p>
+        <h1 class="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[0.95] mb-5 animate-[fadeUp_0.8s_ease-out_0.08s_both]">
+          <span class="text-gold-400">Niik</span>Skate
         </h1>
-        <p class="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-8">
+        <p class="text-xl sm:text-2xl lg:text-3xl font-semibold text-white/90 max-w-2xl leading-snug animate-[fadeUp_0.8s_ease-out_0.16s_both]">
           {{
-            language === 'es'
-              ? 'Aprende skate con coaches expertos. Método Niik, programas por edad y una comunidad que crece contigo.'
-              : 'Learn to skate with expert coaches. The Niik Method, age-based programs, and a community that grows with you.'
+            es
+              ? 'Resiliencia mental + skateboarding'
+              : 'Mental resilience + skateboarding'
           }}
         </p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <NuxtLink
-            to="/skate-programs"
-            class="px-8 py-4 rounded-2xl bg-gold-400 text-black font-bold text-lg hover:bg-gold-300 transition-colors"
+        <p class="mt-4 text-base sm:text-lg text-gray-300 max-w-xl animate-[fadeUp_0.8s_ease-out_0.24s_both]">
+          {{
+            es
+              ? 'Enseñamos skills de vida a través del desarrollo y la exposición al skate.'
+              : 'Teaching life skills through the development and exposure of skateboarding.'
+          }}
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3 animate-[fadeUp_0.8s_ease-out_0.32s_both]">
+          <a
+            href="#schedule"
+            class="px-6 py-3 rounded-xl bg-gold-400 text-black font-bold hover:bg-gold-300 transition-colors"
           >
-            {{ language === 'es' ? 'Ver programas' : 'Explore programs' }}
-          </NuxtLink>
+            {{ es ? 'Ver temporada' : 'See the season' }}
+          </a>
           <NuxtLink
             to="/classes"
-            class="px-8 py-4 rounded-2xl border border-gray-600 text-white font-bold text-lg hover:bg-gray-900 transition-colors"
+            class="px-6 py-3 rounded-xl border border-white/25 text-white font-bold hover:bg-white/5 transition-colors"
           >
-            {{ language === 'es' ? 'Clases disponibles' : 'Available classes' }}
+            {{ es ? 'Clases' : 'Classes' }}
           </NuxtLink>
         </div>
       </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <NuxtLink
-        to="/niik-method"
-        class="group rounded-2xl border border-gray-800 bg-gray-900/50 p-6 hover:border-gold-400/50 transition-colors"
-      >
-        <span class="text-3xl">🎯</span>
-        <h2 class="text-lg font-bold text-white mt-3 group-hover:text-gold-400">
-          {{ language === 'es' ? 'El Método Niik' : 'The Niik Method' }}
-        </h2>
-        <p class="text-sm text-gray-400 mt-2">
-          {{ language === 'es' ? 'Pedagogía y progresión por niveles' : 'Pedagogy and level-based progression' }}
+    <!-- Section 2: Motivational line + season schedule -->
+    <section id="schedule" class="border-t border-white/10">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <p class="text-2xl sm:text-3xl lg:text-4xl font-black text-center max-w-3xl mx-auto leading-tight text-white">
+          {{
+            es
+              ? 'Caer es parte del truco. Levantarse es el Método Niik.'
+              : 'Falling is part of the trick. Getting up is the Niik Method.'
+          }}
         </p>
-      </NuxtLink>
-      <NuxtLink
-        to="/skate-programs"
-        class="group rounded-2xl border border-gray-800 bg-gray-900/50 p-6 hover:border-gold-400/50 transition-colors"
-      >
-        <span class="text-3xl">🛹</span>
-        <h2 class="text-lg font-bold text-white mt-3 group-hover:text-gold-400">
-          {{ language === 'es' ? 'Programas de Skate' : 'Skate Programs' }}
-        </h2>
-        <p class="text-sm text-gray-400 mt-2">
-          {{ language === 'es' ? 'Tots, principiantes, intermedios y más' : 'Tots, beginners, intermediate, and more' }}
-        </p>
-      </NuxtLink>
-      <NuxtLink
-        to="/community"
-        class="group rounded-2xl border border-gray-800 bg-gray-900/50 p-6 hover:border-gold-400/50 transition-colors"
-      >
-        <span class="text-3xl">✨</span>
-        <h2 class="text-lg font-bold text-white mt-3 group-hover:text-gold-400">
-          {{ language === 'es' ? 'Comunidad' : 'Community' }}
-        </h2>
-        <p class="text-sm text-gray-400 mt-2">
-          {{ language === 'es' ? 'Noticias, eventos y redes sociales' : 'News, events, and social' }}
-        </p>
-      </NuxtLink>
-      <NuxtLink
-        :to="user ? '/member' : '/auth/login?redirect=/member'"
-        class="group rounded-2xl border border-gold-400/30 bg-gold-400/5 p-6 hover:border-gold-400 transition-colors"
-      >
-        <span class="text-3xl">📱</span>
-        <h2 class="text-lg font-bold text-white mt-3 group-hover:text-gold-400">
-          {{ language === 'es' ? 'App de miembros' : 'Member app' }}
-        </h2>
-        <p class="text-sm text-gray-400 mt-2">
-          {{ language === 'es' ? 'Clases, progreso y reservas' : 'Classes, progress, and bookings' }}
-        </p>
-      </NuxtLink>
+
+        <div class="mt-14">
+          <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-6 text-center">
+            {{ es ? 'Temporadas del programa' : 'Program seasons' }}
+          </h2>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[520px] text-left border-collapse">
+              <thead>
+                <tr class="border-b border-white/15 text-xs uppercase tracking-wider text-gray-500">
+                  <th class="py-3 pr-4 font-semibold">{{ es ? 'Temporada' : 'Season' }}</th>
+                  <th class="py-3 pr-4 font-semibold">{{ es ? 'Fechas' : 'Dates' }}</th>
+                  <th class="py-3 font-semibold">{{ es ? 'Estado' : 'Status' }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in seasons"
+                  :key="row.name"
+                  class="border-b border-white/10 text-sm sm:text-base"
+                >
+                  <td class="py-4 pr-4 font-bold text-white">{{ row.name }}</td>
+                  <td class="py-4 pr-4 text-gray-300">{{ row.dates }}</td>
+                  <td class="py-4 text-gold-400 font-semibold">{{ row.status }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-8 text-center">
+            <NuxtLink to="/classes" class="inline-flex text-sm font-bold text-gold-400 hover:text-gold-300 underline underline-offset-4">
+              {{ es ? 'Cómo funciona →' : 'How this works →' }}
+            </NuxtLink>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
-      <PublicMemberAppCta />
+    <!-- Section 3: The problem -->
+    <section id="problema" class="relative border-t border-white/10 overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-br from-flame-600/15 via-transparent to-gold-500/10 pointer-events-none" />
+      <div class="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.22em] text-flame-500 mb-4">
+            {{ es ? 'El problema' : 'The problem' }}
+          </p>
+          <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight mb-6">
+            {{
+              es
+                ? 'Los jóvenes enfrentan más presión — y menos herramientas para levantarse.'
+                : 'Young people face more pressure — and fewer tools to get back up.'
+            }}
+          </h2>
+        </div>
+        <div class="space-y-4 text-gray-300 text-base sm:text-lg leading-relaxed">
+          <p>
+            {{
+              es
+                ? 'Ansiedad, miedo al fallo y la cultura del “todo o nada” llegan temprano. El skate ya enseña caída y reintento — nosotros lo hacemos intencional.'
+                : 'Anxiety, fear of failure, and all-or-nothing culture show up early. Skate already teaches falling and trying again — we make that intentional.'
+            }}
+          </p>
+          <p>
+            {{
+              es
+                ? 'NiikSkate convierte cada sesión en práctica de resiliencia: exposición, skills mentales, competencia, confianza.'
+                : 'NiikSkate turns every session into resilience practice: exposure, mental skills, competence, confidence.'
+            }}
+          </p>
+        </div>
+      </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
-      <HomeGuestClassAvailabilityCalendar />
+    <!-- Section 4: Donate -->
+    <section id="donar" class="border-t border-white/10 bg-gradient-to-b from-gray-950 to-black">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
+        <p class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-4">
+          {{ es ? 'Donar' : 'Donate' }}
+        </p>
+        <h2 class="text-3xl sm:text-4xl font-black mb-4">
+          {{ es ? 'Ayúdanos a seguir.' : 'Help us keep rolling.' }}
+        </h2>
+        <p class="text-gray-300 mb-8 max-w-xl mx-auto">
+          {{
+            es
+              ? 'Cada peso apoya clínicas, becas y el Método Niik — resiliencia y salud mental a través del skate.'
+              : 'Every dollar supports clinics, scholarships, and the Niik Method — resilience and mental health through skate.'
+          }}
+        </p>
+
+        <div class="flex flex-wrap justify-center gap-2 mb-4">
+          <button
+            v-for="amount in donateAmounts"
+            :key="amount"
+            type="button"
+            class="min-w-[4.5rem] px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors"
+            :class="selectedDonate === amount && !customDonate
+              ? 'bg-gold-400 text-black border-gold-400'
+              : 'border-white/20 text-white hover:border-gold-400/60'"
+            @click="selectDonate(amount)"
+          >
+            ${{ amount }}
+          </button>
+        </div>
+        <div class="flex items-center justify-center gap-2 mb-6">
+          <span class="text-gray-400 font-bold">$</span>
+          <input
+            v-model="customDonate"
+            type="number"
+            min="1"
+            class="w-36 px-3 py-2.5 rounded-xl bg-gray-900 border border-white/15 text-white text-center font-semibold focus:outline-none focus:border-gold-400"
+            :placeholder="es ? 'Otro' : 'Other'"
+          />
+        </div>
+        <a
+          :href="`mailto:hola@niikskate.com?subject=${encodeURIComponent(es ? 'Donación NiikSkate' : 'NiikSkate donation')}&body=${encodeURIComponent((es ? 'Quiero donar $' : 'I want to donate $') + donateTotal)}`"
+          class="inline-flex px-8 py-3.5 rounded-xl bg-gold-400 text-black font-bold hover:bg-gold-300 transition-colors"
+        >
+          {{ es ? `Continuar — $${donateTotal}` : `Continue — $${donateTotal}` }}
+        </a>
+      </div>
+    </section>
+
+    <!-- Section 5: Free clinics -->
+    <section id="clinics" class="border-t border-white/10">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-4">
+            {{ es ? 'Clínicas gratis' : 'Free clinics' }}
+          </p>
+          <h2 class="text-3xl sm:text-4xl font-black mb-4 leading-tight">
+            {{
+              es
+                ? 'Prueba el Método Niik sin costo.'
+                : 'Try the Niik Method at no cost.'
+            }}
+          </h2>
+          <p class="text-gray-300 text-lg mb-8 max-w-xl">
+            {{
+              es
+                ? 'Sesiones abiertas para conocer coaches, la comunidad y cómo enseñamos a caer — y levantarse.'
+                : 'Open sessions to meet coaches, the community, and how we teach falling — and getting back up.'
+            }}
+          </p>
+          <NuxtLink
+            to="/classes"
+            class="inline-flex px-6 py-3 rounded-xl border border-gold-400 text-gold-400 font-bold hover:bg-gold-400 hover:text-black transition-colors"
+          >
+            {{ es ? 'Ver clínicas' : 'View clinics' }}
+          </NuxtLink>
+        </div>
+        <div class="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10">
+          <img src="/Niik_StainedGlass.png" alt="" class="absolute inset-0 w-full h-full object-cover opacity-70" />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+          <p class="absolute bottom-5 left-5 right-5 text-sm font-semibold text-white/90">
+            {{ es ? 'Próximas clínicas en el calendario de clases.' : 'Upcoming clinics on the class calendar.' }}
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 6: Summer camps -->
+    <section id="camps" class="border-t border-white/10 bg-gray-950/80">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <p class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
+          {{ es ? 'Verano' : 'Summer' }}
+        </p>
+        <h2 class="text-3xl sm:text-5xl font-black mb-4 max-w-3xl leading-tight">
+          {{ es ? '¡Inscríbete a los summer camps!' : 'Register for summer camps!' }}
+        </h2>
+        <p class="text-gray-300 text-lg max-w-2xl mb-8">
+          {{
+            es
+              ? 'Skate, skills mentales y mucha diversión. Camps de una semana para todos los niveles — del primer día al rider con experiencia.'
+              : 'Skateboarding, mental skills, and a whole lot of fun. Week-long camps for every level — from first-timers to experienced riders.'
+          }}
+        </p>
+        <NuxtLink
+          to="/skate-programs"
+          class="inline-flex px-7 py-3.5 rounded-xl bg-white text-black font-bold hover:bg-gold-300 transition-colors"
+        >
+          {{ es ? 'Ver camps' : 'View camps' }}
+        </NuxtLink>
+      </div>
+    </section>
+
+    <!-- Section 7: How Niik teaches — pillars -->
+    <section id="metodo" class="border-t border-white/10">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black max-w-4xl leading-tight mb-12 sm:mb-16">
+          {{
+            es
+              ? 'CÓMO Niik Skate enseña resiliencia a través del SKATEBOARDING'
+              : 'HOW Niik Skate teaches resilience through SKATEBOARDING'
+          }}
+        </h2>
+
+        <ol class="space-y-10 sm:space-y-12">
+          <li
+            v-for="pillar in pillars"
+            :key="pillar.n"
+            class="grid sm:grid-cols-[5rem_1fr] gap-4 sm:gap-8 border-t border-white/10 pt-8"
+          >
+            <span class="text-3xl sm:text-4xl font-black text-gold-400/90 tabular-nums">{{ pillar.n }}</span>
+            <div>
+              <h3 class="text-xl sm:text-2xl font-black text-white mb-2">{{ pillar.title }}</h3>
+              <p class="text-gray-300 text-base sm:text-lg leading-relaxed max-w-2xl">{{ pillar.body }}</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="mt-12">
+          <NuxtLink to="/niik-method" class="text-sm font-bold text-gold-400 hover:text-gold-300 underline underline-offset-4">
+            {{ es ? 'Conoce el Método Niik →' : 'Explore the Niik Method →' }}
+          </NuxtLink>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 8: Impact + parent interviews -->
+    <section id="impacto" class="border-t border-white/10 bg-gradient-to-b from-black to-gray-950">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <p class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-4">
+          {{ es ? 'Reporte de impacto' : 'Student impact report' }}
+        </p>
+        <h2 class="text-3xl sm:text-4xl font-black mb-10 max-w-2xl">
+          {{
+            es
+              ? 'Lo que dicen los datos — y las familias.'
+              : 'What the numbers say — and what families feel.'
+          }}
+        </h2>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-16">
+          <div v-for="stat in impactStats" :key="stat.label">
+            <p class="text-4xl sm:text-5xl font-black text-gold-400 mb-2">{{ stat.value }}</p>
+            <p class="text-sm text-gray-400 leading-snug">{{ stat.label }}</p>
+          </div>
+        </div>
+        <p class="text-xs text-gray-500 mb-14">
+          {{
+            es
+              ? '*Cifras ilustrativas — actualiza con tu encuesta real de alumnos.'
+              : '*Illustrative figures — replace with your real student survey.'
+          }}
+        </p>
+
+        <div class="border border-white/10 rounded-2xl bg-black/50 px-6 sm:px-10 py-10 min-h-[220px] flex flex-col justify-center">
+          <div class="flex items-center justify-between gap-3 mb-6">
+            <p class="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">
+              {{ es ? 'Padres nos cuentan' : 'Parents tell us' }}
+            </p>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="w-9 h-9 rounded-lg border border-white/15 text-white hover:border-gold-400/50"
+                :aria-label="es ? 'Anterior' : 'Previous'"
+                @click="prevQuote"
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                class="w-9 h-9 rounded-lg border border-white/15 text-white hover:border-gold-400/50"
+                :aria-label="es ? 'Siguiente' : 'Next'"
+                @click="nextQuote"
+              >
+                →
+              </button>
+            </div>
+          </div>
+          <Transition name="quote-fade" mode="out-in">
+            <blockquote :key="quoteIndex" class="text-xl sm:text-2xl font-medium text-white leading-relaxed">
+              “{{ parentQuotes[quoteIndex]?.quote }}”
+            </blockquote>
+          </Transition>
+          <div class="mt-8 flex gap-2">
+            <button
+              v-for="(_, i) in parentQuotes"
+              :key="i"
+              type="button"
+              class="h-1.5 rounded-full transition-all"
+              :class="i === quoteIndex ? 'w-8 bg-gold-400' : 'w-3 bg-white/20 hover:bg-white/40'"
+              :aria-label="'Quote ' + (i + 1)"
+              @click="quoteIndex = i"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 9: Community — those who help -->
+    <section id="comunidad" class="border-t border-white/10 overflow-hidden">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 pb-8 text-center">
+        <p class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
+          {{ es ? 'Comunidad' : 'Community' }}
+        </p>
+        <h2 class="text-3xl sm:text-4xl font-black mb-3">
+          {{ es ? 'QUIENES NOS AYUDAN @ Niik Skate' : 'THOSE WHO HELP US @ Niik Skate' }}
+        </h2>
+        <p class="text-gray-400 max-w-xl mx-auto mb-10">
+          {{
+            es
+              ? 'Partners, familias y riders que empujan la misión.'
+              : 'Partners, families, and riders who push the mission forward.'
+          }}
+        </p>
+      </div>
+
+      <div class="relative pb-16 sm:pb-20">
+        <div class="flex gap-5 w-max animate-deck-marquee hover:[animation-play-state:paused]">
+          <div
+            v-for="(deck, i) in [...communityDecks, ...communityDecks]"
+            :key="deck.id + '-' + i"
+            class="group relative w-36 sm:w-44 aspect-[8/22] shrink-0 transition-transform duration-300 hover:-translate-y-1"
+          >
+            <NuxtLink
+              v-if="deck.url"
+              :to="deck.url"
+              class="absolute inset-0 z-10"
+              :aria-label="deck.name"
+            />
+            <!-- Deck base -->
+            <img
+              src="/images/decks/blank-deck.svg"
+              alt=""
+              class="absolute inset-0 w-full h-full object-contain drop-shadow-2xl pointer-events-none"
+            />
+            <!-- Soft brand tint over wood -->
+            <div
+              class="absolute inset-[8%] rounded-[2rem] bg-gradient-to-b opacity-70 pointer-events-none"
+              :class="deck.tone || 'from-white/10 to-black/50'"
+            />
+            <!-- Collaborator logo on top of deck -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center px-4 sm:px-5 pointer-events-none">
+              <div
+                class="w-[78%] aspect-square rounded-2xl bg-black/55 border border-white/10 backdrop-blur-[2px] flex items-center justify-center p-2.5 sm:p-3 shadow-lg transition-transform duration-300 group-hover:scale-105"
+              >
+                <img
+                  :src="deck.logo"
+                  :alt="deck.name"
+                  class="w-full h-full object-contain"
+                />
+              </div>
+              <p class="mt-4 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white/85 text-center leading-tight">
+                {{ deck.name }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 pb-16 text-center">
+        <NuxtLink to="/community" class="text-sm font-bold text-gold-400 hover:text-gold-300 underline underline-offset-4">
+          {{ es ? 'Ver comunidad →' : 'See the community →' }}
+        </NuxtLink>
+      </div>
+    </section>
+
+    <!-- Soft CTA before footer -->
+    <section class="border-t border-white/10">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-14 flex flex-col sm:flex-row items-center justify-between gap-6">
+        <p class="text-xl sm:text-2xl font-black text-center sm:text-left">
+          {{ es ? '¿Listo para subir a la tabla?' : 'Ready to step on the board?' }}
+        </p>
+        <div class="flex flex-wrap justify-center gap-3">
+          <NuxtLink to="/skate-programs" class="px-6 py-3 rounded-xl bg-gold-400 text-black font-bold hover:bg-gold-300">
+            {{ es ? 'Programas' : 'Programs' }}
+          </NuxtLink>
+          <NuxtLink
+            to="/auth/login?redirect=/member"
+            class="px-6 py-3 rounded-xl border border-white/20 font-bold hover:bg-white/5"
+          >
+            {{ es ? 'App de miembros' : 'Member app' }}
+          </NuxtLink>
+        </div>
+      </div>
     </section>
   </div>
 </template>
+
+<style scoped>
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes deck-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-deck-marquee {
+  animation: deck-marquee 42s linear infinite;
+}
+
+.quote-fade-enter-active,
+.quote-fade-leave-active {
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.quote-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.quote-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+</style>

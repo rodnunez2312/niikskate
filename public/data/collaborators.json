@@ -1,0 +1,32 @@
+{
+  "collaborators": [
+    {
+      "id": "niik-skateshop",
+      "name": "Niik Skateshop",
+      "logo": "/images/collaborators/niik-skateshop.png",
+      "url": "/skateshop",
+      "tone": "from-cyan-500/25 to-black/60"
+    },
+    {
+      "id": "el-deshuesadero-sk8",
+      "name": "El Deshuesadero SK8",
+      "logo": "/images/collaborators/el-deshuesadero-sk8.png",
+      "url": null,
+      "tone": "from-white/10 to-black/70"
+    },
+    {
+      "id": "darma",
+      "name": "Darma",
+      "logo": "/images/collaborators/darma.png",
+      "url": null,
+      "tone": "from-lime-400/20 to-black/60"
+    },
+    {
+      "id": "flip-no-comply",
+      "name": "Flip No Comply",
+      "logo": "/images/collaborators/flip-no-comply.png",
+      "url": null,
+      "tone": "from-red-500/25 to-black/60"
+    }
+  ]
+}

@@ -1,4 +1,7 @@
 <script setup lang="ts">
-definePageMeta({ middleware: ['auth'] })
-await navigateTo('/member/coach/knowledge-base', { replace: true })
+await navigateTo('/member/coach/plans?tab=tips', { replace: true })
 </script>
+
+<template>
+  <div />
+</template>

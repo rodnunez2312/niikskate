@@ -2,6 +2,11 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+definePageMeta({
+  middleware: ['auth', 'member'],
+  layout: 'member',
+})
+
 const client = useSupabaseClient()
 const { language, formatPrice, currency } = useI18n()
 const { syncing: syncingStock, syncStock } = useStockSync()
@@ -313,7 +318,7 @@ const saleTotal = computed(() => {
     <header class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4 pt-safe pb-4">
       <div class="max-w-lg mx-auto pt-4">
         <h1 class="text-2xl font-bold text-white mb-2">
-          {{ language === 'es' ? 'Tienda' : 'Store' }}
+          Skateshop
         </h1>
         
         <!-- Quick Stats -->

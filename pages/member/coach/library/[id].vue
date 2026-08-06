@@ -229,7 +229,7 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
           </button>
           <h1 class="text-xl font-bold text-white flex items-center gap-2">
             <span class="text-2xl" aria-hidden="true">🛹</span>
-            Program
+            {{ language === 'es' ? 'Programa' : 'Program' }}
           </h1>
           <div class="w-10" />
         </div>

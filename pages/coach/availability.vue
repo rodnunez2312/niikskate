@@ -5,7 +5,8 @@ import type { DayOfWeek, TimeSlot } from '~/types'
 import { DAY_LABELS, TIME_SLOT_LABELS } from '~/types'
 
 definePageMeta({
-  middleware: ['auth'],
+  middleware: ['auth', 'member'],
+  layout: 'member',
 })
 
 const router = useRouter()

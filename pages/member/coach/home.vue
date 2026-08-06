@@ -158,7 +158,7 @@ function slotLabel(slot: TimeSlot) {
               <span class="text-2xl">📝</span>
               <p class="font-bold text-white text-sm mt-1">{{ language === 'es' ? 'Evaluar' : 'Evaluate' }}</p>
             </NuxtLink>
-            <NuxtLink to="/member/coach/knowledge-base" class="rounded-xl bg-gradient-to-br from-flame-600/80 to-orange-600/80 p-4">
+            <NuxtLink to="/member/coach/plans?tab=tips" class="rounded-xl bg-gradient-to-br from-flame-600/80 to-orange-600/80 p-4">
               <span class="text-2xl">💡</span>
               <p class="font-bold text-white text-sm mt-1">{{ language === 'es' ? 'Conocimiento' : 'Knowledge' }}</p>
             </NuxtLink>

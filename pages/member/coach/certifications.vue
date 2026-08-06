@@ -132,7 +132,7 @@ function monthName(year: number, month: number) {
     </section>
 
     <div class="flex flex-col gap-2">
-      <NuxtLink to="/member/coach/knowledge-base" class="text-center text-gold-400 text-sm font-semibold underline">
+      <NuxtLink to="/member/coach/plans?tab=tips" class="text-center text-gold-400 text-sm font-semibold underline">
         {{ language === 'es' ? 'Base de conocimiento →' : 'Knowledge base →' }}
       </NuxtLink>
       <NuxtLink to="/member/coach/plans" class="text-center text-gray-400 text-sm underline">
