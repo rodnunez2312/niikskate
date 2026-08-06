@@ -81,6 +81,14 @@ export type ParseShopProductCsvResult = {
   duplicateCount: number
 }
 
+/**
+ * Deck sizes like 8.75" export without CSV quotes. The " toggles quote mode and
+ * swallows ,1231,1 into the size cell — price_mxn looks empty in the app.
+ */
+function sanitizeCsvLineForSkateData(line: string): string {
+  return line.replace(/(\d+(?:\.\d+)?)[\u2033"](?=[,;\t]|$)/g, '$1 in')
+}
+
 function parseCsvLine(line: string, delimiter = ','): string[] {
   const out: string[] = []
   let cur = ''
@@ -201,7 +209,14 @@ function expandMergedRowCells(cells: string[]): string[] {
 }
 
 function parseRowCells(line: string, delimiter: string): string[] {
-  return expandMergedRowCells(parseCsvLine(line, delimiter))
+  return expandMergedRowCells(parseCsvLine(sanitizeCsvLineForSkateData(line), delimiter))
+}
+
+/** Size cell absorbed price/stock because of inch mark (8.75") in CSV. */
+export function sizeFieldLooksLikeCsvInchShift(size: string | null | undefined): boolean {
+  const s = (size ?? '').trim()
+  if (!s) return false
+  return /,\s*\d{2,6}(?:\s*[,;]\s*\d+)?\s*$/.test(s) || /\d+(?:\.\d+)?"[,;]/.test(s)
 }
 
 function parseOptionalBool(raw: string): boolean | null {
@@ -448,6 +463,7 @@ export function validateRowsForImport(
           columnExcel: row.price_mxn_excel_col,
           productName: row.name.trim(),
           rawValue: row.price_mxn_raw.trim() || undefined,
+          detail: sizeFieldLooksLikeCsvInchShift(row.size) ? 'inch_csv_shift' : undefined,
         })
       }
     }

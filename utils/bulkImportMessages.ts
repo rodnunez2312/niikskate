@@ -46,14 +46,19 @@ function formatMissingPriceLine(i: BulkImportIssue, es: boolean): string {
       : `, product «${name}»`
     : ''
   const raw = i.rawValue?.trim()
+  if (i.detail === 'inch_csv_shift') {
+    return es
+      ? `Fila ${i.row}, ${col}${namePart}: en Excel se ve precio, pero la talla tiene comillas de pulgadas (ej. 8.75") y al guardar CSV el precio se desplaza. En columna talla usa 8.75 in o 8.75 sin comilla, guarda de nuevo como CSV y sube otra vez.`
+      : `Row ${i.row}, ${col}${namePart}: price looks fine in Excel, but the size uses inch quotes (e.g. 8.75") and the CSV shifts columns. Use 8.75 in or 8.75 without " in the size column, re-save as CSV, and upload again.`
+  }
   if (raw) {
     return es
       ? `Fila ${i.row}, ${col}${namePart}: no se pudo leer el precio. Valor en la celda: «${raw}». Quita formato de moneda y escribe solo el número (ej. 1200), sin $ ni MXN.`
       : `Row ${i.row}, ${col}${namePart}: could not read price. Cell value: «${raw}». Remove currency format and enter digits only (e.g. 1200), no $ or MXN.`
   }
   return es
-    ? `Fila ${i.row}, ${col}${namePart}: la celda está vacía. Escribe el precio en pesos (solo números, ej. 350 o 1200). Si este producto está repetido más abajo, la última fila debe traer precio o déjalo en la fila que sí lo tiene.`
-    : `Row ${i.row}, ${col}${namePart}: cell is empty. Enter price in pesos (digits only, e.g. 350 or 1200). If this product is duplicated below, the last row needs a price or keep it on the row that has one.`
+    ? `Fila ${i.row}, ${col}${namePart}: la celda está vacía en el CSV (aunque en Excel se vea bien). Revisa comillas en nombre/talla (usa 8.75 in en lugar de 8.75") y vuelve a guardar como CSV UTF-8.`
+    : `Row ${i.row}, ${col}${namePart}: cell is empty in the CSV (even if Excel looks fine). Check quotes in name/size (use 8.75 in instead of 8.75") and re-save as CSV UTF-8.`
 }
 
 function formatBadPriceLine(i: BulkImportIssue, es: boolean): string {
