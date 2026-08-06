@@ -2,6 +2,7 @@
 definePageMeta({ layout: 'public' })
 
 import type { Product, ProductCategory } from '~/types'
+import { CATEGORY_LABELS } from '~/types'
 
 type ShopGroupId = 'skate_equip' | 'security_equip' | 'clothing' | 'accessories'
 
@@ -195,6 +196,47 @@ function clearFilters() {
   searchQuery.value = ''
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+}
+
+function productSearchHaystack(product: Product): string {
+  const group = groupForProduct(product)
+  const cat = CATEGORY_LABELS[product.category as ProductCategory]
+  const titleWords = (product.name || '').split(/\s+/).join(' ')
+  return [
+    titleWords,
+    product.name,
+    product.brand,
+    product.description,
+    product.sku,
+    group?.label.en,
+    group?.label.es,
+    cat?.name,
+    cat?.name_es,
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function productMatchesSearch(product: Product, rawQuery: string) {
+  const tokens = normalizeSearchText(rawQuery)
+    .split(/\s+/)
+    .filter(Boolean)
+  if (!tokens.length) return true
+
+  const hay = normalizeSearchText(productSearchHaystack(product))
+  const nameHay = normalizeSearchText(product.name || '')
+
+  return tokens.every(token =>
+    hay.includes(token)
+    || nameHay.split(/\s+/).some(word => word.includes(token)),
+  )
+}
+
 function productMatchesFilters(product: Product) {
   if (selectedBrand.value) {
     return (product.brand || '').trim().toLowerCase() === selectedBrand.value.trim().toLowerCase()
@@ -210,6 +252,14 @@ function productMatchesFilters(product: Product) {
 
 function groupForProduct(product: Product): ShopGroup | undefined {
   return shopGroups.find(g => g.dbCategories.includes(product.category))
+}
+
+/** Public URLs only — blob: previews from failed uploads must not reach the storefront */
+function productImageUrl(product: Product): string | null {
+  const url = product.images?.find(
+    img => typeof img === 'string' && /^https?:\/\//i.test(img.trim()),
+  )
+  return url?.trim() || null
 }
 
 type BrandCard = {
@@ -234,7 +284,10 @@ const brandCards = computed((): BrandCard[] => {
     const logo = logoForBrand(name)
     const cur = map.get(name) || { count: 0, image: logo }
     cur.count += 1
-    if (!cur.image && p.images?.[0]) cur.image = p.images[0]
+    if (!cur.image && p.images?.[0]) {
+      const pub = productImageUrl(p)
+      if (pub) cur.image = pub
+    }
     if (logo) cur.image = logo
     map.set(name, cur)
   }
@@ -244,23 +297,36 @@ const brandCards = computed((): BrandCard[] => {
 })
 
 const filteredProducts = computed(() => {
-  if (brandsMode.value) return []
-  let list = products.value.filter(productMatchesFilters)
-  const q = searchQuery.value.trim().toLowerCase()
-  if (q) {
-    list = list.filter(p => {
-      const hay = `${p.name} ${p.brand || ''} ${p.description || ''}`.toLowerCase()
-      return hay.includes(q)
-    })
+  const q = searchQuery.value.trim()
+  const hasSearch = Boolean(q)
+
+  let list = products.value.filter(product => {
+    if (hasSearch) return true
+    return productMatchesFilters(product)
+  })
+
+  if (hasSearch) {
+    list = list.filter(p => productMatchesSearch(p, q))
   }
+
   return list
+})
+
+const showBrandPicker = computed(
+  () => brandsMode.value && !searchQuery.value.trim(),
+)
+
+watch(searchQuery, (q) => {
+  if (!q.trim()) return
+  brandsMode.value = false
+  selectedBrand.value = null
 })
 
 const brandsTileActive = computed(() => brandsMode.value || Boolean(selectedBrand.value))
 
 const getProductPrice = (product: Product) => {
-  const priceUSD = product.sale_price || product.price
-  return formatPrice(priceUSD * 17.5)
+  const priceMXN = product.sale_price || product.price
+  return formatPrice(priceMXN)
 }
 
 const addToCart = (product: Product) => {
@@ -468,7 +534,7 @@ const cartLabel = computed(() => {
       </div>
 
       <!-- Brands big cards -->
-      <div v-else-if="brandsMode" class="space-y-4">
+      <div v-else-if="showBrandPicker" class="space-y-4">
         <p class="text-center text-sm text-gray-400">
           {{ es ? 'Elige una marca para ver sus productos' : 'Pick a brand to see its products' }}
         </p>
@@ -524,7 +590,11 @@ const cartLabel = computed(() => {
         class="text-center py-16 border border-white/10 rounded-2xl"
       >
         <p class="text-lg font-bold mb-2">
-          {{ es ? 'No hay productos con estos filtros' : 'No products match these filters' }}
+          {{
+            searchQuery.trim()
+              ? (es ? 'Ningún producto coincide con tu búsqueda' : 'No products match your search')
+              : (es ? 'No hay productos con estos filtros' : 'No products match these filters')
+          }}
         </p>
         <button
           type="button"
@@ -544,8 +614,8 @@ const cartLabel = computed(() => {
         >
           <NuxtLink :to="`/shop/${product.id}`" class="relative aspect-square bg-gray-900 overflow-hidden block">
             <img
-              v-if="product.images?.[0]"
-              :src="product.images[0]"
+              v-if="productImageUrl(product)"
+              :src="productImageUrl(product)!"
               :alt="product.name"
               class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />

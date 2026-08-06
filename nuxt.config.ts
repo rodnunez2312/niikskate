@@ -52,7 +52,7 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/auth/login',
       callback: '/auth/confirm',
-      exclude: ['/', '/classes', '/niik-method', '/skate-programs', '/community', '/shop', '/shop/*', '/equipment', '/equipment/*'],
+      exclude: ['/', '/classes', '/niik-method', '/skate-programs', '/community', '/shop', '/shop/*', '/skateshop', '/cart', '/equipment', '/equipment/*'],
     },
   },
 
@@ -81,6 +81,11 @@ export default defineNuxtConfig({
 
   // SSR configuration - disable for Capacitor mobile builds
   ssr: true,
+
+  routeRules: {
+    '/shop': { redirect: '/skateshop' },
+    '/skate-products': { redirect: '/skateshop' },
+  },
 
   // Nitro configuration
   nitro: {

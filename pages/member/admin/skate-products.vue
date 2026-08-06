@@ -260,6 +260,7 @@ async function handleImageUpload(event: Event) {
   const input = event.target as HTMLInputElement
   if (!input.files?.length) return
   uploadingImage.value = true
+  formError.value = null
   try {
     for (const file of Array.from(input.files)) {
       const fileExt = file.name.split('.').pop()
@@ -271,16 +272,22 @@ async function handleImageUpload(event: Event) {
       })
       if (error) {
         console.error(error)
-        productImages.value.push(URL.createObjectURL(file))
-      } else {
-        const { data: urlData } = client.storage.from('images').getPublicUrl(filePath)
-        productImages.value.push(urlData.publicUrl)
+        formError.value = es.value
+          ? `No se pudo subir la foto: ${error.message}. Revisa que exista el bucket "images" en Supabase y que tu usuario admin tenga permiso.`
+          : `Photo upload failed: ${error.message}. Ensure the "images" bucket exists and admins can upload to products/.`
+        continue
       }
+      const { data: urlData } = client.storage.from('images').getPublicUrl(filePath)
+      productImages.value.push(urlData.publicUrl)
     }
   } finally {
     uploadingImage.value = false
     if (imageInput.value) imageInput.value.value = ''
   }
+}
+
+function persistableProductImages() {
+  return productImages.value.filter(url => typeof url === 'string' && /^https?:\/\//i.test(url.trim()))
 }
 
 function removeImage(index: number) {
@@ -295,6 +302,15 @@ async function saveProduct() {
   saving.value = true
   formError.value = null
   try {
+    const images = persistableProductImages()
+    if (productImages.value.length && !images.length) {
+      formError.value = es.value
+        ? 'Las fotos no están en la nube. Sube de nuevo o revisa Storage en Supabase.'
+        : 'Photos were not saved to cloud storage. Re-upload or check Supabase Storage.'
+      saving.value = false
+      return
+    }
+
     const payload = {
       name: form.value.name.trim(),
       description: form.value.description.trim() || '',
@@ -304,7 +320,7 @@ async function saveProduct() {
       stock_quantity: Number(form.value.stock_quantity) || 0,
       is_active: form.value.is_active,
       is_featured: form.value.is_featured,
-      images: productImages.value,
+      images,
       is_service: form.value.category === 'ramps',
       requires_quote: form.value.category === 'ramps',
       updated_at: new Date().toISOString(),
@@ -684,7 +700,9 @@ function onShopGroupPick(groupId: ShopGroupId) {
 
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs text-gray-400 mb-1">{{ es ? 'Precio' : 'Price' }} *</label>
+                <label class="block text-xs text-gray-400 mb-1">
+                  {{ es ? 'Precio (MXN)' : 'Price (MXN)' }} *
+                </label>
                 <input
                   v-model.number="form.price"
                   type="number"

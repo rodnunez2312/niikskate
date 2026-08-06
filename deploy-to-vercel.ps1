@@ -1,4 +1,5 @@
-# Deploy local working tree to Vercel production
+# Deploy local working tree to Vercel production (CLI — bypasses GitHub)
+# Prefer:  .\publish.ps1 -Message "your commit message"
 # Usage:  .\deploy-to-vercel.ps1
 # First run will ask you to log in / link the project.
 

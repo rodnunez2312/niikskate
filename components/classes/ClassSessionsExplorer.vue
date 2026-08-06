@@ -40,8 +40,8 @@ const enrollmentsByEvent = ref<Map<string, Set<string>>>(new Map())
 const skateparks = [DEFAULT_SKATEPARK]
 const selectedSkatepark = ref(DEFAULT_SKATEPARK)
 const selectedDays = ref<number[]>([])
-/** Optional browse filter by age band — empty = show all */
-const selectedAgeBands = ref<AudienceCategory[]>([])
+/** Optional browse filter by age band — null = show all */
+const selectedAgeBand = ref<AudienceCategory | null>(null)
 /** Optional — highlight classes for these crew members */
 const selectedSkaterKeys = ref<string[]>([])
 
@@ -87,9 +87,7 @@ const toggleDay = (d: number) => {
 }
 
 const toggleAgeBand = (id: AudienceCategory) => {
-  const i = selectedAgeBands.value.indexOf(id)
-  if (i >= 0) selectedAgeBands.value = selectedAgeBands.value.filter(x => x !== id)
-  else selectedAgeBands.value = [...selectedAgeBands.value, id]
+  selectedAgeBand.value = selectedAgeBand.value === id ? null : id
 }
 
 const toggleSkaterFilter = (key: string) => {
@@ -117,14 +115,13 @@ const participantEligible = (p: CrewParticipant, s: BookableClassSession) => {
 }
 
 const sessionMatchesAgeBandFilter = (s: BookableClassSession) => {
-  if (!selectedAgeBands.value.length) return true
+  const bandId = selectedAgeBand.value
+  if (!bandId) return true
   const cats = parseAudienceCategories(s)
-  if (cats.some(c => selectedAgeBands.value.includes(c))) return true
+  if (cats.includes(bandId)) return true
   const bounds = sessionAgeBounds(s)
-  return selectedAgeBands.value.some(bandId => {
-    const band = audienceAgeRange(bandId)
-    return rangesOverlap(bounds.minAge, bounds.maxAge, band.minAge, band.maxAge)
-  })
+  const band = audienceAgeRange(bandId)
+  return rangesOverlap(bounds.minAge, bounds.maxAge, band.minAge, band.maxAge)
 }
 
 const sessionMatchesSkaterFilter = (s: BookableClassSession) => {
@@ -146,24 +143,20 @@ const filteredSessions = computed(() =>
 )
 
 const crewInSelectedBands = computed(() => {
-  if (!selectedAgeBands.value.length) return participants.value
-  return participants.value.filter(
-    p => p.age != null && selectedAgeBands.value.some(bandId => ageInBand(p.age!, bandId)),
-  )
+  const bandId = selectedAgeBand.value
+  if (!bandId) return participants.value
+  return participants.value.filter(p => p.age != null && ageInBand(p.age!, bandId))
 })
 
 const ageFilterError = computed(() => {
-  if (!user.value || !selectedAgeBands.value.length) return null
+  const bandId = selectedAgeBand.value
+  if (!user.value || !bandId) return null
   if (crewInSelectedBands.value.length === 0) {
-    const labels = selectedAgeBands.value
-      .map(id => {
-        const band = PROGRAM_AGE_BANDS.find(b => b.id === id)
-        return band ? (language.value === 'es' ? band.label.es : band.label.en) : id
-      })
-      .join(', ')
+    const band = PROGRAM_AGE_BANDS.find(b => b.id === bandId)
+    const label = band ? (language.value === 'es' ? band.label.es : band.label.en) : bandId
     return language.value === 'es'
-      ? `Ningún patinador de tu crew está en: ${labels}. Agrega uno en Crew o quita el filtro.`
-      : `None of your crew skaters are in: ${labels}. Add one in Crew or clear the filter.`
+      ? `Ningún patinador de tu crew está en: ${label}. Agrega uno en Crew o quita el filtro.`
+      : `None of your crew skaters are in: ${label}. Add one in Crew or clear the filter.`
   }
   return null
 })
@@ -479,7 +472,7 @@ onMounted(async () => {
             type="button"
             class="px-3 py-2 rounded-xl border-2 text-left text-xs font-bold transition-colors flex items-center gap-2"
             :class="
-              selectedAgeBands.includes(band.id)
+              selectedAgeBand === band.id
                 ? 'border-black bg-teal-600 text-white'
                 : 'border-gray-400 bg-white text-gray-800'
             "

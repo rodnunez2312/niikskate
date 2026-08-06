@@ -22,7 +22,16 @@ CREATE TYPE class_type AS ENUM ('grouped_beginner', 'grouped_intermediate', 'ind
 CREATE TYPE time_slot AS ENUM ('early', 'late'); -- early = 5:30-7:00, late = 7:00-8:30
 CREATE TYPE day_of_week AS ENUM ('tuesday', 'thursday', 'saturday');
 CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'completed', 'no_show');
-CREATE TYPE product_category AS ENUM ('safety_equipment', 'merchandise', 'skateboards', 'hardware', 'ramps');
+CREATE TYPE product_category AS ENUM (
+  'tablas',
+  'llantas',
+  'hardware',
+  'lijas',
+  'protecciones',
+  'cascos',
+  'merch',
+  'ramps'
+);
 CREATE TYPE order_status AS ENUM ('pending', 'processing', 'ready', 'completed', 'cancelled', 'refunded');
 CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'failed', 'refunded', 'partial');
 CREATE TYPE payment_method AS ENUM ('cash', 'card', 'transfer', 'other');

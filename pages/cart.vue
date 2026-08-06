@@ -4,27 +4,17 @@ const user = useSupabaseUser()
 const cartStore = useCartStore()
 const { t, formatPrice, language } = useI18n()
 
-// Convert USD prices to MXN for display
+// Prices in the catalog are stored in MXN (admin Skateshop form).
 const getItemPrice = (item: typeof cartStore.items[0]) => {
-  const priceUSD = item.product.sale_price || item.product.price
-  const priceMXN = priceUSD * 17.5
+  const priceMXN = item.product.sale_price || item.product.price
   return formatPrice(priceMXN)
 }
 
-const getSubtotal = computed(() => {
-  const subtotalMXN = cartStore.subtotal * 17.5
-  return formatPrice(subtotalMXN)
-})
+const getSubtotal = computed(() => formatPrice(cartStore.subtotal))
 
-const getTax = computed(() => {
-  const taxMXN = cartStore.tax * 17.5
-  return formatPrice(taxMXN)
-})
+const getTax = computed(() => formatPrice(cartStore.tax))
 
-const getTotal = computed(() => {
-  const totalMXN = cartStore.total * 17.5
-  return formatPrice(totalMXN)
-})
+const getTotal = computed(() => formatPrice(cartStore.total))
 
 const updateQuantity = (productId: string, newQuantity: number) => {
   cartStore.updateQuantity(productId, newQuantity)
@@ -32,6 +22,10 @@ const updateQuantity = (productId: string, newQuantity: number) => {
 
 const removeItem = (productId: string) => {
   cartStore.removeItem(productId)
+}
+
+function goToShop() {
+  return navigateTo('/skateshop')
 }
 
 const checkout = () => {
@@ -85,13 +79,17 @@ const getCategoryIcon = (category: string) => {
         <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center text-4xl">
           🛒
         </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ t('cart.empty') }}</h3>
-        <p class="text-gray-500 mb-4">
+        <h3 class="text-lg font-semibold text-white mb-2">{{ t('cart.empty') }}</h3>
+        <p class="text-gray-400 mb-6">
           {{ t('cart.addItems') }}
         </p>
-        <NuxtLink to="/shop" class="btn bg-yellow-400 text-gray-900 font-bold">
+        <button
+          type="button"
+          class="btn bg-yellow-400 text-gray-900 font-bold px-8 py-3"
+          @click="goToShop"
+        >
           {{ t('cart.shopNow') }}
-        </NuxtLink>
+        </button>
       </div>
 
       <!-- Cart Items -->
