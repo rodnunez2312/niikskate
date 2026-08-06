@@ -1,8 +1,11 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 
+import { resolveAppBuildMeta } from './server/utils/appBuildMeta'
+
 // OneDrive / cloud-sync folders: native FS watchers often fire bogus delete events on
 // `.nuxt/dist`, which makes Nuxt restart in a loop and the browser stays blank/spinning.
 const isWin = process.platform === 'win32'
+const appBuildMeta = resolveAppBuildMeta()
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
@@ -77,6 +80,13 @@ export default defineNuxtConfig({
     /** Meta Graph: Facebook Page feed with full_picture (optional) */
     metaFacebookPageToken: process.env.META_FACEBOOK_PAGE_TOKEN || '',
     metaFacebookPageId: process.env.META_FACEBOOK_PAGE_ID || '',
+    /** Server-only deploy info (admin API); set at build on Vercel. */
+    appBuildShaShort: appBuildMeta.shaShort,
+    appBuildShaFull: appBuildMeta.shaFull,
+    appBuildMessage: appBuildMeta.message,
+    appBuildAt: appBuildMeta.builtAt,
+    appBuildEnv: appBuildMeta.environment,
+    appBuildBranch: appBuildMeta.branch,
   },
 
   // SSR configuration - disable for Capacitor mobile builds

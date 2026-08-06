@@ -79,6 +79,8 @@ useCrew()
         </button>
       </div>
 
+      <MemberAdminBuildBadge v-if="isAdmin" />
+
       <MemberCrewSwitcher v-if="isStudent" compact @add="goAddCrew" />
     </div>
   </header>

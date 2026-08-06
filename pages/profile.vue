@@ -448,10 +448,8 @@ const roleBadgeColors: Record<string, string> = {
         {{ language === 'es' ? 'Cerrar Sesión' : 'Sign Out' }}
       </button>
 
-      <!-- App Version -->
-      <p class="text-center text-gray-600 text-xs mt-4 mb-8">
-        NiikSkate Academy v1.1.0
-      </p>
+      <MemberAdminBuildBadge v-if="profile?.role === 'admin'" class="mt-4 mb-8" />
+      <div v-else class="mt-4 mb-8" />
     </div>
   </div>
 </template>
