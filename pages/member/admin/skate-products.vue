@@ -7,12 +7,19 @@ definePageMeta({
 import type { ProductCategory } from '~/types'
 import {
   parseShopProductCsv,
-  mergeShopProductForUpsert,
   validateRowsForImport,
+  buildBulkImportPayloads,
+  bulkProductMatchKey,
   productsToCsv,
   SHOP_PRODUCT_CSV_COLUMNS,
 } from '~/utils/shopProductBulk'
 import { nextNumericProductId, normalizeNumericProductId } from '~/utils/productId'
+import { compressImageForUpload, PRODUCT_PHOTO_UPLOAD } from '~/utils/compressImageForUpload'
+import {
+  buildAutoProductDescription,
+  composeProductDescription,
+  extractUserAppendFromStoredDescription,
+} from '~/utils/productDescriptionTemplate'
 
 type ShopGroupId = 'skate_equip' | 'security_equip' | 'clothing' | 'accessories'
 
@@ -92,6 +99,8 @@ const emptyForm = () => ({
   description: '',
   brand: '',
   size: '',
+  proveedor: '',
+  comentarios: '',
   category: 'tablas' as ProductCategory,
   price: 0,
   stock_quantity: 0,
@@ -100,6 +109,15 @@ const emptyForm = () => ({
 })
 
 const form = ref(emptyForm())
+
+const autoDescriptionPreview = computed(() =>
+  buildAutoProductDescription({
+    name: form.value.name,
+    brand: form.value.brand || null,
+    category: form.value.category,
+    size: form.value.size || null,
+  }),
+)
 
 onMounted(async () => {
   if (!user.value) {
@@ -228,7 +246,7 @@ const filteredProducts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     list = list.filter(p =>
-      `${p.sku} ${p.name} ${p.brand || ''} ${p.size || ''} ${p.description || ''}`.toLowerCase().includes(q),
+      `${p.sku} ${p.name} ${p.brand || ''} ${p.size || ''} ${p.proveedor || ''} ${p.comentarios || ''} ${p.description || ''}`.toLowerCase().includes(q),
     )
   }
   return list
@@ -254,9 +272,11 @@ function openEdit(product: any) {
   form.value = {
     sku: product.sku || '',
     name: product.name || '',
-    description: product.description || '',
+    description: extractUserAppendFromStoredDescription(product.description),
     brand: product.brand || '',
     size: product.size || '',
+    proveedor: product.proveedor || '',
+    comentarios: product.comentarios || '',
     category: product.category || 'tablas',
     price: Number(product.price) || 0,
     stock_quantity: Number(product.stock_quantity) || 0,
@@ -281,12 +301,23 @@ async function handleImageUpload(event: Event) {
   formError.value = null
   try {
     for (const file of Array.from(input.files)) {
-      const fileExt = file.name.split('.').pop()
+      let uploadFile: File
+      try {
+        uploadFile = await compressImageForUpload(file)
+      } catch (e) {
+        console.error(e)
+        formError.value = es.value
+          ? 'No se pudo procesar la imagen. Usa JPG o PNG.'
+          : 'Could not process image. Use JPG or PNG.'
+        continue
+      }
+      const fileExt = uploadFile.name.split('.').pop() || 'jpg'
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`
       const filePath = `products/${fileName}`
-      const { error } = await client.storage.from('images').upload(filePath, file, {
+      const { error } = await client.storage.from('images').upload(filePath, uploadFile, {
         cacheControl: '3600',
         upsert: false,
+        contentType: uploadFile.type,
       })
       if (error) {
         console.error(error)
@@ -320,8 +351,8 @@ async function assertSkuAvailable(sku: string, excludeId?: string | null) {
   if (data) {
     throw new Error(
       es.value
-        ? `El ID "${sku}" ya existe. Usa otro product_id o edita ese producto.`
-        : `Product ID "${sku}" already exists. Use another product_id or edit that product.`,
+        ? `El ID "${sku}" ya existe. Cambia el ID en Editar o usa otro número.`
+        : `Product ID "${sku}" already exists. Change it in Edit or pick another number.`,
     )
   }
 }
@@ -349,12 +380,24 @@ async function saveProduct() {
       return
     }
 
+    const description = composeProductDescription(
+      {
+        name: form.value.name.trim(),
+        brand: form.value.brand.trim() || null,
+        category: form.value.category,
+        size: form.value.size.trim() || null,
+      },
+      form.value.description.trim(),
+    )
+
     const payload = {
       sku,
       name: form.value.name.trim(),
-      description: form.value.description.trim() || '',
+      description,
       brand: form.value.brand.trim() || null,
       size: form.value.size.trim() || null,
+      proveedor: form.value.proveedor.trim() || null,
+      comentarios: form.value.comentarios.trim() || '',
       category: form.value.category,
       price: Number(form.value.price),
       stock_quantity: Number(form.value.stock_quantity) || 0,
@@ -438,10 +481,12 @@ async function onBulkFileSelected(event: Event) {
     if (bulkFileInput.value) bulkFileInput.value.value = ''
     return
   }
-  const skus = parsed.rows.map(r => r.product_id.trim())
-  const { data: existing } = await client.from('products').select('sku').in('sku', skus)
-  const existingSkus = new Set((existing || []).map(r => r.sku))
-  const importErrors = validateRowsForImport(parsed.rows, existingSkus)
+  const { data: existingProducts } = await client.from('products').select('*')
+  const existingByMatchKey = new Map<string, NonNullable<typeof existingProducts>[number]>()
+  for (const p of existingProducts || []) {
+    existingByMatchKey.set(bulkProductMatchKey(p.name, p.brand, p.size), p)
+  }
+  const importErrors = validateRowsForImport(parsed.rows, existingByMatchKey)
   bulkPreview.value = parsed
   bulkImportErrors.value = importErrors
   if (bulkFileInput.value) bulkFileInput.value.value = ''
@@ -452,23 +497,19 @@ async function runBulkImport() {
   bulkImporting.value = true
   bulkMessage.value = null
   try {
-    const skus = bulkPreview.value.rows.map(r => r.product_id.trim())
-    const { data: existingRows, error: fetchErr } = await client.from('products').select('*').in('sku', skus)
+    const { data: catalogExisting, error: fetchErr } = await client.from('products').select('*')
     if (fetchErr) throw fetchErr
-    const bySku = new Map((existingRows || []).map(r => [r.sku, r]))
-    let created = 0
-    let updated = 0
-    const payloads = bulkPreview.value.rows.map(row => {
-      const ex = bySku.get(row.product_id.trim()) || null
-      if (ex) updated += 1
-      else created += 1
-      return mergeShopProductForUpsert(row, ex as any)
-    })
-    const { error } = await client.from('products').upsert(payloads, { onConflict: 'sku' })
+    const built = buildBulkImportPayloads(bulkPreview.value.rows, catalogExisting || [])
+    if (built.errors.length) {
+      bulkImportErrors.value = built.errors
+      bulkMessage.value = es.value ? 'Revisa los errores antes de importar.' : 'Fix errors before importing.'
+      return
+    }
+    const { error } = await client.from('products').upsert(built.payloads, { onConflict: 'sku' })
     if (error) throw error
     bulkMessage.value = es.value
-      ? `Listo: ${created} nuevos, ${updated} actualizados (por product_id).`
-      : `Done: ${created} created, ${updated} updated (by product_id).`
+      ? `Listo: ${built.created} nuevos (ID asignado automático), ${built.updated} actualizados (mismo nombre/marca/talla).`
+      : `Done: ${built.created} created (auto ID), ${built.updated} updated (same name/brand/size).`
     bulkPreview.value = null
     bulkImportErrors.value = []
     await fetchProducts()
@@ -495,6 +536,12 @@ function downloadCatalogExport() {
 
 const bulkColumnHelp = computed(() =>
   SHOP_PRODUCT_CSV_COLUMNS.map(c => `• ${c}`).join('\n'),
+)
+
+const productPhotoUploadHint = computed(() =>
+  es.value
+    ? `Las fotos no van en el CSV. Después de importar, edita cada producto y súbelas aquí (móvil o laptop). Se redimensionan automáticamente (máx. ${PRODUCT_PHOTO_UPLOAD.maxWidth}px, ~${Math.round(PRODUCT_PHOTO_UPLOAD.maxBytes / 1024)} KB).`
+    : `Photos are not in the CSV. After import, edit each product and upload here (mobile or laptop). Images are auto-resized (max ${PRODUCT_PHOTO_UPLOAD.maxWidth}px, ~${Math.round(PRODUCT_PHOTO_UPLOAD.maxBytes / 1024)} KB).`,
 )
 </script>
 
@@ -568,8 +615,8 @@ const bulkColumnHelp = computed(() =>
         <p class="text-xs text-gray-500 whitespace-pre-line">
           {{
             es
-              ? `Individual: Agregar / Editar guarda un producto. Masivo: exporta el catálogo, edita CSV en Excel, importa (mismo product_id = actualizar). Celdas vacías en filas existentes no borran ese campo (excepto descripción). Columnas:\n${bulkColumnHelp}`
-              : `Individual: Add / Edit saves one product. Bulk: export catalog, edit CSV in Excel, import (same product_id = update). Blank cells on existing SKUs keep that field (description excepted). Columns:\n${bulkColumnHelp}`
+              ? `Masivo: solo texto (sin ID ni fotos). El sistema asigna ID 001, 002… y genera la descripción para la tienda desde nombre, marca, categoría y talla. Columna description: déjala vacía o agrega notas extra (se añaden al texto automático).\n${productPhotoUploadHint}\nproveedor/comentarios no aparecen en /skateshop.\nColumnas:\n${bulkColumnHelp}`
+              : `Bulk: text only (no ID or photos). Auto IDs 001, 002… and storefront descriptions from name, brand, category, and size. description column: leave empty or add extra notes (appended to auto text).\n${productPhotoUploadHint}\nproveedor/comentarios are not on /skateshop.\nColumns:\n${bulkColumnHelp}`
           }}
         </p>
         <div class="flex flex-wrap gap-2">
@@ -611,7 +658,7 @@ const bulkColumnHelp = computed(() =>
           <li v-for="(err, i) in bulkImportErrors" :key="i">{{ err }}</li>
         </ul>
         <p v-else-if="bulkPreview?.rows.length" class="text-sm text-glass-green">
-          {{ bulkPreview.rows.length }} {{ es ? 'filas listas (nuevas o actualización por product_id).' : 'rows ready (new or update by product_id).' }}
+          {{ bulkPreview.rows.length }} {{ es ? 'filas listas (IDs se asignan al importar).' : 'rows ready (IDs assigned on import).' }}
         </p>
         <p v-if="bulkMessage" class="text-sm text-gray-300">{{ bulkMessage }}</p>
       </section>
@@ -718,6 +765,9 @@ const bulkColumnHelp = computed(() =>
                   <span v-if="product.brand"> · {{ product.brand }}</span>
                   <span v-if="product.size"> · {{ es ? 'Talla' : 'Size' }} {{ product.size }}</span>
                 </p>
+                <p v-if="product.proveedor" class="text-xs text-amber-200/70 truncate">
+                  {{ es ? 'Proveedor' : 'Supplier' }}: {{ product.proveedor }}
+                </p>
               </div>
               <span
                 class="text-[10px] font-bold uppercase px-2 py-1 rounded shrink-0"
@@ -785,6 +835,7 @@ const bulkColumnHelp = computed(() =>
               <label class="block text-xs text-gray-400 mb-2">
                 {{ es ? 'Fotos' : 'Photos' }}
               </label>
+              <p class="text-[11px] text-gray-500 mb-2">{{ productPhotoUploadHint }}</p>
               <div v-if="productImages.length" class="grid grid-cols-3 gap-2 mb-2">
                 <div
                   v-for="(img, idx) in productImages"
@@ -918,13 +969,43 @@ const bulkColumnHelp = computed(() =>
 
             <div>
               <label class="block text-xs text-gray-400 mb-1">
-                {{ es ? 'Descripción (Detalles)' : 'Description (Details)' }}
+                {{ es ? 'Descripción en tienda (automática)' : 'Store description (auto)' }}
+              </label>
+              <p class="text-xs text-gray-500 whitespace-pre-line rounded-xl bg-gray-900/80 border border-gray-800 p-3 mb-2 max-h-32 overflow-y-auto">
+                {{ autoDescriptionPreview || (es ? 'Completa nombre y categoría para ver la vista previa.' : 'Fill name and category to preview.') }}
+              </p>
+              <label class="block text-xs text-gray-400 mb-1">
+                {{ es ? 'Notas extra (opcional)' : 'Extra notes (optional)' }}
               </label>
               <textarea
                 v-model="form.description"
-                rows="3"
+                rows="2"
                 class="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm resize-y"
+                :placeholder="es ? 'Se añaden debajo del texto automático en /skateshop' : 'Appended below auto text on /skateshop'"
               />
+            </div>
+
+            <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+              <p class="text-xs font-bold text-amber-200/90">
+                {{ es ? 'Solo admin (no se muestra en la tienda)' : 'Admin only (not shown in the shop)' }}
+              </p>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">Proveedor</label>
+                <input
+                  v-model="form.proveedor"
+                  type="text"
+                  class="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">Comentarios</label>
+                <textarea
+                  v-model="form.comentarios"
+                  rows="2"
+                  class="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm resize-y"
+                  :placeholder="es ? 'Notas internas, costos, pedidos…' : 'Internal notes, costs, orders…'"
+                />
+              </div>
             </div>
 
             <label class="flex items-center gap-2 text-sm text-gray-300">

@@ -1,9 +1,12 @@
 import type { ProductCategory } from '~/types'
-import { normalizeImportProductId } from '~/utils/productId'
+import { nextNumericProductId } from '~/utils/productId'
+import {
+  extractUserAppendFromStoredDescription,
+  resolveBulkImportDescription,
+} from '~/utils/productDescriptionTemplate'
 
-/** CSV columns (row 1 header). Save as .csv from Excel. */
+/** CSV columns (row 1 header). Save as .csv from Excel. Product IDs (001, 002…) are assigned by the app. */
 export const SHOP_PRODUCT_CSV_COLUMNS = [
-  'product_id',
   'name',
   'brand',
   'category',
@@ -11,7 +14,8 @@ export const SHOP_PRODUCT_CSV_COLUMNS = [
   'price_mxn',
   'stock_quantity',
   'description',
-  'image_urls',
+  'proveedor',
+  'comentarios',
   'is_active',
   'is_featured',
 ] as const
@@ -29,9 +33,20 @@ const VALID_CATEGORIES: ProductCategory[] = [
   'ramps',
 ]
 
+/** Match key for bulk update without product_id in CSV. */
+export function bulkProductMatchKey(
+  name: string,
+  brand: string | null,
+  size: string | null,
+): string {
+  const n = name.trim().toLowerCase()
+  const b = (brand || '').trim().toLowerCase()
+  const s = (size || '').trim().toLowerCase()
+  return `${n}\0${b}\0${s}`
+}
+
 export type ParsedShopProductRow = {
   rowNumber: number
-  product_id: string
   name: string
   brand: string | null
   /** null = leave unchanged on bulk update of existing SKU */
@@ -42,7 +57,9 @@ export type ParsedShopProductRow = {
   /** null = leave unchanged on bulk update of existing SKU */
   stock_quantity: number | null
   description: string
-  image_urls: string[]
+  /** Empty string on bulk update = keep existing */
+  proveedor: string
+  comentarios: string
   is_active: boolean | null
   is_featured: boolean | null
 }
@@ -114,19 +131,13 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     const cells = parseCsvLine(lines[i])
     const get = (col: ShopProductCsvColumn) => cells[colIndex(col)]?.trim() ?? ''
 
-    const product_id = get('product_id')
     const name = get('name')
     const categoryRaw = get('category').toLowerCase()
     const category = categoryRaw
       ? (VALID_CATEGORIES.includes(categoryRaw as ProductCategory) ? (categoryRaw as ProductCategory) : null)
       : null
 
-    if (!product_id && !name) continue
-
-    if (!product_id) {
-      errors.push(`Row ${rowNumber}: product_id is required.`)
-      continue
-    }
+    if (!name.trim()) continue
 
     const priceRaw = get('price_mxn')
     let price_mxn: number | null = null
@@ -155,22 +166,17 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
       continue
     }
 
-    const imageField = get('image_urls')
-    const image_urls = imageField
-      ? imageField.split('|').map(u => u.trim()).filter(u => /^https?:\/\//i.test(u))
-      : []
-
     rows.push({
       rowNumber,
-      product_id: normalizeImportProductId(product_id),
-      name: get('name'),
+      name: name.trim(),
       brand: get('brand') || null,
       category,
       size: get('size') || null,
       price_mxn,
       stock_quantity,
       description: get('description') || '',
-      image_urls,
+      proveedor: get('proveedor'),
+      comentarios: get('comentarios'),
       is_active: parseOptionalBool(get('is_active')),
       is_featured: parseOptionalBool(get('is_featured')),
     })
@@ -178,28 +184,40 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
 
   const seen = new Set<string>()
   for (const r of rows) {
-    const key = r.product_id.toLowerCase()
-    if (seen.has(key)) errors.push(`Duplicate product_id in file: ${r.product_id}`)
+    const key = bulkProductMatchKey(r.name, r.brand, r.size)
+    if (seen.has(key)) {
+      errors.push(
+        `Duplicate row in file (same name, brand, size): "${r.name}"${r.brand ? ` / ${r.brand}` : ''}${r.size ? ` / ${r.size}` : ''}`,
+      )
+    }
     seen.add(key)
   }
 
   return { rows, errors }
 }
 
-export function shopProductRowToDbPayload(row: ParsedShopProductRow) {
+export function shopProductRowToDbPayload(row: ParsedShopProductRow, sku: string) {
   if (!row.category || row.price_mxn == null) {
     throw new Error('New products require category and price_mxn in CSV.')
   }
+  const descFields = {
+    name: row.name.trim(),
+    brand: row.brand,
+    category: row.category,
+    size: row.size,
+  }
   return {
-    sku: normalizeImportProductId(row.product_id),
+    sku,
     name: row.name.trim(),
     brand: row.brand,
     category: row.category,
     size: row.size,
     price: row.price_mxn,
     stock_quantity: row.stock_quantity ?? 0,
-    description: row.description,
-    images: row.image_urls,
+    description: resolveBulkImportDescription(descFields, row.description),
+    proveedor: row.proveedor.trim() || null,
+    comentarios: row.comentarios.trim() || '',
+    images: [] as string[],
     is_active: row.is_active ?? true,
     is_featured: row.is_featured ?? false,
     is_service: row.category === 'ramps',
@@ -219,6 +237,8 @@ type ExistingProductRow = {
   price: number
   stock_quantity: number
   description: string
+  proveedor: string | null
+  comentarios: string
   images: string[]
   is_active: boolean
   is_featured: boolean
@@ -234,24 +254,27 @@ export function mergeShopProductForUpsert(
   existing: ExistingProductRow | null,
 ) {
   if (!existing) {
-    return shopProductRowToDbPayload(row)
+    throw new Error('mergeShopProductForUpsert requires an existing row when updating.')
   }
 
   const category = row.category || existing.category
-  const images =
-    row.image_urls.length > 0
-      ? row.image_urls
-      : (Array.isArray(existing.images) ? existing.images : [])
+  const images = Array.isArray(existing.images) ? existing.images : []
+  const name = row.name.trim() || existing.name
+  const brand = row.brand ?? existing.brand
+  const size = row.size ?? existing.size
+  const descFields = { name, brand, category, size }
 
   return {
-    sku: normalizeImportProductId(row.product_id),
-    name: row.name.trim() || existing.name,
-    brand: row.brand ?? existing.brand,
+    sku: existing.sku,
+    name,
+    brand,
     category,
-    size: row.size ?? existing.size,
+    size,
     price: row.price_mxn ?? Number(existing.price),
     stock_quantity: row.stock_quantity ?? existing.stock_quantity,
-    description: row.description !== '' ? row.description : existing.description,
+    description: resolveBulkImportDescription(descFields, row.description, existing.description),
+    proveedor: row.proveedor !== '' ? (row.proveedor.trim() || null) : existing.proveedor,
+    comentarios: row.comentarios !== '' ? row.comentarios : existing.comentarios,
     images,
     is_active: row.is_active ?? existing.is_active,
     is_featured: row.is_featured ?? existing.is_featured,
@@ -265,19 +288,98 @@ export function mergeShopProductForUpsert(
 
 export function validateRowsForImport(
   rows: ParsedShopProductRow[],
-  existingSkus: Set<string>,
+  existingByMatchKey: Map<string, ExistingProductRow>,
 ): string[] {
   const errors: string[] = []
   for (const row of rows) {
-    const sku = row.product_id.trim()
-    const isNew = !existingSkus.has(sku)
+    if (!row.name.trim()) {
+      errors.push(`Row ${row.rowNumber}: name is required.`)
+      continue
+    }
+    const key = bulkProductMatchKey(row.name, row.brand, row.size)
+    const isNew = !existingByMatchKey.has(key)
     if (isNew) {
-      if (!row.name.trim()) errors.push(`Row ${row.rowNumber}: name is required for new product_id ${sku}.`)
-      if (!row.category) errors.push(`Row ${row.rowNumber}: category is required for new product_id ${sku}.`)
-      if (row.price_mxn == null) errors.push(`Row ${row.rowNumber}: price_mxn is required for new product_id ${sku}.`)
+      if (!row.category) errors.push(`Row ${row.rowNumber}: category is required for new product "${row.name}".`)
+      if (row.price_mxn == null) errors.push(`Row ${row.rowNumber}: price_mxn is required for new product "${row.name}".`)
     }
   }
   return errors
+}
+
+export type BulkImportBuildResult = {
+  payloads: Record<string, unknown>[]
+  created: number
+  updated: number
+  errors: string[]
+}
+
+/** Assign SKUs for new rows; match existing by name + brand + size. */
+export function buildBulkImportPayloads(
+  rows: ParsedShopProductRow[],
+  catalogExisting: ExistingProductRow[],
+): BulkImportBuildResult {
+  const errors: string[] = []
+  const existingByMatchKey = new Map<string, ExistingProductRow>()
+  for (const p of catalogExisting) {
+    existingByMatchKey.set(bulkProductMatchKey(p.name, p.brand, p.size), p)
+  }
+
+  const allSkus = catalogExisting.map(p => p.sku)
+  const assignedInBatch: string[] = []
+  const payloads: Record<string, unknown>[] = []
+  let created = 0
+  let updated = 0
+
+  for (const row of rows) {
+    const key = bulkProductMatchKey(row.name, row.brand, row.size)
+    const existing = existingByMatchKey.get(key) || null
+
+    try {
+      if (existing) {
+        payloads.push(mergeShopProductForUpsert(row, existing))
+        updated += 1
+      } else {
+        const sku = nextNumericProductId([...allSkus, ...assignedInBatch])
+        assignedInBatch.push(sku)
+        allSkus.push(sku)
+        payloads.push(shopProductRowToDbPayload(row, sku))
+        created += 1
+        existingByMatchKey.set(key, {
+          sku,
+          name: row.name.trim(),
+          brand: row.brand,
+          category: row.category!,
+          size: row.size,
+          price: row.price_mxn!,
+          stock_quantity: row.stock_quantity ?? 0,
+          description: resolveBulkImportDescription(
+            {
+              name: row.name.trim(),
+              brand: row.brand,
+              category: row.category!,
+              size: row.size,
+            },
+            row.description,
+          ),
+          proveedor: row.proveedor.trim() || null,
+          comentarios: row.comentarios.trim() || '',
+          images: [],
+          is_active: row.is_active ?? true,
+          is_featured: row.is_featured ?? false,
+          is_service: row.category === 'ramps',
+          requires_quote: row.category === 'ramps',
+          min_stock_level: 0,
+          max_stock_level: 9999,
+        })
+      }
+    } catch (e) {
+      errors.push(
+        `Row ${row.rowNumber}: ${e instanceof Error ? e.message : 'Could not build import row.'}`,
+      )
+    }
+  }
+
+  return { payloads, created, updated, errors }
 }
 
 function csvEscape(value: string): string {
@@ -287,7 +389,6 @@ function csvEscape(value: string): string {
 
 /** Export current catalog for edit-in-Excel → re-import (bulk update). */
 export function productsToCsv(rows: Array<{
-  sku: string
   name: string
   brand?: string | null
   category: string
@@ -295,23 +396,23 @@ export function productsToCsv(rows: Array<{
   price: number
   stock_quantity: number
   description?: string
-  images?: string[]
+  proveedor?: string | null
+  comentarios?: string | null
   is_active: boolean
   is_featured: boolean
 }>): string {
   const header = SHOP_PRODUCT_CSV_COLUMNS.join(',')
   const lines = rows.map(p => {
-    const imageUrls = (p.images || []).filter(u => /^https?:\/\//i.test(u)).join('|')
     return [
-      csvEscape(p.sku || ''),
       csvEscape(p.name || ''),
       csvEscape(p.brand || ''),
       csvEscape(p.category || ''),
       csvEscape(p.size || ''),
       String(p.price ?? 0),
       String(p.stock_quantity ?? 0),
-      csvEscape(p.description || ''),
-      csvEscape(imageUrls),
+      csvEscape(extractUserAppendFromStoredDescription(p.description) || ''),
+      csvEscape(p.proveedor || ''),
+      csvEscape(p.comentarios || ''),
       p.is_active ? 'true' : 'false',
       p.is_featured ? 'true' : 'false',
     ].join(',')

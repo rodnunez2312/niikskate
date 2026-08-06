@@ -176,6 +176,8 @@ CREATE TABLE products (
   specifications JSONB DEFAULT '{}',
   brand TEXT,
   size TEXT,
+  proveedor TEXT, -- Admin-only supplier
+  comentarios TEXT, -- Admin-only internal notes
   is_featured BOOLEAN DEFAULT FALSE NOT NULL,
   is_active BOOLEAN DEFAULT TRUE NOT NULL,
   is_service BOOLEAN DEFAULT FALSE NOT NULL, -- For ramp building services

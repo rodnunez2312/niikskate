@@ -1,4 +1,5 @@
 import type { Product, ProductCategory, ProductFilters, InventoryTransaction, InventoryTransactionType } from '~/types'
+import { STOREFRONT_PRODUCT_SELECT } from '~/utils/productColumns'
 
 export const useProducts = () => {
   const client = useSupabaseClient()
@@ -15,7 +16,7 @@ export const useProducts = () => {
     try {
       let query = client
         .from('products')
-        .select('*')
+        .select(STOREFRONT_PRODUCT_SELECT)
         .eq('is_active', true)
         .order('category')
         .order('name')
@@ -62,7 +63,7 @@ export const useProducts = () => {
     try {
       const { data, error: fetchError } = await client
         .from('products')
-        .select('*')
+        .select(STOREFRONT_PRODUCT_SELECT)
         .eq('id', id)
         .single()
       
@@ -82,7 +83,7 @@ export const useProducts = () => {
     try {
       const { data, error: fetchError } = await client
         .from('products')
-        .select('*')
+        .select(STOREFRONT_PRODUCT_SELECT)
         .eq('is_active', true)
         .eq('is_featured', true)
         .order('created_at', { ascending: false })
@@ -104,7 +105,7 @@ export const useProducts = () => {
     try {
       const { data, error: fetchError } = await client
         .from('products')
-        .select('*')
+        .select(STOREFRONT_PRODUCT_SELECT)
         .eq('category', category)
         .eq('is_active', true)
         .order('name')

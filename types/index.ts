@@ -543,6 +543,10 @@ export interface Product {
   specifications?: Record<string, string>
   brand?: string
   size?: string
+  /** Admin-only; not exposed on public storefront selects */
+  proveedor?: string | null
+  /** Admin-only internal notes */
+  comentarios?: string | null
   is_featured: boolean
   is_active: boolean
   is_service: boolean
