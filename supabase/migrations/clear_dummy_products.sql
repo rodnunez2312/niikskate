@@ -1,5 +1,5 @@
--- Remove ALL products (dummy seed data + manual tests).
--- Run once in Supabase SQL Editor before bulk import of real inventory.
+-- DBA / owner only — NOT exposed in the admin app.
+-- Wipe all products. Run manually in Supabase SQL Editor if you truly need a empty catalog.
 -- Order history keeps line items but product_id may become NULL (ON DELETE SET NULL).
 
 DELETE FROM inventory_transactions

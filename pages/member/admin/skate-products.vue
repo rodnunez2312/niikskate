@@ -12,6 +12,7 @@ import {
   productsToCsv,
   SHOP_PRODUCT_CSV_COLUMNS,
 } from '~/utils/shopProductBulk'
+import { nextNumericProductId, normalizeNumericProductId } from '~/utils/productId'
 
 type ShopGroupId = 'skate_equip' | 'security_equip' | 'clothing' | 'accessories'
 
@@ -41,7 +42,6 @@ const bulkPreview = ref<ReturnType<typeof parseShopProductCsv> | null>(null)
 const bulkImportErrors = ref<string[]>([])
 const bulkMessage = ref<string | null>(null)
 const bulkFileInput = ref<HTMLInputElement | null>(null)
-const clearingCatalog = ref(false)
 
 const shopGroups: Array<{
   id: ShopGroupId
@@ -243,6 +243,7 @@ const stats = computed(() => ({
 function openCreate() {
   editingId.value = null
   form.value = emptyForm()
+  form.value.sku = nextNumericProductId(products.value.map(p => p.sku))
   productImages.value = []
   formError.value = null
   panelOpen.value = true
@@ -326,7 +327,8 @@ async function assertSkuAvailable(sku: string, excludeId?: string | null) {
 }
 
 async function saveProduct() {
-  const sku = form.value.sku.trim()
+  const sku = normalizeNumericProductId(form.value.sku)
+  form.value.sku = sku
   if (!sku || !form.value.name.trim() || !form.value.price) {
     formError.value = es.value
       ? 'ID de producto, nombre y precio son obligatorios.'
@@ -491,26 +493,6 @@ function downloadCatalogExport() {
     : 'CSV exported. Edit in Excel and re-import.'
 }
 
-async function clearEntireCatalog() {
-  const msg = es.value
-    ? '¿Eliminar TODOS los productos del catálogo? Esto no se puede deshacer.'
-    : 'Delete ALL products from the catalog? This cannot be undone.'
-  if (!confirm(msg)) return
-  if (!confirm(es.value ? 'Confirmar otra vez.' : 'Confirm again.')) return
-  clearingCatalog.value = true
-  bulkMessage.value = null
-  try {
-    const { error } = await client.from('products').delete().gte('price', 0)
-    if (error) throw error
-    bulkMessage.value = es.value ? 'Catálogo vacío.' : 'Catalog cleared.'
-    await fetchProducts()
-  } catch (e: any) {
-    bulkMessage.value = e?.message || (es.value ? 'No se pudo vaciar.' : 'Could not clear catalog.')
-  } finally {
-    clearingCatalog.value = false
-  }
-}
-
 const bulkColumnHelp = computed(() =>
   SHOP_PRODUCT_CSV_COLUMNS.map(c => `• ${c}`).join('\n'),
 )
@@ -623,14 +605,6 @@ const bulkColumnHelp = computed(() =>
             @click="runBulkImport"
           >
             {{ bulkImporting ? (es ? 'Importando…' : 'Importing…') : (es ? 'Importar filas' : 'Import rows') }}
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl border border-flame-500/50 text-flame-500 text-sm font-bold disabled:opacity-50"
-            :disabled="clearingCatalog"
-            @click="clearEntireCatalog"
-          >
-            {{ clearingCatalog ? '…' : (es ? 'Vaciar catálogo' : 'Clear catalog') }}
           </button>
         </div>
         <ul v-if="bulkImportErrors.length" class="text-sm text-flame-500 space-y-1">
@@ -855,7 +829,7 @@ const bulkColumnHelp = computed(() =>
                 v-model="form.sku"
                 type="text"
                 class="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm font-mono uppercase"
-                :placeholder="es ? 'Ej. DW-JF-825' : 'e.g. DW-JF-825'"
+                :placeholder="es ? 'Ej. 001' : 'e.g. 001'"
               />
             </div>
 

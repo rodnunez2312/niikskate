@@ -1,4 +1,5 @@
 import type { ProductCategory } from '~/types'
+import { normalizeImportProductId } from '~/utils/productId'
 
 /** CSV columns (row 1 header). Save as .csv from Excel. */
 export const SHOP_PRODUCT_CSV_COLUMNS = [
@@ -161,7 +162,7 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
 
     rows.push({
       rowNumber,
-      product_id,
+      product_id: normalizeImportProductId(product_id),
       name: get('name'),
       brand: get('brand') || null,
       category,
@@ -190,7 +191,7 @@ export function shopProductRowToDbPayload(row: ParsedShopProductRow) {
     throw new Error('New products require category and price_mxn in CSV.')
   }
   return {
-    sku: row.product_id.trim(),
+    sku: normalizeImportProductId(row.product_id),
     name: row.name.trim(),
     brand: row.brand,
     category: row.category,
@@ -243,7 +244,7 @@ export function mergeShopProductForUpsert(
       : (Array.isArray(existing.images) ? existing.images : [])
 
   return {
-    sku: row.product_id.trim(),
+    sku: normalizeImportProductId(row.product_id),
     name: row.name.trim() || existing.name,
     brand: row.brand ?? existing.brand,
     category,
