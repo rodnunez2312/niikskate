@@ -5,6 +5,13 @@ definePageMeta({
 })
 
 import type { ProductCategory } from '~/types'
+import {
+  parseShopProductCsv,
+  mergeShopProductForUpsert,
+  validateRowsForImport,
+  productsToCsv,
+  SHOP_PRODUCT_CSV_COLUMNS,
+} from '~/utils/shopProductBulk'
 
 type ShopGroupId = 'skate_equip' | 'security_equip' | 'clothing' | 'accessories'
 
@@ -29,6 +36,12 @@ const brandLogos = ref<Record<string, string>>({})
 const uploadingBrand = ref<string | null>(null)
 const brandFileInput = ref<HTMLInputElement | null>(null)
 const brandUploadTarget = ref<string | null>(null)
+const bulkImporting = ref(false)
+const bulkPreview = ref<ReturnType<typeof parseShopProductCsv> | null>(null)
+const bulkImportErrors = ref<string[]>([])
+const bulkMessage = ref<string | null>(null)
+const bulkFileInput = ref<HTMLInputElement | null>(null)
+const clearingCatalog = ref(false)
 
 const shopGroups: Array<{
   id: ShopGroupId
@@ -74,9 +87,11 @@ const dbCategoryOptions: Array<{ id: ProductCategory; name: { en: string; es: st
 ]
 
 const emptyForm = () => ({
+  sku: '',
   name: '',
   description: '',
   brand: '',
+  size: '',
   category: 'tablas' as ProductCategory,
   price: 0,
   stock_quantity: 0,
@@ -213,7 +228,7 @@ const filteredProducts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     list = list.filter(p =>
-      `${p.name} ${p.brand || ''} ${p.description || ''}`.toLowerCase().includes(q),
+      `${p.sku} ${p.name} ${p.brand || ''} ${p.size || ''} ${p.description || ''}`.toLowerCase().includes(q),
     )
   }
   return list
@@ -236,9 +251,11 @@ function openCreate() {
 function openEdit(product: any) {
   editingId.value = product.id
   form.value = {
+    sku: product.sku || '',
     name: product.name || '',
     description: product.description || '',
     brand: product.brand || '',
+    size: product.size || '',
     category: product.category || 'tablas',
     price: Number(product.price) || 0,
     stock_quantity: Number(product.stock_quantity) || 0,
@@ -294,15 +311,34 @@ function removeImage(index: number) {
   productImages.value.splice(index, 1)
 }
 
+async function assertSkuAvailable(sku: string, excludeId?: string | null) {
+  let query = client.from('products').select('id').eq('sku', sku)
+  if (excludeId) query = query.neq('id', excludeId)
+  const { data, error } = await query.maybeSingle()
+  if (error) throw error
+  if (data) {
+    throw new Error(
+      es.value
+        ? `El ID "${sku}" ya existe. Usa otro product_id o edita ese producto.`
+        : `Product ID "${sku}" already exists. Use another product_id or edit that product.`,
+    )
+  }
+}
+
 async function saveProduct() {
-  if (!form.value.name.trim() || !form.value.price) {
-    formError.value = es.value ? 'Nombre y precio son obligatorios.' : 'Name and price are required.'
+  const sku = form.value.sku.trim()
+  if (!sku || !form.value.name.trim() || !form.value.price) {
+    formError.value = es.value
+      ? 'ID de producto, nombre y precio son obligatorios.'
+      : 'Product ID, name, and price are required.'
     return
   }
   saving.value = true
   formError.value = null
   try {
-    const images = persistableProductImages()
+    await assertSkuAvailable(sku, editingId.value)
+
+    let images = persistableProductImages()
     if (productImages.value.length && !images.length) {
       formError.value = es.value
         ? 'Las fotos no están en la nube. Sube de nuevo o revisa Storage en Supabase.'
@@ -312,9 +348,11 @@ async function saveProduct() {
     }
 
     const payload = {
+      sku,
       name: form.value.name.trim(),
       description: form.value.description.trim() || '',
       brand: form.value.brand.trim() || null,
+      size: form.value.size.trim() || null,
       category: form.value.category,
       price: Number(form.value.price),
       stock_quantity: Number(form.value.stock_quantity) || 0,
@@ -332,7 +370,6 @@ async function saveProduct() {
     } else {
       const { error } = await client.from('products').insert({
         ...payload,
-        sku: `SKU-${Date.now()}`,
         min_stock_level: 0,
         max_stock_level: 9999,
       })
@@ -341,6 +378,7 @@ async function saveProduct() {
 
     await fetchProducts()
     closePanel()
+    bulkMessage.value = es.value ? 'Producto guardado.' : 'Product saved.'
   } catch (e: any) {
     console.error(e)
     formError.value = e?.message || (es.value ? 'No se pudo guardar.' : 'Could not save.')
@@ -383,6 +421,99 @@ function onShopGroupPick(groupId: ShopGroupId) {
     form.value.category = group.defaultCategory
   }
 }
+
+async function onBulkFileSelected(event: Event) {
+  bulkMessage.value = null
+  bulkImportErrors.value = []
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const text = await file.text()
+  const parsed = parseShopProductCsv(text)
+  if (parsed.errors.length) {
+    bulkPreview.value = parsed
+    bulkImportErrors.value = parsed.errors
+    if (bulkFileInput.value) bulkFileInput.value.value = ''
+    return
+  }
+  const skus = parsed.rows.map(r => r.product_id.trim())
+  const { data: existing } = await client.from('products').select('sku').in('sku', skus)
+  const existingSkus = new Set((existing || []).map(r => r.sku))
+  const importErrors = validateRowsForImport(parsed.rows, existingSkus)
+  bulkPreview.value = parsed
+  bulkImportErrors.value = importErrors
+  if (bulkFileInput.value) bulkFileInput.value.value = ''
+}
+
+async function runBulkImport() {
+  if (!bulkPreview.value?.rows.length || bulkImportErrors.value.length) return
+  bulkImporting.value = true
+  bulkMessage.value = null
+  try {
+    const skus = bulkPreview.value.rows.map(r => r.product_id.trim())
+    const { data: existingRows, error: fetchErr } = await client.from('products').select('*').in('sku', skus)
+    if (fetchErr) throw fetchErr
+    const bySku = new Map((existingRows || []).map(r => [r.sku, r]))
+    let created = 0
+    let updated = 0
+    const payloads = bulkPreview.value.rows.map(row => {
+      const ex = bySku.get(row.product_id.trim()) || null
+      if (ex) updated += 1
+      else created += 1
+      return mergeShopProductForUpsert(row, ex as any)
+    })
+    const { error } = await client.from('products').upsert(payloads, { onConflict: 'sku' })
+    if (error) throw error
+    bulkMessage.value = es.value
+      ? `Listo: ${created} nuevos, ${updated} actualizados (por product_id).`
+      : `Done: ${created} created, ${updated} updated (by product_id).`
+    bulkPreview.value = null
+    bulkImportErrors.value = []
+    await fetchProducts()
+  } catch (e: any) {
+    bulkMessage.value = e?.message || (es.value ? 'Error en importación.' : 'Import failed.')
+  } finally {
+    bulkImporting.value = false
+  }
+}
+
+function downloadCatalogExport() {
+  const csv = productsToCsv(products.value)
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `skateshop-catalog-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  bulkMessage.value = es.value
+    ? 'CSV exportado. Edítalo en Excel y vuelve a importar.'
+    : 'CSV exported. Edit in Excel and re-import.'
+}
+
+async function clearEntireCatalog() {
+  const msg = es.value
+    ? '¿Eliminar TODOS los productos del catálogo? Esto no se puede deshacer.'
+    : 'Delete ALL products from the catalog? This cannot be undone.'
+  if (!confirm(msg)) return
+  if (!confirm(es.value ? 'Confirmar otra vez.' : 'Confirm again.')) return
+  clearingCatalog.value = true
+  bulkMessage.value = null
+  try {
+    const { error } = await client.from('products').delete().gte('price', 0)
+    if (error) throw error
+    bulkMessage.value = es.value ? 'Catálogo vacío.' : 'Catalog cleared.'
+    await fetchProducts()
+  } catch (e: any) {
+    bulkMessage.value = e?.message || (es.value ? 'No se pudo vaciar.' : 'Could not clear catalog.')
+  } finally {
+    clearingCatalog.value = false
+  }
+}
+
+const bulkColumnHelp = computed(() =>
+  SHOP_PRODUCT_CSV_COLUMNS.map(c => `• ${c}`).join('\n'),
+)
 </script>
 
 <template>
@@ -448,6 +579,68 @@ function onShopGroupPick(groupId: ShopGroupId) {
           </option>
         </select>
       </div>
+
+      <!-- Bulk import -->
+      <section class="rounded-2xl border border-gray-800 bg-gray-900 p-4 space-y-3">
+        <h2 class="font-bold text-white">{{ es ? 'Importación masiva (CSV / Excel)' : 'Bulk import (CSV / Excel)' }}</h2>
+        <p class="text-xs text-gray-500 whitespace-pre-line">
+          {{
+            es
+              ? `Individual: Agregar / Editar guarda un producto. Masivo: exporta el catálogo, edita CSV en Excel, importa (mismo product_id = actualizar). Celdas vacías en filas existentes no borran ese campo (excepto descripción). Columnas:\n${bulkColumnHelp}`
+              : `Individual: Add / Edit saves one product. Bulk: export catalog, edit CSV in Excel, import (same product_id = update). Blank cells on existing SKUs keep that field (description excepted). Columns:\n${bulkColumnHelp}`
+          }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="px-4 py-2 rounded-xl border border-white/20 text-sm font-bold text-gray-200 hover:border-gold-400/50 disabled:opacity-50"
+            :disabled="!products.length"
+            @click="downloadCatalogExport"
+          >
+            {{ es ? 'Exportar catálogo CSV' : 'Export catalog CSV' }}
+          </button>
+          <a
+            href="/templates/skateshop-products-template.csv"
+            download="skateshop-products-template.csv"
+            class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold hover:bg-gold-400/10"
+          >
+            {{ es ? 'Descargar plantilla CSV' : 'Download CSV template' }}
+          </a>
+          <label class="px-4 py-2 rounded-xl bg-gray-800 text-sm font-bold text-gray-200 cursor-pointer hover:text-white">
+            {{ es ? 'Elegir archivo…' : 'Choose file…' }}
+            <input
+              ref="bulkFileInput"
+              type="file"
+              accept=".csv,text/csv"
+              class="hidden"
+              @change="onBulkFileSelected"
+            />
+          </label>
+          <button
+            type="button"
+            class="px-4 py-2 rounded-xl bg-gold-400 text-black text-sm font-bold disabled:opacity-50"
+            :disabled="bulkImporting || !bulkPreview?.rows.length || bulkImportErrors.length > 0"
+            @click="runBulkImport"
+          >
+            {{ bulkImporting ? (es ? 'Importando…' : 'Importing…') : (es ? 'Importar filas' : 'Import rows') }}
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 rounded-xl border border-flame-500/50 text-flame-500 text-sm font-bold disabled:opacity-50"
+            :disabled="clearingCatalog"
+            @click="clearEntireCatalog"
+          >
+            {{ clearingCatalog ? '…' : (es ? 'Vaciar catálogo' : 'Clear catalog') }}
+          </button>
+        </div>
+        <ul v-if="bulkImportErrors.length" class="text-sm text-flame-500 space-y-1">
+          <li v-for="(err, i) in bulkImportErrors" :key="i">{{ err }}</li>
+        </ul>
+        <p v-else-if="bulkPreview?.rows.length" class="text-sm text-glass-green">
+          {{ bulkPreview.rows.length }} {{ es ? 'filas listas (nuevas o actualización por product_id).' : 'rows ready (new or update by product_id).' }}
+        </p>
+        <p v-if="bulkMessage" class="text-sm text-gray-300">{{ bulkMessage }}</p>
+      </section>
 
       <!-- Brand logos for Marcas filter -->
       <section class="rounded-2xl border border-gray-800 bg-gray-900 p-4 space-y-3">
@@ -545,9 +738,11 @@ function onShopGroupPick(groupId: ShopGroupId) {
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <h2 class="font-bold text-white truncate">{{ product.name }}</h2>
+                <p class="text-xs text-gray-500 font-mono">{{ product.sku }}</p>
                 <p class="text-xs text-gray-500">
                   {{ es ? groupForCategory(product.category)?.label.es : groupForCategory(product.category)?.label.en }}
                   <span v-if="product.brand"> · {{ product.brand }}</span>
+                  <span v-if="product.size"> · {{ es ? 'Talla' : 'Size' }} {{ product.size }}</span>
                 </p>
               </div>
               <span
@@ -653,6 +848,18 @@ function onShopGroupPick(groupId: ShopGroupId) {
             </div>
 
             <div>
+              <label class="block text-xs text-gray-400 mb-1">
+                {{ es ? 'ID de producto (SKU)' : 'Product ID (SKU)' }} *
+              </label>
+              <input
+                v-model="form.sku"
+                type="text"
+                class="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm font-mono uppercase"
+                :placeholder="es ? 'Ej. DW-JF-825' : 'e.g. DW-JF-825'"
+              />
+            </div>
+
+            <div>
               <label class="block text-xs text-gray-400 mb-1">{{ es ? 'Nombre' : 'Name' }} *</label>
               <input
                 v-model="form.name"
@@ -667,6 +874,18 @@ function onShopGroupPick(groupId: ShopGroupId) {
                 v-model="form.brand"
                 type="text"
                 class="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">
+                {{ es ? 'Tamaño / medida' : 'Size' }}
+              </label>
+              <input
+                v-model="form.size"
+                type="text"
+                class="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm"
+                :placeholder="es ? 'Ej. 8.25, M, 54mm' : 'e.g. 8.25, M, 54mm'"
               />
             </div>
 

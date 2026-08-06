@@ -542,6 +542,7 @@ export interface Product {
   images: string[]
   specifications?: Record<string, string>
   brand?: string
+  size?: string
   is_featured: boolean
   is_active: boolean
   is_service: boolean

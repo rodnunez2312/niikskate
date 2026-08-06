@@ -175,6 +175,7 @@ CREATE TABLE products (
   images TEXT[] DEFAULT '{}' NOT NULL,
   specifications JSONB DEFAULT '{}',
   brand TEXT,
+  size TEXT,
   is_featured BOOLEAN DEFAULT FALSE NOT NULL,
   is_active BOOLEAN DEFAULT TRUE NOT NULL,
   is_service BOOLEAN DEFAULT FALSE NOT NULL, -- For ramp building services

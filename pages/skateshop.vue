@@ -209,10 +209,11 @@ function productSearchHaystack(product: Product): string {
   const titleWords = (product.name || '').split(/\s+/).join(' ')
   return [
     titleWords,
-    product.name,
-    product.brand,
-    product.description,
-    product.sku,
+      product.name,
+      product.brand,
+      product.size,
+      product.sku,
+      product.description,
     group?.label.en,
     group?.label.es,
     cat?.name,
@@ -660,6 +661,9 @@ const cartLabel = computed(() => {
             >
               <p v-if="product.brand">
                 <span class="text-gray-500">{{ es ? 'Marca' : 'Brand' }}:</span> {{ product.brand }}
+              </p>
+              <p v-if="product.size">
+                <span class="text-gray-500">{{ es ? 'Tamaño' : 'Size' }}:</span> {{ product.size }}
               </p>
               <p v-if="groupForProduct(product)">
                 <span class="text-gray-500">{{ es ? 'Tipo' : 'Type' }}:</span>
