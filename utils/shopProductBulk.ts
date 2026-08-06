@@ -69,7 +69,7 @@ export type ParseShopProductCsvResult = {
   errors: string[]
 }
 
-function parseCsvLine(line: string): string[] {
+function parseCsvLine(line: string, delimiter = ','): string[] {
   const out: string[] = []
   let cur = ''
   let inQuotes = false
@@ -84,7 +84,7 @@ function parseCsvLine(line: string): string[] {
       }
       continue
     }
-    if (c === ',' && !inQuotes) {
+    if (c === delimiter && !inQuotes) {
       out.push(cur.trim())
       cur = ''
       continue
@@ -95,16 +95,109 @@ function parseCsvLine(line: string): string[] {
   return out
 }
 
+function countDelimiterOutsideQuotes(line: string, delimiter: string): number {
+  let n = 0
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (c === '"') {
+      inQuotes = !inQuotes
+      continue
+    }
+    if (!inQuotes && c === delimiter) n++
+  }
+  return n
+}
+
+/** Excel in many locales (incl. Mexico) exports CSV with semicolons. */
+function detectCsvDelimiter(headerLine: string): string {
+  const comma = countDelimiterOutsideQuotes(headerLine, ',')
+  const semi = countDelimiterOutsideQuotes(headerLine, ';')
+  const tab = countDelimiterOutsideQuotes(headerLine, '\t')
+  const need = SHOP_PRODUCT_CSV_COLUMNS.length - 1
+  if (semi >= need && semi >= comma) return ';'
+  if (tab >= need && tab >= comma) return '\t'
+  return ','
+}
+
+const HEADER_ALIASES: Record<string, ShopProductCsvColumn> = {
+  name: 'name',
+  nombre: 'name',
+  producto: 'name',
+  brand: 'brand',
+  marca: 'brand',
+  category: 'category',
+  categoria: 'category',
+  size: 'size',
+  talla: 'size',
+  medida: 'size',
+  tamano: 'size',
+  price_mxn: 'price_mxn',
+  precio: 'price_mxn',
+  precio_mxn: 'price_mxn',
+  price: 'price_mxn',
+  stock_quantity: 'stock_quantity',
+  stock: 'stock_quantity',
+  inventario: 'stock_quantity',
+  cantidad: 'stock_quantity',
+  description: 'description',
+  descripcion: 'description',
+  proveedor: 'proveedor',
+  supplier: 'proveedor',
+  comentarios: 'comentarios',
+  notas: 'comentarios',
+  is_active: 'is_active',
+  activo: 'is_active',
+  visible: 'is_active',
+  is_featured: 'is_featured',
+  destacado: 'is_featured',
+  featured: 'is_featured',
+}
+
+function normalizeHeader(h: string): string {
+  return h
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, '_')
+}
+
+function mapHeaderToColumn(normalized: string): ShopProductCsvColumn | null {
+  if (SHOP_PRODUCT_CSV_COLUMNS.includes(normalized as ShopProductCsvColumn)) {
+    return normalized as ShopProductCsvColumn
+  }
+  return HEADER_ALIASES[normalized] ?? null
+}
+
+/** Excel (e.g. es-MX) sometimes opens comma CSV into one cell: "name,brand,...". */
+function expandMergedRowCells(cells: string[]): string[] {
+  if (cells.length !== 1) return cells
+  const single = cells[0]?.trim() ?? ''
+  if (!single) return cells
+
+  for (const alt of [',', ';', '\t']) {
+    const parts = parseCsvLine(single, alt)
+    if (parts.length < 5) continue
+    const firstCol = mapHeaderToColumn(normalizeHeader(parts[0] ?? ''))
+    if (firstCol === 'name' || parts.length >= SHOP_PRODUCT_CSV_COLUMNS.length - 2) {
+      return parts
+    }
+  }
+  return cells
+}
+
+function parseRowCells(line: string, delimiter: string): string[] {
+  return expandMergedRowCells(parseCsvLine(line, delimiter))
+}
+
 function parseOptionalBool(raw: string): boolean | null {
   const v = raw.trim().toLowerCase()
   if (!v) return null
   if (['1', 'true', 'yes', 'y', 'si', 'sí', 'on'].includes(v)) return true
   if (['0', 'false', 'no', 'n', 'off'].includes(v)) return false
   return null
-}
-
-function normalizeHeader(h: string): string {
-  return h.replace(/^\uFEFF/, '').trim().toLowerCase()
 }
 
 export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
@@ -114,21 +207,38 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     return { rows: [], errors: ['File is empty.'] }
   }
 
-  const headerCells = parseCsvLine(lines[0]).map(normalizeHeader)
-  const colIndex = (name: ShopProductCsvColumn) => headerCells.indexOf(name)
+  const delimiter = detectCsvDelimiter(lines[0])
+  const rawHeaderCells = parseRowCells(lines[0], delimiter)
+  const columnIndexByField = new Map<ShopProductCsvColumn, number>()
+
+  rawHeaderCells.forEach((cell, index) => {
+    const mapped = mapHeaderToColumn(normalizeHeader(cell))
+    if (mapped != null && !columnIndexByField.has(mapped)) {
+      columnIndexByField.set(mapped, index)
+    }
+  })
+
+  const colIndex = (name: ShopProductCsvColumn) => columnIndexByField.get(name) ?? -1
 
   for (const col of SHOP_PRODUCT_CSV_COLUMNS) {
     if (colIndex(col) < 0) {
       errors.push(`Missing column: ${col}`)
     }
   }
-  if (errors.length) return { rows: [], errors }
+
+  if (errors.length) {
+    const preview = rawHeaderCells.slice(0, 6).join(' | ') || '(empty first row)'
+    errors.push(
+      `Could not read column headers (${rawHeaderCells.length} detected). Preview: ${preview}. Your sheet layout can be correct—Excel may still save row 1 as one cell. Try: download the template again, paste only data under the headers, Save As CSV UTF-8, upload that .csv (not .xlsx).`,
+    )
+    return { rows: [], errors }
+  }
 
   const rows: ParsedShopProductRow[] = []
 
   for (let i = 1; i < lines.length; i++) {
     const rowNumber = i + 1
-    const cells = parseCsvLine(lines[i])
+    const cells = parseRowCells(lines[i], delimiter)
     const get = (col: ShopProductCsvColumn) => cells[colIndex(col)]?.trim() ?? ''
 
     const name = get('name')
@@ -139,7 +249,12 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
 
     if (!name.trim()) continue
 
-    const priceRaw = get('price_mxn')
+    let priceRaw = get('price_mxn').replace(/\s/g, '')
+    if (priceRaw.includes(',') && !priceRaw.includes('.')) {
+      priceRaw = priceRaw.replace(',', '.')
+    }
+    priceRaw = priceRaw.replace(/[$₡€£]/g, '')
+
     let price_mxn: number | null = null
     if (priceRaw) {
       price_mxn = Number(priceRaw)

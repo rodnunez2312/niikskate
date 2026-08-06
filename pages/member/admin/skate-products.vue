@@ -11,7 +11,6 @@ import {
   buildBulkImportPayloads,
   bulkProductMatchKey,
   productsToCsv,
-  SHOP_PRODUCT_CSV_COLUMNS,
 } from '~/utils/shopProductBulk'
 import { nextNumericProductId, normalizeNumericProductId } from '~/utils/productId'
 import { compressImageForUpload, PRODUCT_PHOTO_UPLOAD } from '~/utils/compressImageForUpload'
@@ -534,14 +533,10 @@ function downloadCatalogExport() {
     : 'CSV exported. Edit in Excel and re-import.'
 }
 
-const bulkColumnHelp = computed(() =>
-  SHOP_PRODUCT_CSV_COLUMNS.map(c => `• ${c}`).join('\n'),
-)
-
 const productPhotoUploadHint = computed(() =>
   es.value
-    ? `Las fotos no van en el CSV. Después de importar, edita cada producto y súbelas aquí (móvil o laptop). Se redimensionan automáticamente (máx. ${PRODUCT_PHOTO_UPLOAD.maxWidth}px, ~${Math.round(PRODUCT_PHOTO_UPLOAD.maxBytes / 1024)} KB).`
-    : `Photos are not in the CSV. After import, edit each product and upload here (mobile or laptop). Images are auto-resized (max ${PRODUCT_PHOTO_UPLOAD.maxWidth}px, ~${Math.round(PRODUCT_PHOTO_UPLOAD.maxBytes / 1024)} KB).`,
+    ? `Fotos aquí (no en CSV). Máx. ${PRODUCT_PHOTO_UPLOAD.maxWidth}px.`
+    : `Photos here (not in CSV). Max ${PRODUCT_PHOTO_UPLOAD.maxWidth}px.`,
 )
 </script>
 
@@ -610,15 +605,31 @@ const productPhotoUploadHint = computed(() =>
       </div>
 
       <!-- Bulk import -->
-      <section class="rounded-2xl border border-gray-800 bg-gray-900 p-4 space-y-3">
-        <h2 class="font-bold text-white">{{ es ? 'Importación masiva (CSV / Excel)' : 'Bulk import (CSV / Excel)' }}</h2>
-        <p class="text-xs text-gray-500 whitespace-pre-line">
-          {{
-            es
-              ? `Masivo: solo texto (sin ID ni fotos). El sistema asigna ID 001, 002… y genera la descripción para la tienda desde nombre, marca, categoría y talla. Columna description: déjala vacía o agrega notas extra (se añaden al texto automático).\n${productPhotoUploadHint}\nproveedor/comentarios no aparecen en /skateshop.\nColumnas:\n${bulkColumnHelp}`
-              : `Bulk: text only (no ID or photos). Auto IDs 001, 002… and storefront descriptions from name, brand, category, and size. description column: leave empty or add extra notes (appended to auto text).\n${productPhotoUploadHint}\nproveedor/comentarios are not on /skateshop.\nColumns:\n${bulkColumnHelp}`
-          }}
-        </p>
+      <section class="rounded-2xl border border-gray-800 bg-gray-900 p-4 space-y-2">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="font-bold text-white text-sm">
+            {{ es ? 'Importación masiva' : 'Bulk import' }}
+          </h2>
+          <p class="text-[11px] text-gray-500">
+            {{
+              es
+                ? 'Fila 1: un encabezado por columna (A1=name, B1=brand…). Datos abajo en las mismas columnas.'
+                : 'Row 1: one header per column (A1=name, B1=brand…). Data below in the same columns.'
+            }}
+          </p>
+        </div>
+        <details class="text-[11px] text-gray-500">
+          <summary class="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
+            {{ es ? 'Ayuda' : 'Help' }}
+          </summary>
+          <p class="mt-2 leading-relaxed">
+            {{
+              es
+                ? 'Tu flujo es correcto: fila 1 intacta, solo pegas datos. Si falla la importación, prueba la plantilla «Excel (MX)» o guarda CSV UTF-8. Sube .csv, no .xlsx.'
+                : 'Your flow is correct: keep row 1, paste data only. If import fails, try the «Excel (MX)» template or save CSV UTF-8. Upload .csv, not .xlsx.'
+            }}
+          </p>
+        </details>
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
@@ -633,7 +644,15 @@ const productPhotoUploadHint = computed(() =>
             download="skateshop-products-template.csv"
             class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold hover:bg-gold-400/10"
           >
-            {{ es ? 'Descargar plantilla CSV' : 'Download CSV template' }}
+            {{ es ? 'Plantilla CSV' : 'CSV template' }}
+          </a>
+          <a
+            href="/templates/skateshop-products-template-excel-mx.csv"
+            download="skateshop-products-template-excel-mx.csv"
+            class="px-4 py-2 rounded-xl border border-white/15 text-gray-400 text-xs font-bold hover:border-gold-400/40 hover:text-gold-400"
+            :title="es ? 'Si Excel abre la otra plantilla en una sola columna' : 'If Excel opens the other template as one column'"
+          >
+            {{ es ? 'Plantilla Excel (MX ;)' : 'Excel template (MX ;)' }}
           </a>
           <label class="px-4 py-2 rounded-xl bg-gray-800 text-sm font-bold text-gray-200 cursor-pointer hover:text-white">
             {{ es ? 'Elegir archivo…' : 'Choose file…' }}
