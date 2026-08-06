@@ -48,6 +48,7 @@ const bulkPreview = ref<ReturnType<typeof parseShopProductCsv> | null>(null)
 const bulkImportErrors = ref<string[]>([])
 const bulkMessage = ref<string | null>(null)
 const bulkFileInput = ref<HTMLInputElement | null>(null)
+const bulkSelectedFileName = ref<string | null>(null)
 
 const shopGroups: Array<{
   id: ShopGroupId
@@ -472,6 +473,7 @@ async function onBulkFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  bulkSelectedFileName.value = file.name
   const text = await file.text()
   const parsed = parseShopProductCsv(text)
   if (parsed.errors.length) {
@@ -511,6 +513,7 @@ async function runBulkImport() {
       : `Done: ${built.created} created (auto ID), ${built.updated} updated (same name/brand/size).`
     bulkPreview.value = null
     bulkImportErrors.value = []
+    bulkSelectedFileName.value = null
     await fetchProducts()
   } catch (e: any) {
     bulkMessage.value = e?.message || (es.value ? 'Error en importación.' : 'Import failed.')
@@ -673,6 +676,12 @@ const productPhotoUploadHint = computed(() =>
             {{ bulkImporting ? (es ? 'Importando…' : 'Importing…') : (es ? 'Importar filas' : 'Import rows') }}
           </button>
         </div>
+        <p v-if="bulkSelectedFileName" class="text-[11px] text-gray-500 truncate" :title="bulkSelectedFileName">
+          {{ es ? 'Archivo' : 'File' }}: {{ bulkSelectedFileName }}
+          <span v-if="/\(\d+\)(?=\.csv$)/i.test(bulkSelectedFileName)" class="text-gray-600">
+            — {{ es ? 'copia Windows; OK' : 'Windows copy; OK' }}
+          </span>
+        </p>
         <ul v-if="bulkImportErrors.length" class="text-sm text-flame-500 space-y-1">
           <li v-for="(err, i) in bulkImportErrors" :key="i">{{ err }}</li>
         </ul>

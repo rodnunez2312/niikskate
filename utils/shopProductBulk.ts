@@ -4,6 +4,12 @@ import {
   extractUserAppendFromStoredDescription,
   resolveBulkImportDescription,
 } from '~/utils/productDescriptionTemplate'
+import {
+  normalizeImportCategory,
+  parsePriceMxnField,
+  parseStockQuantityField,
+  SHOP_PRODUCT_CATEGORIES,
+} from '~/utils/productCategoryImport'
 
 /** CSV columns (row 1 header). Save as .csv from Excel. Product IDs (001, 002…) are assigned by the app. */
 export const SHOP_PRODUCT_CSV_COLUMNS = [
@@ -21,17 +27,6 @@ export const SHOP_PRODUCT_CSV_COLUMNS = [
 ] as const
 
 export type ShopProductCsvColumn = (typeof SHOP_PRODUCT_CSV_COLUMNS)[number]
-
-const VALID_CATEGORIES: ProductCategory[] = [
-  'tablas',
-  'llantas',
-  'hardware',
-  'lijas',
-  'protecciones',
-  'cascos',
-  'merch',
-  'ramps',
-]
 
 /** Match key for bulk update without product_id in CSV. */
 export function bulkProductMatchKey(
@@ -242,41 +237,27 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     const get = (col: ShopProductCsvColumn) => cells[colIndex(col)]?.trim() ?? ''
 
     const name = get('name')
-    const categoryRaw = get('category').toLowerCase()
-    const category = categoryRaw
-      ? (VALID_CATEGORIES.includes(categoryRaw as ProductCategory) ? (categoryRaw as ProductCategory) : null)
-      : null
+    const categoryRaw = get('category')
+    const category = categoryRaw ? normalizeImportCategory(categoryRaw) : null
 
     if (!name.trim()) continue
 
-    let priceRaw = get('price_mxn').replace(/\s/g, '')
-    if (priceRaw.includes(',') && !priceRaw.includes('.')) {
-      priceRaw = priceRaw.replace(',', '.')
-    }
-    priceRaw = priceRaw.replace(/[$₡€£]/g, '')
-
-    let price_mxn: number | null = null
-    if (priceRaw) {
-      price_mxn = Number(priceRaw)
-      if (Number.isNaN(price_mxn) || price_mxn < 0) {
-        errors.push(`Row ${rowNumber}: price_mxn must be a number >= 0.`)
-        continue
-      }
+    const price_mxn = parsePriceMxnField(get('price_mxn'))
+    if (get('price_mxn').trim() && price_mxn == null) {
+      errors.push(`Row ${rowNumber}: price_mxn must be a number (got "${get('price_mxn').trim()}").`)
+      continue
     }
 
-    const stockRaw = get('stock_quantity')
-    let stock_quantity: number | null = null
-    if (stockRaw) {
-      stock_quantity = Number(stockRaw)
-      if (Number.isNaN(stock_quantity) || stock_quantity < 0) {
-        errors.push(`Row ${rowNumber}: stock_quantity must be a number >= 0.`)
-        continue
-      }
+    const stockParsed = parseStockQuantityField(get('stock_quantity'))
+    if (get('stock_quantity').trim() && stockParsed == null) {
+      errors.push(`Row ${rowNumber}: stock_quantity must be a number >= 0.`)
+      continue
     }
+    const stock_quantity = stockParsed
 
-    if (categoryRaw && !category) {
+    if (categoryRaw.trim() && !category) {
       errors.push(
-        `Row ${rowNumber}: invalid category "${categoryRaw}". Use: ${VALID_CATEGORIES.join(', ')}`,
+        `Row ${rowNumber}: unknown category "${categoryRaw.trim()}". Use a product type (playera, casco, baleros, tabla, lija, gorra…) or shop category: ${SHOP_PRODUCT_CATEGORIES.join(', ')}.`,
       )
       continue
     }
