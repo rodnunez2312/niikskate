@@ -212,6 +212,43 @@ function parseRowCells(line: string, delimiter: string): string[] {
   return expandMergedRowCells(parseCsvLine(sanitizeCsvLineForSkateData(line), delimiter))
 }
 
+/**
+ * Commas inside product name (without CSV quotes) add extra cells — category reads as stock, etc.
+ */
+function rebalanceRowCellsForCommaInName(
+  cells: string[],
+  columnIndexByField: Map<ShopProductCsvColumn, number>,
+): string[] {
+  const nameIdx = columnIndexByField.get('name')
+  const stockIdx = columnIndexByField.get('stock_quantity')
+  if (nameIdx == null || nameIdx !== 0 || stockIdx == null) return cells
+
+  const logicalDataCols = stockIdx - nameIdx + 1
+  if (cells.length <= logicalDataCols) return cells
+
+  const extra = cells.length - logicalDataCols
+  if (extra <= 0 || extra > 4) return cells
+
+  const nameParts = cells.slice(0, 1 + extra)
+  const rest = cells.slice(1 + extra)
+  const merged = [nameParts.join(', '), ...rest]
+  const maxIdx = Math.max(...columnIndexByField.values())
+  while (merged.length <= maxIdx) merged.push('')
+  return merged
+}
+
+/** Category cell looks like stock/price/size — columns shifted (often comma in name). */
+export function categoryFieldLooksLikeColumnShift(raw: string): boolean {
+  const s = raw.trim()
+  if (!s) return false
+  if (/^\d+$/.test(s)) return true
+  if (/^\d+[.,]\d+$/.test(s)) return true
+  if (/^[a-z]{1,4}$/i.test(s) && ['xs', 's', 'm', 'l', 'xl', 'xxl', 'unitalla'].includes(s.toLowerCase())) {
+    return true
+  }
+  return false
+}
+
 /** Size cell absorbed price/stock because of inch mark (8.75") in CSV. */
 export function sizeFieldLooksLikeCsvInchShift(size: string | null | undefined): boolean {
   const s = (size ?? '').trim()
@@ -227,10 +264,29 @@ function parseOptionalBool(raw: string): boolean | null {
   return null
 }
 
-export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
+function cellToImportString(value: unknown): string {
+  if (value == null || value === '') return ''
+  if (typeof value === 'number') {
+    if (Number.isFinite(value) && Number.isInteger(value)) return String(value)
+    if (Number.isFinite(value)) {
+      const rounded = Math.round(value * 100) / 100
+      return Number.isInteger(rounded) ? String(rounded) : String(rounded)
+    }
+  }
+  if (value instanceof Date) return value.toISOString()
+  return String(value).trim()
+}
+
+function padTableRow(cells: unknown[], minCols: number): string[] {
+  const out = cells.map(cellToImportString)
+  while (out.length < minCols) out.push('')
+  return out
+}
+
+/** Parse header + data rows (from .xlsx or from CSV lines). Row 1 = Excel row 1. */
+export function parseShopProductTable(table: unknown[][]): ParseShopProductCsvResult {
   const issues: BulkImportIssue[] = []
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
-  if (!lines.length) {
+  if (!table.length || !table.some(row => row.some(c => cellToImportString(c).length > 0))) {
     issues.push({
       row: 0,
       kind: 'other',
@@ -239,8 +295,7 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     return { rows: [], issues, duplicateCount: 0 }
   }
 
-  const delimiter = detectCsvDelimiter(lines[0])
-  const rawHeaderCells = parseRowCells(lines[0], delimiter)
+  const rawHeaderCells = padTableRow(table[0] ?? [], SHOP_PRODUCT_CSV_COLUMNS.length)
   const columnIndexByField = new Map<ShopProductCsvColumn, number>()
 
   rawHeaderCells.forEach((cell, index) => {
@@ -262,14 +317,18 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     return { rows: [], issues, duplicateCount: 0 }
   }
 
+  const minCols = Math.max(...columnIndexByField.values()) + 1
   const priceMxnExcelCol =
     colIndex('price_mxn') >= 0 ? excelColumnLetter(colIndex('price_mxn')) : '?'
 
   const rows: ParsedShopProductRow[] = []
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = 1; i < table.length; i++) {
     const rowNumber = i + 1
-    const cells = parseRowCells(lines[i], delimiter)
+    const sourceRow = table[i] ?? []
+    if (!sourceRow.some(c => cellToImportString(c).length > 0)) continue
+    let cells = padTableRow(sourceRow, minCols)
+    cells = rebalanceRowCellsForCommaInName(cells, columnIndexByField)
     const get = (col: ShopProductCsvColumn) => cells[colIndex(col)]?.trim() ?? ''
 
     const name = get('name')
@@ -301,7 +360,15 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     const stock_quantity = stockParsed
 
     if (categoryRaw.trim() && !category) {
-      issues.push({ row: rowNumber, kind: 'unknown_category', detail: categoryRaw.trim() })
+      issues.push({
+        row: rowNumber,
+        kind: 'unknown_category',
+        detail: categoryFieldLooksLikeColumnShift(categoryRaw)
+          ? 'comma_in_name'
+          : categoryRaw.trim(),
+        productName: name.trim(),
+        rawValue: categoryRaw.trim(),
+      })
       continue
     }
 
@@ -349,6 +416,16 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
   }
 
   return { rows: [...seen.values()], issues, duplicateCount }
+}
+
+export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
+  if (!lines.length) {
+    return parseShopProductTable([])
+  }
+  const delimiter = detectCsvDelimiter(lines[0])
+  const table = lines.map(line => parseRowCells(line, delimiter))
+  return parseShopProductTable(table)
 }
 
 export function shopProductRowToDbPayload(row: ParsedShopProductRow, sku: string) {

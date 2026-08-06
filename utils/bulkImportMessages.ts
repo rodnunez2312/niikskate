@@ -75,6 +75,22 @@ function formatBadPriceLine(i: BulkImportIssue, es: boolean): string {
     : `Row ${i.row}, ${col}${namePart}: invalid price («${raw}»). Use digits only (1200) or Mexican format ($1,200 or 1.200 with no cents).`
 }
 
+function formatUnknownCategoryLine(i: BulkImportIssue, es: boolean): string {
+  const name = i.productName?.trim()
+  const namePart = name ? (es ? `, producto «${name}»` : `, product «${name}»`) : ''
+  if (i.detail === 'comma_in_name') {
+    const read = i.rawValue?.trim()
+    const readPart = read ? (es ? ` (leyó «${read}» en categoría)` : ` (read «${read}» as category)`) : ''
+    return es
+      ? `Fila ${i.row}${namePart}: el nombre lleva coma (ej. «Modelo: …») y al guardar CSV las columnas se corren${readPart}. Guarda como CSV UTF-8 desde Excel (pon comillas al nombre) o quita comas del nombre; PROTECCIONES debe quedar en columna category.`
+      : `Row ${i.row}${namePart}: the name contains a comma and CSV columns shifted${readPart}. Save as CSV UTF-8 (quoted name) or remove commas from the name; PROTECCIONES must stay in the category column.`
+  }
+  const tipo = i.detail ?? i.rawValue ?? '?'
+  return es
+    ? `Fila ${i.row}${namePart}: tipo «${tipo}» no reconocido. En columna category usa playera, gorra, casco, tabla, PROTECCIONES, baleros, tenis…`
+    : `Row ${i.row}${namePart}: type «${tipo}» not recognized. In category column use playera, gorra, casco, tabla, PROTECCIONES, baleros, tenis…`
+}
+
 /** Short messages for admins (no IT jargon). */
 export function summarizeBulkImportIssues(
   issues: BulkImportIssue[],
@@ -161,18 +177,31 @@ export function summarizeBulkImportIssues(
 
   const unknownCat = issues.filter(i => i.kind === 'unknown_category')
   if (unknownCat.length) {
-    const names = [...new Set(unknownCat.map(i => i.detail).filter(Boolean))].slice(0, 5)
-    summary.push(
-      es
-        ? `Tipo de producto no reconocido en ${unknownCat.length} fila(s)${names.length ? `: ${names.join(', ')}` : ''}. Usa palabras como playera, gorra, casco, tabla, baleros, tenis… ${rowList(
-            unknownCat.map(i => i.row),
-            es,
-          )}.`
-        : `Unrecognized product type on ${unknownCat.length} row(s)${names.length ? `: ${names.join(', ')}` : ''}. Use words like playera, gorra, casco, tabla, baleros, tenis… ${rowList(
-            unknownCat.map(i => i.row),
-            es,
-          )}.`,
-    )
+    if (unknownCat.length === 1) {
+      summary.push(formatUnknownCategoryLine(unknownCat[0]!, es))
+    } else {
+      for (const i of unknownCat) {
+        details.push(formatUnknownCategoryLine(i, es))
+      }
+      const labels = [
+        ...new Set(
+          unknownCat
+            .map(i => (i.detail === 'comma_in_name' ? (es ? 'columnas corridas (coma en nombre)' : 'shifted columns (comma in name)') : i.detail))
+            .filter(Boolean),
+        ),
+      ].slice(0, 5)
+      summary.push(
+        es
+          ? `Tipo de producto no reconocido en ${unknownCat.length} fila(s)${labels.length ? `: ${labels.join(', ')}` : ''}. ${rowList(
+              unknownCat.map(i => i.row),
+              es,
+            )}.`
+          : `Unrecognized product type on ${unknownCat.length} row(s)${labels.length ? `: ${labels.join(', ')}` : ''}. ${rowList(
+              unknownCat.map(i => i.row),
+              es,
+            )}.`,
+      )
+    }
   }
 
   const badStock = byKind.get('bad_stock') ?? []

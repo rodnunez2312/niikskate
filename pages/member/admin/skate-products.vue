@@ -492,8 +492,49 @@ async function onBulkFileSelected(event: Event) {
   const file = input.files?.[0]
   if (!file) return
   bulkSelectedFileName.value = file.name
-  const text = await file.text()
-  const parsed = parseShopProductCsv(text)
+  const isXlsx = /\.xlsx$/i.test(file.name)
+  const isCsv = /\.csv$/i.test(file.name) || file.type.includes('csv') || file.type.includes('text')
+  let parsed: ReturnType<typeof parseShopProductCsv>
+  try {
+    if (isXlsx) {
+      const { parseShopProductXlsx } = await import('~/utils/shopProductBulkXlsx')
+      parsed = await parseShopProductXlsx(await file.arrayBuffer())
+    } else if (isCsv || !/\.xls$/i.test(file.name)) {
+      parsed = parseShopProductCsv(await file.text())
+    } else {
+      bulkPreview.value = null
+      applyBulkIssueFeedback(
+        [
+          {
+            row: 0,
+            kind: 'other',
+            detail: es.value
+              ? 'Formato no soportado. Usa .xlsx (Excel) o .csv.'
+              : 'Unsupported format. Use .xlsx (Excel) or .csv.',
+          },
+        ],
+        0,
+      )
+      if (bulkFileInput.value) bulkFileInput.value.value = ''
+      return
+    }
+  } catch {
+    bulkPreview.value = null
+    applyBulkIssueFeedback(
+      [
+        {
+          row: 0,
+          kind: 'other',
+          detail: es.value
+            ? 'No se pudo leer el archivo. Prueba guardar de nuevo como .xlsx o CSV UTF-8.'
+            : 'Could not read the file. Try saving again as .xlsx or UTF-8 CSV.',
+        },
+      ],
+      0,
+    )
+    if (bulkFileInput.value) bulkFileInput.value.value = ''
+    return
+  }
   if (parsed.issues.length) {
     bulkPreview.value = parsed
     applyBulkIssueFeedback(parsed.issues, parsed.duplicateCount)
@@ -652,8 +693,8 @@ const productPhotoUploadHint = computed(() =>
           <p class="mt-2 leading-relaxed">
             {{
               es
-                ? 'Tu flujo es correcto: fila 1 intacta, solo pegas datos. Si falla la importación, prueba la plantilla «Excel (MX)» o guarda CSV UTF-8. Sube .csv, no .xlsx.'
-                : 'Your flow is correct: keep row 1, paste data only. If import fails, try the «Excel (MX)» template or save CSV UTF-8. Upload .csv, not .xlsx.'
+                ? 'Recomendado: guarda tu catálogo como .xlsx y súbelo directo (sin exportar CSV). También aceptamos .csv. Fila 1 = encabezados (name, brand, category…).'
+                : 'Recommended: save your catalog as .xlsx and upload it directly (no CSV export). We also accept .csv. Row 1 = headers (name, brand, category…).'
             }}
           </p>
         </details>
@@ -686,7 +727,7 @@ const productPhotoUploadHint = computed(() =>
             <input
               ref="bulkFileInput"
               type="file"
-              accept=".csv,text/csv"
+              accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
               class="hidden"
               @change="onBulkFileSelected"
             />
