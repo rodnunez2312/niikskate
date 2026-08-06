@@ -676,8 +676,8 @@ const productPhotoUploadHint = computed(() =>
           <p class="text-[11px] text-gray-500">
             {{
               es
-                ? 'Fila 1 = encabezados en español (nombre, marca, categoria, precio_mxn…). No cambies esos títulos. Datos desde fila 2.'
-                : 'Row 1 = Spanish headers (nombre, marca, categoria, precio_mxn…). Do not change them. Data from row 2.'
+                ? 'Plantilla = solo encabezados. Una hoja «Productos», columnas A–K.'
+                : 'Template = headers only. One «Productos» sheet, columns A–K.'
             }}
           </p>
         </div>
@@ -688,8 +688,8 @@ const productPhotoUploadHint = computed(() =>
           <p class="mt-2 leading-relaxed">
             {{
               es
-                ? 'Sube solo .xlsx. Fila 1 = encabezados (name, brand, category…). Fotos se agregan en esta pantalla, no en el Excel.'
-                : 'Upload .xlsx only. Row 1 = headers (name, brand, category…). Add photos on this screen, not in Excel.'
+                ? 'Fila 1 = encabezados (nombre, marca, categoria…). Copia tus productos desde WordPress y pégalos desde la fila 2. No cambies la fila 1.'
+                : 'Row 1 = headers (nombre, marca, categoria…). Copy products from WordPress and paste from row 2. Do not change row 1.'
             }}
           </p>
         </details>

@@ -18,24 +18,64 @@ export type CatalogExportRow = {
 }
 
 const HEADER_ROW = [...SHOP_PRODUCT_EXCEL_HEADERS_ES]
+const PRODUCT_SHEET_NAME = 'Productos'
 
-/** Column widths so headers are fully visible in Excel. */
-const COLUMN_WIDTHS = [
-  36, // nombre
-  16, // marca
-  14, // categoria
-  10, // talla
-  12, // precio_mxn
-  8, // stock
-  24, // descripcion
-  14, // proveedor
-  18, // comentarios
-  8, // activo
-  10, // destacado
-]
+const COLUMN_WIDTHS = [36, 16, 14, 10, 12, 8, 22, 14, 18, 8, 11]
 
-function catalogRowsToAoA(rows: CatalogExportRow[]): string[][] {
-  const data = rows.map(p => [
+function columnLetter(index: number): string {
+  let n = index + 1
+  let s = ''
+  while (n > 0) {
+    const rem = (n - 1) % 26
+    s = String.fromCharCode(65 + rem) + s
+    n = Math.floor((n - 1) / 26)
+  }
+  return s
+}
+
+function writeSheetFromRows(
+  XLSX: typeof import('xlsx'),
+  rows: string[][],
+  colCount: number,
+): import('xlsx').WorkSheet {
+  const ws: import('xlsx').WorkSheet = {}
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r] ?? []
+    for (let c = 0; c < colCount; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c })
+      ws[addr] = { t: 's', v: String(row[c] ?? '') }
+    }
+  }
+  const lastCol = columnLetter(colCount - 1)
+  ws['!ref'] = `A1:${lastCol}${rows.length}`
+  return ws
+}
+
+function buildHeaderOnlyProductSheet(XLSX: typeof import('xlsx')): import('xlsx').WorkSheet {
+  const ws = writeSheetFromRows(XLSX, [HEADER_ROW], HEADER_ROW.length)
+  ws['!cols'] = COLUMN_WIDTHS.map(wch => ({ wch }))
+  ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' }
+  return ws
+}
+
+function buildProductSheet(XLSX: typeof import('xlsx'), dataRows: string[][]): import('xlsx').WorkSheet {
+  const ws = writeSheetFromRows(XLSX, [HEADER_ROW, ...dataRows], HEADER_ROW.length)
+  ws['!cols'] = COLUMN_WIDTHS.map(wch => ({ wch }))
+  ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' }
+  return ws
+}
+
+async function xlsxBlobFromWorkbook(build: (XLSX: typeof import('xlsx')) => import('xlsx').WorkBook): Promise<Blob> {
+  const XLSX = await import('xlsx')
+  const wb = build(XLSX)
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  return new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+}
+
+function catalogDataRows(rows: CatalogExportRow[]): string[][] {
+  return rows.map(p => [
     p.name || '',
     p.brand || '',
     p.category || '',
@@ -48,45 +88,23 @@ function catalogRowsToAoA(rows: CatalogExportRow[]): string[][] {
     p.is_active ? 'true' : 'false',
     p.is_featured ? 'true' : 'false',
   ])
-  return [HEADER_ROW, ...data]
-}
-
-function applyProductSheetLayout(ws: import('xlsx').WorkSheet) {
-  ws['!cols'] = COLUMN_WIDTHS.map(wch => ({ wch }))
-  ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' }
-}
-
-async function xlsxBlobFromAoA(rows: string[][], sheetName: string): Promise<Blob> {
-  const XLSX = await import('xlsx')
-  const ws = XLSX.utils.aoa_to_sheet(rows)
-  applyProductSheetLayout(ws)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, sheetName)
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-  return new Blob([buf], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  })
 }
 
 export async function catalogToXlsxBlob(rows: CatalogExportRow[]): Promise<Blob> {
-  return xlsxBlobFromAoA(catalogRowsToAoA(rows), 'Productos')
+  return xlsxBlobFromWorkbook(XLSX => {
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, buildProductSheet(XLSX, catalogDataRows(rows)), PRODUCT_SHEET_NAME)
+    return wb
+  })
 }
 
+/** One sheet, row 1 = column headers only (paste catalog from row 2). */
 export async function skateshopTemplateXlsxBlob(): Promise<Blob> {
-  const example: string[] = [
-    'Playera logo (ejemplo)',
-    'Tu marca',
-    'playera',
-    'M',
-    '350',
-    '5',
-    '',
-    '',
-    '',
-    'true',
-    'false',
-  ]
-  return xlsxBlobFromAoA([HEADER_ROW, example], 'Productos')
+  return xlsxBlobFromWorkbook(XLSX => {
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, buildHeaderOnlyProductSheet(XLSX), PRODUCT_SHEET_NAME)
+    return wb
+  })
 }
 
 export function triggerBlobDownload(blob: Blob, filename: string) {
@@ -98,11 +116,12 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-/** First worksheet → same validation as table import. */
 export async function parseShopProductXlsx(buffer: ArrayBuffer): Promise<ParseShopProductCsvResult> {
   const XLSX = await import('xlsx')
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
-  const sheetName = workbook.SheetNames[0]
+  const sheetName =
+    workbook.SheetNames.find(n => n.toLowerCase() === PRODUCT_SHEET_NAME.toLowerCase()) ??
+    workbook.SheetNames[0]
   if (!sheetName) {
     return parseShopProductTable([])
   }
