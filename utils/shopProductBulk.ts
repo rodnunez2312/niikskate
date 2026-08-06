@@ -40,6 +40,18 @@ export function bulkProductMatchKey(
   return `${n}\0${b}\0${s}`
 }
 
+/** Excel column letter (1 → A) for error messages. */
+export function excelColumnLetter(index: number): string {
+  let n = index + 1
+  let s = ''
+  while (n > 0) {
+    const rem = (n - 1) % 26
+    s = String.fromCharCode(65 + rem) + s
+    n = Math.floor((n - 1) / 26)
+  }
+  return s
+}
+
 export type ParsedShopProductRow = {
   rowNumber: number
   name: string
@@ -49,6 +61,10 @@ export type ParsedShopProductRow = {
   size: string | null
   /** null = leave unchanged on bulk update of existing SKU */
   price_mxn: number | null
+  /** Raw cell from price_mxn column (for admin error text). */
+  price_mxn_raw: string
+  /** Excel column letter for price_mxn in this file (from header position). */
+  price_mxn_excel_col: string
   /** null = leave unchanged on bulk update of existing SKU */
   stock_quantity: number | null
   description: string
@@ -231,6 +247,9 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     return { rows: [], issues, duplicateCount: 0 }
   }
 
+  const priceMxnExcelCol =
+    colIndex('price_mxn') >= 0 ? excelColumnLetter(colIndex('price_mxn')) : '?'
+
   const rows: ParsedShopProductRow[] = []
 
   for (let i = 1; i < lines.length; i++) {
@@ -244,9 +263,18 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
 
     if (!name.trim()) continue
 
-    const price_mxn = parsePriceMxnField(get('price_mxn'))
-    if (get('price_mxn').trim() && price_mxn == null) {
-      issues.push({ row: rowNumber, kind: 'bad_price', detail: get('price_mxn').trim() })
+    const priceRaw = get('price_mxn')
+    const price_mxn = parsePriceMxnField(priceRaw)
+    if (priceRaw.trim() && price_mxn == null) {
+      issues.push({
+        row: rowNumber,
+        kind: 'bad_price',
+        column: 'price_mxn',
+        columnExcel: priceMxnExcelCol,
+        productName: name.trim(),
+        rawValue: priceRaw.trim(),
+        detail: priceRaw.trim(),
+      })
       continue
     }
 
@@ -269,6 +297,8 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
       category,
       size: get('size') || null,
       price_mxn,
+      price_mxn_raw: priceRaw,
+      price_mxn_excel_col: priceMxnExcelCol,
       stock_quantity,
       description: get('description') || '',
       proveedor: get('proveedor'),
@@ -282,8 +312,25 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
   let duplicateCount = 0
   for (const r of rows) {
     const key = bulkProductMatchKey(r.name, r.brand, r.size)
-    if (seen.has(key)) duplicateCount += 1
-    seen.set(key, r)
+    if (seen.has(key)) {
+      duplicateCount += 1
+      const prev = seen.get(key)!
+      seen.set(key, {
+        ...r,
+        rowNumber: r.rowNumber,
+        category: r.category ?? prev.category,
+        price_mxn: r.price_mxn ?? prev.price_mxn,
+        price_mxn_raw: r.price_mxn != null ? r.price_mxn_raw : prev.price_mxn_raw || r.price_mxn_raw,
+        stock_quantity: r.stock_quantity ?? prev.stock_quantity,
+        description: r.description.trim() ? r.description : prev.description,
+        proveedor: r.proveedor.trim() ? r.proveedor : prev.proveedor,
+        comentarios: r.comentarios.trim() ? r.comentarios : prev.comentarios,
+        is_active: r.is_active ?? prev.is_active,
+        is_featured: r.is_featured ?? prev.is_featured,
+      })
+    } else {
+      seen.set(key, r)
+    }
   }
 
   return { rows: [...seen.values()], issues, duplicateCount }
@@ -393,7 +440,16 @@ export function validateRowsForImport(
     const isNew = !existingByMatchKey.has(key)
     if (isNew) {
       if (!row.category) issues.push({ row: row.rowNumber, kind: 'missing_category' })
-      if (row.price_mxn == null) issues.push({ row: row.rowNumber, kind: 'missing_price' })
+      if (row.price_mxn == null) {
+        issues.push({
+          row: row.rowNumber,
+          kind: 'missing_price',
+          column: 'price_mxn',
+          columnExcel: row.price_mxn_excel_col,
+          productName: row.name.trim(),
+          rawValue: row.price_mxn_raw.trim() || undefined,
+        })
+      }
     }
   }
   return issues

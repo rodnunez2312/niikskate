@@ -189,18 +189,26 @@ export function normalizeImportCategory(raw: string): ProductCategory | null {
   return IMPORT_CATEGORY_MAP[key] ?? null
 }
 
-/** MXN price from Excel (empty / consultar → null). */
+/** MXN price from Excel (empty / consultar → null). Accepts $, MXN, 1.200, 1,200, no decimals. */
 export function parsePriceMxnField(raw: string): number | null {
-  let s = raw.trim()
+  let s = raw
+    .replace(/\u00a0|\u202f/g, ' ')
+    .trim()
   if (!s) return null
-  const lower = s.toLowerCase()
+  const lower = s.toLowerCase().replace(/\s+/g, ' ')
   if (['n/a', 'na', 'consultar', 'cotizar', '-', '—', 'tbd'].includes(lower)) {
     return null
   }
 
-  s = s.replace(/[$₡€£MXN\s]/gi, '')
+  s = s.replace(/\bmxn\b/gi, '').replace(/\bpesos?\b/gi, '')
+  s = s.replace(/[$₡€£¥]/g, '').replace(/\s/g, '')
 
-  if (s.includes(',') && s.includes('.')) {
+  // Mexico: 1.200 or 12.345.678 (dot = thousands)
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, '')
+  } else if (/^\d{1,3}(\.\d{3})+,\d{1,2}$/.test(s)) {
+    s = s.replace(/\./g, '').replace(',', '.')
+  } else if (s.includes(',') && s.includes('.')) {
     if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
       s = s.replace(/,/g, '')
     } else {
@@ -213,11 +221,18 @@ export function parsePriceMxnField(raw: string): number | null {
     } else {
       s = s.replace(/,/g, '')
     }
+  } else if (/^\d+\.\d{3}$/.test(s)) {
+    // e.g. 1.200 mis-read as decimal — treat as thousands when 3 digits after dot
+    const asThousands = s.replace('.', '')
+    const nThousands = Number(asThousands)
+    if (!Number.isNaN(nThousands) && nThousands >= 100) {
+      return nThousands
+    }
   }
 
   const n = Number(s)
   if (Number.isNaN(n) || n < 0) return null
-  return n
+  return Math.round(n * 100) / 100
 }
 
 export function parseStockQuantityField(raw: string): number | null {
