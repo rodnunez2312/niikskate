@@ -12,14 +12,64 @@ export const SHOP_PRODUCT_CATEGORIES: ProductCategory[] = [
 ]
 
 /**
- * Maps catalog / Excel product types → shop filter category (enum).
- * Column `category` can be playera, casco, baleros, etc.
+ * Excel `category` = your catalog product type (playera, gorra, …).
+ * Stored in DB as shop filter `ProductCategory` (merch, hardware, …).
+ * All apparel / lifestyle SKUs below → merch (Ropa en /skateshop).
  */
+const MERCH_PRODUCT_TYPES = [
+  'playera',
+  'playeras',
+  'camiseta',
+  'camisetas',
+  'tshirt',
+  'gorra',
+  'gorras',
+  'cap',
+  'caps',
+  'beanie',
+  'beanies',
+  'calcetines',
+  'calcetin',
+  'socks',
+  'cartera',
+  'carteras',
+  'wallet',
+  'cinturon',
+  'cinturones',
+  'belt',
+  'pantalon',
+  'pantalones',
+  'pants',
+  'short',
+  'shorts',
+  'lentes sol',
+  'lentes',
+  'sunglasses',
+  'marcador',
+  'marcadores',
+  'sticker',
+  'stickers',
+  'ropa',
+  'clothing',
+  'sudadera',
+  'sudaderas',
+  'hoodie',
+  'hoodies',
+  'chamarra',
+  'chamarras',
+  'mochila',
+  'mochilas',
+  'bag',
+  'bags',
+] as const
+
 const IMPORT_CATEGORY_MAP: Record<string, ProductCategory> = {
   tablas: 'tablas',
   tabla: 'tablas',
   deck: 'tablas',
   decks: 'tablas',
+  longboard: 'tablas',
+  longboards: 'tablas',
   llantas: 'llantas',
   llanta: 'llantas',
   wheels: 'llantas',
@@ -50,12 +100,32 @@ const IMPORT_CATEGORY_MAP: Record<string, ProductCategory> = {
   protecciones: 'protecciones',
   proteccion: 'protecciones',
   pads: 'protecciones',
+  guantes: 'protecciones',
+  guante: 'protecciones',
+  gloves: 'protecciones',
+  glove: 'protecciones',
   cascos: 'cascos',
   casco: 'cascos',
   helmet: 'cascos',
   helmets: 'cascos',
   merch: 'merch',
   merchandise: 'merch',
+  merh: 'merch',
+  sudadera: 'merch',
+  sudaderas: 'merch',
+  hoodie: 'merch',
+  hoodies: 'merch',
+  chamarra: 'merch',
+  chamarras: 'merch',
+  mochila: 'merch',
+  mochilas: 'merch',
+  bag: 'merch',
+  bags: 'merch',
+  tenis: 'merch',
+  zapatos: 'merch',
+  zapatillas: 'merch',
+  shoes: 'merch',
+  sneakers: 'merch',
   playera: 'merch',
   playeras: 'merch',
   camiseta: 'merch',
@@ -93,6 +163,12 @@ const IMPORT_CATEGORY_MAP: Record<string, ProductCategory> = {
   ramps: 'ramps',
   rampa: 'ramps',
   rampas: 'ramps',
+}
+
+for (const key of MERCH_PRODUCT_TYPES) {
+  if (!(key in IMPORT_CATEGORY_MAP)) {
+    IMPORT_CATEGORY_MAP[key] = 'merch'
+  }
 }
 
 function normalizeCategoryKey(raw: string): string {
@@ -148,8 +224,11 @@ export function parseStockQuantityField(raw: string): number | null {
   const s = raw.trim()
   if (!s) return 0
   const lower = s.toLowerCase()
-  if (['n/a', 'na', '-', '—'].includes(lower)) return 0
-  const n = Number(s.replace(/,/g, ''))
+  if (['n/a', 'na', '-', '—', 'unitalla', 'unitalla.', 'varios', 'vario'].includes(lower)) {
+    return 0
+  }
+  let num = s.replace(/,/g, '.')
+  const n = Number.parseFloat(num)
   if (Number.isNaN(n) || n < 0) return null
   return Math.floor(n)
 }

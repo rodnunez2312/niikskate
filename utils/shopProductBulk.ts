@@ -8,8 +8,8 @@ import {
   normalizeImportCategory,
   parsePriceMxnField,
   parseStockQuantityField,
-  SHOP_PRODUCT_CATEGORIES,
 } from '~/utils/productCategoryImport'
+import type { BulkImportIssue } from '~/utils/bulkImportMessages'
 
 /** CSV columns (row 1 header). Save as .csv from Excel. Product IDs (001, 002…) are assigned by the app. */
 export const SHOP_PRODUCT_CSV_COLUMNS = [
@@ -61,7 +61,8 @@ export type ParsedShopProductRow = {
 
 export type ParseShopProductCsvResult = {
   rows: ParsedShopProductRow[]
-  errors: string[]
+  issues: BulkImportIssue[]
+  duplicateCount: number
 }
 
 function parseCsvLine(line: string, delimiter = ','): string[] {
@@ -196,10 +197,15 @@ function parseOptionalBool(raw: string): boolean | null {
 }
 
 export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
-  const errors: string[] = []
+  const issues: BulkImportIssue[] = []
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
   if (!lines.length) {
-    return { rows: [], errors: ['File is empty.'] }
+    issues.push({
+      row: 0,
+      kind: 'other',
+      detail: 'El archivo está vacío.',
+    })
+    return { rows: [], issues, duplicateCount: 0 }
   }
 
   const delimiter = detectCsvDelimiter(lines[0])
@@ -217,16 +223,12 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
 
   for (const col of SHOP_PRODUCT_CSV_COLUMNS) {
     if (colIndex(col) < 0) {
-      errors.push(`Missing column: ${col}`)
+      issues.push({ row: 1, kind: 'header', detail: `Missing column: ${col}` })
     }
   }
 
-  if (errors.length) {
-    const preview = rawHeaderCells.slice(0, 6).join(' | ') || '(empty first row)'
-    errors.push(
-      `Could not read column headers (${rawHeaderCells.length} detected). Preview: ${preview}. Your sheet layout can be correct—Excel may still save row 1 as one cell. Try: download the template again, paste only data under the headers, Save As CSV UTF-8, upload that .csv (not .xlsx).`,
-    )
-    return { rows: [], errors }
+  if (issues.some(i => i.kind === 'header')) {
+    return { rows: [], issues, duplicateCount: 0 }
   }
 
   const rows: ParsedShopProductRow[] = []
@@ -244,21 +246,19 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
 
     const price_mxn = parsePriceMxnField(get('price_mxn'))
     if (get('price_mxn').trim() && price_mxn == null) {
-      errors.push(`Row ${rowNumber}: price_mxn must be a number (got "${get('price_mxn').trim()}").`)
+      issues.push({ row: rowNumber, kind: 'bad_price', detail: get('price_mxn').trim() })
       continue
     }
 
     const stockParsed = parseStockQuantityField(get('stock_quantity'))
     if (get('stock_quantity').trim() && stockParsed == null) {
-      errors.push(`Row ${rowNumber}: stock_quantity must be a number >= 0.`)
+      issues.push({ row: rowNumber, kind: 'bad_stock' })
       continue
     }
     const stock_quantity = stockParsed
 
     if (categoryRaw.trim() && !category) {
-      errors.push(
-        `Row ${rowNumber}: unknown category "${categoryRaw.trim()}". Use a product type (playera, casco, baleros, tabla, lija, gorra…) or shop category: ${SHOP_PRODUCT_CATEGORIES.join(', ')}.`,
-      )
+      issues.push({ row: rowNumber, kind: 'unknown_category', detail: categoryRaw.trim() })
       continue
     }
 
@@ -278,18 +278,15 @@ export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
     })
   }
 
-  const seen = new Set<string>()
+  const seen = new Map<string, ParsedShopProductRow>()
+  let duplicateCount = 0
   for (const r of rows) {
     const key = bulkProductMatchKey(r.name, r.brand, r.size)
-    if (seen.has(key)) {
-      errors.push(
-        `Duplicate row in file (same name, brand, size): "${r.name}"${r.brand ? ` / ${r.brand}` : ''}${r.size ? ` / ${r.size}` : ''}`,
-      )
-    }
-    seen.add(key)
+    if (seen.has(key)) duplicateCount += 1
+    seen.set(key, r)
   }
 
-  return { rows, errors }
+  return { rows: [...seen.values()], issues, duplicateCount }
 }
 
 export function shopProductRowToDbPayload(row: ParsedShopProductRow, sku: string) {
@@ -385,21 +382,21 @@ export function mergeShopProductForUpsert(
 export function validateRowsForImport(
   rows: ParsedShopProductRow[],
   existingByMatchKey: Map<string, ExistingProductRow>,
-): string[] {
-  const errors: string[] = []
+): BulkImportIssue[] {
+  const issues: BulkImportIssue[] = []
   for (const row of rows) {
     if (!row.name.trim()) {
-      errors.push(`Row ${row.rowNumber}: name is required.`)
+      issues.push({ row: row.rowNumber, kind: 'missing_name' })
       continue
     }
     const key = bulkProductMatchKey(row.name, row.brand, row.size)
     const isNew = !existingByMatchKey.has(key)
     if (isNew) {
-      if (!row.category) errors.push(`Row ${row.rowNumber}: category is required for new product "${row.name}".`)
-      if (row.price_mxn == null) errors.push(`Row ${row.rowNumber}: price_mxn is required for new product "${row.name}".`)
+      if (!row.category) issues.push({ row: row.rowNumber, kind: 'missing_category' })
+      if (row.price_mxn == null) issues.push({ row: row.rowNumber, kind: 'missing_price' })
     }
   }
-  return errors
+  return issues
 }
 
 export type BulkImportBuildResult = {
