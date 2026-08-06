@@ -259,6 +259,6 @@ export function summarizeBulkImportIssues(
 export function summarizeBulkImportWarnings(warningCount: number, es: boolean): string | null {
   if (!warningCount) return null
   return es
-    ? `${warningCount} producto(s) repetido(s) en el archivo — se importará la última fila de cada uno; si la última fila no trae precio, se usa el precio de una fila anterior del mismo producto.`
-    : `${warningCount} duplicate product(s) in the file — the last row wins; if the last row has no price, the price from an earlier row for the same product is kept.`
+    ? `${warningCount} fila(s) repetida(s) (mismo nombre/marca/talla). Edítalas abajo o quita la fila extra; al importar se combina la última fila de cada grupo.`
+    : `${warningCount} duplicate row(s) (same name/brand/size). Edit below or remove extras; import merges the last row in each group.`
 }

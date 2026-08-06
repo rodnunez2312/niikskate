@@ -10,6 +10,9 @@ import {
   validateRowsForImport,
   buildBulkImportPayloads,
   bulkProductMatchKey,
+  dedupeShopProductRows,
+  type BulkDuplicateGroup,
+  type ParsedShopProductRow,
 } from '~/utils/shopProductBulk'
 import {
   summarizeBulkImportIssues,
@@ -55,6 +58,10 @@ const bulkDuplicateCount = ref(0)
 const bulkMessage = ref<string | null>(null)
 const bulkFileInput = ref<HTMLInputElement | null>(null)
 const bulkSelectedFileName = ref<string | null>(null)
+const bulkEditRows = ref<ParsedShopProductRow[]>([])
+const bulkImportReadyRows = ref<ParsedShopProductRow[]>([])
+const bulkDuplicateGroups = ref<BulkDuplicateGroup[]>([])
+const bulkExistingByMatchKey = ref(new Map<string, any>())
 
 const shopGroups: Array<{
   id: ShopGroupId
@@ -473,6 +480,36 @@ function onShopGroupPick(groupId: ShopGroupId) {
   }
 }
 
+function cloneBulkRows(rows: ParsedShopProductRow[]): ParsedShopProductRow[] {
+  return rows.map(r => ({ ...r }))
+}
+
+function refreshBulkValidation() {
+  const { rows, duplicateCount, duplicateGroups } = dedupeShopProductRows(bulkEditRows.value)
+  bulkImportReadyRows.value = rows
+  bulkDuplicateGroups.value = duplicateGroups
+  const importIssues = validateRowsForImport(rows, bulkExistingByMatchKey.value)
+  applyBulkIssueFeedback(importIssues, duplicateCount)
+}
+
+function initBulkEditorFromParse(parsed: ParseShopProductCsvResult) {
+  const source = parsed.allRows?.length ? parsed.allRows : parsed.rows
+  bulkEditRows.value = cloneBulkRows(source)
+  refreshBulkValidation()
+}
+
+function onBulkEditRowsUpdate(rows: ParsedShopProductRow[]) {
+  bulkEditRows.value = rows
+  refreshBulkValidation()
+}
+
+function clearBulkEditor() {
+  bulkEditRows.value = []
+  bulkImportReadyRows.value = []
+  bulkDuplicateGroups.value = []
+  bulkExistingByMatchKey.value = new Map()
+}
+
 function applyBulkIssueFeedback(allIssues: BulkImportIssue[], duplicateCount: number) {
   const { summary, details } = summarizeBulkImportIssues(allIssues, es.value)
   bulkImportErrors.value = summary
@@ -487,6 +524,7 @@ async function onBulkFileSelected(event: Event) {
   bulkImportErrorDetails.value = []
   bulkImportWarnings.value = null
   bulkDuplicateCount.value = 0
+  clearBulkEditor()
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
@@ -531,29 +569,34 @@ async function onBulkFileSelected(event: Event) {
   }
   if (parsed.issues.length) {
     bulkPreview.value = parsed
+    for (const p of (await client.from('products').select('*')).data || []) {
+      bulkExistingByMatchKey.value.set(bulkProductMatchKey(p.name, p.brand, p.size), p)
+    }
+    if (parsed.allRows?.length) initBulkEditorFromParse(parsed)
     applyBulkIssueFeedback(parsed.issues, parsed.duplicateCount)
     if (bulkFileInput.value) bulkFileInput.value.value = ''
     return
   }
   const { data: existingProducts } = await client.from('products').select('*')
-  const existingByMatchKey = new Map<string, NonNullable<typeof existingProducts>[number]>()
+  bulkExistingByMatchKey.value = new Map()
   for (const p of existingProducts || []) {
-    existingByMatchKey.set(bulkProductMatchKey(p.name, p.brand, p.size), p)
+    bulkExistingByMatchKey.value.set(bulkProductMatchKey(p.name, p.brand, p.size), p)
   }
-  const importIssues = validateRowsForImport(parsed.rows, existingByMatchKey)
+  const importIssues = validateRowsForImport(parsed.rows, bulkExistingByMatchKey.value)
   bulkPreview.value = parsed
+  initBulkEditorFromParse(parsed)
   applyBulkIssueFeedback(importIssues, parsed.duplicateCount)
   if (bulkFileInput.value) bulkFileInput.value.value = ''
 }
 
 async function runBulkImport() {
-  if (!bulkPreview.value?.rows.length || bulkImportErrors.value.length) return
+  if (!bulkImportReadyRows.value.length || bulkImportErrors.value.length) return
   bulkImporting.value = true
   bulkMessage.value = null
   try {
     const { data: catalogExisting, error: fetchErr } = await client.from('products').select('*')
     if (fetchErr) throw fetchErr
-    const built = buildBulkImportPayloads(bulkPreview.value.rows, catalogExisting || [])
+    const built = buildBulkImportPayloads(bulkImportReadyRows.value, catalogExisting || [])
     if (built.errors.length) {
       applyBulkIssueFeedback(
         built.errors.map((msg, i) => ({ row: 0, kind: 'other' as const, detail: msg })),
@@ -568,6 +611,7 @@ async function runBulkImport() {
       ? `Listo: ${built.created} nuevos (ID asignado automático), ${built.updated} actualizados (mismo nombre/marca/talla).`
       : `Done: ${built.created} created (auto ID), ${built.updated} updated (same name/brand/size).`
     bulkPreview.value = null
+    clearBulkEditor()
     bulkImportErrors.value = []
     bulkImportErrorDetails.value = []
     bulkImportWarnings.value = null
@@ -722,7 +766,7 @@ const productPhotoUploadHint = computed(() =>
           <button
             type="button"
             class="px-4 py-2 rounded-xl bg-gold-400 text-black text-sm font-bold disabled:opacity-50"
-            :disabled="bulkImporting || !bulkPreview?.rows.length || bulkImportErrors.length > 0"
+            :disabled="bulkImporting || !bulkImportReadyRows.length || bulkImportErrors.length > 0"
             @click="runBulkImport"
           >
             {{ bulkImporting ? (es ? 'Importando…' : 'Importing…') : (es ? 'Importar filas' : 'Import rows') }}
@@ -739,7 +783,11 @@ const productPhotoUploadHint = computed(() =>
           class="rounded-xl border border-flame-500/40 bg-flame-500/10 p-3 space-y-2"
         >
           <p class="text-sm font-bold text-flame-400">
-            {{ es ? 'Corrige en Excel y vuelve a subir el archivo:' : 'Fix in Excel and upload again:' }}
+            {{
+              bulkEditRows.length
+                ? (es ? 'Corrige en la tabla de abajo (o en Excel y vuelve a subir):' : 'Fix in the table below (or in Excel and re-upload):')
+                : (es ? 'Corrige en Excel y vuelve a subir el archivo:' : 'Fix in Excel and upload again:')
+            }}
           </p>
           <ul class="text-sm text-flame-100/90 list-disc pl-4 space-y-2">
             <li v-for="(err, i) in bulkImportErrors" :key="'e' + i">{{ err }}</li>
@@ -753,15 +801,24 @@ const productPhotoUploadHint = computed(() =>
             </ul>
           </details>
         </div>
-        <template v-else-if="bulkPreview?.rows.length">
-          <p class="text-sm text-glass-green">
-            {{ bulkPreview.rows.length }}
-            {{ es ? ' productos listos para importar.' : ' products ready to import.' }}
-          </p>
-          <p v-if="bulkImportWarnings" class="text-xs text-amber-200/80 mt-1">
-            {{ bulkImportWarnings }}
-          </p>
-        </template>
+        <p v-if="bulkImportReadyRows.length && !bulkImportErrors.length" class="text-sm text-glass-green">
+          {{ bulkImportReadyRows.length }}
+          {{ es ? ' productos listos para importar.' : ' products ready to import.' }}
+        </p>
+        <p v-else-if="bulkImportReadyRows.length" class="text-sm text-gray-400">
+          {{ bulkImportReadyRows.length }}
+          {{ es ? ' productos cuando corrijas los errores.' : ' products once errors are fixed.' }}
+        </p>
+        <p v-if="bulkImportWarnings && bulkEditRows.length" class="text-xs text-amber-200/80 mt-1">
+          {{ bulkImportWarnings }}
+        </p>
+        <MemberBulkImportEditor
+          v-if="bulkEditRows.length"
+          :rows="bulkEditRows"
+          :duplicate-groups="bulkDuplicateGroups"
+          :es="es"
+          @update:rows="onBulkEditRowsUpdate"
+        />
         <p v-if="bulkMessage" class="text-sm text-gray-300">{{ bulkMessage }}</p>
       </section>
 

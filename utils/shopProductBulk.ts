@@ -88,12 +88,88 @@ export type ParsedShopProductRow = {
   comentarios: string
   is_active: boolean | null
   is_featured: boolean | null
+  /** Original categoria cell text from Excel. */
+  category_raw: string
+}
+
+export type BulkDuplicateGroup = {
+  key: string
+  name: string
+  brand: string | null
+  size: string | null
+  rowNumbers: number[]
 }
 
 export type ParseShopProductCsvResult = {
+  /** Rows after merging duplicates (what import uses by default). */
   rows: ParsedShopProductRow[]
+  /** Every data row from the file (for in-app editing). */
+  allRows: ParsedShopProductRow[]
+  duplicateGroups: BulkDuplicateGroup[]
   issues: BulkImportIssue[]
   duplicateCount: number
+}
+
+export function findDuplicateGroups(allRows: ParsedShopProductRow[]): BulkDuplicateGroup[] {
+  const byKey = new Map<string, { rowNumbers: number[]; sample: ParsedShopProductRow }>()
+  for (const r of allRows) {
+    const key = bulkProductMatchKey(r.name, r.brand, r.size)
+    const cur = byKey.get(key)
+    if (cur) {
+      cur.rowNumbers.push(r.rowNumber)
+    } else {
+      byKey.set(key, { rowNumbers: [r.rowNumber], sample: r })
+    }
+  }
+  const groups: BulkDuplicateGroup[] = []
+  for (const [key, { rowNumbers, sample }] of byKey) {
+    if (rowNumbers.length <= 1) continue
+    groups.push({
+      key,
+      name: sample.name,
+      brand: sample.brand,
+      size: sample.size,
+      rowNumbers: [...rowNumbers].sort((a, b) => a - b),
+    })
+  }
+  return groups
+}
+
+/** Last row wins; empty fields on later rows keep earlier values. */
+export function dedupeShopProductRows(allRows: ParsedShopProductRow[]): {
+  rows: ParsedShopProductRow[]
+  duplicateCount: number
+  duplicateGroups: BulkDuplicateGroup[]
+} {
+  const duplicateGroups = findDuplicateGroups(allRows)
+  let duplicateCount = 0
+  for (const g of duplicateGroups) {
+    duplicateCount += g.rowNumbers.length - 1
+  }
+  const seen = new Map<string, ParsedShopProductRow>()
+  for (const r of allRows) {
+    const key = bulkProductMatchKey(r.name, r.brand, r.size)
+    if (seen.has(key)) {
+      const prev = seen.get(key)!
+      seen.set(key, {
+        ...r,
+        rowNumber: r.rowNumber,
+        category: r.category ?? prev.category,
+        category_raw: r.category_raw.trim() ? r.category_raw : prev.category_raw,
+        price_mxn: r.price_mxn ?? prev.price_mxn,
+        price_mxn_raw: r.price_mxn != null ? r.price_mxn_raw : prev.price_mxn_raw || r.price_mxn_raw,
+        stock_quantity: r.stock_quantity ?? prev.stock_quantity,
+        description: r.description.trim() ? r.description : prev.description,
+        proveedor: r.proveedor.trim() ? r.proveedor : prev.proveedor,
+        comentarios: r.comentarios.trim() ? r.comentarios : prev.comentarios,
+        is_active: r.is_active ?? prev.is_active,
+        is_featured: r.is_featured ?? prev.is_featured,
+      })
+    } else {
+      seen.set(key, r)
+    }
+  }
+  return { rows: [...seen.values()], duplicateCount, duplicateGroups }
 }
 
 /**
@@ -307,7 +383,7 @@ export function parseShopProductTable(table: unknown[][]): ParseShopProductCsvRe
       kind: 'other',
       detail: 'El archivo está vacío.',
     })
-    return { rows: [], issues, duplicateCount: 0 }
+    return { rows: [], allRows: [], duplicateGroups: [], issues, duplicateCount: 0 }
   }
 
   const rawHeaderCells = padTableRow(table[0] ?? [], SHOP_PRODUCT_CSV_COLUMNS.length)
@@ -329,7 +405,7 @@ export function parseShopProductTable(table: unknown[][]): ParseShopProductCsvRe
   }
 
   if (issues.some(i => i.kind === 'header')) {
-    return { rows: [], issues, duplicateCount: 0 }
+    return { rows: [], allRows: [], duplicateGroups: [], issues, duplicateCount: 0 }
   }
 
   const minCols = Math.max(...columnIndexByField.values()) + 1
@@ -392,6 +468,7 @@ export function parseShopProductTable(table: unknown[][]): ParseShopProductCsvRe
       name: name.trim(),
       brand: get('brand') || null,
       category,
+      category_raw: categoryRaw.trim(),
       size: get('size') || null,
       price_mxn,
       price_mxn_raw: priceRaw,
@@ -405,32 +482,10 @@ export function parseShopProductTable(table: unknown[][]): ParseShopProductCsvRe
     })
   }
 
-  const seen = new Map<string, ParsedShopProductRow>()
-  let duplicateCount = 0
-  for (const r of rows) {
-    const key = bulkProductMatchKey(r.name, r.brand, r.size)
-    if (seen.has(key)) {
-      duplicateCount += 1
-      const prev = seen.get(key)!
-      seen.set(key, {
-        ...r,
-        rowNumber: r.rowNumber,
-        category: r.category ?? prev.category,
-        price_mxn: r.price_mxn ?? prev.price_mxn,
-        price_mxn_raw: r.price_mxn != null ? r.price_mxn_raw : prev.price_mxn_raw || r.price_mxn_raw,
-        stock_quantity: r.stock_quantity ?? prev.stock_quantity,
-        description: r.description.trim() ? r.description : prev.description,
-        proveedor: r.proveedor.trim() ? r.proveedor : prev.proveedor,
-        comentarios: r.comentarios.trim() ? r.comentarios : prev.comentarios,
-        is_active: r.is_active ?? prev.is_active,
-        is_featured: r.is_featured ?? prev.is_featured,
-      })
-    } else {
-      seen.set(key, r)
-    }
-  }
+  const allRows = [...rows]
+  const { rows: deduped, duplicateCount, duplicateGroups } = dedupeShopProductRows(allRows)
 
-  return { rows: [...seen.values()], issues, duplicateCount }
+  return { rows: deduped, allRows, duplicateGroups, issues, duplicateCount }
 }
 
 export function parseShopProductCsv(text: string): ParseShopProductCsvResult {
