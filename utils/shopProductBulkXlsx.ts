@@ -1,4 +1,4 @@
-import { SHOP_PRODUCT_CSV_COLUMNS } from '~/utils/shopProductBulk'
+import { SHOP_PRODUCT_EXCEL_HEADERS_ES } from '~/utils/shopProductBulk'
 import { extractUserAppendFromStoredDescription } from '~/utils/productDescriptionTemplate'
 import type { ParseShopProductCsvResult } from '~/utils/shopProductBulk'
 import { parseShopProductTable } from '~/utils/shopProductBulk'
@@ -17,8 +17,24 @@ export type CatalogExportRow = {
   is_featured: boolean
 }
 
+const HEADER_ROW = [...SHOP_PRODUCT_EXCEL_HEADERS_ES]
+
+/** Column widths so headers are fully visible in Excel. */
+const COLUMN_WIDTHS = [
+  36, // nombre
+  16, // marca
+  14, // categoria
+  10, // talla
+  12, // precio_mxn
+  8, // stock
+  24, // descripcion
+  14, // proveedor
+  18, // comentarios
+  8, // activo
+  10, // destacado
+]
+
 function catalogRowsToAoA(rows: CatalogExportRow[]): string[][] {
-  const header = [...SHOP_PRODUCT_CSV_COLUMNS]
   const data = rows.map(p => [
     p.name || '',
     p.brand || '',
@@ -32,12 +48,18 @@ function catalogRowsToAoA(rows: CatalogExportRow[]): string[][] {
     p.is_active ? 'true' : 'false',
     p.is_featured ? 'true' : 'false',
   ])
-  return [header, ...data]
+  return [HEADER_ROW, ...data]
+}
+
+function applyProductSheetLayout(ws: import('xlsx').WorkSheet) {
+  ws['!cols'] = COLUMN_WIDTHS.map(wch => ({ wch }))
+  ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' }
 }
 
 async function xlsxBlobFromAoA(rows: string[][], sheetName: string): Promise<Blob> {
   const XLSX = await import('xlsx')
   const ws = XLSX.utils.aoa_to_sheet(rows)
+  applyProductSheetLayout(ws)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, sheetName)
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -51,7 +73,6 @@ export async function catalogToXlsxBlob(rows: CatalogExportRow[]): Promise<Blob>
 }
 
 export async function skateshopTemplateXlsxBlob(): Promise<Blob> {
-  const header = [...SHOP_PRODUCT_CSV_COLUMNS]
   const example: string[] = [
     'Playera logo (ejemplo)',
     'Tu marca',
@@ -65,7 +86,7 @@ export async function skateshopTemplateXlsxBlob(): Promise<Blob> {
     'true',
     'false',
   ]
-  return xlsxBlobFromAoA([header, example], 'Productos')
+  return xlsxBlobFromAoA([HEADER_ROW, example], 'Productos')
 }
 
 export function triggerBlobDownload(blob: Blob, filename: string) {

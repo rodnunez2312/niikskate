@@ -28,6 +28,21 @@ export const SHOP_PRODUCT_CSV_COLUMNS = [
 
 export type ShopProductCsvColumn = (typeof SHOP_PRODUCT_CSV_COLUMNS)[number]
 
+/** Row 1 labels in Excel (import accepts these via header aliases). */
+export const SHOP_PRODUCT_EXCEL_HEADERS_ES = [
+  'nombre',
+  'marca',
+  'categoria',
+  'talla',
+  'precio_mxn',
+  'stock',
+  'descripcion',
+  'proveedor',
+  'comentarios',
+  'activo',
+  'destacado',
+] as const
+
 /** Match key for bulk update without product_id in CSV. */
 export function bulkProductMatchKey(
   name: string,

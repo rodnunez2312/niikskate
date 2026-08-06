@@ -676,8 +676,8 @@ const productPhotoUploadHint = computed(() =>
           <p class="text-[11px] text-gray-500">
             {{
               es
-                ? 'Fila 1: un encabezado por columna (A1=name, B1=brand…). Datos abajo en las mismas columnas.'
-                : 'Row 1: one header per column (A1=name, B1=brand…). Data below in the same columns.'
+                ? 'Fila 1 = encabezados en español (nombre, marca, categoria, precio_mxn…). No cambies esos títulos. Datos desde fila 2.'
+                : 'Row 1 = Spanish headers (nombre, marca, categoria, precio_mxn…). Do not change them. Data from row 2.'
             }}
           </p>
         </div>
