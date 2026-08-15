@@ -3,6 +3,19 @@ import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { isClassDay } from '~/utils/classSchedule'
 import classPlanningData from '~/data/class-planning.json'
+import {
+  SKATE_TRICK_AREAS,
+  SKATE_TRICK_STRUCTURES,
+  SKATE_TRICK_TYPES,
+  SKATE_TRICK_PROGRAMS,
+  categoryFromTrickMeta,
+  difficultyFromStructure,
+  difficultyTagClass,
+  areaTagClass,
+  trickManualLabel,
+  compareSkillsByManualId,
+} from '~/utils/skateTrickTaxonomy'
+import { hasEmbeddableVideoPreview } from '~/utils/videoEmbed'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -596,7 +609,11 @@ const initials = (name?: string) => {
 
 onMounted(async () => {
   const tab = String(useRoute().query.tab || '')
-  if (tab === 'tips' || tab === 'plan' || tab === 'tricks') {
+  if (tab === 'tricks') {
+    await navigateTo('/member/coach/tricks', { replace: true })
+    return
+  }
+  if (tab === 'tips' || tab === 'plan') {
     activeTab.value = tab
   }
   if (user.value) {
@@ -610,6 +627,18 @@ onMounted(async () => {
     selectedDate.value = addDays(selectedDate.value, 1)
   }
   await loadExistingPlan()
+  // Restore tricks picked from /member/coach/tricks?pick=plan
+  try {
+    const raw = sessionStorage.getItem('niik-plan-pick-skills')
+    if (raw) {
+      const ids: string[] = JSON.parse(raw)
+      if (ids.length) {
+        const merged = [...new Set([...plan.value.planned_skills, ...ids])]
+        plan.value.planned_skills = merged
+      }
+      sessionStorage.removeItem('niik-plan-pick-skills')
+    }
+  } catch { /* ignore */ }
   await fetchPrograms()
   fetchAllCoachesAndStudents()
   // Only admins can sync from Excel; run auto-sync for admin only
@@ -800,16 +829,18 @@ const programSummary = computed(() => {
   }
 })
 
-// Filtered skills (by program card, search, and difficulty)
+// Filtered skills (by program card, search, and difficulty) — ordered by Excel #
 const filteredSkills = computed(() => {
-  return skills.value.filter(skill => {
-    const matchesProgram = !selectedProgram.value || (skill.program || '').trim() === selectedProgram.value
-    const matchesSearch = !searchQuery.value ||
-      skill.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      skill.name_es?.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesDifficulty = !selectedDifficulty.value || skill.difficulty === selectedDifficulty.value
-    return matchesProgram && matchesSearch && matchesDifficulty
-  })
+  return skills.value
+    .filter(skill => {
+      const matchesProgram = !selectedProgram.value || (skill.program || '').trim() === selectedProgram.value
+      const matchesSearch = !searchQuery.value ||
+        skill.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        skill.name_es?.toLowerCase().includes(searchQuery.value.toLowerCase())
+      const matchesDifficulty = !selectedDifficulty.value || skill.difficulty === selectedDifficulty.value
+      return matchesProgram && matchesSearch && matchesDifficulty
+    })
+    .sort(compareSkillsByManualId)
 })
 
 // Get selected skills details
@@ -824,6 +855,12 @@ const getTrickMeta = (skill: any) => {
 
 const trickDetailSkill = ref<any | null>(null)
 const trickDetailMeta = computed(() => trickDetailSkill.value ? getTrickMeta(trickDetailSkill.value) : undefined)
+const trickDetailUrl = computed(() => {
+  const skill = trickDetailSkill.value
+  if (!skill) return null
+  const url = (skill.video_url || trickDetailMeta.value?.url || '').trim()
+  return url || null
+})
 const openTrickDetail = (skill: any) => { trickDetailSkill.value = skill }
 const closeTrickDetail = () => { trickDetailSkill.value = null }
 
@@ -832,7 +869,8 @@ const addTrickModalOpen = ref(false)
 const addTrickSaving = ref(false)
 const newTrick = ref({
   name: '',
-  categoria: '',
+  area: '',
+  structure: '',
   tipo: '',
   program: '',
   comentarios: '',
@@ -860,35 +898,12 @@ const HABILIDAD_MOTRIZ_OPTIONS = [
   'Balance, Coordinación, Fuerza',
   'Coordinación, Balance',
 ]
-const CATEGORIA_OPTIONS = ['0 - Warmup', '1 - Basics', '2 - Principiantes', '3 - Intermedios', '4 - Avanzados']
-const TIPO_OPTIONS = ['Ejercicios', 'Drill', 'Truco']
-const PROGRAM_OPTIONS = ['Strength Training', 'Iniciacion', 'Street', 'Park/Bowl']
-
 function openAddTrickModal() {
-  newTrick.value = { name: '', categoria: '', tipo: '', program: '', comentarios: '', url: '', habilidadMotriz: '' }
+  newTrick.value = { name: '', area: '', structure: '', tipo: '', program: '', comentarios: '', url: '', habilidadMotriz: '' }
   addTrickModalOpen.value = true
 }
 function closeAddTrickModal() {
   addTrickModalOpen.value = false
-}
-
-function difficultyFromCategoria(cat: string) {
-  if (!cat) return 'beginner'
-  if (/0\s*-\s*Warmup|1\s*-\s*Basics/i.test(cat)) return 'beginner'
-  if (/2\s*-\s*Principiantes/i.test(cat)) return 'beginner'
-  if (/3\s*-\s*Intermedios/i.test(cat)) return 'intermediate'
-  if (/4\s*-\s*Avanzados/i.test(cat)) return 'advanced'
-  return 'beginner'
-}
-function categoryFromProgram(program: string, tipo: string) {
-  const t = (tipo || '').toLowerCase()
-  if (/ejercicio|funcional|drill/.test(t)) return program === 'Strength Training' ? 'excercise' : 'iniciacion'
-  const p = (program || '').toLowerCase()
-  if (p === 'strength training') return 'excercise'
-  if (p === 'iniciacion') return 'iniciacion'
-  if (p === 'street') return 'street'
-  if (p === 'park/bowl') return 'vert_bowl'
-  return 'iniciacion'
 }
 
 async function saveNewTrick() {
@@ -897,22 +912,34 @@ async function saveNewTrick() {
     alert(language.value === 'es' ? 'Escribe el nombre del truco.' : 'Enter the trick name.')
     return
   }
+  if (!n.area || !n.structure || !n.tipo || !n.program) {
+    alert(language.value === 'es'
+      ? 'Completa Área, Estructura, Tipo y Programa.'
+      : 'Fill in Area, Structure, Type, and Program.')
+    return
+  }
   addTrickSaving.value = true
   try {
     const motorSkills = n.habilidadMotriz
       ? n.habilidadMotriz.split(',').map((s: string) => s.trim()).filter(Boolean)
       : []
+    const nextManualId =
+      skills.value.reduce((max, s) => Math.max(max, s.manual_id ?? s.sort_order ?? 0), 0) + 1
     const { error } = await client.from('skills_library').insert({
       name: n.name.trim(),
       name_es: n.name.trim(),
       description: n.comentarios?.trim() || n.name.trim(),
-      difficulty: difficultyFromCategoria(n.categoria),
-      category: categoryFromProgram(n.program, n.tipo),
-      categoria: n.categoria || null,
+      difficulty: difficultyFromStructure(n.structure),
+      category: categoryFromTrickMeta(n.area, n.program, n.tipo),
+      categoria: n.structure,
+      area: n.area,
+      structure: n.structure,
+      trick_type: n.tipo,
       video_url: n.url?.trim() || null,
-      program: n.program || null,
+      program: n.program,
       motor_skills: motorSkills,
-      sort_order: skills.value.length,
+      manual_id: nextManualId,
+      sort_order: nextManualId,
       is_active: true,
     })
     if (error) throw error
@@ -1016,13 +1043,12 @@ function goProgramResourceHub() {
           >
             {{ language === 'es' ? 'Sesiones' : 'Sessions' }}
           </button>
-          <button
-            @click="activeTab = 'tricks'"
-            class="flex-1 py-2 px-3 rounded-xl font-semibold text-sm transition-all"
-            :class="activeTab === 'tricks' ? 'bg-gold-400 text-black' : 'bg-gray-800 text-gray-400'"
+          <NuxtLink
+            to="/member/coach/tricks"
+            class="flex-1 py-2 px-3 rounded-xl font-semibold text-sm transition-all text-center bg-gray-800 text-gray-400 hover:text-white"
           >
             {{ language === 'es' ? 'Trucos' : 'Tricks' }}
-          </button>
+          </NuxtLink>
         </div>
       </div>
     </header>
@@ -1154,12 +1180,12 @@ function goProgramResourceHub() {
               <label class="text-sm text-gray-400">
                 🛹 {{ language === 'es' ? 'Trucos Seleccionados' : 'Selected Tricks' }} ({{ plan.planned_skills.length }})
               </label>
-              <button
-                @click="activeTab = 'tricks'"
+              <NuxtLink
+                to="/member/coach/tricks?pick=plan"
                 class="text-gold-400 text-sm font-semibold"
               >
                 {{ language === 'es' ? '+ Agregar' : '+ Add' }}
-              </button>
+              </NuxtLink>
             </div>
             
             <div v-if="selectedSkillsDetails.length === 0" class="text-center py-4 text-gray-500">
@@ -1386,11 +1412,14 @@ function goProgramResourceHub() {
                 </svg>
               </button>
               <div 
-                class="flex-1"
+                class="flex-1 min-w-0"
               >
-                <p :class="plan.planned_skills.includes(skill.id) ? 'text-white' : 'text-gray-300'">
-                  {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
-                </p>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span v-if="trickManualLabel(skill)" class="text-xs font-mono text-gray-500 shrink-0">{{ trickManualLabel(skill) }}</span>
+                  <p :class="plan.planned_skills.includes(skill.id) ? 'text-white' : 'text-gray-300'">
+                    {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
+                  </p>
+                </div>
                 <button
                   @click="openTrickDetail(skill)"
                   class="mt-1 px-2 py-0.5 rounded-md text-[11px] leading-tight font-semibold bg-gray-800 text-blue-300 hover:bg-gray-700"
@@ -1398,12 +1427,12 @@ function goProgramResourceHub() {
                   {{ language === 'es' ? 'Ver detalle' : 'View details' }}
                 </button>
               </div>
-              <div class="flex flex-col gap-1 items-end">
-                <span v-if="skill.categoria" class="px-2 py-0.5 rounded text-xs bg-indigo-500/20 text-indigo-300">
-                  {{ skill.categoria }}
+              <div class="flex flex-wrap gap-1 items-end justify-end max-w-[50%]">
+                <span v-if="skill.area" class="px-2 py-0.5 rounded text-xs" :class="areaTagClass(skill.area)">
+                  {{ skill.area }}
                 </span>
-                <span class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
-                  {{ difficultyStars(skill.difficulty) }}
+                <span class="px-2 py-0.5 rounded text-xs capitalize" :class="difficultyTagClass(skill.difficulty)">
+                  {{ skill.difficulty }}
                 </span>
               </div>
             </div>
@@ -1442,24 +1471,31 @@ function goProgramResourceHub() {
                 <input v-model="newTrick.name" type="text" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white" :placeholder="language === 'es' ? 'Nombre del truco' : 'Trick name'" />
               </div>
               <div>
-                <label class="block text-gray-400 mb-1">Categoría</label>
-                <select v-model="newTrick.categoria" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
+                <label class="block text-gray-400 mb-1">Area *</label>
+                <select v-model="newTrick.area" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
                   <option value="">—</option>
-                  <option v-for="opt in CATEGORIA_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                  <option v-for="opt in SKATE_TRICK_AREAS" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
               </div>
               <div>
-                <label class="block text-gray-400 mb-1">Tipo</label>
-                <select v-model="newTrick.tipo" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
+                <label class="block text-gray-400 mb-1">{{ language === 'es' ? 'Estructura' : 'Structure' }} *</label>
+                <select v-model="newTrick.structure" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
                   <option value="">—</option>
-                  <option v-for="opt in TIPO_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                  <option v-for="opt in SKATE_TRICK_STRUCTURES" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
               </div>
               <div>
-                <label class="block text-gray-400 mb-1">Program</label>
-                <select v-model="newTrick.program" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
+                <label class="block text-gray-400 mb-1">Type *</label>
+                <select v-model="newTrick.tipo" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
                   <option value="">—</option>
-                  <option v-for="opt in PROGRAM_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                  <option v-for="opt in SKATE_TRICK_TYPES" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-gray-400 mb-1">Program *</label>
+                <select v-model="newTrick.program" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
+                  <option value="">—</option>
+                  <option v-for="opt in SKATE_TRICK_PROGRAMS" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
               </div>
               <div>
@@ -1494,7 +1530,8 @@ function goProgramResourceHub() {
           @click="closeTrickDetail"
         >
           <div
-            class="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-2xl p-4 max-h-[85vh] overflow-y-auto"
+            class="w-full bg-gray-900 border border-gray-700 rounded-2xl p-4 max-h-[85vh] overflow-y-auto"
+            :class="trickDetailUrl && hasEmbeddableVideoPreview(trickDetailUrl) ? 'max-w-2xl' : 'max-w-lg'"
             @click.stop
           >
             <div class="flex items-center justify-between mb-3">
@@ -1511,22 +1548,16 @@ function goProgramResourceHub() {
 
             <div class="grid grid-cols-1 gap-2 text-sm">
               <p class="text-gray-300"><span class="text-gray-500">Truco:</span> {{ trickDetailMeta?.truco || (language === 'es' ? trickDetailSkill.name_es || trickDetailSkill.name : trickDetailSkill.name) }}</p>
-              <p class="text-gray-300"><span class="text-gray-500">categoria:</span> {{ trickDetailMeta?.categoria || trickDetailSkill.difficulty || '-' }}</p>
-              <p class="text-gray-300"><span class="text-gray-500">dirigido:</span> {{ trickDetailMeta?.dirigido || '-' }}</p>
+              <p class="text-gray-300"><span class="text-gray-500">Area:</span> {{ trickDetailSkill.area || trickDetailMeta?.area || '-' }}</p>
+              <p class="text-gray-300"><span class="text-gray-500">{{ language === 'es' ? 'Estructura' : 'Structure' }}:</span> {{ trickDetailSkill.structure || trickDetailMeta?.structure || trickDetailSkill.categoria || '-' }}</p>
+              <p class="text-gray-300"><span class="text-gray-500">Type:</span> {{ trickDetailSkill.trick_type || trickDetailMeta?.trick_type || '-' }}</p>
+              <p class="text-gray-300"><span class="text-gray-500">Program:</span> {{ trickDetailSkill.program || trickDetailMeta?.program || '-' }}</p>
               <p class="text-gray-300"><span class="text-gray-500">comentarios:</span> {{ trickDetailMeta?.comentarios || trickDetailSkill.description || '-' }}</p>
-              <p class="text-gray-300">
-                <span class="text-gray-500">url:</span>
-                <a
-                  v-if="trickDetailMeta?.url"
-                  :href="trickDetailMeta.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-blue-400 underline break-all ml-1"
-                >
-                  {{ trickDetailMeta.url }}
-                </a>
-                <span v-else>-</span>
-              </p>
+              <div>
+                <p class="text-gray-500 mb-1">url</p>
+                <VideoUrlPreview v-if="trickDetailUrl" :url="trickDetailUrl" />
+                <span v-else class="text-gray-300">-</span>
+              </div>
               <p class="text-gray-300"><span class="text-gray-500">{{ language === 'es' ? 'Categoría' : 'Category' }}:</span> {{ trickDetailMeta?.categoria || trickDetailSkill.categoria || trickDetailSkill.difficulty || '-' }}</p>
               <p class="text-gray-300">
                 <span class="text-gray-500">habilidad motriz habilitada:</span>

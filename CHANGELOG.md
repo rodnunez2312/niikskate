@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here. The format follows semantic-style versioning (`VERSION` file).
 
+## [1.3.0] – 2026-08-15
+
+### Summary
+Admin and coach release: **school calendar programs**, **season pricing**, **family/skater admin**, and **coach student tools**. Production deploy via GitHub → Vercel.
+
+### School calendar
+- Recurring programs, summer course (Mon–Fri, 5 or 10 days), season titles, and a more reliable admin load (no endless spinner).
+- Program create/edit modal: confirm before discarding unsaved changes; auto title from temporada.
+
+### Pricing
+- Separate reference tables for **Coach Principiante**, **Coach Street**, and **Coach Bowl**.
+- Final prices aligned to the academy spreadsheet (monthly, drop-in, and packs).
+
+### Academy & families
+- Admin users: save-and-close, family create/edit, auto `@niikskate.com` emails, skater assign/remove.
+
+### Coach tools
+- Student profile: completed challenges list, assign-trick table with filters and scroll.
+- Programs / tricks hub, skill-group structure, and related migrations in `supabase/migrations/`.
+
+### Compared to [1.2.0]
+- **`1.3.0`** ships live scheduling/pricing and roster workflows used daily by admin and coaches.
+
+---
+
 ## [1.2.0] – 2026-04-26
 
 ### Summary

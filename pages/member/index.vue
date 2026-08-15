@@ -7,8 +7,8 @@ watch(
   [loading, isAdmin, isCoach, isStudent],
   () => {
     if (loading.value) return
-    if (isAdmin.value) navigateTo('/member/admin/scheduling', { replace: true })
-    else if (isCoach.value) navigateTo('/member/coach/home', { replace: true })
+    if (isAdmin.value) navigateTo('/member/staff/dashboard', { replace: true })
+    else if (isCoach.value) navigateTo('/member/staff/dashboard', { replace: true })
     else if (isStudent.value) navigateTo('/member/student/classes', { replace: true })
     else navigateTo('/auth/login?redirect=/member', { replace: true })
   },

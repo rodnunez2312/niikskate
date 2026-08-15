@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import {
+  SKATE_TRICK_STRUCTURES,
+  areaTagClass,
+  difficultyFromStructure,
+  difficultyTagClass,
+  skillStructure,
+} from '~/utils/skateTrickTaxonomy'
+import { isPlanningSkillGroupName } from '~/utils/skillGroupLevels'
+
 definePageMeta({
   middleware: ['auth', 'member'],
   layout: 'member',
@@ -42,12 +51,50 @@ const areas = ref<AreaWithSkills[]>([])
 const subgroups = ref<Array<{ id: string; name: string }>>([])
 const expandedAreaIds = ref<Set<string>>(new Set())
 
-const librarySkills = ref<Array<{ id: string; name: string; name_es: string | null; category: string; difficulty?: string }>>([])
+const librarySkills = ref<Array<{
+  id: string
+  name: string
+  name_es: string | null
+  category: string
+  area?: string | null
+  structure?: string | null
+  categoria?: string | null
+  difficulty?: string | null
+}>>([])
 const addSkillAreaId = ref<string | null>(null)
 const addSkillModalOpen = ref(false)
 const addSkillSearch = ref('')
+const addSkillStructureFilter = ref('')
+const addSkillAreaFilter = ref('')
 const addSkillVariant = ref('')
 const addSkillSaving = ref(false)
+
+const programLevels = ref<Array<{ id: string; name: string; sort_order: number }>>([])
+
+type ProgramSkater = {
+  id: string
+  full_name: string
+  email: string
+  skill_level: string | null
+}
+
+const programSkaters = ref<ProgramSkater[]>([])
+const skatersExpanded = ref(true)
+
+const currentLevelIndex = computed(() =>
+  programLevels.value.findIndex(g => g.id === (route.params.id as string)),
+)
+
+const prevProgramLevel = computed(() => {
+  const i = currentLevelIndex.value
+  return i > 0 ? programLevels.value[i - 1]! : null
+})
+
+const nextProgramLevel = computed(() => {
+  const i = currentLevelIndex.value
+  if (i < 0 || i >= programLevels.value.length - 1) return null
+  return programLevels.value[i + 1]!
+})
 
 onMounted(async () => {
   if (!user.value) {
@@ -59,8 +106,32 @@ onMounted(async () => {
     router.push('/')
     return
   }
+  await loadProgramLevels()
   await fetchGroup()
 })
+
+watch(
+  () => route.params.id,
+  async (id) => {
+    if (id) await fetchGroup()
+  },
+)
+
+async function loadProgramLevels() {
+  const { data } = await client
+    .from('skill_groups')
+    .select('id, name, sort_order, is_active')
+    .order('sort_order')
+  programLevels.value = (data || []).filter(g => g.is_active !== false)
+}
+
+function goToAdjacentLevel(delta: -1 | 1) {
+  const target = delta === -1 ? prevProgramLevel.value : nextProgramLevel.value
+  if (!target) return
+  expandedAreaIds.value = new Set()
+  router.push(`/member/coach/library/${target.id}`)
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 async function fetchGroup() {
   const id = route.params.id as string
@@ -108,6 +179,13 @@ async function fetchGroup() {
       skills: (byArea.get(a.id) || []).sort((x: AreaSkill, y: AreaSkill) => x.sort_order - y.sort_order),
     }))
     subgroups.value = subgroupsData || []
+    const { data: skaterData } = await client
+      .from('profiles')
+      .select('id, full_name, email, skill_level')
+      .eq('role', 'customer')
+      .eq('skill_group_id', id)
+      .order('full_name')
+    programSkaters.value = (skaterData || []) as ProgramSkater[]
     const totalSkills = areas.value.reduce((n, ar) => n + ar.skills_count, 0)
     group.value = {
       ...g,
@@ -137,6 +215,8 @@ function goBack() {
 function openAddSkillModal(areaId: string) {
   addSkillAreaId.value = areaId
   addSkillSearch.value = ''
+  addSkillStructureFilter.value = ''
+  addSkillAreaFilter.value = ''
   addSkillVariant.value = ''
   addSkillModalOpen.value = true
   loadLibrarySkills()
@@ -146,27 +226,37 @@ function closeAddSkillModal() {
   addSkillModalOpen.value = false
   addSkillAreaId.value = null
   addSkillSearch.value = ''
+  addSkillStructureFilter.value = ''
+  addSkillAreaFilter.value = ''
   addSkillVariant.value = ''
 }
 
 async function loadLibrarySkills() {
   const { data } = await client
     .from('skills_library')
-    .select('id, name, name_es, category, difficulty')
+    .select('id, name, name_es, category, area, structure, categoria, difficulty')
     .eq('is_active', true)
-    .order('category')
     .order('sort_order')
   librarySkills.value = data || []
 }
 
 const filteredLibrarySkills = computed(() => {
+  let list = librarySkills.value
+  if (addSkillStructureFilter.value) {
+    list = list.filter(sk => skillStructure(sk) === addSkillStructureFilter.value)
+  }
+  if (addSkillAreaFilter.value) {
+    list = list.filter(sk => sk.area === addSkillAreaFilter.value)
+  }
   const q = addSkillSearch.value.trim().toLowerCase()
-  if (!q) return librarySkills.value
-  return librarySkills.value.filter(
+  if (!q) return list
+  return list.filter(
     (s) =>
       (s.name || '').toLowerCase().includes(q) ||
       (s.name_es || '').toLowerCase().includes(q) ||
-      (s.category || '').toLowerCase().includes(q)
+      skillStructure(s).toLowerCase().includes(q) ||
+      (s.area || '').toLowerCase().includes(q) ||
+      (s.category || '').toLowerCase().includes(q),
   )
 })
 
@@ -215,6 +305,27 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
   if (!skill) return '—'
   return language.value === 'es' ? (skill.name_es || skill.name) : skill.name
 }
+
+function skillDifficultyLabel(skill: { difficulty?: string | null; structure?: string | null; categoria?: string | null }) {
+  return skill.difficulty || difficultyFromStructure(skillStructure(skill))
+}
+
+function skaterBandLabel(level: string | null | undefined) {
+  if (!level) return language.value === 'es' ? 'Sin nivel' : 'No level'
+  return level
+}
+
+function skaterInitials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0])
+      .join('')
+      .toUpperCase() || '?'
+  )
+}
 </script>
 
 <template>
@@ -244,9 +355,27 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
       <div class="px-4 py-6 max-w-2xl mx-auto">
         <!-- Group header -->
         <div class="flex items-start gap-3 mb-6">
-          <div class="flex flex-col text-gray-500 shrink-0">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+          <div class="flex flex-col shrink-0">
+            <button
+              type="button"
+              class="p-0.5 rounded transition-colors"
+              :class="prevProgramLevel ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-700 cursor-not-allowed'"
+              :disabled="!prevProgramLevel"
+              :title="prevProgramLevel?.name || (language === 'es' ? 'Primer nivel' : 'First level')"
+              @click="goToAdjacentLevel(-1)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+            </button>
+            <button
+              type="button"
+              class="p-0.5 rounded transition-colors"
+              :class="nextProgramLevel ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-700 cursor-not-allowed'"
+              :disabled="!nextProgramLevel"
+              :title="nextProgramLevel?.name || (language === 'es' ? 'Último nivel' : 'Last level')"
+              @click="goToAdjacentLevel(1)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
           </div>
           <div class="flex-1 min-w-0">
             <h2 class="text-xl font-bold text-white">{{ group.name }}</h2>
@@ -261,6 +390,9 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
               <svg class="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
             </span>
             <p class="text-xs text-gray-500">
+              <template v-if="!isPlanningSkillGroupName(group.name)">
+                {{ programSkaters.length }} {{ language === 'es' ? 'patinadores' : 'skaters' }},
+              </template>
               {{ group.areas_count }} {{ language === 'es' ? 'áreas' : 'areas' }}, {{ group.subgroups_count }} {{ language === 'es' ? 'subgrupos' : 'subgroups' }}, {{ group.skills_count }} {{ language === 'es' ? 'skills' : 'skills' }}
             </p>
             <button type="button" class="p-2 text-gray-500 hover:text-white" title="Copy">📋</button>
@@ -268,6 +400,69 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
             <button type="button" class="p-2 text-gray-500 hover:text-red-400" title="Delete">🗑️</button>
           </div>
         </div>
+
+        <!-- Skaters assigned to this program (Kanban skill_group_id) -->
+        <section
+          v-if="!isPlanningSkillGroupName(group.name)"
+          class="mb-8 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
+        >
+          <button
+            type="button"
+            class="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-800/50 transition-colors"
+            @click="skatersExpanded = !skatersExpanded"
+          >
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-lg" aria-hidden="true">👥</span>
+              <h3 class="text-base font-bold text-white truncate">
+                {{ language === 'es' ? 'Patinadores en este programa' : 'Skaters in this program' }}
+              </h3>
+              <span
+                class="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
+                :class="programSkaters.length ? 'bg-gold-400/20 text-gold-300' : 'bg-gray-800 text-gray-500'"
+              >
+                {{ programSkaters.length }}
+              </span>
+            </div>
+            <svg
+              class="w-5 h-5 text-gray-500 shrink-0 transition-transform"
+              :class="skatersExpanded ? 'rotate-180' : ''"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div v-if="skatersExpanded" class="border-t border-gray-800 px-4 py-3">
+            <p v-if="!programSkaters.length" class="text-sm text-gray-500 py-2">
+              {{
+                language === 'es'
+                  ? 'Ningún patinador asignado. Asígnalos desde Patinadores → Kanban «Por programa».'
+                  : 'No skaters assigned yet. Assign them from Skaters → Kanban «By program».'
+              }}
+            </p>
+            <ul v-else class="space-y-2">
+              <li v-for="skater in programSkaters" :key="skater.id">
+                <NuxtLink
+                  :to="`/member/coach/students/${skater.id}`"
+                  class="flex items-center gap-3 rounded-lg border border-gray-800 bg-gray-800/40 px-3 py-2 hover:border-gray-600 hover:bg-gray-800 transition-colors"
+                >
+                  <div class="w-9 h-9 rounded-full bg-glass-blue flex items-center justify-center text-xs font-bold text-white shrink-0">
+                    {{ skaterInitials(skater.full_name) }}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-white truncate">{{ skater.full_name }}</p>
+                    <p class="text-xs text-gray-500 truncate capitalize">{{ skaterBandLabel(skater.skill_level) }}</p>
+                  </div>
+                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </NuxtLink>
+              </li>
+            </ul>
+          </div>
+        </section>
 
         <!-- Areas -->
         <section class="mb-8">
@@ -379,10 +574,24 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
                 </button>
               </div>
               <div class="p-4 space-y-3">
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Structure</label>
+                  <select
+                    v-model="addSkillStructureFilter"
+                    class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+                  >
+                    <option value="">{{ language === 'es' ? 'Todas las estructuras' : 'All structures' }}</option>
+                    <option v-for="opt in SKATE_TRICK_STRUCTURES" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Area</label>
+                  <MemberTrickAreaPicker v-model="addSkillAreaFilter" allow-empty size="sm" />
+                </div>
                 <input
                   v-model="addSkillSearch"
                   type="text"
-                  :placeholder="language === 'es' ? 'Buscar por nombre o categoría...' : 'Search by name or category...'"
+                  :placeholder="language === 'es' ? 'Buscar por nombre, área o estructura...' : 'Search by name, area, or structure...'"
                   class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-500 text-sm"
                 />
                 <div>
@@ -406,8 +615,23 @@ function skillDisplayName(skill: { name: string; name_es: string | null } | null
                     :disabled="currentAreaAssignedSkillIds.has(skill.id + '|' + (addSkillVariant.trim() || ''))"
                     @click="addSkillToArea(skill.id)"
                   >
-                    <span>{{ skillDisplayName(skill) }}</span>
-                    <span class="text-xs text-gray-500">{{ skill.category }}</span>
+                    <span class="min-w-0 truncate">{{ skillDisplayName(skill) }}</span>
+                    <span class="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                      <span
+                        v-if="skill.area"
+                        class="px-2 py-0.5 rounded text-[10px] font-medium"
+                        :class="areaTagClass(skill.area)"
+                      >
+                        {{ skill.area }}
+                      </span>
+                      <span
+                        v-if="skillDifficultyLabel(skill)"
+                        class="px-2 py-0.5 rounded text-[10px] font-medium capitalize"
+                        :class="difficultyTagClass(skillDifficultyLabel(skill))"
+                      >
+                        {{ skillDifficultyLabel(skill) }}
+                      </span>
+                    </span>
                   </button>
                 </div>
                 <p v-if="!filteredLibrarySkills.length" class="text-gray-500 text-sm py-4">

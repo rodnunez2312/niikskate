@@ -8,7 +8,6 @@ const { language } = useI18n()
 const {
   participants,
   activeKey,
-  activeParticipant,
   crewCount,
   loading,
   guardianProfile,
@@ -27,19 +26,25 @@ const showForm = ref(false)
 const editingKey = ref<string | null>(null)
 const saving = ref(false)
 const formError = ref('')
+const addAnother = ref(false)
 
-const form = ref({
+const emptyForm = () => ({
   first_name: '',
   last_name: '',
   date_of_birth: '',
+  age: '',
 })
 
+const form = ref(emptyForm())
+
 const isEditingSelf = computed(() => editingKey.value === 'self')
+const skaterCount = computed(() => crewMembers.value.length)
 
 function openAdd() {
   editingKey.value = null
-  form.value = { first_name: '', last_name: '', date_of_birth: '' }
+  form.value = emptyForm()
   formError.value = ''
+  addAnother.value = false
   showForm.value = true
 }
 
@@ -52,6 +57,7 @@ function openEdit(key: string) {
       first_name: guardianProfile.value.first_name || '',
       last_name: guardianProfile.value.last_name || '',
       date_of_birth: guardianProfile.value.date_of_birth || '',
+      age: guardianProfile.value.age != null ? String(guardianProfile.value.age) : '',
     }
   } else {
     const row = crewMembers.value.find(m => m.id === key)
@@ -59,29 +65,42 @@ function openEdit(key: string) {
       first_name: p.firstName,
       last_name: row?.last_name || '',
       date_of_birth: p.dateOfBirth || '',
+      age: p.age != null ? String(p.age) : '',
     }
   }
   formError.value = ''
   showForm.value = true
 }
 
+function buildPayload() {
+  const ageNum = form.value.age.trim() ? Number(form.value.age) : null
+  return {
+    first_name: form.value.first_name,
+    last_name: form.value.last_name,
+    date_of_birth: form.value.date_of_birth || null,
+    age: ageNum != null && Number.isFinite(ageNum) ? ageNum : null,
+  }
+}
+
 async function saveForm() {
   formError.value = ''
   saving.value = true
   try {
-    const payload = {
-      first_name: form.value.first_name,
-      last_name: form.value.last_name,
-      date_of_birth: form.value.date_of_birth || null,
-    }
+    const payload = buildPayload()
     if (isEditingSelf.value) {
       await updateGuardianProfile(payload)
+      showForm.value = false
     } else if (editingKey.value) {
       await updateCrewMember(editingKey.value, payload)
+      showForm.value = false
     } else {
       await addCrewMember(payload)
+      if (addAnother.value) {
+        form.value = emptyForm()
+      } else {
+        showForm.value = false
+      }
     }
-    showForm.value = false
   } catch (e: any) {
     formError.value = e?.message || 'Error'
   } finally {
@@ -92,8 +111,8 @@ async function saveForm() {
 async function removeMember(id: string) {
   const ok = confirm(
     language.value === 'es'
-      ? '¿Eliminar este miembro del crew?'
-      : 'Remove this crew member?',
+      ? '¿Eliminar este patinador de la familia?'
+      : 'Remove this skater from your family?',
   )
   if (!ok) return
   try {
@@ -119,18 +138,25 @@ onMounted(async () => {
 <template>
   <div class="min-h-screen bg-[#fff9f0] text-gray-900 pb-24">
     <div class="max-w-lg mx-auto px-4 py-8">
-      <div class="flex items-center justify-between gap-3 mb-6">
+      <div class="flex items-center justify-between gap-3 mb-2">
         <h1 class="text-2xl font-black uppercase tracking-tight">
-          {{ language === 'es' ? 'Tu crew' : 'Your crew' }}
+          {{ language === 'es' ? 'Mi familia' : 'My family' }}
         </h1>
         <button
           type="button"
           class="rounded-full border-2 border-black px-4 py-1.5 text-sm font-bold hover:bg-black hover:text-white transition-colors"
           @click="openAdd"
         >
-          + {{ language === 'es' ? 'Agregar' : 'Add' }}
+          + {{ language === 'es' ? 'Patinador' : 'Skater' }}
         </button>
       </div>
+      <p class="text-sm text-gray-600 mb-6">
+        {{
+          language === 'es'
+            ? 'Un padre o tutor y uno o más patinadores. La edad de cada uno define qué clases puede tomar en cada temporada.'
+            : 'One parent or guardian and one or more skaters. Each skater’s age determines which season classes they can join.'
+        }}
+      </p>
 
       <div class="text-center mb-8">
         <div
@@ -141,9 +167,12 @@ onMounted(async () => {
         <p class="text-sm font-black uppercase tracking-wide text-gray-700">
           {{
             language === 'es'
-              ? 'Miembros en tu crew'
-              : 'Members in your crew'
+              ? 'Miembros en tu familia'
+              : 'Members in your family'
           }}
+        </p>
+        <p v-if="skaterCount" class="text-xs text-gray-500 mt-1">
+          {{ skaterCount }} {{ language === 'es' ? 'patinador(es)' : 'skater(s)' }}
         </p>
       </div>
 
@@ -153,10 +182,11 @@ onMounted(async () => {
         <article
           v-for="p in participants"
           :key="p.key"
-          class="border-[3px] border-teal-600 rounded-2xl bg-white overflow-hidden"
-          :class="activeKey === p.key ? 'ring-2 ring-teal-500 ring-offset-2' : ''"
+          class="border-[3px] rounded-2xl bg-white overflow-hidden"
+          :class="p.isYou ? 'border-gray-800' : 'border-teal-600'"
+          :style="activeKey === p.key ? { boxShadow: '0 0 0 2px #14b8a6' } : undefined"
         >
-          <div class="p-4 border-b-2 border-teal-600/30 flex items-start gap-3">
+          <div class="p-4 border-b-2 flex items-start gap-3" :class="p.isYou ? 'border-gray-200 bg-gray-50' : 'border-teal-600/30'">
             <div
               class="w-14 h-14 rounded-full bg-gray-200 border-2 border-black flex items-center justify-center overflow-hidden shrink-0"
             >
@@ -166,24 +196,30 @@ onMounted(async () => {
                 :alt="p.displayName"
                 class="w-full h-full object-cover"
               />
-              <span v-else class="text-2xl">🛹</span>
+              <span v-else class="text-2xl">{{ p.isYou ? '👤' : '🛹' }}</span>
             </div>
             <div class="min-w-0 flex-1">
+              <p v-if="p.isYou" class="text-[10px] font-black uppercase text-gray-500 mb-0.5">
+                {{ language === 'es' ? 'Padre / tutor' : 'Parent / guardian' }}
+              </p>
               <h2 class="text-lg font-black uppercase leading-tight truncate">
                 {{ p.displayName }}
               </h2>
-              <p class="text-xs font-bold uppercase text-gray-600 mt-1">
-                {{ skillLabel(p.type === 'self' ? guardianProfile?.skill_level : null) }}
+              <p v-if="!p.isYou" class="text-[10px] font-black uppercase text-teal-700 mt-0.5">
+                {{ language === 'es' ? 'Patinador' : 'Skater' }}
+              </p>
+              <p v-if="p.isYou" class="text-xs font-bold uppercase text-gray-600 mt-1">
+                {{ skillLabel(guardianProfile?.skill_level) }}
               </p>
               <p v-if="p.age != null" class="text-xs text-gray-500 mt-1">
                 {{ language === 'es' ? 'Edad' : 'Age' }}: {{ p.age }}
                 <span v-if="p.dateOfBirth"> · {{ p.dateOfBirth }}</span>
               </p>
-              <p v-else class="text-xs text-amber-700 mt-1 font-medium">
+              <p v-else-if="!p.isYou" class="text-xs text-amber-700 mt-1 font-medium">
                 {{
                   language === 'es'
-                    ? 'Agrega fecha de nacimiento para inscribir clases'
-                    : 'Add date of birth to enroll in classes'
+                    ? 'Agrega edad o fecha de nacimiento para inscribir clases'
+                    : 'Add age or date of birth to enroll in classes'
                 }}
               </p>
             </div>
@@ -195,7 +231,7 @@ onMounted(async () => {
               class="bg-white py-3 text-[10px] font-black uppercase hover:bg-gray-50"
               @click="setActive(p.key)"
             >
-              {{ activeKey === p.key ? '● ' : '' }}{{ language === 'es' ? 'Ver perfil' : 'View' }}
+              {{ activeKey === p.key ? '● ' : '' }}{{ language === 'es' ? 'Seleccionar' : 'Select' }}
             </button>
             <button
               type="button"
@@ -210,7 +246,7 @@ onMounted(async () => {
               class="col-span-2 bg-white py-3 text-[10px] font-black uppercase text-red-700 hover:bg-red-50"
               @click="removeMember(p.crewMemberId!)"
             >
-              {{ language === 'es' ? 'Eliminar del crew' : 'Remove from crew' }}
+              {{ language === 'es' ? 'Eliminar patinador' : 'Remove skater' }}
             </button>
           </div>
         </article>
@@ -219,72 +255,37 @@ onMounted(async () => {
       <p v-if="formError" class="mt-4 text-sm text-red-600 font-medium">{{ formError }}</p>
     </div>
 
-    <!-- Add / edit modal -->
     <div
       v-if="showForm"
       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
       @click.self="showForm = false"
     >
-      <div class="w-full max-w-md bg-white border-[3px] border-black rounded-2xl p-5 shadow-xl">
+      <div class="w-full max-w-md bg-white border-[3px] border-black rounded-2xl p-5 shadow-xl max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-black uppercase mb-4">
           {{
             editingKey
               ? language === 'es'
-                ? 'Editar perfil'
-                : 'Edit profile'
+                ? 'Editar miembro'
+                : 'Edit member'
               : language === 'es'
-                ? 'Agregar al crew'
-                : 'Add to crew'
+                ? 'Agregar patinador'
+                : 'Add skater'
           }}
         </h3>
-        <form class="space-y-3" @submit.prevent="saveForm">
-          <label class="block text-xs font-bold uppercase">
-            {{ language === 'es' ? 'Nombre' : 'First name' }}
-            <input
-              v-model="form.first_name"
-              required
-              class="mt-1 w-full border-2 border-black rounded-lg px-3 py-2 font-medium normal-case"
-            />
-          </label>
-          <label class="block text-xs font-bold uppercase">
-            {{ language === 'es' ? 'Apellido' : 'Last name' }}
-            <input
-              v-model="form.last_name"
-              class="mt-1 w-full border-2 border-black rounded-lg px-3 py-2 font-medium normal-case"
-            />
-          </label>
-          <label class="block text-xs font-bold uppercase">
-            {{ language === 'es' ? 'Fecha de nacimiento' : 'Date of birth' }}
-            <input
-              v-model="form.date_of_birth"
-              type="date"
-              class="mt-1 w-full border-2 border-black rounded-lg px-3 py-2 font-medium normal-case"
-            />
-          </label>
-          <p class="text-xs text-gray-600">
-            {{
-              language === 'es'
-                ? 'La edad determina qué clases puede tomar cada patinador.'
-                : 'Age determines which classes each skater can join.'
-            }}
-          </p>
-          <div class="flex gap-2 pt-2">
-            <button
-              type="button"
-              class="flex-1 py-2.5 border-2 border-black rounded-lg font-bold"
-              @click="showForm = false"
-            >
-              {{ language === 'es' ? 'Cancelar' : 'Cancel' }}
-            </button>
-            <button
-              type="submit"
-              class="flex-1 py-2.5 bg-black text-white rounded-lg font-bold disabled:opacity-50"
-              :disabled="saving"
-            >
-              {{ saving ? '…' : language === 'es' ? 'Guardar' : 'Save' }}
-            </button>
-          </div>
-        </form>
+        <MemberFamilyMemberForm
+          v-model="form"
+          :saving="saving"
+          :is-parent="isEditingSelf"
+          @submit="saveForm"
+          @cancel="showForm = false"
+        />
+        <label
+          v-if="!editingKey"
+          class="mt-3 flex items-center gap-2 text-xs font-bold uppercase cursor-pointer"
+        >
+          <input v-model="addAnother" type="checkbox" class="rounded border-2 border-black" />
+          {{ language === 'es' ? 'Agregar otro patinador después' : 'Add another skater after saving' }}
+        </label>
       </div>
     </div>
   </div>

@@ -24,7 +24,6 @@ const stats = ref({
   activeCoaches: 0,
   totalCustomers: 0,
   pendingRegistrations: 0,
-  pendingCredits: 0,
 })
 
 // Recent bookings
@@ -87,15 +86,6 @@ const loadDashboardData = async () => {
     .eq('status', 'pending')
 
   stats.value.pendingRegistrations = pendingRegs || 0
-
-  const { count: pendingCreditsCount } = await client
-    .from('user_credits')
-    .select('*', { count: 'exact', head: true })
-    .eq('payment_status', 'pending')
-    .eq('remaining_credits', 0)
-    .gt('total_credits', 0)
-
-  stats.value.pendingCredits = pendingCreditsCount || 0
 
   // Load recent bookings
   const { data: bookingsData } = await client
@@ -223,32 +213,6 @@ const formatDate = (date: string) => {
             </div>
             <span v-if="stats.pendingRegistrations > 0" class="px-2 py-1 bg-gold-400 text-black text-xs font-bold rounded-full">
               {{ stats.pendingRegistrations }}
-            </span>
-            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </NuxtLink>
-
-          <!-- Pending credit purchases (offline payment) -->
-          <NuxtLink
-            to="/member/admin/scheduling/credits"
-            class="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all relative"
-            :class="{ 'border-gold-400/50': stats.pendingCredits > 0 }"
-          >
-            <div class="w-12 h-12 rounded-xl bg-glass-green/20 flex items-center justify-center text-2xl">
-              🎫
-            </div>
-            <div class="flex-1">
-              <p class="font-semibold text-white">{{ language === 'es' ? 'Créditos pendientes' : 'Pending credits' }}</p>
-              <p class="text-sm text-gray-400">
-                {{ language === 'es' ? 'Confirmar pagos de paquetes' : 'Confirm package payments' }}
-              </p>
-            </div>
-            <span
-              v-if="stats.pendingCredits > 0"
-              class="px-2 py-1 bg-gold-400 text-black text-xs font-bold rounded-full"
-            >
-              {{ stats.pendingCredits }}
             </span>
             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

@@ -72,6 +72,13 @@ export function generateProgramOccurrences(opts: {
   return out
 }
 
+/** Summer course end = start + N calendar days (5 or 10). */
+export function computeSummerCourseEndDate(startDate: string, durationDays: number): string {
+  const [sy, sm, sd] = startDate.split('-').map(Number)
+  const start = new Date(sy, sm - 1, sd)
+  return format(addDays(start, Math.max(1, durationDays)), 'yyyy-MM-dd')
+}
+
 /** Last class date for a program of `maxClasses` sessions on selected weekdays. */
 export function computeProgramEndDate(opts: {
   startDate: string

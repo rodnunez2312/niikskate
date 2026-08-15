@@ -2,14 +2,28 @@ import type { Ref } from 'vue'
 
 type ProfileWithAvatar = { avatar_url?: string | null } | null
 
+type SkaterAvatarUploadOptions = {
+  /** When set (e.g. coach editing a student), uploads to that user's folder and profile. */
+  subjectUserId?: Ref<string | null | undefined>
+}
+
 /**
  * Skater profile photo: Supabase Storage `images` bucket at avatars/{userId}/avatar.jpg
  * + profiles.avatar_url. One image per user; folder cleared before replace.
  */
-export function useSkaterAvatarUpload(profileRef: Ref<ProfileWithAvatar>) {
+export function useSkaterAvatarUpload(
+  profileRef: Ref<ProfileWithAvatar>,
+  options?: SkaterAvatarUploadOptions,
+) {
   const client = useSupabaseClient()
   const user = useSupabaseUser()
   const { language } = useI18n()
+
+  function targetUserId(): string | null {
+    const subject = options?.subjectUserId?.value
+    if (subject) return subject
+    return user.value?.id ?? null
+  }
 
   const uploadingAvatar = ref(false)
   const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -72,7 +86,8 @@ export function useSkaterAvatarUpload(profileRef: Ref<ProfileWithAvatar>) {
   async function onAvatarFileChange(ev: Event) {
     const input = ev.target as HTMLInputElement
     const file = input.files?.[0]
-    if (!file || !user.value?.id) return
+    const uid = targetUserId()
+    if (!file || !uid) return
 
     const maxBytes = 8 * 1024 * 1024
     if (file.size > maxBytes) {
@@ -93,7 +108,7 @@ export function useSkaterAvatarUpload(profileRef: Ref<ProfileWithAvatar>) {
 
     uploadingAvatar.value = true
     try {
-      await clearAvatarFolder(user.value.id)
+      await clearAvatarFolder(uid)
 
       let blob: Blob
       try {
@@ -101,7 +116,7 @@ export function useSkaterAvatarUpload(profileRef: Ref<ProfileWithAvatar>) {
       } catch {
         blob = file
       }
-      const path = `avatars/${user.value.id}/avatar.jpg`
+      const path = `avatars/${uid}/avatar.jpg`
       const { error: upErr } = await client.storage.from('images').upload(path, blob, {
         cacheControl: '3600',
         upsert: true,
@@ -118,11 +133,11 @@ export function useSkaterAvatarUpload(profileRef: Ref<ProfileWithAvatar>) {
           avatar_url: publicUrl,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', user.value.id)
+        .eq('id', uid)
 
       if (dbErr) throw dbErr
 
-      if (profileRef.value) profileRef.value.avatar_url = publicUrl
+      if (profileRef.value) profileRef.value.avatar_url = `${publicUrl}?t=${Date.now()}`
       else profileRef.value = { avatar_url: publicUrl }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'error'
@@ -143,14 +158,15 @@ export function useSkaterAvatarUpload(profileRef: Ref<ProfileWithAvatar>) {
   }
 
   async function removeAvatar() {
-    if (!user.value?.id || !profileRef.value?.avatar_url) return
+    const uid = targetUserId()
+    if (!uid || !profileRef.value?.avatar_url) return
     uploadingAvatar.value = true
     try {
-      await clearAvatarFolder(user.value.id)
+      await clearAvatarFolder(uid)
       const { error } = await client
         .from('profiles')
         .update({ avatar_url: null, updated_at: new Date().toISOString() })
-        .eq('id', user.value.id)
+        .eq('id', uid)
       if (error) throw error
       if (profileRef.value) profileRef.value.avatar_url = null
     } catch (e) {

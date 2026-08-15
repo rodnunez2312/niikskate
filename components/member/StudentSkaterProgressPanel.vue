@@ -2,6 +2,7 @@
 import type { Skill, StudentProgress, SkillCategory } from '~/types'
 import { SKILL_CATEGORY_LABELS } from '~/types'
 import type { CrewParticipant } from '~/composables/useCrew'
+import { skaterRatingBubbleClass } from '~/utils/skaterRatingDots'
 
 const props = defineProps<{
   participant: CrewParticipant
@@ -56,15 +57,6 @@ const getCategoryDots = (categoryKey: string) => {
   )
   if (categorySkills.length === 0) return 0
   return Math.round((learnedInCategory.length / categorySkills.length) * 10)
-}
-
-const getDotColor = (index: number, total: number) => {
-  if (index >= total) return 'bg-gray-700'
-  const position = index / 10
-  if (position < 0.3) return 'bg-red-500'
-  if (position < 0.5) return 'bg-orange-500'
-  if (position < 0.7) return 'bg-yellow-400'
-  return 'bg-green-500'
 }
 
 const stats = computed(() => {
@@ -208,7 +200,7 @@ watch(() => props.studentId, loadData, { immediate: true })
                   v-for="i in 10"
                   :key="i"
                   class="w-2 h-2 rounded-full"
-                  :class="getDotColor(i - 1, getCategoryDots(stat.key))"
+                  :class="skaterRatingBubbleClass(i - 1, getCategoryDots(stat.key))"
                 />
               </div>
             </div>

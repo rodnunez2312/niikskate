@@ -55,7 +55,7 @@ if not defined NPM_CMD (
 echo.
 echo  ========================================
 echo   NiikSkate Academy - App Launcher
-echo   Version 1.2.0
+echo   Version 1.3.0
 echo  ========================================
 echo.
 echo  Using: %NPM_CMD%

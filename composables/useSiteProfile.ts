@@ -15,8 +15,8 @@ export function useSiteProfile() {
   const memberEntryPath = computed(() => {
     if (!user.value) return '/auth/login?redirect=/member'
     if (loading.value || role.value === null) return '/member'
-    if (isAdmin.value) return '/member/admin'
-    if (isCoach.value) return '/member/coach'
+    if (isAdmin.value) return '/member/staff/dashboard'
+    if (isCoach.value) return '/member/staff/dashboard'
     if (isStudent.value) return '/member/student'
     return '/member'
   })

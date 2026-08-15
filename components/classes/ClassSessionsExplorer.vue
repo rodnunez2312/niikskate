@@ -3,10 +3,17 @@ import { format, getDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { CrewParticipant } from '~/composables/useCrew'
 import {
-  DEFAULT_SKATEPARK,
-  DROP_IN_CLASS_PRICE_MXN,
+  coachTierFromSkillLevel,
+  coachTierLabel,
+  getClassPriceMxn,
   MONTHLY_PROGRAM_PRICE_MXN,
+  programPriceHint,
+} from '~/utils/classPricing'
+import {
+  DEFAULT_SKATEPARK,
   PROGRAM_AGE_BANDS,
+  PROGRAM_TOTAL_CLASSES,
+  PROGRAM_WEEKS,
   SKATE_SKILL_LEVELS,
   TIME_SLOT_LABELS,
   audienceAgeRange,
@@ -16,13 +23,30 @@ import {
   type BookableClassSession,
 } from '~/types'
 import { ineligibilityReason, isAgeEligibleForSession, sessionAgeBounds } from '~/utils/ageEligibility'
+import {
+  applyMultiStudentDiscount,
+  DEFAULT_PROGRAM_LOCATION,
+  getProgramSeasonBySlug,
+  multiStudentDiscountRate,
+} from '~/utils/programSeasons'
+
+const props = withDefaults(
+  defineProps<{
+    seasonSlug?: string
+    registrationOpen?: boolean
+  }>(),
+  {
+    seasonSlug: '',
+    registrationOpen: true,
+  },
+)
 
 const route = useRoute()
 const router = useRouter()
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language, formatPrice } = useI18n()
-const { participants, refreshCrew } = useCrew()
+const { participants, refreshCrew, activeKey, setActive } = useCrew()
 
 const loading = ref(true)
 const enrollingId = ref<string | null>(null)
@@ -42,11 +66,34 @@ const selectedSkatepark = ref(DEFAULT_SKATEPARK)
 const selectedDays = ref<number[]>([])
 /** Optional browse filter by age band — null = show all */
 const selectedAgeBand = ref<AudienceCategory | null>(null)
-/** Optional — highlight classes for these crew members */
-const selectedSkaterKeys = ref<string[]>([])
+/** Highlight classes for the active family member (synced with Familia switcher) */
+const selectedSkaterKeys = computed(() => (activeKey.value ? [activeKey.value] : []))
 
 const enrollModalSession = ref<BookableClassSession | null>(null)
 const modalSelectedKeys = ref<string[]>([])
+
+const activeSeason = computed(() =>
+  props.seasonSlug ? getProgramSeasonBySlug(props.seasonSlug) : undefined,
+)
+
+const pageTitle = computed(() => {
+  if (activeSeason.value) {
+    return language.value === 'es' ? activeSeason.value.name.es : activeSeason.value.name.en
+  }
+  return language.value === 'es' ? 'Clases grupales' : 'Group classes'
+})
+
+const pageSubtitle = computed(() => {
+  if (activeSeason.value) {
+    const dates = language.value === 'es' ? activeSeason.value.dates.es : activeSeason.value.dates.en
+    return `${dates} · ${DEFAULT_PROGRAM_LOCATION}`
+  }
+  return language.value === 'es'
+    ? 'Todos los programas publicados. Usa filtros solo si lo necesitas.'
+    : 'All published programs. Use filters only when you need to.'
+})
+
+const canRegister = computed(() => props.registrationOpen)
 
 /** Official La Plancha practice days only (JS getDay). */
 const dayOptions = computed(() => {
@@ -90,11 +137,24 @@ const toggleAgeBand = (id: AudienceCategory) => {
   selectedAgeBand.value = selectedAgeBand.value === id ? null : id
 }
 
-const toggleSkaterFilter = (key: string) => {
-  const i = selectedSkaterKeys.value.indexOf(key)
-  if (i >= 0) selectedSkaterKeys.value.splice(i, 1)
-  else selectedSkaterKeys.value.push(key)
-  selectedSkaterKeys.value = [...selectedSkaterKeys.value]
+function selectFamilySkater(key: string) {
+  setActive(key)
+}
+
+function syncFiltersToActiveSkater() {
+  const p = participants.value.find(x => x.key === activeKey.value)
+  if (!p || p.age == null) return
+  const band = PROGRAM_AGE_BANDS.find(b => ageInBand(p.age!, b.id))
+  if (band) selectedAgeBand.value = band.id
+}
+
+function goAddFamilyMember() {
+  const dest = '/member/student/profile?add=1'
+  if (!user.value) {
+    router.push(`/auth/login?redirect=${encodeURIComponent(dest)}`)
+    return
+  }
+  router.push(dest)
 }
 
 const sessionDay = (dateStr: string) => {
@@ -155,8 +215,8 @@ const ageFilterError = computed(() => {
     const band = PROGRAM_AGE_BANDS.find(b => b.id === bandId)
     const label = band ? (language.value === 'es' ? band.label.es : band.label.en) : bandId
     return language.value === 'es'
-      ? `Ningún patinador de tu crew está en: ${label}. Agrega uno en Crew o quita el filtro.`
-      : `None of your crew skaters are in: ${label}. Add one in Crew or clear the filter.`
+      ? `Ningún patinador de tu familia está en: ${label}. Agrega uno en Familia o quita el filtro.`
+      : `None of your family skaters are in: ${label}. Add one under Family or clear the filter.`
   }
   return null
 })
@@ -175,8 +235,29 @@ const skillLabel = (id: string | null) => {
   return language.value === 'es' ? row.title.es : row.title.en
 }
 
-const monthlyPrice = (s: BookableClassSession) =>
-  s.price_mxn != null && s.price_mxn > 0 ? Number(s.price_mxn) : MONTHLY_PROGRAM_PRICE_MXN
+const monthlyPrice = (s: BookableClassSession) => {
+  if (s.price_mxn != null && s.price_mxn > 0) return Number(s.price_mxn)
+  const tier = coachTierFromSkillLevel(s.skill_level)
+  return getClassPriceMxn(tier, 'monthly_8')
+}
+
+const groupDropInPrice = (s: BookableClassSession) =>
+  getClassPriceMxn(coachTierFromSkillLevel(s.skill_level), 'group_session')
+
+const individualDropInPrice = (s: BookableClassSession) =>
+  getClassPriceMxn(coachTierFromSkillLevel(s.skill_level), 'individual_session')
+
+const modalSubtotalMxn = computed(() => {
+  const s = enrollModalSession.value
+  if (!s || !modalSelectedKeys.value.length) return 0
+  return monthlyPrice(s) * modalSelectedKeys.value.length
+})
+
+const modalDiscountRate = computed(() => multiStudentDiscountRate(modalSelectedKeys.value.length))
+
+const modalTotalMxn = computed(() =>
+  applyMultiStudentDiscount(modalSubtotalMxn.value, modalSelectedKeys.value.length),
+)
 
 const isDetailsOpen = (id: string) => detailsOpen.value.has(id)
 
@@ -202,7 +283,7 @@ const sessionDetailsText = (s: BookableClassSession) => {
       ages ? `Edades: ${ages}.` : null,
       `Nivel: ${skillLabel(s.skill_level)}.`,
       slot ? `Horario: ${slot}.` : null,
-      `Programa mensual ${formatPrice(monthlyPrice(s))} · Clase individual ${formatPrice(DROP_IN_CLASS_PRICE_MXN)}.`,
+      `Programa mensual ${formatPrice(monthlyPrice(s))} · Grupal ${formatPrice(groupDropInPrice(s))} · Individual ${formatPrice(individualDropInPrice(s))}.`,
       `Máx. ${s.maxCapacity || 6} patinadores por sesión.`,
     ]
     return bits.filter(Boolean).join(' ')
@@ -213,7 +294,7 @@ const sessionDetailsText = (s: BookableClassSession) => {
     ages ? `Ages: ${ages}.` : null,
     `Level: ${skillLabel(s.skill_level)}.`,
     slot ? `Time: ${slot}.` : null,
-    `Monthly program ${formatPrice(monthlyPrice(s))} · Drop-in class ${formatPrice(DROP_IN_CLASS_PRICE_MXN)}.`,
+    `Monthly program ${formatPrice(monthlyPrice(s))} · Group ${formatPrice(groupDropInPrice(s))} · Individual ${formatPrice(individualDropInPrice(s))}.`,
     `Max ${s.maxCapacity || 6} skaters per session.`,
   ]
   return bits.filter(Boolean).join(' ')
@@ -284,7 +365,10 @@ const loadSessions = async () => {
   loadError.value = ''
   try {
     const res = await $fetch<{ sessions: BookableClassSession[] }>('/api/classes/sessions', {
-      query: { skatepark: selectedSkatepark.value },
+      query: {
+        skatepark: selectedSkatepark.value,
+        ...(props.seasonSlug ? { season: props.seasonSlug } : {}),
+      },
     })
     sessions.value = res.sessions || []
     await loadEnrollments()
@@ -328,13 +412,24 @@ const modalAgeRangeLabel = (s: BookableClassSession) => {
 
 function openEnrollModal(s: BookableClassSession) {
   enrollError.value = ''
+  if (!canRegister.value) {
+    enrollError.value =
+      language.value === 'es'
+        ? 'Las inscripciones para esta temporada aún no están abiertas.'
+        : 'Registration for this season is not open yet.'
+    return
+  }
   if (!user.value) {
     router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
     return
   }
   if (s.status === 'full' || s.status === 'no_coaches') return
   enrollModalSession.value = s
-  modalSelectedKeys.value = []
+  const active = participants.value.find(x => x.key === activeKey.value)
+  modalSelectedKeys.value =
+    active && participantEligible(active, s) && !isEnrolled(s, active)
+      ? [activeKey.value]
+      : []
 }
 
 function closeEnrollModal() {
@@ -401,6 +496,9 @@ async function confirmEnroll() {
 }
 
 watch(selectedSkatepark, loadSessions)
+watch(() => props.seasonSlug, loadSessions)
+watch(activeKey, () => syncFiltersToActiveSkater(), { immediate: true })
+watch(participants, () => syncFiltersToActiveSkater())
 onMounted(async () => {
   if (user.value) await refreshCrew()
   await loadSessions()
@@ -410,21 +508,79 @@ onMounted(async () => {
 <template>
   <div class="min-h-screen bg-[#fff9f0] text-gray-900 pb-28">
     <header class="border-b-2 border-black bg-[#fff9f0] sticky top-0 z-30">
-      <div class="max-w-3xl mx-auto px-4 py-4">
-        <h1 class="text-2xl font-black uppercase tracking-tight">
-          {{ language === 'es' ? 'Clases grupales' : 'Group classes' }}
-        </h1>
-        <p class="text-sm text-gray-600 mt-1 font-mono">
-          {{
-            language === 'es'
-              ? 'Todos los programas publicados. Usa filtros solo si lo necesitas.'
-              : 'All published programs. Use filters only when you need to.'
-          }}
-        </p>
+      <div class="max-w-3xl mx-auto px-4 py-4 space-y-3">
+        <div>
+          <h1 class="text-2xl font-black uppercase tracking-tight">
+            {{ pageTitle }}
+          </h1>
+          <p class="text-sm text-gray-600 mt-1 font-mono">
+            {{ pageSubtitle }}
+          </p>
+        </div>
+        <div v-if="user" class="rounded-xl border-2 border-black bg-white px-3 py-2">
+          <MemberCrewSwitcher compact show-add theme="light" @add="goAddFamilyMember" />
+          <p class="text-[10px] text-gray-500 mt-1 font-mono">
+            {{
+              language === 'es'
+                ? 'Las clases se filtran según el patinador seleccionado en tu familia.'
+                : 'Classes filter to match the skater selected in your family.'
+            }}
+          </p>
+        </div>
       </div>
     </header>
 
     <div class="max-w-3xl mx-auto px-4 py-6 space-y-5">
+      <p
+        v-if="seasonSlug && !canRegister"
+        class="rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-900 px-4 py-3 text-sm font-medium"
+      >
+        {{
+          language === 'es'
+            ? 'Esta temporada se publicará pronto. Las inscripciones aún no están abiertas.'
+            : 'This season is coming soon. Registration is not open yet.'
+        }}
+      </p>
+
+      <details class="rounded-xl border-2 border-teal-600/40 bg-white shadow-sm">
+        <summary
+          class="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3 text-teal-700 font-bold text-sm sm:text-base"
+        >
+          <span>{{ language === 'es' ? 'Cómo funciona' : 'How this works' }}</span>
+          <span class="text-teal-500 text-xs font-mono shrink-0" aria-hidden="true">▼</span>
+        </summary>
+        <div class="px-4 pb-4 pt-1 text-sm text-gray-600 leading-relaxed space-y-2 border-t border-teal-100">
+          <p>
+            {{
+              language === 'es'
+                ? programPriceHint('principiante', true)
+                : programPriceHint('principiante', false)
+            }}
+          </p>
+          <p>
+            {{
+              language === 'es'
+                ? programPriceHint('pro_street', true)
+                : programPriceHint('pro_street', false)
+            }}
+          </p>
+          <p>
+            {{
+              language === 'es'
+                ? 'Elige la clase que corresponda a la edad y nivel de tu patinador e inscríbelo. Los lugares se llenan rápido — conviene registrarse temprano.'
+                : 'Pick the class that fits your skater’s age and level and complete registration. Spots fill quickly — register early.'
+            }}
+          </p>
+          <p>
+            {{
+              language === 'es'
+                ? 'Descuentos automáticos al inscribir a 2 patinadores (hermanos o varios estudiantes): 10% cada uno; con 3 o más, 15% cada uno.'
+                : 'Automatic discounts when enrolling 2 skaters (siblings or multiple students): 10% each; with 3 or more, 15% each.'
+            }}
+          </p>
+        </div>
+      </details>
+
       <!-- Skatepark -->
       <section>
         <p class="text-xs font-bold uppercase tracking-wider mb-2">
@@ -487,10 +643,10 @@ onMounted(async () => {
         </p>
       </section>
 
-      <!-- Student recommendations (optional filter) -->
+      <!-- Active family skater (synced with Familia switcher) -->
       <section v-if="user && participants.length" class="border-t border-gray-300 pt-4">
         <p class="text-sm font-mono text-gray-700 mb-2">
-          {{ language === 'es' ? 'Recomendaciones por patinador' : 'Student class recommendations' }}
+          {{ language === 'es' ? 'Patinador activo (familia)' : 'Active skater (family)' }}
         </p>
         <div class="flex flex-wrap gap-2">
           <button
@@ -499,13 +655,16 @@ onMounted(async () => {
             type="button"
             class="px-4 py-2 rounded-full border-2 text-sm font-black uppercase transition-colors"
             :class="
-              selectedSkaterKeys.includes(p.key)
-                ? 'border-black bg-white ring-2 ring-black ring-offset-1'
-                : 'border-gray-400 bg-white'
+              activeKey === p.key
+                ? 'border-black bg-teal-600 text-white ring-2 ring-black ring-offset-1'
+                : 'border-gray-400 bg-white text-gray-900'
             "
-            @click="toggleSkaterFilter(p.key)"
+            @click="selectFamilySkater(p.key)"
           >
             {{ p.firstName }}{{ p.isYou ? ` (${language === 'es' ? 'tú' : 'you'})` : '' }}
+            <span v-if="p.age != null" class="font-mono font-normal text-xs opacity-80">
+              · {{ p.age }}
+            </span>
           </button>
         </div>
       </section>
@@ -545,13 +704,19 @@ onMounted(async () => {
               <span class="text-[10px] font-bold bg-teal-600 text-white px-2 py-1 rounded text-right leading-tight">
                 {{ formatPrice(monthlyPrice(s)) }}
                 <span class="block font-mono font-normal opacity-90 normal-case">
-                  {{ language === 'es' ? 'programa mensual' : 'monthly program' }}
+                  {{ language === 'es' ? 'mensual (8 clases)' : 'monthly (8 classes)' }}
                 </span>
               </span>
               <span class="text-[10px] font-bold bg-black text-white px-2 py-1 rounded text-right leading-tight">
-                {{ formatPrice(DROP_IN_CLASS_PRICE_MXN) }}
+                {{ formatPrice(groupDropInPrice(s)) }}
                 <span class="block font-mono font-normal opacity-90 normal-case">
-                  {{ language === 'es' ? 'clase individual' : 'individual class' }}
+                  {{ language === 'es' ? 'grupal · 1 sesión' : 'group · 1 session' }}
+                </span>
+              </span>
+              <span class="text-[10px] font-bold bg-gray-800 text-white px-2 py-1 rounded text-right leading-tight">
+                {{ formatPrice(individualDropInPrice(s)) }}
+                <span class="block font-mono font-normal opacity-90 normal-case">
+                  {{ language === 'es' ? 'individual · 1 sesión' : 'individual · 1 session' }}
                 </span>
               </span>
             </div>
@@ -610,7 +775,7 @@ onMounted(async () => {
               disabled
               class="w-full py-3 rounded-lg bg-teal-600 text-white font-bold text-sm"
             >
-              ✓ {{ language === 'es' ? 'Inscrito en tu crew' : 'Enrolled in your crew' }}
+              ✓ {{ language === 'es' ? 'Inscrito en tu familia' : 'Enrolled in your family' }}
             </button>
             <button
               v-else
@@ -622,7 +787,7 @@ onMounted(async () => {
                 hover:shadow-[0_6px_20px_rgba(20,184,166,0.55)]
                 hover:scale-[1.02] active:scale-[0.98]
                 transition-all duration-200 disabled:opacity-40 disabled:hover:scale-100 disabled:shadow-none"
-              :disabled="enrollingId === s.id || s.status === 'full' || s.status === 'no_coaches'"
+              :disabled="enrollingId === s.id || s.status === 'full' || s.status === 'no_coaches' || !canRegister"
               @click="openEnrollModal(s)"
             >
               {{
@@ -666,8 +831,10 @@ onMounted(async () => {
                 {{ sessionDetailsText(s) }}
               </p>
               <ul class="mt-3 space-y-1 text-xs font-mono text-gray-300">
-                <li>* {{ formatPrice(monthlyPrice(s)) }} — {{ language === 'es' ? 'programa mensual' : 'monthly program' }}</li>
-                <li>* {{ formatPrice(DROP_IN_CLASS_PRICE_MXN) }} — {{ language === 'es' ? 'clase individual' : 'individual / drop-in class' }}</li>
+                <li>* {{ formatPrice(monthlyPrice(s)) }} — {{ language === 'es' ? 'mensual (8 clases)' : 'monthly (8 classes)' }}</li>
+                <li>* {{ formatPrice(groupDropInPrice(s)) }} — {{ language === 'es' ? 'grupal · 1 sesión' : 'group · 1 session' }}</li>
+                <li>* {{ formatPrice(individualDropInPrice(s)) }} — {{ language === 'es' ? 'individual · 1 sesión' : 'individual · 1 session' }}</li>
+                <li>* {{ coachTierLabel(coachTierFromSkillLevel(s.skill_level), language === 'es') }}</li>
                 <li>* {{ s.skatepark || selectedSkatepark }}</li>
               </ul>
             </div>
@@ -732,8 +899,8 @@ onMounted(async () => {
           >
             {{
               language === 'es'
-                ? `Ningún patinador de tu crew cumple la edad (${modalAgeRangeLabel(enrollModalSession)}).`
-                : `None of your students meet the age requirement (${modalAgeRangeLabel(enrollModalSession)}).`
+                ? `Ningún patinador de tu familia cumple la edad (${modalAgeRangeLabel(enrollModalSession)}).`
+                : `None of your family skaters meet the age requirement (${modalAgeRangeLabel(enrollModalSession)}).`
             }}
           </p>
 
@@ -762,6 +929,25 @@ onMounted(async () => {
           </div>
 
           <p v-if="enrollError" class="text-sm text-red-600 mb-3">{{ enrollError }}</p>
+
+          <div
+            v-if="modalSelectedKeys.length && enrollModalSession"
+            class="mb-4 rounded-xl border-2 border-teal-600/30 bg-teal-50 px-4 py-3 text-sm"
+          >
+            <p class="font-bold text-teal-800">
+              {{ language === 'es' ? 'Programa mensual (estimado)' : 'Monthly program (estimate)' }}
+            </p>
+            <p v-if="modalDiscountRate > 0" class="text-gray-600 line-through mt-1">
+              {{ formatPrice(modalSubtotalMxn) }}
+            </p>
+            <p class="text-lg font-black text-teal-900">
+              {{ formatPrice(modalTotalMxn) }}
+              <span v-if="modalSelectedKeys.length > 1" class="text-xs font-mono font-normal text-teal-700">
+                · {{ Math.round(modalDiscountRate * 100) }}%
+                {{ language === 'es' ? 'desc. multi-estudiante' : 'multi-student off' }}
+              </span>
+            </p>
+          </div>
 
           <button
             type="button"

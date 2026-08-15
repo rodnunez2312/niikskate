@@ -4,10 +4,11 @@ import {
   getSessionUserId,
   type BookableSessionRow,
 } from '~/server/utils/bookableSessions'
-
+import { getProgramSeasonBySlug } from '~/utils/programSeasons'
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const skatepark = typeof query.skatepark === 'string' ? query.skatepark.trim() : ''
+  const seasonSlug = typeof query.season === 'string' ? query.season.trim() : ''
   const crewMemberId =
     typeof query.crewMemberId === 'string' && query.crewMemberId.trim()
       ? query.crewMemberId.trim()
@@ -18,7 +19,7 @@ export default defineEventHandler(async (event) => {
   let q = supabase
     .from('school_calendar_events')
     .select(
-      'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, program_series_id, max_capacity_override',
+      'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, program_series_id, max_capacity_override, season_slug',
     )
     .eq('event_type', 'class_session')
     .eq('is_bookable', true)
@@ -41,6 +42,16 @@ export default defineEventHandler(async (event) => {
   }
 
   let rows = (data || []) as BookableSessionRow[]
+  if (seasonSlug) {
+    const season = getProgramSeasonBySlug(seasonSlug)
+    rows = rows.filter(r => {
+      if (r.season_slug) return r.season_slug === seasonSlug
+      if (season) {
+        return r.start_date >= season.startDate && r.start_date <= season.endDate
+      }
+      return false
+    })
+  }
   if (skatepark) {
     rows = rows.filter(
       r =>

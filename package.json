@@ -1,6 +1,6 @@
 {
   "name": "niikskate-academy",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "private": true,
   "description": "NiikSkate Academy - Skateboard class scheduling, booking, and progress tracking app",
   "scripts": {

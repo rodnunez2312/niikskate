@@ -40,7 +40,7 @@ const pillClass = (active: boolean) => {
       class="text-[10px] font-bold uppercase tracking-wider"
       :class="theme === 'light' ? 'text-gray-600' : 'text-gray-500'"
     >
-      {{ language === 'es' ? 'Crew' : 'Crew' }}:
+      {{ language === 'es' ? 'Familia' : 'Family' }}:
     </p>
     <div class="flex flex-wrap items-center gap-2">
       <button
@@ -67,7 +67,7 @@ const pillClass = (active: boolean) => {
             ? 'border-black text-black hover:bg-gray-100'
             : 'border-white/70 text-white hover:border-white',
         ]"
-        :title="language === 'es' ? 'Agregar al crew' : 'Add to crew'"
+        :title="language === 'es' ? 'Agregar patinador a la familia' : 'Add skater to family'"
         @click="emit('add')"
       >
         +

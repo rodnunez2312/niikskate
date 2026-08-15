@@ -15,7 +15,7 @@ export default defineNuxtRouteMiddleware(async to => {
   const adminOnly = to.path.startsWith('/member/admin')
 
   if (studentOnly && role !== 'customer') {
-    return navigateTo(role === 'admin' ? '/member/admin/scheduling' : '/member/coach/home')
+    return navigateTo(role === 'admin' || role === 'coach' ? '/member/staff/dashboard' : '/member/coach/home')
   }
   if (coachOnly && role !== 'coach' && role !== 'admin') {
     return navigateTo('/member/student')
@@ -24,7 +24,12 @@ export default defineNuxtRouteMiddleware(async to => {
   const coachSharedAdmin =
     to.path === '/member/admin/competitions' || to.path.startsWith('/member/admin/competitions/')
 
+  const staffShared = to.path.startsWith('/member/staff')
+  if (staffShared && role !== 'admin' && role !== 'coach') {
+    return navigateTo('/member/student')
+  }
+
   if (adminOnly && role !== 'admin' && !(role === 'coach' && coachSharedAdmin)) {
-    return navigateTo(role === 'coach' ? '/member/coach/home' : '/member/student')
+    return navigateTo(role === 'coach' ? '/member/staff/dashboard' : '/member/student')
   }
 })

@@ -489,7 +489,7 @@ const saveCoachAvailability = async () => {
       <div class="px-4 py-4 max-w-2xl mx-auto">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
-            <button type="button" class="p-2 -ml-2 text-white flex-shrink-0" @click="router.push('/member/admin/scheduling')">
+            <button type="button" class="p-2 -ml-2 text-white flex-shrink-0" @click="router.push('/member/staff/dashboard')">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>

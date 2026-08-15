@@ -1,12 +1,10 @@
 /**
- * Parse "1 - Manual de Trucos" from Niik_Plan_Clases.xlsx → niik-trick-library.json
+ * Parse NiikSkate_Tricks_Manual.xlsx → niik-trick-library.json
  *
- * Expected columns (from current Excel):
- *   #, Truco, Categoria, Tipo, Program, Comentarios, URL,
- *   Habilidad motriz desarrollada (sub-columns: Coordinación, Balance, Resistencia, Fuerza, Agilidad, Confianza, Estabilidad)
+ * Columns: Skill, Area, Structure, Type, Program, Comentarios, URL,
+ *          Habilidad motriz desarrollada (+ optional motor skill x-columns)
  *
  * Run: npm run niik:parse
- * Excel: data/Niik_source/Niik_Plan_Clases.xlsx or data/Niik_Plan_Clases.xlsx
  */
 
 import XLSX from 'xlsx'
@@ -18,26 +16,32 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = join(__dirname, '..')
 
 function resolveExcelPath() {
-  const withSource = join(projectRoot, 'data', 'Niik_source', 'Niik_Plan_Clases.xlsx')
-  const rootData = join(projectRoot, 'data', 'Niik_Plan_Clases.xlsx')
-  if (existsSync(withSource)) return withSource
-  if (existsSync(rootData)) return rootData
-  return withSource
+  const candidates = [
+    join(projectRoot, 'data', 'Niik_source', 'NiikSkate_Ticks_Manual.xlsx'),
+    join(projectRoot, 'data', 'Niik_source', 'NiikSkate_Tricks_Manual.xlsx'),
+    join(projectRoot, 'data', 'Niik_source', 'Niik_Plan_Clases.xlsx'),
+    join(projectRoot, 'data', 'Niik_Plan_Clases.xlsx'),
+  ]
+  for (const p of candidates) {
+    if (existsSync(p)) return p
+  }
+  return candidates[0]
 }
 
 const excelPath = resolveExcelPath()
 const outPath = join(projectRoot, 'data', 'niik-trick-library.json')
 const outPathPublic = join(projectRoot, 'public', 'data', 'niik-trick-library.json')
 
-const SHEET_MATCH = /1\s*-\s*manual\s*de\s*trucos|manual|trucos/i
-
 const MOTOR_LABELS = [
   'Coordinación',
   'Balance',
   'Resistencia',
-  'Fuerza',
+  'Core',
+  'Fuerza en Piernas',
   'Agilidad',
   'Confianza',
+  'Tiempo de Reacción',
+  'Control de Tabla',
   'Estabilidad',
 ]
 
@@ -49,24 +53,45 @@ function findHeaderIndex(headerRow, ...keywords) {
   return -1
 }
 
-function normalizeDifficulty(categoria) {
-  if (!categoria || typeof categoria !== 'string') return 'beginner'
-  const v = categoria.toLowerCase().trim()
-  if (/0\s*-\s*warmup|1\s*-\s*basics|warmup|basics/.test(v)) return 'beginner'
-  if (/2\s*-\s*principiantes|principiantes/.test(v)) return 'beginner'
-  if (/3\s*-\s*intermedios|intermedios/.test(v)) return 'intermediate'
-  if (/4\s*-\s*avanzados|avanzados/.test(v)) return 'advanced'
+function findHashColumnIndex(headerRow) {
+  for (let i = 0; i < headerRow.length; i++) {
+    if ((headerRow[i] || '').toString().trim() === '#') return i
+  }
+  return -1
+}
+
+function parseManualId(val) {
+  if (val == null || val === '') return null
+  const n = parseInt(String(val).trim(), 10)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function normalizeStructure(val) {
+  const s = (val || '').toString().trim()
+  if (!s) return ''
+  if (s === '0 - Warmup') return 'Strength Training'
+  if (/stregth training/i.test(s)) return 'Strength Training'
+  if (/^strength training$/i.test(s)) return 'Strength Training'
+  return s
+}
+
+function normalizeDifficulty(structure) {
+  if (!structure || typeof structure !== 'string') return 'beginner'
+  const v = structure.toLowerCase().trim()
+  if (/strength training|warmup|level 1|level 2/.test(v)) return 'beginner'
+  if (/level 3|level 4/.test(v)) return 'intermediate'
+  if (/level 5|advanced/.test(v)) return 'advanced'
   return 'beginner'
 }
 
-function normalizeCategory(program, tipo) {
+function normalizeCategory(area, program, tipo) {
   const t = (tipo || '').toString().toLowerCase().trim()
-  if (/ejercicio|funcional|exercise/.test(t)) return 'excercise'
-  const p = (program || '').toString().toLowerCase().trim()
-  if (p === 'strength training') return 'excercise'
-  if (p === 'iniciacion') return 'iniciacion'
-  if (p === 'street') return 'street'
-  if (p === 'park/bowl') return 'vert_bowl'
+  if (/exercise|drill/.test(t) && program === 'Strength Training') return 'excercise'
+  const a = (area || '').toString().toLowerCase().trim()
+  if (a === 'warmup') return 'excercise'
+  if (a === 'street') return 'street'
+  if (['park', 'bowl', 'mini ramp', 'vert'].includes(a)) return 'vert_bowl'
+  if (program === 'Foundations' || program === 'Beginners') return 'iniciacion'
   return 'iniciacion'
 }
 
@@ -76,17 +101,20 @@ function isChecked(val) {
   if (!s) return false
   if (/^[x1sísiy✓✔+]$/.test(s)) return true
   if (s === 'yes' || s === 'true') return true
-  return s.length > 0 && s.length < 25
+  return false
 }
 
 function main() {
   if (!existsSync(excelPath)) {
-    console.error('Excel not found. Tried: data/Niik_source/Niik_Plan_Clases.xlsx and data/Niik_Plan_Clases.xlsx')
+    console.error('Excel not found. Expected:', excelPath)
     process.exit(1)
   }
 
   const workbook = XLSX.readFile(excelPath)
-  const sheetName = workbook.SheetNames.find(n => SHEET_MATCH.test(n)) || workbook.SheetNames[0]
+  const sheetName =
+    workbook.SheetNames.find(n => /skate_manual|manual|trucos/i.test(n))
+    || workbook.SheetNames[0]
+  console.log('File:', excelPath)
   console.log('Sheet:', sheetName)
 
   const sheet = workbook.Sheets[sheetName]
@@ -97,12 +125,11 @@ function main() {
     process.exit(1)
   }
 
-  // Find row that contains "Truco" (header row)
   let headerRow = null
   let dataStartIndex = 0
   for (let r = 0; r < Math.min(10, raw.length); r++) {
     const row = raw[r].map(c => (c ?? '').toString().trim())
-    const idx = findHeaderIndex(row, 'Truco')
+    const idx = findHeaderIndex(row, 'Skill', 'Truco')
     if (idx >= 0) {
       headerRow = row
       dataStartIndex = r + 1
@@ -111,67 +138,78 @@ function main() {
   }
 
   if (!headerRow) {
-    console.error('Header row with "Truco" not found. First row cells:', raw[0]?.slice(0, 8))
+    console.error('Header row with "Skill" not found.')
     process.exit(1)
   }
 
-  const colTruco = findHeaderIndex(headerRow, 'Truco')
-  const colCategoria = findHeaderIndex(headerRow, 'Categoria', 'Categoría')
-  const colTipo = findHeaderIndex(headerRow, 'Tipo')
+  const colSkill = findHeaderIndex(headerRow, 'Skill', 'Truco')
+  const colNum = findHashColumnIndex(headerRow)
+  const colArea = findHeaderIndex(headerRow, 'Area')
+  const colStructure = findHeaderIndex(headerRow, 'Structure', 'Categoria', 'Categoría')
+  const colType = findHeaderIndex(headerRow, 'Type', 'Tipo')
   const colProgram = findHeaderIndex(headerRow, 'Program')
   const colComentarios = findHeaderIndex(headerRow, 'Comentarios')
   const colUrl = findHeaderIndex(headerRow, 'URL')
+  const colMotorText = findHeaderIndex(headerRow, 'Habilidad motriz desarrollada')
 
-  if (colTruco < 0) {
-    console.error('Column "Truco" not found.')
-    process.exit(1)
-  }
-
-  // Motor skill sub-columns: headers that match MOTOR_LABELS
   const motorCols = []
   for (let c = 0; c < headerRow.length; c++) {
     const h = (headerRow[c] || '').trim()
     const match = MOTOR_LABELS.find(l => h === l || h.toLowerCase().includes(l.toLowerCase()))
     if (match) motorCols.push({ index: c, label: match })
   }
-  console.log('Columns: Truco, Categoria, Tipo, Program, Comentarios, URL', motorCols.length ? ', motor:' + motorCols.map(m => m.label).join(', ') : '')
 
   const tricks = []
   for (let i = dataStartIndex; i < raw.length; i++) {
     const row = raw[i]
-    const name = (row[colTruco] ?? '').toString().trim()
-    const desc = colComentarios >= 0 ? (row[colComentarios] ?? '').toString().trim() : ''
-    if (!name && !desc) continue
+    const name = (row[colSkill] ?? '').toString().trim()
+    if (!name) continue
 
-    const categoriaRaw = colCategoria >= 0 ? (row[colCategoria] ?? '').toString().trim() : ''
-    const tipo = colTipo >= 0 ? (row[colTipo] ?? '').toString().trim() : ''
+    const area = colArea >= 0 ? (row[colArea] ?? '').toString().trim() : ''
+    const structureRaw = colStructure >= 0 ? (row[colStructure] ?? '').toString().trim() : ''
+    const structure = normalizeStructure(structureRaw)
+    const trickType = colType >= 0 ? (row[colType] ?? '').toString().trim() : ''
     const program = colProgram >= 0 ? (row[colProgram] ?? '').toString().trim() : ''
+    const desc = colComentarios >= 0 ? (row[colComentarios] ?? '').toString().trim() : ''
     const url = colUrl >= 0 ? (row[colUrl] ?? '').toString().trim() : ''
+    const motorText =
+      colMotorText >= 0 ? (row[colMotorText] ?? '').toString().trim() : ''
 
     const motorSkills = []
     for (const { index, label } of motorCols) {
       if (isChecked(row[index])) motorSkills.push(label)
     }
+    if (motorText && !motorSkills.length) {
+      motorText.split(/[,;]/).map(s => s.trim()).filter(Boolean).forEach(s => motorSkills.push(s))
+    }
+
+    const manualId = colNum >= 0 ? parseManualId(row[colNum]) : null
 
     tricks.push({
-      name: name || desc?.slice(0, 200) || 'Unnamed',
-      name_es: name || undefined,
-      description: desc || name || '',
+      manual_id: manualId ?? undefined,
+      name,
+      name_es: name,
+      description: desc || name,
       comentarios: desc || undefined,
-      categoria: categoriaRaw || undefined,
-      difficulty: normalizeDifficulty(categoriaRaw),
-      category: normalizeCategory(program, tipo),
+      area: area || undefined,
+      structure: structure || undefined,
+      trick_type: trickType || undefined,
+      categoria: structure || undefined,
+      difficulty: normalizeDifficulty(structure),
+      category: normalizeCategory(area, program, trickType),
       program: program || undefined,
       url: url || undefined,
       motor_skills: motorSkills.length ? motorSkills : undefined,
-      activity_type: tipo || undefined,
-      sort_order: tricks.length,
+      activity_type: trickType || undefined,
+      sort_order: manualId ?? tricks.length + 1,
     })
   }
 
+  tricks.sort((a, b) => (a.sort_order ?? 999999) - (b.sort_order ?? 999999))
+
   const output = {
     source: sheetName,
-    sourceFile: 'Niik_Plan_Clases.xlsx',
+    sourceFile: excelPath.split(/[/\\]/).pop(),
     generatedAt: new Date().toISOString(),
     tricks,
   }
@@ -184,7 +222,7 @@ function main() {
   const jsonStr = JSON.stringify(output, null, 2)
   writeFileSync(outPath, jsonStr, 'utf8')
   writeFileSync(outPathPublic, jsonStr, 'utf8')
-  console.log('Wrote', tricks.length, 'tricks to', outPath, 'and', outPathPublic)
+  console.log('Wrote', tricks.length, 'tricks to', outPath)
 }
 
 try {

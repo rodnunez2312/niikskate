@@ -25,6 +25,7 @@ export type BookableSessionRow = {
   price_mxn: number | null
   program_series_id?: string | null
   max_capacity_override?: number | null
+  season_slug?: string | null
 }
 
 const jsDayToPgDow = (dayNum: number): string | null => {

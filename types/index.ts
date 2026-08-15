@@ -21,10 +21,14 @@ export interface User {
   is_active: boolean
   created_at: string
   updated_at: string
-  /** Assigned skate program level (skill_groups). */
+  /** Assigned skate program (skill_groups Level 1–5). */
   skill_group_id?: string | null
+  /** Skater band: foundation | beginner | intermediate | advanced */
+  skill_level?: string | null
+  /** Parent/guardian when this profile is a skater with login. */
+  guardian_user_id?: string | null
   /** Admin-set weekly preference: { start, end, days[] } — days 0–6 Sun–Sat. */
-  skater_schedule?: { start?: string; end?: string; days?: number[] } | null
+  skater_schedule?: { start?: string; end?: string; days?: number[]; season_slug?: string } | null
 }
 
 export type UserRole = 'admin' | 'coach' | 'customer'
@@ -86,28 +90,28 @@ export const PROGRAM_AGE_BANDS: Array<{
   {
     id: 'tots_5_7',
     emoji: '🛹',
-    label: { en: '5–7 Skater Tots', es: '5–7 Skater Tots' },
+    label: { en: '5–7', es: '5–7' },
     minAge: 5,
     maxAge: 7,
   },
   {
     id: 'kids_7_12',
     emoji: '🌱',
-    label: { en: '7–12 Kids', es: '7–12 Niños' },
+    label: { en: '7–12', es: '7–12' },
     minAge: 7,
     maxAge: 12,
   },
   {
     id: 'teens_13_17',
     emoji: '⚡',
-    label: { en: '13–17 Teens', es: '13–17 Adolescentes' },
+    label: { en: '13–17', es: '13–17' },
     minAge: 13,
     maxAge: 17,
   },
   {
     id: 'adults_18_plus',
     emoji: '👊',
-    label: { en: '18+ Adults', es: '18+ Adultos' },
+    label: { en: '18+', es: '18+' },
     minAge: 18,
     maxAge: null,
   },
@@ -398,9 +402,27 @@ export const SKATE_SKILL_LEVELS: Array<{
 
 export const DEFAULT_SKATEPARK = 'Skatepark La Plancha'
 
-/** Standard La Plancha class pricing (MXN). */
-export const MONTHLY_PROGRAM_PRICE_MXN = 1000
-export const DROP_IN_CLASS_PRICE_MXN = 150
+/** Standard La Plancha class pricing (MXN) — see utils/classPricing.ts for full coach tier table. */
+export {
+  DROP_IN_CLASS_PRICE_MXN,
+  DROP_IN_INDIVIDUAL_PRICE_MXN,
+  FULL_PROGRAM_PRICE_MXN,
+  MONTHLY_PROGRAM_PRICE_MXN,
+} from '~/utils/classPricing'
+
+/** 8-week season program structure. */
+export const PROGRAM_WEEKS = 8
+export const PROGRAM_TOTAL_CLASSES = 24
+/** Included in base monthly fee — parents pick up to this many sessions per week. */
+export const PROGRAM_CLASSES_PER_WEEK_INCLUDED = 2
+export const PROGRAM_INCLUDED_CLASSES = PROGRAM_WEEKS * PROGRAM_CLASSES_PER_WEEK_INCLUDED
+
+/** Summer course (curso de verano): Mon–Fri only, 5 or 10 class days. */
+export const SUMMER_COURSE_WEEKDAY_PRESET = [1, 2, 3, 4, 5] as const
+export const SUMMER_COURSE_WEEK_OPTIONS = [
+  { weeks: 1, classes: 5, label: { es: '1 sem (5 días)', en: '1 wk (5 days)' } },
+  { weeks: 2, classes: 10, label: { es: '2 sem (10 días)', en: '2 wk (10 days)' } },
+] as const
 
 /** Venues available when creating calendar events (expand later). */
 export const EVENT_LOCATIONS = [DEFAULT_SKATEPARK] as const
@@ -427,6 +449,7 @@ export interface BookableClassSession {
   spotsLeft: number
   status: SessionAvailabilityStatus
   isEnrolled?: boolean
+  season_slug?: string | null
 }
 
 export interface CrewMember {
@@ -797,6 +820,10 @@ export interface Skill {
   tips?: string[]
   prerequisites?: string[]
   motor_skills?: string[]  // Body parts / motor skills developed (Habilidad motriz desarrollada)
+  manual_id?: number
+  area?: string
+  structure?: string
+  trick_type?: string
   sort_order: number
   is_active: boolean
   created_at: string

@@ -2,6 +2,7 @@
 definePageMeta({ middleware: ['auth', 'member'], layout: 'member' })
 
 import type { Skill } from '~/types'
+import { trickBagStatusLabel, type SkaterTrickBagStatus } from '~/utils/skateTrickTaxonomy'
 
 const client = useSupabaseClient()
 const user = useSupabaseUser()
@@ -12,7 +13,7 @@ const profile = ref<any>(null)
 const programName = ref<string | null>(null)
 const skillGroupName = ref<string | null>(null)
 const programPct = ref(0)
-const skillFocus = ref<Array<{ id: string; skill_id: string; coach_note: string | null; skill?: Skill }>>([])
+const skillFocus = ref<Array<{ id: string; skill_id: string; coach_note: string | null; status?: string; skill?: Skill }>>([])
 
 onMounted(async () => {
   if (!user.value) return
@@ -53,9 +54,9 @@ onMounted(async () => {
 
     const { data: focus } = await client
       .from('student_skill_focus')
-      .select('id, skill_id, coach_note, skill:skills_library(*)')
+      .select('id, skill_id, coach_note, status, skill:skills_library(*)')
       .eq('student_id', uid)
-      .eq('status', 'active')
+      .in('status', ['assigned', 'pending', 'done'])
       .order('created_at', { ascending: false })
     skillFocus.value = (focus || []) as typeof skillFocus.value
   } finally {
@@ -107,7 +108,7 @@ function skillLabel(skill?: Skill) {
 
       <section class="space-y-3">
         <h2 class="text-sm font-bold text-gold-400 uppercase tracking-wide">
-          {{ language === 'es' ? 'Objetivos del coach' : 'Coach targets' }}
+          {{ language === 'es' ? 'Bolsa de trucos' : 'Trick bag' }}
         </h2>
         <ul v-if="skillFocus.length" class="space-y-2">
           <li
@@ -115,12 +116,21 @@ function skillLabel(skill?: Skill) {
             :key="f.id"
             class="rounded-xl bg-gray-900 border border-amber-500/30 px-4 py-3"
           >
-            <p class="text-white font-medium text-sm">{{ skillLabel(f.skill) }}</p>
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-white font-medium text-sm">{{ skillLabel(f.skill) }}</p>
+              <span
+                v-if="f.status"
+                class="text-xs px-2 py-0.5 rounded shrink-0"
+                :class="f.status === 'done' ? 'bg-emerald-500/20 text-emerald-300' : f.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'"
+              >
+                {{ trickBagStatusLabel(f.status as SkaterTrickBagStatus, language === 'es') }}
+              </span>
+            </div>
             <p v-if="f.coach_note" class="text-gray-400 text-xs mt-1">{{ f.coach_note }}</p>
           </li>
         </ul>
         <p v-else class="text-sm text-gray-500 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          {{ language === 'es' ? 'Tu coach aún no ha asignado trucos de práctica.' : 'Your coach has not assigned practice tricks yet.' }}
+          {{ language === 'es' ? 'Tu coach aún no ha asignado trucos.' : 'Your coach has not assigned tricks yet.' }}
         </p>
       </section>
 

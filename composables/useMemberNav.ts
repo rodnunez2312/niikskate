@@ -22,6 +22,8 @@ type StaffNavSectionDef = {
   items: StaffNavItemDef[]
 }
 
+export const STAFF_DASHBOARD_PATH = '/member/staff/dashboard'
+
 export function useMemberNav() {
   const route = useRoute()
   const user = useSupabaseUser()
@@ -37,7 +39,7 @@ export function useMemberNav() {
       icon: 'calendar',
     },
     {
-      name: es.value ? 'Crew' : 'Crew',
+      name: es.value ? 'Familia' : 'Family',
       path: '/member/student/profile',
       icon: 'user',
     },
@@ -115,6 +117,12 @@ export function useMemberNav() {
     },
   ])
 
+  const staffDashboardItem = computed((): MemberNavItem => ({
+    name: 'Dashboard',
+    path: STAFF_DASHBOARD_PATH,
+    icon: 'grid',
+  }))
+
   const staffSidebarDefs = computed((): StaffNavSectionDef[] => {
     const skatersPath = isAdmin.value
       ? '/member/admin/academy/users'
@@ -136,7 +144,7 @@ export function useMemberNav() {
             adminOnly: true,
           },
           {
-            name: es.value ? 'Coaches (disponibilidad)' : 'Coaches (availability)',
+            name: es.value ? 'Coaches' : 'Coaches',
             path: coachesPath,
             icon: 'users',
           },
@@ -144,12 +152,6 @@ export function useMemberNav() {
             name: es.value ? 'Asistencia' : 'Attendance',
             path: '/member/admin/scheduling/attendance',
             icon: 'clipboard',
-            adminOnly: true,
-          },
-          {
-            name: es.value ? 'Créditos y reservas' : 'Credits and reservations',
-            path: '/member/admin/scheduling/credits',
-            icon: 'credits',
             adminOnly: true,
           },
         ],
@@ -165,9 +167,9 @@ export function useMemberNav() {
             icon: 'skate-program',
           },
           {
-            name: es.value ? 'Patinadores' : 'Skaters',
-            path: skatersPath,
-            icon: 'users',
+            name: es.value ? 'Trucos' : 'Tricks',
+            path: '/member/coach/tricks',
+            icon: 'skills',
           },
           {
             name: es.value ? 'Competencias' : 'Competitions',
@@ -196,6 +198,11 @@ export function useMemberNav() {
             path: '/member/admin/academy/dashboard',
             icon: 'star',
             adminOnly: true,
+          },
+          {
+            name: es.value ? 'Patinadores' : 'Skaters',
+            path: skatersPath,
+            icon: 'users',
           },
           {
             name: es.value ? 'Reportes' : 'Reports',
@@ -239,12 +246,6 @@ export function useMemberNav() {
             adminOnly: true,
           },
           {
-            name: es.value ? 'Créditos' : 'Credits',
-            path: '/member/admin/scheduling/credits',
-            icon: 'credits',
-            adminOnly: true,
-          },
-          {
             name: 'Skateshop',
             path: '/member/admin/skate-products',
             icon: 'store',
@@ -279,6 +280,9 @@ export function useMemberNav() {
   })
 
   const isActive = (path: string) => {
+    if (path === STAFF_DASHBOARD_PATH) {
+      return route.path === STAFF_DASHBOARD_PATH
+    }
     if (path === '/member/student/classes' && (route.path === '/classes' || route.path.startsWith('/member/student/classes'))) return true
     if (path === '/member/student/profile' && route.path.startsWith('/member/student/profile')) return true
     if (path === '/member/student/progress' && route.path.startsWith('/member/student/progress')) return true
@@ -289,14 +293,16 @@ export function useMemberNav() {
     if (path === '/member/coach/students' && route.path.startsWith('/member/coach/students')) return true
     if (path === '/member/coach/evaluations' && route.path.startsWith('/member/coach/evaluations')) return true
     if (path === '/member/admin/payments' && route.path.startsWith('/member/admin/payments')) return true
-    // Programs = former Tricks Hub (skill_groups library)
+    // Programs = skill_groups library
     if (path === '/member/coach/library' && route.path.startsWith('/member/coach/library')) return true
+    if (path === '/member/coach/tricks' && route.path.startsWith('/member/coach/tricks')) return true
     if (path === '/member/admin/competitions' && route.path.startsWith('/member/admin/competitions')) return true
     if (path === '/member/admin/reports' && route.path.startsWith('/member/admin/reports')) return true
     if (path === '/member/coach/profile' && route.path.startsWith('/member/coach/profile')) return true
     if (path === '/member/coach/certifications' && route.path.startsWith('/member/coach/certifications')) return true
     if (path === '/coach/availability' && route.path.startsWith('/coach/availability')) return true
     if (path === '/member/admin/academy/dashboard' && route.path.startsWith('/member/admin/academy/dashboard')) return true
+    if (path === '/member/admin/academy/users' && route.path.startsWith('/member/admin/academy/users')) return true
     if (path === '/member/admin/skate-products' && (route.path.startsWith('/member/admin/skate-products') || route.path.startsWith('/dashboard/store'))) return true
     if (path === '/dashboard/store' && route.path.startsWith('/dashboard/store')) return true
     return route.path === path || route.path.startsWith(`${path}/`)
@@ -306,6 +312,7 @@ export function useMemberNav() {
     studentNav,
     coachNav,
     adminNav,
+    staffDashboardItem,
     staffNavSections,
     usesStaffSidebar,
     navItems,

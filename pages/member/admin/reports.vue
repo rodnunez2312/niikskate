@@ -9,7 +9,6 @@ const stats = ref({
   totalCustomers: 0,
   activeCoaches: 0,
   pendingRegistrations: 0,
-  pendingCredits: 0,
   totalBookings: 0,
   pendingBookings: 0,
   classesThisMonth: 0,
@@ -26,7 +25,6 @@ onMounted(async () => {
       customers,
       coaches,
       regs,
-      credits,
       bookings,
       pendingBookings,
       reservations,
@@ -35,7 +33,6 @@ onMounted(async () => {
       client.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'customer'),
       countActiveCoachDirectoryProfiles(client),
       client.from('registration_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      client.from('user_credits').select('*', { count: 'exact', head: true }).eq('payment_status', 'pending').eq('remaining_credits', 0).gt('total_credits', 0),
       client.from('bookings').select('*', { count: 'exact', head: true }),
       client.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       client.from('class_reservations').select('*', { count: 'exact', head: true }).gte('reservation_date', monthStart.slice(0, 10)),
@@ -45,7 +42,6 @@ onMounted(async () => {
     stats.value.totalCustomers = customers.count || 0
     stats.value.activeCoaches = coaches
     stats.value.pendingRegistrations = regs.count || 0
-    stats.value.pendingCredits = credits.count || 0
     stats.value.totalBookings = bookings.count || 0
     stats.value.pendingBookings = pendingBookings.count || 0
     stats.value.classesThisMonth = reservations.count || 0
@@ -70,11 +66,6 @@ const cards = computed(() => [
     label: language.value === 'es' ? 'Solicitudes pendientes' : 'Pending registrations',
     value: stats.value.pendingRegistrations,
     to: '/member/admin/academy/registrations',
-  },
-  {
-    label: language.value === 'es' ? 'Créditos por confirmar' : 'Credits to confirm',
-    value: stats.value.pendingCredits,
-    to: '/member/admin/scheduling/credits',
   },
   {
     label: language.value === 'es' ? 'Reservas del mes' : 'Reservations this month',

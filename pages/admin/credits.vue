@@ -1,4 +1,3 @@
 <script setup lang="ts">
-definePageMeta({ middleware: ['auth'] })
-await navigateTo('/member/admin/scheduling/credits', { replace: true })
+await navigateTo('/member/admin/academy/dashboard', { replace: true })
 </script>

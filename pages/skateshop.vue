@@ -56,19 +56,19 @@ const shopGroups: ShopGroup[] = [
   },
 ]
 
-/** Multi-select category filters — empty means show all categories */
-const selectedFilters = ref<ShopGroupId[]>([])
+/** Single category filter — null means all products (unless brand picker / brand selected) */
+const selectedFilter = ref<ShopGroupId | null>(null)
 /** Brands picker mode + selected brand name */
 const brandsMode = ref(false)
 const selectedBrand = ref<string | null>(null)
 const brandLogos = ref<Record<string, string>>({})
 
 const showAllActive = computed(
-  () => !brandsMode.value && !selectedBrand.value && selectedFilters.value.length === 0,
+  () => !brandsMode.value && !selectedBrand.value && selectedFilter.value === null,
 )
 
 function selectAll() {
-  selectedFilters.value = []
+  selectedFilter.value = null
   brandsMode.value = false
   selectedBrand.value = null
 }
@@ -76,7 +76,7 @@ function selectAll() {
 function openBrandsMode() {
   brandsMode.value = true
   selectedBrand.value = null
-  selectedFilters.value = []
+  selectedFilter.value = null
 }
 
 function selectBrand(name: string) {
@@ -153,44 +153,35 @@ onMounted(async () => {
     brandsMode.value = true
   } else if (raw.startsWith('brand:')) {
     selectedBrand.value = decodeURIComponent(raw.slice(6))
-  } else if (raw) {
-    const ids = raw.split(',').filter((id): id is ShopGroupId =>
-      shopGroups.some(g => g.id === id),
-    )
-    selectedFilters.value = ids
+  } else if (raw && shopGroups.some(g => g.id === raw)) {
+    selectedFilter.value = raw as ShopGroupId
   }
 })
 
 watch(
-  [selectedFilters, brandsMode, selectedBrand],
+  [selectedFilter, brandsMode, selectedBrand],
   () => {
     const query = { ...route.query } as Record<string, string>
     if (brandsMode.value) query.cat = 'brands'
     else if (selectedBrand.value) query.cat = `brand:${encodeURIComponent(selectedBrand.value)}`
-    else if (!selectedFilters.value.length) delete query.cat
-    else query.cat = selectedFilters.value.join(',')
+    else if (!selectedFilter.value) delete query.cat
+    else query.cat = selectedFilter.value
     router.replace({ query })
   },
-  { deep: true },
 )
 
 function isSelected(id: ShopGroupId) {
-  return !brandsMode.value && !selectedBrand.value && selectedFilters.value.includes(id)
+  return !brandsMode.value && !selectedBrand.value && selectedFilter.value === id
 }
 
-function toggleFilter(id: ShopGroupId) {
+function selectFilter(id: ShopGroupId) {
   brandsMode.value = false
   selectedBrand.value = null
-  const i = selectedFilters.value.indexOf(id)
-  if (i >= 0) {
-    selectedFilters.value = selectedFilters.value.filter(x => x !== id)
-  } else {
-    selectedFilters.value = [...selectedFilters.value, id]
-  }
+  selectedFilter.value = id
 }
 
 function clearFilters() {
-  selectedFilters.value = []
+  selectedFilter.value = null
   brandsMode.value = false
   selectedBrand.value = null
   searchQuery.value = ''
@@ -242,13 +233,10 @@ function productMatchesFilters(product: Product) {
   if (selectedBrand.value) {
     return (product.brand || '').trim().toLowerCase() === selectedBrand.value.trim().toLowerCase()
   }
-  if (!selectedFilters.value.length) return true
-  const allowed = new Set(
-    shopGroups
-      .filter(g => selectedFilters.value.includes(g.id))
-      .flatMap(g => g.dbCategories),
-  )
-  return allowed.has(product.category)
+  if (!selectedFilter.value) return true
+  const group = shopGroups.find(g => g.id === selectedFilter.value)
+  if (!group) return true
+  return group.dbCategories.includes(product.category)
 }
 
 function groupForProduct(product: Product): ShopGroup | undefined {
@@ -278,22 +266,18 @@ function logoForBrand(name: string): string | null {
 }
 
 const brandCards = computed((): BrandCard[] => {
-  const map = new Map<string, { count: number; image: string | null }>()
+  const map = new Map<string, number>()
   for (const p of products.value) {
     const name = (p.brand || '').trim()
     if (!name) continue
-    const logo = logoForBrand(name)
-    const cur = map.get(name) || { count: 0, image: logo }
-    cur.count += 1
-    if (!cur.image && p.images?.[0]) {
-      const pub = productImageUrl(p)
-      if (pub) cur.image = pub
-    }
-    if (logo) cur.image = logo
-    map.set(name, cur)
+    map.set(name, (map.get(name) || 0) + 1)
   }
   return [...map.entries()]
-    .map(([name, v]) => ({ name, count: v.count, image: v.image }))
+    .map(([name, count]) => ({
+      name,
+      count,
+      image: logoForBrand(name),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name))
 })
 
@@ -365,8 +349,8 @@ const cartLabel = computed(() => {
         <p class="text-gray-300 text-sm sm:text-base max-w-xl">
           {{
             es
-              ? 'Filtra por categoría (puedes elegir varias) y agrega al carrito.'
-              : 'Filter by category (pick one or more) and add to cart.'
+              ? 'Filtra por categoría (una a la vez) y agrega al carrito.'
+              : 'Filter by category (one at a time) and add to cart.'
           }}
         </p>
       </div>
@@ -403,26 +387,28 @@ const cartLabel = computed(() => {
           </button>
         </div>
 
-        <div class="flex justify-center pt-1 pr-10">
-          <div class="flex flex-nowrap justify-center gap-2.5 sm:gap-3 overflow-x-auto max-w-full px-1 pb-1 scrollbar-none">
+        <div class="pt-1 pr-11 sm:pr-0">
+          <div
+            class="grid grid-cols-3 gap-2 max-w-[15.5rem] mx-auto sm:max-w-none sm:flex sm:flex-nowrap sm:justify-center sm:gap-3"
+          >
             <!-- ALL -->
             <button
               type="button"
-              class="shrink-0 w-[4.75rem] sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1.5 transition-colors"
+              class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors"
               :class="showAllActive
                 ? 'border-gold-500 text-gold-600'
                 : 'border-gray-300 text-gray-900 hover:border-gray-500'"
               :aria-pressed="showAllActive"
               @click="selectAll"
             >
-              <svg class="w-6 h-6 sm:w-7 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg class="w-5 h-5 sm:w-7 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <rect x="3" y="3" width="7.5" height="7.5" rx="1" />
                 <rect x="13.5" y="3" width="7.5" height="7.5" rx="1" />
                 <rect x="3" y="13.5" width="7.5" height="7.5" rx="1" />
                 <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1" />
               </svg>
-              <span class="mt-2 mb-1.5 w-8 border-t border-current opacity-40" />
-              <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide leading-none">
+              <span class="mt-1.5 mb-1 w-6 sm:w-8 border-t border-current opacity-40" />
+              <span class="text-[8px] sm:text-[10px] font-bold uppercase tracking-wide leading-none">
                 {{ es ? 'Todo' : 'All' }}
               </span>
             </button>
@@ -431,16 +417,16 @@ const cartLabel = computed(() => {
               v-for="group in shopGroups"
               :key="group.id"
               type="button"
-              class="shrink-0 w-[4.75rem] sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1.5 transition-colors"
+              class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors"
               :class="isSelected(group.id)
                 ? 'border-gold-500 text-gold-600'
                 : 'border-gray-300 text-gray-900 hover:border-gray-500'"
               :aria-pressed="isSelected(group.id)"
-              @click="toggleFilter(group.id)"
+              @click="selectFilter(group.id)"
             >
               <svg
                 v-if="group.icon === 'skate'"
-                class="w-6 h-6 sm:w-7 sm:h-7"
+                class="w-5 h-5 sm:w-7 sm:h-7"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
@@ -449,7 +435,7 @@ const cartLabel = computed(() => {
               </svg>
               <svg
                 v-else-if="group.icon === 'helmet'"
-                class="w-6 h-6 sm:w-7 sm:h-7"
+                class="w-5 h-5 sm:w-7 sm:h-7"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
@@ -459,7 +445,7 @@ const cartLabel = computed(() => {
               </svg>
               <svg
                 v-else-if="group.icon === 'shirt'"
-                class="w-6 h-6 sm:w-7 sm:h-7"
+                class="w-5 h-5 sm:w-7 sm:h-7"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
@@ -468,7 +454,7 @@ const cartLabel = computed(() => {
               </svg>
               <svg
                 v-else
-                class="w-6 h-6 sm:w-7 sm:h-7"
+                class="w-5 h-5 sm:w-7 sm:h-7"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
@@ -476,8 +462,8 @@ const cartLabel = computed(() => {
                 <path d="M12 5.2c-3.4 0-6.2 2.2-7.1 5.2H4c-.5 0-.9.4-.9.9v1.1c0 .5.4.9.9.9h16c.5 0 .9-.4.9-.9V11.3c0-.5-.4-.9-.9-.9h-.9C18.2 7.4 15.4 5.2 12 5.2zm0 1.8c2.3 0 4.2 1.3 5.1 3.2H6.9C7.8 8.3 9.7 7 12 7zM5.2 14.8h13.6c.4 0 .7.4.6.8-.4 1.5-2.5 2.6-6.6 2.6s-6.2-1.1-6.6-2.6c-.1-.4.2-.8.6-.8z" />
               </svg>
 
-              <span class="mt-2 mb-1.5 w-8 border-t border-current opacity-40" />
-              <span class="text-[8px] sm:text-[10px] font-bold uppercase tracking-wide leading-tight text-center px-0.5">
+              <span class="mt-1.5 mb-1 w-6 sm:w-8 border-t border-current opacity-40" />
+              <span class="text-[7px] sm:text-[10px] font-bold uppercase tracking-wide leading-tight text-center px-0.5">
                 {{ es ? group.label.es : group.label.en }}
               </span>
             </button>
@@ -485,19 +471,19 @@ const cartLabel = computed(() => {
             <!-- Marcas -->
             <button
               type="button"
-              class="shrink-0 w-[4.75rem] sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1.5 transition-colors"
+              class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors"
               :class="brandsTileActive
                 ? 'border-gold-500 text-gold-600'
                 : 'border-gray-300 text-gray-900 hover:border-gray-500'"
               :aria-pressed="brandsTileActive"
               @click="openBrandsMode"
             >
-              <svg class="w-6 h-6 sm:w-7 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg class="w-5 h-5 sm:w-7 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M4.5 6.5h9.2l1.8 2.2H19.5v9.8H4.5V6.5zm2 2v8h11v-5.8h-3.3l-1.8-2.2H6.5z" />
                 <circle cx="9" cy="13.5" r="1.2" />
               </svg>
-              <span class="mt-2 mb-1.5 w-8 border-t border-current opacity-40" />
-              <span class="text-[8px] sm:text-[10px] font-bold uppercase tracking-wide leading-tight text-center px-0.5">
+              <span class="mt-1.5 mb-1 w-6 sm:w-8 border-t border-current opacity-40" />
+              <span class="text-[7px] sm:text-[10px] font-bold uppercase tracking-wide leading-tight text-center px-0.5">
                 {{ es ? 'Marcas' : 'Brands' }}
               </span>
             </button>
@@ -534,7 +520,7 @@ const cartLabel = computed(() => {
         </div>
       </div>
 
-      <!-- Brands big cards -->
+      <!-- Brand logos (compact) -->
       <div v-else-if="showBrandPicker" class="space-y-4">
         <p class="text-center text-sm text-gray-400">
           {{ es ? 'Elige una marca para ver sus productos' : 'Pick a brand to see its products' }}
@@ -544,43 +530,34 @@ const cartLabel = computed(() => {
             {{ es ? 'Aún no hay marcas en el catálogo.' : 'No brands in the catalog yet.' }}
           </p>
         </div>
-        <div v-else class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div v-else class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
           <button
             v-for="brand in brandCards"
             :key="brand.name"
             type="button"
-            class="group text-left rounded-2xl border border-white/10 bg-[#111] overflow-hidden transition-transform hover:-translate-y-0.5"
+            class="group text-left rounded-xl border border-white/10 bg-[#111] p-2.5 sm:p-3 transition-transform hover:-translate-y-0.5 hover:border-white/20"
             @click="selectBrand(brand.name)"
           >
-            <div class="relative aspect-square bg-gray-900 overflow-hidden">
+            <div class="aspect-square rounded-lg bg-gray-900 flex items-center justify-center p-2 overflow-hidden">
               <img
                 v-if="brand.image"
                 :src="brand.image"
                 :alt="brand.name"
-                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                class="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-105"
               />
-              <div
+              <img
                 v-else
-                class="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-950"
-              >
-                <img src="/niikskate-logo.png" alt="" class="w-16 h-16 object-contain opacity-70" />
-              </div>
+                src="/niikskate-logo.png"
+                alt=""
+                class="w-8 h-8 sm:w-10 sm:h-10 object-contain opacity-50"
+              />
             </div>
-            <div class="p-4 sm:p-5">
-              <h3 class="text-base sm:text-lg font-black uppercase tracking-wide text-white leading-snug mb-1">
-                {{ brand.name }}
-              </h3>
-              <p class="text-sm text-gray-500 mb-4">
-                {{ brand.count }}
-                {{ es ? 'productos' : 'products' }}
-              </p>
-              <span
-                class="inline-flex w-full items-center justify-center px-4 py-3.5 rounded-xl font-black text-sm uppercase tracking-wide text-white"
-                style="background-color: #0d9488"
-              >
-                {{ es ? 'Ver productos' : 'View products' }}
-              </span>
-            </div>
+            <h3 class="mt-2 text-[10px] sm:text-xs font-black uppercase tracking-wide text-white text-center leading-tight truncate">
+              {{ brand.name }}
+            </h3>
+            <p class="text-[9px] text-gray-500 text-center mt-0.5">
+              {{ brand.count }} {{ es ? 'prod.' : 'items' }}
+            </p>
           </button>
         </div>
       </div>

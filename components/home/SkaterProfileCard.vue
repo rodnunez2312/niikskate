@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Skill, StudentProgress } from '~/types'
+import { skaterRatingBubbleClass } from '~/utils/skaterRatingDots'
 
 const user = useSupabaseUser()
 const client = useSupabaseClient()
@@ -27,15 +28,6 @@ const getCategoryDots = (categoryKey: string) => {
   if (categorySkills.length === 0) return 0
   const percentage = learnedInCategory.length / categorySkills.length
   return Math.round(percentage * 10)
-}
-
-const getDotColor = (index: number, total: number) => {
-  if (index >= total) return 'bg-gray-700'
-  const position = index / 10
-  if (position < 0.3) return 'bg-red-500'
-  if (position < 0.5) return 'bg-orange-500'
-  if (position < 0.7) return 'bg-yellow-400'
-  return 'bg-green-500'
 }
 
 const stats = computed(() => {
@@ -111,7 +103,7 @@ onMounted(async () => {
                   v-for="i in 10"
                   :key="i"
                   class="w-2.5 h-2.5 rounded-full transition-all"
-                  :class="getDotColor(i - 1, getCategoryDots(stat.key))"
+                  :class="skaterRatingBubbleClass(i - 1, getCategoryDots(stat.key))"
                 ></span>
               </div>
             </div>
@@ -153,7 +145,7 @@ onMounted(async () => {
                 v-for="i in 10"
                 :key="i"
                 class="w-1.5 h-1.5 rounded-full"
-                :class="getDotColor(i - 1, getCategoryDots(stat.key))"
+                :class="skaterRatingBubbleClass(i - 1, getCategoryDots(stat.key))"
               ></span>
             </div>
           </div>

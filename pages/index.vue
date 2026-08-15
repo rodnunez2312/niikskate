@@ -1,31 +1,23 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'public' })
 
+import { PROGRAM_SEASONS, seasonStatusLabel } from '~/utils/programSeasons'
+import { PROGRAM_TOTAL_CLASSES, PROGRAM_WEEKS } from '~/types'
+
 const { language } = useI18n()
 const es = computed(() => language.value === 'es')
 
-const seasons = computed(() => [
-  {
-    name: es.value ? 'Primavera' : 'Spring',
-    dates: es.value ? 'Feb – May' : 'Feb – May',
-    status: es.value ? 'Abierto' : 'Open',
-  },
-  {
-    name: es.value ? 'Verano' : 'Summer',
-    dates: es.value ? 'Jun – Ago' : 'Jun – Aug',
-    status: es.value ? 'Inscripciones' : 'Enrolling',
-  },
-  {
-    name: es.value ? 'Otoño' : 'Fall',
-    dates: es.value ? 'Sep – Nov' : 'Sep – Nov',
-    status: es.value ? 'Pronto' : 'Soon',
-  },
-  {
-    name: es.value ? 'Invierno' : 'Winter',
-    dates: es.value ? 'Dic – Ene' : 'Dec – Jan',
-    status: es.value ? 'Pronto' : 'Soon',
-  },
-])
+const seasons = computed(() =>
+  PROGRAM_SEASONS.map(s => ({
+    slug: s.slug,
+    icon: s.icon,
+    name: es.value ? s.name.es : s.name.en,
+    dates: es.value ? s.dates.es : s.dates.en,
+    status: seasonStatusLabel(s.status, es),
+    statusKey: s.status,
+    href: s.status === 'enrolling' ? `/temporadas/${s.slug}` : null,
+  })),
+)
 
 const donateAmounts = [100, 250, 500, 1000]
 const selectedDonate = ref(250)
@@ -171,14 +163,14 @@ watch(parentQuotes, () => {
         <p class="text-xl sm:text-2xl lg:text-3xl font-semibold text-white/90 max-w-2xl leading-snug animate-[fadeUp_0.8s_ease-out_0.16s_both]">
           {{
             es
-              ? 'Resiliencia mental + skateboarding'
-              : 'Mental resilience + skateboarding'
+              ? 'Resiliencia + Progresion + Diversion'
+              : 'Resilience + Progression + Fun'
           }}
         </p>
         <p class="mt-4 text-base sm:text-lg text-gray-300 max-w-xl animate-[fadeUp_0.8s_ease-out_0.24s_both]">
           {{
             es
-              ? 'Enseñamos skills de vida a través del desarrollo y la exposición al skate.'
+              ? 'Enseñamos skills de vida a través del desarrollo y la exposición al skateboarding.'
               : 'Teaching life skills through the development and exposure of skateboarding.'
           }}
         </p>
@@ -205,7 +197,7 @@ watch(parentQuotes, () => {
         <p class="text-2xl sm:text-3xl lg:text-4xl font-black text-center max-w-3xl mx-auto leading-tight text-white">
           {{
             es
-              ? 'Caer es parte del truco. Levantarse es el Método Niik.'
+              ? 'Caer es parte del truco. Volver a intentarlo es lo que cuenta.'
               : 'Falling is part of the trick. Getting up is the Niik Method.'
           }}
         </p>
@@ -215,30 +207,72 @@ watch(parentQuotes, () => {
             {{ es ? 'Temporadas del programa' : 'Program seasons' }}
           </h2>
           <div class="overflow-x-auto">
-            <table class="w-full min-w-[520px] text-left border-collapse">
+            <table class="w-full min-w-[560px] text-left border-collapse">
               <thead>
                 <tr class="border-b border-white/15 text-xs uppercase tracking-wider text-gray-500">
                   <th class="py-3 pr-4 font-semibold">{{ es ? 'Temporada' : 'Season' }}</th>
                   <th class="py-3 pr-4 font-semibold">{{ es ? 'Fechas' : 'Dates' }}</th>
-                  <th class="py-3 font-semibold">{{ es ? 'Estado' : 'Status' }}</th>
+                  <th class="py-3 font-semibold">Mérida</th>
                 </tr>
               </thead>
               <tbody>
                 <tr
                   v-for="row in seasons"
-                  :key="row.name"
+                  :key="row.slug"
                   class="border-b border-white/10 text-sm sm:text-base"
                 >
-                  <td class="py-4 pr-4 font-bold text-white">{{ row.name }}</td>
+                  <td class="py-4 pr-4 font-bold text-white">
+                    <NuxtLink :to="`/temporadas/${row.slug}`" class="hover:text-gold-300 transition-colors">
+                      <span class="mr-1.5" aria-hidden="true">{{ row.icon }}</span>
+                      {{ row.name }}
+                    </NuxtLink>
+                  </td>
                   <td class="py-4 pr-4 text-gray-300">{{ row.dates }}</td>
-                  <td class="py-4 text-gold-400 font-semibold">{{ row.status }}</td>
+                  <td class="py-4 font-semibold">
+                    <NuxtLink
+                      v-if="row.href"
+                      :to="row.href"
+                      class="text-gold-400 hover:text-gold-300 underline underline-offset-4"
+                    >
+                      {{ row.status }}
+                    </NuxtLink>
+                    <span v-else class="text-amber-200/80">{{ row.status }}</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div class="mt-8 text-center">
-            <NuxtLink to="/classes" class="inline-flex text-sm font-bold text-gold-400 hover:text-gold-300 underline underline-offset-4">
-              {{ es ? 'Cómo funciona →' : 'How this works →' }}
+          <details class="mt-8 max-w-2xl mx-auto text-left">
+            <summary class="cursor-pointer text-center text-sm font-bold text-gold-400 hover:text-gold-300">
+              {{ es ? 'Cómo funciona' : 'How this works' }}
+            </summary>
+            <div class="mt-4 rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-gray-300 leading-relaxed space-y-3">
+              <p>
+                {{
+                  es
+                    ? `Cada temporada dura ${PROGRAM_WEEKS} semanas con hasta ${PROGRAM_TOTAL_CLASSES} clases en Mérida, Yucatán: Skatepark La Plancha. Desde $1,000 MXN/mes (hasta 2 clases/semana). Paquete completo (24 clases): $1,500 MXN.`
+                    : `Each season runs ${PROGRAM_WEEKS} weeks with up to ${PROGRAM_TOTAL_CLASSES} classes in Mérida, Yucatán at Skatepark La Plancha. From $1,000 MXN/month (up to 2 classes/week). Full package (24 classes): $1,500 MXN.`
+                }}
+              </p>
+              <p>
+                {{
+                  es
+                    ? 'Cuando abren inscripciones, elige la temporada, revisa las clases disponibles (edad y nivel) e inscribe a tu patinador. Los lugares se llenan rápido — conviene registrarse temprano.'
+                    : 'When registration opens, pick a season, review available classes (age and level), and enroll your skater. Spots fill quickly — register early.'
+                }}
+              </p>
+              <p>
+                {{
+                  es
+                    ? 'Descuentos automáticos al inscribir a 2 patinadores (hermanos o varios estudiantes): 10% cada uno; con 3 o más, 15% cada uno.'
+                    : 'Automatic discounts when enrolling 2 skaters (siblings or multiple students): 10% each; with 3 or more, 15% each.'
+                }}
+              </p>
+            </div>
+          </details>
+          <div class="mt-6 text-center">
+            <NuxtLink to="/classes" class="inline-flex text-sm font-bold text-gray-400 hover:text-gold-300 underline underline-offset-4">
+              {{ es ? 'Ver todas las clases publicadas →' : 'Browse all published classes →' }}
             </NuxtLink>
           </div>
         </div>
@@ -570,7 +604,7 @@ watch(parentQuotes, () => {
     <section class="border-t border-white/10">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 py-14 flex flex-col sm:flex-row items-center justify-between gap-6">
         <p class="text-xl sm:text-2xl font-black text-center sm:text-left">
-          {{ es ? '¿Listo para subir a la tabla?' : 'Ready to step on the board?' }}
+          {{ es ? '¿Listo para subirte a la tabla?' : 'Ready to jump on the board?' }}
         </p>
         <div class="flex flex-wrap justify-center gap-3">
           <NuxtLink to="/skate-programs" class="px-6 py-3 rounded-xl bg-gold-400 text-black font-bold hover:bg-gold-300">

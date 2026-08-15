@@ -14,7 +14,11 @@ export default defineNuxtConfig({
     ...(isWin
       ? {
           server: {
-            watch: { usePolling: true, interval: 1000 },
+            watch: {
+              usePolling: true,
+              interval: 1000,
+              ignored: ['**/.nuxt/**', '**/node_modules/**'],
+            },
           },
         }
       : {}),

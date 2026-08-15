@@ -193,7 +193,7 @@ const dayLabels = computed(() => {
     <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
       <div class="px-4 py-4 max-w-2xl mx-auto">
         <div class="flex items-center gap-3">
-          <button @click="router.push('/member/admin/scheduling')" class="p-2 -ml-2 text-white">
+          <button @click="router.push('/member/staff/dashboard')" class="p-2 -ml-2 text-white">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
