@@ -79,13 +79,158 @@ export const PROGRAM_SEASONS: ProgramSeason[] = [
 
 export const DEFAULT_PROGRAM_LOCATION = 'Skatepark La Plancha'
 
-export function getProgramSeasonBySlug(slug: string): ProgramSeason | undefined {
-  return PROGRAM_SEASONS.find(s => s.slug === slug)
+export function slugifySeasonName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+}
+
+export function formatSeasonDateRange(startDate: string, endDate: string, es: boolean): string {
+  const start = new Date(`${startDate}T12:00:00`)
+  const end = new Date(`${endDate}T12:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return ''
+  const loc = es ? 'es-MX' : 'en-US'
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(loc, { month: 'short', day: 'numeric' }).replace('.', '')
+  return `${fmt(start)} – ${fmt(end)}, ${end.getFullYear()}`
+}
+
+export function seasonFromDates(
+  input: {
+    slug: string
+    nameEs: string
+    nameEn?: string
+    startDate: string
+    endDate: string
+    status?: ProgramSeasonStatus
+    icon?: string
+  },
+): ProgramSeason {
+  const nameEs = input.nameEs.trim()
+  const nameEn = (input.nameEn || nameEs).trim()
+  return {
+    slug: input.slug,
+    name: { es: nameEs, en: nameEn },
+    dates: {
+      es: formatSeasonDateRange(input.startDate, input.endDate, true),
+      en: formatSeasonDateRange(input.startDate, input.endDate, false),
+    },
+    startDate: input.startDate,
+    endDate: input.endDate,
+    status: input.status || 'enrolling',
+    icon: input.icon || '📅',
+  }
+}
+
+export function mergeProgramSeasons(extra: ProgramSeason[] = [], hiddenSlugs: string[] = []): ProgramSeason[] {
+  const hidden = new Set(hiddenSlugs.filter(Boolean))
+  const bySlug = new Map<string, ProgramSeason>()
+  for (const s of PROGRAM_SEASONS) {
+    if (!hidden.has(s.slug)) bySlug.set(s.slug, s)
+  }
+  for (const s of extra) {
+    if (!hidden.has(s.slug)) bySlug.set(s.slug, s)
+  }
+  return [...bySlug.values()].sort((a, b) => a.startDate.localeCompare(b.startDate))
+}
+
+export function getProgramSeasonBySlug(
+  slug: string,
+  catalog: ProgramSeason[] = PROGRAM_SEASONS,
+): ProgramSeason | undefined {
+  return catalog.find(s => s.slug === slug)
 }
 
 /** Curso de verano — intensive Mon–Fri block (5 or 10 days), not the 24-class season program. */
 export function isSummerCourseSeason(slug: string | null | undefined): boolean {
   return Boolean(slug?.startsWith('curso-verano'))
+}
+
+export function isOpenProgramSeason(
+  season: ProgramSeason,
+  today = new Date().toISOString().slice(0, 10),
+): boolean {
+  if (season.status === 'closed') return false
+  if (season.endDate < today) return false
+  return season.status === 'enrolling'
+}
+
+export function pickDefaultProgramSeason(
+  seasons: ProgramSeason[],
+  today = new Date().toISOString().slice(0, 10),
+): ProgramSeason | undefined {
+  const open = seasons.filter(s => isOpenProgramSeason(s, today))
+  const pool = open.length ? open : seasons.filter(s => s.endDate >= today && s.status !== 'closed')
+  if (!pool.length) return undefined
+  const happening = pool.filter(s => today >= s.startDate && today <= s.endDate)
+  const regular = happening.find(s => !isSummerCourseSeason(s.slug))
+  if (regular) return regular
+  if (happening[0]) return happening[0]
+  return pool.find(s => s.startDate >= today) || pool[0]
+}
+
+export function isSummerCampSeason(season: {
+  slug?: string | null
+  name?: { es?: string; en?: string }
+}): boolean {
+  if (isSummerCourseSeason(season.slug)) return true
+  const text = `${season.name?.es || ''} ${season.name?.en || ''}`.toLowerCase()
+  return /curso de verano|summer course|summer camp/.test(text)
+}
+
+export function dateRangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  return aStart <= bEnd && bStart <= aEnd
+}
+
+export function findOverlappingRegularSeason(
+  candidate: {
+    startDate: string
+    endDate: string
+    slug?: string
+    name?: { es?: string; en?: string }
+  },
+  catalog: ProgramSeason[],
+): ProgramSeason | undefined {
+  const candidateIsCamp = isSummerCampSeason(candidate)
+  return catalog.find((other) => {
+    if (candidate.slug && other.slug === candidate.slug) return false
+    if (!dateRangesOverlap(candidate.startDate, candidate.endDate, other.startDate, other.endDate)) return false
+    if (candidateIsCamp || isSummerCampSeason(other)) return false
+    return true
+  })
+}
+
+export type SeasonHighlightColor = {
+  fill: string
+  fillMuted: string
+  solid: string
+}
+
+export const SEASON_HIGHLIGHT_PALETTE: SeasonHighlightColor[] = [
+  { fill: 'rgba(20, 184, 166, 0.40)', fillMuted: 'rgba(20, 184, 166, 0.18)', solid: '#14b8a6' },
+  { fill: 'rgba(245, 158, 11, 0.40)', fillMuted: 'rgba(245, 158, 11, 0.18)', solid: '#f59e0b' },
+  { fill: 'rgba(168, 85, 247, 0.40)', fillMuted: 'rgba(168, 85, 247, 0.18)', solid: '#a855f7' },
+  { fill: 'rgba(59, 130, 246, 0.40)', fillMuted: 'rgba(59, 130, 246, 0.18)', solid: '#3b82f6' },
+  { fill: 'rgba(244, 63, 94, 0.40)', fillMuted: 'rgba(244, 63, 94, 0.18)', solid: '#f43f5e' },
+  { fill: 'rgba(34, 197, 94, 0.40)', fillMuted: 'rgba(34, 197, 94, 0.18)', solid: '#22c55e' },
+  { fill: 'rgba(236, 72, 153, 0.40)', fillMuted: 'rgba(236, 72, 153, 0.18)', solid: '#ec4899' },
+  { fill: 'rgba(6, 182, 212, 0.40)', fillMuted: 'rgba(6, 182, 212, 0.18)', solid: '#06b6d4' },
+]
+
+export function seasonHighlightColor(index: number): SeasonHighlightColor {
+  return SEASON_HIGHLIGHT_PALETTE[index % SEASON_HIGHLIGHT_PALETTE.length]
+}
+
+export function stripedSeasonFill(colors: string[]): string {
+  if (!colors.length) return ''
+  if (colors.length === 1) return colors[0]
+  const band = 8
+  const parts = colors.map((color, i) => `${color} ${i * band}px ${(i + 1) * band}px`)
+  return `repeating-linear-gradient(135deg, ${parts.join(', ')})`
 }
 
 export function seasonStatusLabel(status: ProgramSeasonStatus, es: boolean): string {

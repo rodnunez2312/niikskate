@@ -157,19 +157,17 @@ const discount = computed(() => {
     </div>
 
     <!-- Product Details -->
-    <div v-else>
-      <!-- Image Gallery -->
-      <div class="relative">
-        <div class="aspect-square bg-gray-100">
-          <img
-            v-if="product.images?.[selectedImage]"
-            :src="product.images[selectedImage]"
-            :alt="product.name"
-            class="w-full h-full object-cover"
-          />
-          <div v-else class="w-full h-full flex items-center justify-center text-8xl">
-            {{ CATEGORY_LABELS[product.category]?.icon || '🛹' }}
-          </div>
+    <div v-else class="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-10 lg:items-start lg:px-6 lg:pt-24 lg:pb-8">
+      <!-- Image Gallery — capped so it never takes 2–3 screens -->
+      <div class="relative bg-white overflow-hidden h-[46vh] max-h-[380px] lg:h-[min(70vh,640px)] lg:max-h-none lg:rounded-2xl lg:border lg:border-gray-100">
+        <img
+          v-if="product.images?.[selectedImage]"
+          :src="product.images[selectedImage]"
+          :alt="product.name"
+          class="absolute inset-0 w-full h-full object-contain p-4"
+        />
+        <div v-else class="absolute inset-0 flex items-center justify-center text-8xl">
+          {{ CATEGORY_LABELS[product.category]?.icon || '🛹' }}
         </div>
 
         <!-- Sale Badge -->
@@ -178,23 +176,23 @@ const discount = computed(() => {
         </span>
 
         <!-- Image Thumbnails -->
-        <div v-if="product.images && product.images.length > 1" class="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+        <div v-if="product.images && product.images.length > 1" class="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
           <button
             v-for="(img, index) in product.images"
             :key="index"
             @click="selectedImage = index"
-            class="w-14 h-14 rounded-lg overflow-hidden border-2 transition-all"
+            class="w-12 h-12 rounded-lg overflow-hidden border-2 transition-all bg-white"
             :class="[
-              selectedImage === index ? 'border-yellow-400' : 'border-white'
+              selectedImage === index ? 'border-yellow-400' : 'border-white shadow'
             ]"
           >
-            <img :src="img" :alt="`${product.name} ${index + 1}`" class="w-full h-full object-cover" />
+            <img :src="img" :alt="`${product.name} ${index + 1}`" class="w-full h-full object-contain p-0.5" />
           </button>
         </div>
       </div>
 
       <!-- Content -->
-      <div class="px-4 py-6">
+      <div class="px-4 py-6 lg:px-0 lg:py-0">
         <!-- Category & Brand -->
         <div class="flex items-center gap-2 mb-2">
           <span class="badge bg-gray-100 text-gray-700">
@@ -263,25 +261,27 @@ const discount = computed(() => {
 
         <!-- Quantity Selector (for purchasable items) -->
         <div v-if="product.stock_quantity > 0 && !product.requires_quote" class="mb-6">
-          <label class="label">Quantity</label>
+          <label class="block text-sm font-semibold text-gray-900 mb-1.5">Quantity</label>
           <div class="flex items-center gap-4">
             <button
-              @click="decrementQuantity"
-              class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              type="button"
+              class="w-10 h-10 rounded-full bg-gray-200 text-gray-900 flex items-center justify-center hover:bg-gray-300 transition-colors disabled:opacity-40"
               :disabled="quantity <= 1"
+              @click="decrementQuantity"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
               </svg>
             </button>
-            <span class="text-xl font-semibold w-12 text-center">{{ quantity }}</span>
+            <span class="text-xl font-bold w-12 text-center text-gray-900">{{ quantity }}</span>
             <button
-              @click="incrementQuantity"
-              class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              type="button"
+              class="w-10 h-10 rounded-full bg-gray-200 text-gray-900 flex items-center justify-center hover:bg-gray-300 transition-colors disabled:opacity-40"
               :disabled="quantity >= product.stock_quantity"
+              @click="incrementQuantity"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
             </button>
           </div>

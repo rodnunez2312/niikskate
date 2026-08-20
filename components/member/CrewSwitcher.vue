@@ -40,7 +40,7 @@ const pillClass = (active: boolean) => {
       class="text-[10px] font-bold uppercase tracking-wider"
       :class="theme === 'light' ? 'text-gray-600' : 'text-gray-500'"
     >
-      {{ language === 'es' ? 'Familia' : 'Family' }}:
+      {{ language === 'es' ? 'Crew:' : 'Crew:' }}
     </p>
     <div class="flex flex-wrap items-center gap-2">
       <button

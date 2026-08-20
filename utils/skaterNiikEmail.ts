@@ -21,6 +21,13 @@ export function niikEmailLocalFromNames(firstName: string, lastName?: string | n
   return first || last
 }
 
+/** first.lastname from a single full-name string (first token vs rest). */
+export function niikEmailLocalFromFullName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return ''
+  return niikEmailLocalFromNames(parts[0], parts.slice(1).join(' '))
+}
+
 export function normalizeNiikEmailLocal(raw: string): string {
   return raw
     .trim()

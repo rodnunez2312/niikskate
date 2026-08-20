@@ -174,6 +174,10 @@ const assignedProgramLabel = computed(() => {
 const assignedProgramId = computed(() => assignedSkillGroup.value?.id ?? null)
 
 const canEditSkaterProfile = computed(() => userRole.value === 'admin' || userRole.value === 'coach')
+
+const skaterDisplayName = computed(
+  () => student.value?.full_name?.trim() || (language.value === 'es' ? 'Patinador' : 'Skater'),
+)
 const savingProfileField = ref<string | null>(null)
 const profileSaveError = ref<string | null>(null)
 
@@ -1228,7 +1232,7 @@ watch(studentId, () => loadStudent(), { immediate: false })
               {{ language === 'es' ? 'Evaluar' : 'Evaluate' }}
             </button>
           </div>
-          <p class="text-xs text-gray-500">
+          <p class="hidden lg:block text-xs text-gray-500">
             {{
               language === 'es'
                 ? 'Arriba: trucos completados. Abajo: asignados y en progreso. Usa + en la tabla para asignar; clic en el estado para avanzar (Asignado → En progreso → Completado).'
@@ -1236,8 +1240,32 @@ watch(studentId, () => loadStudent(), { immediate: false })
             }}
           </p>
 
+          <MemberSkaterTrickBagMobile
+            :skater-name="skaterDisplayName"
+            :active-tricks="activeTrickBag"
+            :completed-tricks="unblockedTricks"
+            :assign-rows="assignTrickTableRows"
+            :structure-options="assignStructureOptions"
+            :area-options="assignAreaOptions"
+            :type-options="assignTypeOptions"
+            :filter-structure="assignFilterStructure"
+            :filter-area="assignFilterArea"
+            :filter-type="assignFilterType"
+            :updating-focus-id="updatingFocusId"
+            :assigning-skill-id="assigningSkillId"
+            :reverting-skill-id="revertingSkillId"
+            @update:filter-structure="assignFilterStructure = $event"
+            @update:filter-area="assignFilterArea = $event"
+            @update:filter-type="assignFilterType = $event"
+            @set-status="updateSkillFocusStatus"
+            @assign="assignTrickById"
+            @undo="undoCompletedTrick"
+            @dismiss="dismissSkillFocus"
+            @comment="openCommentModal"
+          />
+
           <!-- Unlocked tricks / challenges -->
-          <div class="space-y-2 min-w-0">
+          <div class="hidden lg:block space-y-2 min-w-0">
             <h4 class="text-sm font-semibold text-emerald-400">
               {{ language === 'es' ? 'Trucos / Desafíos desbloqueados' : 'Unlocked tricks / challenges' }}
               <span class="text-gray-500 font-normal">({{ unblockedTricks.length }})</span>
@@ -1247,11 +1275,11 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 <thead class="bg-gray-800/80 text-gray-400 text-xs uppercase tracking-wide">
                   <tr>
                     <th class="px-3 py-2 font-medium w-12">#</th>
+                    <th class="px-3 py-2 font-medium w-28">{{ language === 'es' ? 'Estado' : 'Status' }}</th>
                     <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
                     <th class="px-3 py-2 font-medium">Program</th>
                     <th class="px-3 py-2 font-medium">Area</th>
                     <th class="px-3 py-2 font-medium">Type</th>
-                    <th class="px-3 py-2 font-medium w-28">{{ language === 'es' ? 'Estado' : 'Status' }}</th>
                   </tr>
                 </thead>
                 <tbody v-if="unblockedTricks.length" class="divide-y divide-gray-800">
@@ -1261,16 +1289,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     class="hover:bg-gray-800/40"
                   >
                     <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ trickManualLabel(row.skill) || '—' }}</td>
-                    <td class="px-3 py-2 text-white font-medium max-w-[240px]">
-                      <span class="block truncate">{{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}</span>
-                      <div class="flex flex-wrap gap-1 mt-1">
-                        <span v-if="row.skill?.area" class="px-1.5 py-0.5 rounded text-[10px]" :class="areaTagClass(row.skill.area)">{{ row.skill.area }}</span>
-                        <span class="px-1.5 py-0.5 rounded text-[10px] capitalize" :class="difficultyTagClass(row.skill?.difficulty)">{{ row.skill?.difficulty }}</span>
-                      </div>
-                    </td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill?.area || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill?.trick_type || '—' }}</td>
                     <td class="px-3 py-2 whitespace-nowrap">
                       <div class="inline-flex items-center gap-1.5 flex-nowrap">
                         <span
@@ -1297,6 +1315,16 @@ watch(studentId, () => loadStudent(), { immediate: false })
                         </button>
                       </div>
                     </td>
+                    <td class="px-3 py-2 text-white font-medium max-w-[240px]">
+                      <span class="block truncate">{{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}</span>
+                      <div class="flex flex-wrap gap-1 mt-1">
+                        <span v-if="row.skill?.area" class="px-1.5 py-0.5 rounded text-[10px]" :class="areaTagClass(row.skill.area)">{{ row.skill.area }}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] capitalize" :class="difficultyTagClass(row.skill?.difficulty)">{{ row.skill?.difficulty }}</span>
+                      </div>
+                    </td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill?.area || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill?.trick_type || '—' }}</td>
                   </tr>
                 </tbody>
                 <tbody v-else>
@@ -1311,7 +1339,7 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </div>
 
           <!-- Assigned + in progress -->
-          <div class="space-y-3 min-w-0 border-t border-gray-800 pt-4">
+          <div class="hidden lg:block space-y-3 min-w-0 border-t border-gray-800 pt-4">
             <h4 class="text-sm font-semibold text-amber-400">
               {{ language === 'es' ? 'Asignados y en progreso' : 'Assigned and in progress' }}
               <span class="text-gray-500 font-normal">({{ activeTrickBag.length }})</span>
@@ -1321,17 +1349,17 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 <thead class="bg-gray-800/80 text-gray-400 text-xs uppercase tracking-wide">
                   <tr>
                     <th class="px-3 py-2 font-medium w-12">#</th>
-                    <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
-                    <th class="px-3 py-2 font-medium">Program</th>
-                    <th class="px-3 py-2 font-medium">Area</th>
-                    <th class="px-3 py-2 font-medium">Type</th>
-                    <th class="px-3 py-2 font-medium w-36">ETA</th>
                     <th
                       class="px-3 py-2 font-medium w-32 cursor-help"
                       :title="trickBagStatusFlowHint(language === 'es')"
                     >
                       {{ language === 'es' ? 'Estado' : 'Status' }}
                     </th>
+                    <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
+                    <th class="px-3 py-2 font-medium">Program</th>
+                    <th class="px-3 py-2 font-medium">Area</th>
+                    <th class="px-3 py-2 font-medium">Type</th>
+                    <th class="px-3 py-2 font-medium w-36">ETA</th>
                     <th class="px-3 py-2 font-medium w-24 text-right">{{ language === 'es' ? 'Notas' : 'Comments' }}</th>
                   </tr>
                 </thead>
@@ -1342,24 +1370,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     class="hover:bg-gray-800/40"
                   >
                     <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ trickManualLabel(f.skill) || '—' }}</td>
-                    <td class="px-3 py-2 text-white font-medium max-w-[200px]">
-                      <span class="block truncate">{{ language === 'es' ? f.skill?.name_es || f.skill?.name : f.skill?.name }}</span>
-                      <div class="flex flex-wrap gap-1 mt-1">
-                        <span v-if="f.skill?.area" class="px-1.5 py-0.5 rounded text-[10px]" :class="areaTagClass(f.skill.area)">{{ f.skill.area }}</span>
-                        <span class="px-1.5 py-0.5 rounded text-[10px] capitalize" :class="difficultyTagClass(f.skill?.difficulty)">{{ f.skill?.difficulty }}</span>
-                      </div>
-                    </td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(f.skill) || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ f.skill?.area || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ f.skill?.trick_type || '—' }}</td>
-                    <td class="px-3 py-2">
-                      <input
-                        type="date"
-                        :value="f.target_date || ''"
-                        class="w-full min-w-[120px] px-2 py-1 rounded bg-gray-900 border border-gray-700 text-white text-xs"
-                        @change="updateFocusEta(f.id, ($event.target as HTMLInputElement).value)"
-                      />
-                    </td>
                     <td class="px-3 py-2">
                       <button
                         type="button"
@@ -1386,6 +1396,24 @@ watch(studentId, () => loadStudent(), { immediate: false })
                         />
                         {{ trickBagStatusLabel(f.status, language === 'es') }}
                       </button>
+                    </td>
+                    <td class="px-3 py-2 text-white font-medium max-w-[200px]">
+                      <span class="block truncate">{{ language === 'es' ? f.skill?.name_es || f.skill?.name : f.skill?.name }}</span>
+                      <div class="flex flex-wrap gap-1 mt-1">
+                        <span v-if="f.skill?.area" class="px-1.5 py-0.5 rounded text-[10px]" :class="areaTagClass(f.skill.area)">{{ f.skill.area }}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] capitalize" :class="difficultyTagClass(f.skill?.difficulty)">{{ f.skill?.difficulty }}</span>
+                      </div>
+                    </td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(f.skill) || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ f.skill?.area || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ f.skill?.trick_type || '—' }}</td>
+                    <td class="px-3 py-2">
+                      <input
+                        type="date"
+                        :value="f.target_date || ''"
+                        class="w-full min-w-[120px] px-2 py-1 rounded bg-gray-900 border border-gray-700 text-white text-xs"
+                        @change="updateFocusEta(f.id, ($event.target as HTMLInputElement).value)"
+                      />
                     </td>
                     <td class="px-3 py-2 text-right whitespace-nowrap">
                       <button
@@ -1422,7 +1450,7 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </div>
 
           <!-- Assign trick table -->
-          <div class="space-y-3 min-w-0 border-t border-gray-800 pt-4">
+          <div class="hidden lg:block space-y-3 min-w-0 border-t border-gray-800 pt-4">
             <div>
               <h4 class="text-sm font-semibold text-amber-400">
                 {{ language === 'es' ? 'Asignar truco' : 'Assign trick' }}
@@ -1473,16 +1501,16 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 <thead class="sticky top-0 z-10 bg-gray-800/95 backdrop-blur-sm text-gray-400 text-xs uppercase tracking-wide">
                   <tr>
                     <th class="px-3 py-2 font-medium w-12">#</th>
-                    <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
-                    <th class="px-3 py-2 font-medium">Program</th>
-                    <th class="px-3 py-2 font-medium">Area</th>
-                    <th class="px-3 py-2 font-medium">Type</th>
                     <th
                       class="px-3 py-2 font-medium w-32 cursor-help"
                       :title="trickBagStatusFlowHint(language === 'es')"
                     >
                       {{ language === 'es' ? 'Estado' : 'Status' }}
                     </th>
+                    <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
+                    <th class="px-3 py-2 font-medium">Program</th>
+                    <th class="px-3 py-2 font-medium">Area</th>
+                    <th class="px-3 py-2 font-medium">Type</th>
                   </tr>
                 </thead>
                 <tbody v-if="assignTrickTableRows.length" class="divide-y divide-gray-800">
@@ -1492,12 +1520,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     class="hover:bg-gray-800/40"
                   >
                     <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ trickManualLabel(row.skill) || '—' }}</td>
-                    <td class="px-3 py-2 text-white font-medium max-w-[200px]">
-                      <span class="block truncate">{{ language === 'es' ? row.skill.name_es || row.skill.name : row.skill.name }}</span>
-                    </td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.area || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.trick_type || '—' }}</td>
                     <td class="px-3 py-2">
                       <button
                         type="button"
@@ -1511,6 +1533,12 @@ watch(studentId, () => loadStudent(), { immediate: false })
                         </svg>
                       </button>
                     </td>
+                    <td class="px-3 py-2 text-white font-medium max-w-[200px]">
+                      <span class="block truncate">{{ language === 'es' ? row.skill.name_es || row.skill.name : row.skill.name }}</span>
+                    </td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.area || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.trick_type || '—' }}</td>
                   </tr>
                 </tbody>
                 <tbody v-else>

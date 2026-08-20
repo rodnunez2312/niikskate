@@ -1,6 +1,6 @@
 import type { ProgramSkillTrack } from '~/types'
 
-export const SEASON_TOTAL_CLASSES = 24
+export const SEASON_TOTAL_CLASSES = 12
 
 /** Curso de verano — flat group rate ($420/day; 5-day pack $1,860). */
 export const SUMMER_COURSE_DAY_PRICE_MXN = 420
@@ -26,6 +26,8 @@ export type CoachPricingTier = 'principiante' | 'pro_street' | 'pro_bowl'
 export type ClassPackageKind =
   | 'monthly_8'
   | 'monthly_12'
+  | 'monthly_16'
+  | 'monthly_24'
   | 'group_session'
   | 'individual_session'
   | 'group_pack_3'
@@ -44,20 +46,28 @@ export type ClassPriceRow = {
 
 const PRINCIPIANTE: Record<ClassPackageKind, ClassPriceRow> = {
   monthly_8: {
-    listMxn: 1200,
-    discountMxn: 1000,
-    discountPct: 17,
+    listMxn: 1000,
     sessions: 8,
     coachPayPerDayMxn: 150,
-    label: { es: 'Mensual (8 clases)', en: 'Monthly (8 classes)' },
+    label: { es: '8 clases (2 por semana · 4 sem)', en: '8 classes (2/week · 4 wk)' },
   },
   monthly_12: {
-    listMxn: 1800,
-    discountMxn: 1500,
-    discountPct: 17,
+    listMxn: 1500,
     sessions: 12,
     coachPayPerDayMxn: 225,
-    label: { es: 'Mensual (12 clases)', en: 'Monthly (12 classes)' },
+    label: { es: '12 clases (3 por semana · 4 sem)', en: '12 classes (3/week · 4 wk)' },
+  },
+  monthly_16: {
+    listMxn: 2000,
+    sessions: 16,
+    coachPayPerDayMxn: 150,
+    label: { es: '16 clases (2 por semana · 8 sem)', en: '16 classes (2/week · 8 wk)' },
+  },
+  monthly_24: {
+    listMxn: 3000,
+    sessions: 24,
+    coachPayPerDayMxn: 225,
+    label: { es: '24 clases (3 por semana · 8 sem)', en: '24 classes (3/week · 8 wk)' },
   },
   group_session: {
     listMxn: 150,
@@ -103,9 +113,24 @@ const PRINCIPIANTE: Record<ClassPackageKind, ClassPriceRow> = {
 
 const PRO_STREET: Partial<Record<ClassPackageKind, ClassPriceRow>> = {
   monthly_8: {
-    listMxn: 2000,
+    listMxn: 1000,
     sessions: 8,
-    label: { es: 'Mensual (8 clases)', en: 'Monthly (8 classes)' },
+    label: { es: '8 clases (2 por semana · 4 sem)', en: '8 classes (2/week · 4 wk)' },
+  },
+  monthly_12: {
+    listMxn: 1500,
+    sessions: 12,
+    label: { es: '12 clases (3 por semana · 4 sem)', en: '12 classes (3/week · 4 wk)' },
+  },
+  monthly_16: {
+    listMxn: 2000,
+    sessions: 16,
+    label: { es: '16 clases (2 por semana · 8 sem)', en: '16 classes (2/week · 8 wk)' },
+  },
+  monthly_24: {
+    listMxn: 3000,
+    sessions: 24,
+    label: { es: '24 clases (3 por semana · 8 sem)', en: '24 classes (3/week · 8 wk)' },
   },
   group_session: {
     listMxn: 250,
@@ -273,7 +298,8 @@ export function resolveProgramPackageKind(input: {
   const n = input.classCount ?? SEASON_TOTAL_CLASSES
   if (n <= 8) return 'monthly_8'
   if (n <= 12) return 'monthly_12'
-  return 'monthly_8'
+  if (n <= 16) return 'monthly_16'
+  return 'monthly_24'
 }
 
 export function resolveDefaultProgramPriceMxn(input: {
@@ -301,14 +327,12 @@ export function resolveDefaultProgramPriceMxn(input: {
   })
 }
 
-/** Full season (24 group classes) at list rate — per-session × count. */
+/** Full 12-class season pack. */
 export function fullSeasonGroupPriceMxn(
   tier: CoachPricingTier = 'principiante',
   discounted = false,
 ): number {
-  const perSession = getClassPriceMxn(tier, 'group_session')
-  const full = perSession * SEASON_TOTAL_CLASSES
-  return discounted ? Math.round(full * 0.9) : full
+  return getClassPriceMxn(tier, 'monthly_12', { discounted })
 }
 
 /** Legacy defaults (Principiante tier). */
@@ -333,6 +357,8 @@ export type PricingReferenceRow = {
 const PRICING_REFERENCE_KINDS: ClassPackageKind[] = [
   'monthly_8',
   'monthly_12',
+  'monthly_16',
+  'monthly_24',
   'group_session',
   'individual_session',
   'group_pack_3',
@@ -346,12 +372,18 @@ export const PRICING_POPOVER_KINDS: Record<CoachPricingTier, ClassPackageKind[]>
   principiante: [
     'monthly_8',
     'monthly_12',
+    'monthly_16',
+    'monthly_24',
     'group_session',
     'individual_session',
     'group_pack_3',
     'group_pack_5',
   ],
   pro_street: [
+    'monthly_8',
+    'monthly_12',
+    'monthly_16',
+    'monthly_24',
     'group_session',
     'individual_session',
     'group_pack_3',
@@ -425,7 +457,6 @@ export function programPriceHint(
   opts?: { isSummerCourse?: boolean; classCount?: number },
 ): string {
   const monthly = getClassPriceMxn(tier, 'monthly_8')
-  const monthlyDisc = getClassPriceMxn(tier, 'monthly_8', { discounted: true })
   const groupDropIn = getClassPriceMxn(tier, 'group_session')
   const indDropIn = getClassPriceMxn(tier, 'individual_session')
   const fullSeason = fullSeasonGroupPriceMxn(tier)
@@ -440,14 +471,14 @@ export function programPriceHint(
       : `Summer course Mon–Fri · $${perDay.toLocaleString('en-US')}/day · 5 days $${five.toLocaleString('en-US')} · 10 days $${ten.toLocaleString('en-US')} MXN.`
   }
 
+  const pack16 = getClassPriceMxn(tier, 'monthly_16')
+  const pack24 = getClassPriceMxn(tier, 'monthly_24')
   if (es) {
-    return `${coach}: mensual 8 clases $${monthly.toLocaleString('es-MX')} MXN`
-      + (monthlyDisc !== monthly ? ` (desc. $${monthlyDisc.toLocaleString('es-MX')})` : '')
-      + ` · grupal $${groupDropIn.toLocaleString('es-MX')} · individual $${indDropIn.toLocaleString('es-MX')}`
-      + ` · temporada completa (${SEASON_TOTAL_CLASSES} clases): $${fullSeason.toLocaleString('es-MX')} MXN.`
+    return `${coach}: 4 sem — 8 clases $${monthly.toLocaleString('es-MX')} o 12 $${fullSeason.toLocaleString('es-MX')}`
+      + ` · 8 sem — 16 clases $${pack16.toLocaleString('es-MX')} o 24 $${pack24.toLocaleString('es-MX')}`
+      + ` · grupal $${groupDropIn.toLocaleString('es-MX')} · individual $${indDropIn.toLocaleString('es-MX')} MXN.`
   }
-  return `${coach}: monthly 8 classes $${monthly.toLocaleString('en-US')} MXN`
-    + (monthlyDisc !== monthly ? ` (disc. $${monthlyDisc.toLocaleString('en-US')})` : '')
-    + ` · group $${groupDropIn.toLocaleString('en-US')} · individual $${indDropIn.toLocaleString('en-US')}`
-    + ` · full season (${SEASON_TOTAL_CLASSES} classes): $${fullSeason.toLocaleString('en-US')} MXN.`
+  return `${coach}: 4 wk — 8 classes $${monthly.toLocaleString('en-US')} or 12 $${fullSeason.toLocaleString('en-US')}`
+    + ` · 8 wk — 16 classes $${pack16.toLocaleString('en-US')} or 24 $${pack24.toLocaleString('en-US')}`
+    + ` · group $${groupDropIn.toLocaleString('en-US')} · individual $${indDropIn.toLocaleString('en-US')} MXN.`
 }

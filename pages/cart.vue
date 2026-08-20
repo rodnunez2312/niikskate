@@ -102,12 +102,12 @@ const getCategoryIcon = (category: string) => {
           >
             <div class="flex gap-4">
               <!-- Product Image -->
-              <NuxtLink :to="`/shop/${item.product.id}`" class="w-24 h-24 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden">
+              <NuxtLink :to="`/shop/${item.product.id}`" class="w-24 h-24 rounded-xl bg-white flex-shrink-0 overflow-hidden flex items-center justify-center p-1">
                 <img
                   v-if="item.product.images?.[0]"
                   :src="item.product.images[0]"
                   :alt="item.product.name"
-                  class="w-full h-full object-cover"
+                  class="max-w-full max-h-full object-contain"
                 />
                 <div v-else class="w-full h-full flex items-center justify-center text-3xl">
                   {{ getCategoryIcon(item.product.category) }}
@@ -131,21 +131,23 @@ const getCategoryIcon = (category: string) => {
                   <!-- Quantity Controls -->
                   <div class="flex items-center gap-2">
                     <button
+                      type="button"
+                      class="w-8 h-8 rounded-full bg-white text-gray-900 flex items-center justify-center hover:bg-gray-200"
                       @click="updateQuantity(item.product.id, item.quantity - 1)"
-                      class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
                       </svg>
                     </button>
-                    <span class="w-8 text-center font-medium">{{ item.quantity }}</span>
+                    <span class="w-8 text-center text-base font-bold text-white">{{ item.quantity }}</span>
                     <button
-                      @click="updateQuantity(item.product.id, item.quantity + 1)"
+                      type="button"
+                      class="w-8 h-8 rounded-full bg-white text-gray-900 flex items-center justify-center hover:bg-gray-200 disabled:opacity-40"
                       :disabled="item.quantity >= item.product.stock_quantity"
-                      class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 disabled:opacity-50"
+                      @click="updateQuantity(item.product.id, item.quantity + 1)"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
                     </button>
                   </div>

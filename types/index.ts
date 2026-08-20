@@ -52,7 +52,7 @@ export interface SkateClass {
 
 export type ClassType = 'grouped_beginner' | 'grouped_intermediate' | 'individual'
 
-export type TimeSlot = 'monday' | 'morning' | 'early' | 'late'
+export type TimeSlot = 'monday' | 'morning' | 'early' | 'late' | 'summer'
 
 export type DayOfWeek = 'monday' | 'tuesday' | 'thursday' | 'saturday' | 'sunday'
 
@@ -61,6 +61,7 @@ export const TIME_SLOT_LABELS: Record<TimeSlot, { start: string; end: string; di
   morning: { start: '07:00', end: '08:30', display: '7:00 AM - 8:30 AM' },
   early: { start: '17:30', end: '19:00', display: '5:30 PM - 7:00 PM' },
   late: { start: '19:00', end: '20:30', display: '7:00 PM - 8:30 PM' },
+  summer: { start: '09:00', end: '13:00', display: '9:00 AM – 1:00 PM' },
 }
 
 /** Slots admins can pick when building a recurring program. */
@@ -84,6 +85,7 @@ export const PROGRAM_AGE_BANDS: Array<{
   id: Extract<AudienceCategory, 'tots_5_7' | 'kids_7_12' | 'teens_13_17' | 'adults_18_plus'>
   emoji: string
   label: { en: string; es: string }
+  nickname: { en: string; es: string }
   minAge: number
   maxAge: number | null
 }> = [
@@ -91,6 +93,7 @@ export const PROGRAM_AGE_BANDS: Array<{
     id: 'tots_5_7',
     emoji: '🛹',
     label: { en: '5–7', es: '5–7' },
+    nickname: { en: 'tots', es: 'peques' },
     minAge: 5,
     maxAge: 7,
   },
@@ -98,6 +101,7 @@ export const PROGRAM_AGE_BANDS: Array<{
     id: 'kids_7_12',
     emoji: '🌱',
     label: { en: '7–12', es: '7–12' },
+    nickname: { en: 'kids', es: 'niños' },
     minAge: 7,
     maxAge: 12,
   },
@@ -105,6 +109,7 @@ export const PROGRAM_AGE_BANDS: Array<{
     id: 'teens_13_17',
     emoji: '⚡',
     label: { en: '13–17', es: '13–17' },
+    nickname: { en: 'teen kids', es: 'niños teens' },
     minAge: 13,
     maxAge: 17,
   },
@@ -112,6 +117,7 @@ export const PROGRAM_AGE_BANDS: Array<{
     id: 'adults_18_plus',
     emoji: '👊',
     label: { en: '18+', es: '18+' },
+    nickname: { en: 'adults', es: 'adultos' },
     minAge: 18,
     maxAge: null,
   },
@@ -143,7 +149,7 @@ export const PROGRAM_SKILL_TRACKS: Array<{
     id: 'advanced',
     skillLevelId: 'advanced_5',
     emoji: '🏆',
-    label: { en: 'Advanced / Competition', es: 'Avanzado / Competencia' },
+    label: { en: 'Advanced', es: 'Avanzado' },
   },
 ]
 
@@ -171,7 +177,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
   {
     id: 'skater_tots',
     emoji: '🛹',
-    ageLabel: { en: 'Ages 5–7', es: 'Edades 5–7' },
+    ageLabel: { en: 'Ages 5–7 (tots)', es: 'Edades 5–7 (peques)' },
     title: { en: 'Skater Tots', es: 'Skater Tots' },
     purpose: {
       en: 'Building balance through play',
@@ -182,7 +188,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
   {
     id: 'foundations',
     emoji: '🌱',
-    ageLabel: { en: 'Ages 7–12', es: 'Edades 7–12' },
+    ageLabel: { en: 'Ages 7–12 (kids)', es: 'Edades 7–12 (niños)' },
     title: { en: 'Foundations', es: 'Fundamentos' },
     purpose: {
       en: 'Learn the fundamentals of skateboarding',
@@ -193,7 +199,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
   {
     id: 'teen_foundations',
     emoji: '⚡',
-    ageLabel: { en: 'Ages 13–17', es: 'Edades 13–17' },
+    ageLabel: { en: 'Ages 13–17 (teen kids)', es: 'Edades 13–17 (niños teens)' },
     title: { en: 'Teen Foundations', es: 'Fundamentos Teen' },
     purpose: {
       en: 'Develop confidence and core skate skills',
@@ -204,7 +210,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
   {
     id: 'adult_foundations',
     emoji: '👊',
-    ageLabel: { en: 'Ages 18+', es: 'Edades 18+' },
+    ageLabel: { en: 'Ages 18+ (adults)', es: 'Edades 18+ (adultos)' },
     title: { en: 'Adult Foundations', es: 'Fundamentos Adultos' },
     purpose: {
       en: "It's never too late to start skating",
@@ -215,7 +221,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
   {
     id: 'progression',
     emoji: '🚀',
-    ageLabel: { en: 'Ages 7–14', es: 'Edades 7–14' },
+    ageLabel: { en: 'Ages 7–17', es: 'Edades 7–17' },
     title: { en: 'Progression', es: 'Progresión' },
     purpose: {
       en: 'Intermediate skills and trick development',
@@ -235,6 +241,20 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
     skillTrack: 'advanced',
   },
 ]
+
+/** Progresión (intermediate) is one program for kids and teens, ages 7–17. */
+export const PROGRESSION_AGE = { minAge: 7, maxAge: 17 } as const
+export const PROGRESSION_AUDIENCE_CATEGORIES: AudienceCategory[] = ['kids_7_12', 'teens_13_17']
+
+export function isProgressionAudience(categories: AudienceCategory[]): boolean {
+  const set = new Set(categories)
+  return (
+    set.has('kids_7_12')
+    && set.has('teens_13_17')
+    && !set.has('tots_5_7')
+    && !set.has('adults_18_plus')
+  )
+}
 
 /** Audience chips shown in admin UI (age bands only). */
 export const AUDIENCE_CATEGORIES = PROGRAM_AGE_BANDS.map(b => ({
@@ -354,48 +374,48 @@ export const SKATE_SKILL_LEVELS: Array<{
     id: 'beginner_1',
     title: { en: 'Beginner 1', es: 'Principiante 1' },
     description: {
-      en: 'First-time skater working on pushing, steering, balance, and coordination.',
-      es: 'Primera vez en patineta: empuje, dirección, equilibrio y coordinación.',
+      en: 'First-time skater, working on pushing, steering, balance, and coordination.',
+      es: 'Primera vez en patineta: trabaja empuje, dirección, equilibrio y coordinación.',
     },
   },
   {
     id: 'beginner_2',
     title: { en: 'Beginner 2', es: 'Principiante 2' },
     description: {
-      en: 'Can push, roll, and turn on flat ground; learning ramps at moderate speeds.',
+      en: 'Can push, roll, and turn on flat ground, learning ramps at moderate speeds.',
       es: 'Empuja, rueda y gira en plano; aprende rampas a velocidad moderada.',
     },
   },
   {
     id: 'intermediate_3',
-    title: { en: 'Intermediate 3', es: 'Intermedio 3' },
+    title: { en: 'Intermediate 1', es: 'Intermedio 1' },
     description: {
-      en: 'Navigates the skatepark independently; working on ollie, drop-in, and manual.',
-      es: 'Recorre el skatepark solo; trabaja ollie, drop-in y manual.',
+      en: 'Can navigate a skatepark independently, working on ollie, drop-in, and manual.',
+      es: 'Recorre el skatepark de forma independiente; trabaja ollie, drop-in y manual.',
     },
   },
   {
     id: 'intermediate_4',
-    title: { en: 'Intermediate 4', es: 'Intermedio 4' },
+    title: { en: 'Intermediate 2', es: 'Intermedio 2' },
     description: {
-      en: 'Drops in on a 4 ft halfpipe or bowl; basic lip tricks; ollie while rolling.',
-      es: 'Drop-in en halfpipe o bowl de 4 ft; trucos de coping básicos; ollie en movimiento.',
+      en: 'Can drop in on a 4′ halfpipe or bowl, working on basic lip tricks, can ollie while rolling.',
+      es: 'Hace drop-in en un halfpipe o bowl de 4′; trucos de coping básicos; ollie en movimiento.',
     },
   },
   {
     id: 'advanced_5',
-    title: { en: 'Advanced 5', es: 'Avanzado 5' },
+    title: { en: 'Advanced 1', es: 'Avanzado 1' },
     description: {
-      en: 'Rides halfpipes and bowls; ollies small obstacles; starting flips, slides, and grinds.',
-      es: 'Halfpipes y bowls; ollie sobre obstáculos; inicia flips, slides y grinds.',
+      en: 'Riding halfpipes and bowls, ollieing over small obstacles, starting flip tricks, slides, and grinds.',
+      es: 'Anda halfpipes y bowls; ollie sobre obstáculos pequeños; empieza flips, slides y grinds.',
     },
   },
   {
     id: 'advanced_6',
-    title: { en: 'Advanced 6', es: 'Avanzado 6' },
+    title: { en: 'Advanced 2', es: 'Avanzado 2' },
     description: {
-      en: 'Strong fundamentals on all terrain; lines and combos; sets independent goals.',
-      es: 'Fundamentos sólidos en todo el terreno; líneas y combos; metas propias.',
+      en: 'Has mastered fundamentals across all terrain types, combining tricks into lines and combos, setting independent goals.',
+      es: 'Dominó los fundamentos en todo tipo de terreno; combina trucos en líneas y combos; define metas propias.',
     },
   },
 ]
@@ -410,14 +430,41 @@ export {
   MONTHLY_PROGRAM_PRICE_MXN,
 } from '~/utils/classPricing'
 
-/** 8-week season program structure. */
-export const PROGRAM_WEEKS = 8
-export const PROGRAM_TOTAL_CLASSES = 24
-/** Included in base monthly fee — parents pick up to this many sessions per week. */
+/** Default 4-week season program: Tue / Thu / Sat. Admins can also create 8-week programs. */
+export const PROGRAM_WEEKS = 4
+export const PROGRAM_WEEK_OPTIONS = [4, 8] as const
+export type ProgramWeekCount = (typeof PROGRAM_WEEK_OPTIONS)[number]
+export const PROGRAM_DAYS_PER_WEEK = 3
+export const PROGRAM_TOTAL_CLASSES = PROGRAM_WEEKS * PROGRAM_DAYS_PER_WEEK
 export const PROGRAM_CLASSES_PER_WEEK_INCLUDED = 2
 export const PROGRAM_INCLUDED_CLASSES = PROGRAM_WEEKS * PROGRAM_CLASSES_PER_WEEK_INCLUDED
+export const PROGRAM_PACK_8_MXN = 1000
+export const PROGRAM_PACK_12_MXN = 1500
+export const PROGRAM_PACK_16_MXN = 2000
+export const PROGRAM_PACK_24_MXN = 3000
 
-/** Summer course (curso de verano): Mon–Fri only, 5 or 10 class days. */
+export type ParentClassPack = 1 | 8 | 12 | 16 | 24
+export type ParentMultiClassPack = 8 | 12 | 16 | 24
+
+export function programClassCount(weeks: ProgramWeekCount): number {
+  return weeks * PROGRAM_DAYS_PER_WEEK
+}
+
+export function packPriceMxn(pack: ParentMultiClassPack): number {
+  if (pack === 8) return PROGRAM_PACK_8_MXN
+  if (pack === 12) return PROGRAM_PACK_12_MXN
+  if (pack === 16) return PROGRAM_PACK_16_MXN
+  return PROGRAM_PACK_24_MXN
+}
+
+/** 8-week series (≥16 sessions) uses 16/24 packs; 4-week uses 8/12. */
+export function multiClassPacksForSeriesLength(sessionCount: number): ParentMultiClassPack[] {
+  return sessionCount >= 16 ? [16, 24] : [8, 12]
+}
+
+/** Summer course (curso de verano): Mon–Fri, 9:00 AM – 1:00 PM, 5 or 10 class days. */
+export const SUMMER_COURSE_SLOT: TimeSlot = 'summer'
+export const SUMMER_COURSE_SLOTS: TimeSlot[] = [SUMMER_COURSE_SLOT]
 export const SUMMER_COURSE_WEEKDAY_PRESET = [1, 2, 3, 4, 5] as const
 export const SUMMER_COURSE_WEEK_OPTIONS = [
   { weeks: 1, classes: 5, label: { es: '1 sem (5 días)', en: '1 wk (5 days)' } },
@@ -450,6 +497,7 @@ export interface BookableClassSession {
   status: SessionAvailabilityStatus
   isEnrolled?: boolean
   season_slug?: string | null
+  program_series_id?: string | null
 }
 
 export interface CrewMember {

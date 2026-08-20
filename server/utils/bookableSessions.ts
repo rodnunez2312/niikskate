@@ -15,7 +15,7 @@ export type BookableSessionRow = {
   location: string | null
   description: string | null
   is_bookable: boolean
-  time_slot: 'monday' | 'morning' | 'early' | 'late' | null
+  time_slot: 'monday' | 'morning' | 'early' | 'late' | 'summer' | null
   audience_category: string | null
   audience_categories: string[] | null
   skill_level: string | null
@@ -56,7 +56,7 @@ export function getServiceSupabase() {
 export async function countCoachesForSlot(
   supabase: ReturnType<typeof getServiceSupabase>,
   dateStr: string,
-  slot: 'monday' | 'morning' | 'early' | 'late',
+  slot: 'monday' | 'morning' | 'early' | 'late' | 'summer',
 ): Promise<number> {
   const { count: dateCount, error: dateErr } = await supabase
     .from('coach_date_availability')

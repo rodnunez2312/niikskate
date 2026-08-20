@@ -2,6 +2,17 @@
 const { items, isActive } = usePublicNav()
 const user = useSupabaseUser()
 const { language } = useI18n()
+const route = useRoute()
+
+const showCrew = computed(
+  () =>
+    Boolean(user.value)
+    && (route.path.startsWith('/temporadas') || route.path.startsWith('/classes')),
+)
+
+const goAddFamilyMember = () => {
+  void navigateTo('/member/student/profile')
+}
 </script>
 
 <template>
@@ -43,6 +54,10 @@ const { language } = useI18n()
             {{ language === 'es' ? 'Entrar' : 'Sign in' }}
           </NuxtLink>
         </div>
+      </div>
+
+      <div v-if="showCrew" class="pb-3">
+        <MemberCrewSwitcher compact show-add theme="dark" @add="goAddFamilyMember" />
       </div>
 
       <!-- Mobile nav -->

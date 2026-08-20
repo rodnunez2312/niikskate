@@ -1,8 +1,8 @@
 import { getDay } from 'date-fns'
 import type { TimeSlot } from '~/types'
 
-/** Official La Plancha days — JS getDay(): Mon=1, Tue=2, Thu=4, Sat=6 */
-export const CLASS_WEEKDAY_NUMBERS = [1, 2, 4, 6] as const
+/** Official season schedule — JS getDay(): Tue=2, Thu=4, Sat=6 */
+export const CLASS_WEEKDAY_NUMBERS = [2, 4, 6] as const
 
 export function isClassDay(date: Date): boolean {
   return (CLASS_WEEKDAY_NUMBERS as readonly number[]).includes(getDay(date))
@@ -55,9 +55,8 @@ export function daySlotsFullyUnavailable(
   return slots.every(s => overrides?.[s] === false)
 }
 
-/** Official La Plancha practice days (JS getDay values). */
+/** Official program days: Tuesday, Thursday, Saturday. */
 export const RECURRING_WEEKDAY_OPTIONS = [
-  { v: 1, en: 'Mon', es: 'Lun' },
   { v: 2, en: 'Tue', es: 'Mar' },
   { v: 4, en: 'Thu', es: 'Jue' },
   { v: 6, en: 'Sat', es: 'Sáb' },
@@ -72,5 +71,5 @@ export const SUMMER_COURSE_WEEKDAY_OPTIONS = [
   { v: 5, en: 'Fri', es: 'Vie' },
 ] as const
 
-/** Default program days: Tuesday, Thursday, Saturday → 3 classes/week × 8 weeks = 24. */
+/** Default program days: Tuesday, Thursday, Saturday → 3 classes/week × 4 weeks = 12. */
 export const DEFAULT_PROGRAM_WEEKDAYS = [2, 4, 6] as const

@@ -15,6 +15,11 @@ import {
 import { es } from 'date-fns/locale'
 import type { UserRole } from '~/types'
 import { daySlotsFullyUnavailable, isClassDay, slotsForDate, slotsForDateStr } from '~/utils/classSchedule'
+import {
+  buildNiikSkaterEmail,
+  DEFAULT_SKATER_PASSWORD,
+  niikEmailLocalFromFullName,
+} from '~/utils/skaterNiikEmail'
 
 /** Sun-start week column indices for class days (Mon, Tue, Thu, Sat). */
 const CLASS_WEEKDAY_HEADER_INDICES = [1, 2, 4, 6]
@@ -60,10 +65,20 @@ const addCoachSaving = ref(false)
 const addCoachError = ref('')
 const newCoachForm = ref({
   email: '',
-  password: '',
+  password: DEFAULT_SKATER_PASSWORD,
   full_name: '',
   phone: '',
 })
+const coachEmailManual = ref(false)
+
+const syncCoachEmailFromName = () => {
+  if (coachEmailManual.value) return
+  newCoachForm.value.email = buildNiikSkaterEmail(
+    niikEmailLocalFromFullName(newCoachForm.value.full_name),
+  )
+}
+
+watch(() => newCoachForm.value.full_name, () => syncCoachEmailFromName())
 
 const adminAuthHeaders = async (): Promise<Record<string, string>> => {
   const { data } = await client.auth.getSession()
@@ -73,7 +88,13 @@ const adminAuthHeaders = async (): Promise<Record<string, string>> => {
 }
 
 const openAddCoachModal = () => {
-  newCoachForm.value = { email: '', password: '', full_name: '', phone: '' }
+  coachEmailManual.value = false
+  newCoachForm.value = {
+    email: '',
+    password: DEFAULT_SKATER_PASSWORD,
+    full_name: '',
+    phone: '',
+  }
   addCoachError.value = ''
   showAddCoachModal.value = true
 }
@@ -817,29 +838,6 @@ const saveCoachAvailability = async () => {
             </div>
             <form class="p-6 space-y-4" @submit.prevent="submitAddCoach">
               <div>
-                <label class="block text-sm font-medium text-gray-400 mb-1">Email *</label>
-                <input
-                  v-model="newCoachForm.email"
-                  type="email"
-                  required
-                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
-                  :placeholder="language === 'es' ? 'correo@ejemplo.com' : 'email@example.com'"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-400 mb-1">{{
-                  language === 'es' ? 'Contraseña temporal *' : 'Temporary password *'
-                }}</label>
-                <input
-                  v-model="newCoachForm.password"
-                  type="password"
-                  required
-                  minlength="6"
-                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
-                  :placeholder="language === 'es' ? 'Mín. 6 caracteres' : 'Min. 6 characters'"
-                />
-              </div>
-              <div>
                 <label class="block text-sm font-medium text-gray-400 mb-1">{{
                   language === 'es' ? 'Nombre completo' : 'Full name'
                 }}</label>
@@ -847,7 +845,40 @@ const saveCoachAvailability = async () => {
                   v-model="newCoachForm.full_name"
                   type="text"
                   class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
-                  :placeholder="language === 'es' ? 'Opcional' : 'Optional'"
+                  :placeholder="language === 'es' ? 'Nombre y apellido' : 'First and last name'"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Email *</label>
+                <input
+                  v-model="newCoachForm.email"
+                  type="email"
+                  required
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none"
+                  placeholder="firstname.lastname@niikskate.com"
+                  @input="coachEmailManual = true"
+                />
+                <p v-if="coachEmailManual" class="mt-1">
+                  <button
+                    type="button"
+                    class="text-xs text-gold-400 hover:text-gold-300"
+                    @click="coachEmailManual = false; syncCoachEmailFromName()"
+                  >
+                    {{ language === 'es' ? 'Regenerar desde el nombre' : 'Regenerate from name' }}
+                  </button>
+                </p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">{{
+                  language === 'es' ? 'Contraseña temporal *' : 'Temporary password *'
+                }}</label>
+                <input
+                  v-model="newCoachForm.password"
+                  type="text"
+                  required
+                  minlength="6"
+                  class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 outline-none font-mono"
+                  :placeholder="DEFAULT_SKATER_PASSWORD"
                 />
               </div>
               <div>

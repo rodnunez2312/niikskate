@@ -25,8 +25,15 @@ import {
   composeProductDescription,
   extractUserAppendFromStoredDescription,
 } from '~/utils/productDescriptionTemplate'
-
-type ShopGroupId = 'skate_equip' | 'security_equip' | 'clothing' | 'accessories'
+import ShopCategoryFilter from '~/components/shop/CategoryFilter.vue'
+import {
+  SHOP_GROUPS,
+  compareShopProducts,
+  groupForProductCategory,
+  productImageUrl,
+  productMatchesSearch,
+  type ShopGroupId,
+} from '~/utils/shopCatalog'
 
 const client = useSupabaseClient()
 const user = useSupabaseUser()
@@ -38,8 +45,11 @@ const loading = ref(true)
 const saving = ref(false)
 const products = ref<any[]>([])
 const searchQuery = ref('')
-const filterGroup = ref<ShopGroupId | 'all'>('all')
+const selectedFilter = ref<ShopGroupId | null>(null)
+const brandsMode = ref(false)
+const selectedBrand = ref<string | null>(null)
 const panelOpen = ref(false)
+const bulkImportOpen = ref(false)
 const editingId = ref<string | null>(null)
 const formError = ref<string | null>(null)
 const uploadingImage = ref(false)
@@ -63,37 +73,7 @@ const bulkImportReadyRows = ref<ParsedShopProductRow[]>([])
 const bulkDuplicateGroups = ref<BulkDuplicateGroup[]>([])
 const bulkExistingByMatchKey = ref(new Map<string, any>())
 
-const shopGroups: Array<{
-  id: ShopGroupId
-  label: { en: string; es: string }
-  dbCategories: ProductCategory[]
-  defaultCategory: ProductCategory
-}> = [
-  {
-    id: 'skate_equip',
-    label: { en: 'Skate equip', es: 'Equipo de skate' },
-    dbCategories: ['tablas', 'llantas', 'lijas', 'ramps'],
-    defaultCategory: 'tablas',
-  },
-  {
-    id: 'security_equip',
-    label: { en: 'Security equip', es: 'Equipo de seguridad' },
-    dbCategories: ['protecciones', 'cascos'],
-    defaultCategory: 'cascos',
-  },
-  {
-    id: 'clothing',
-    label: { en: 'Clothing', es: 'Ropa' },
-    dbCategories: ['merch'],
-    defaultCategory: 'merch',
-  },
-  {
-    id: 'accessories',
-    label: { en: 'Accessories', es: 'Accesorios' },
-    dbCategories: ['hardware'],
-    defaultCategory: 'hardware',
-  },
-]
+const shopGroups = SHOP_GROUPS
 
 const dbCategoryOptions: Array<{ id: ProductCategory; name: { en: string; es: string }; group: ShopGroupId }> = [
   { id: 'tablas', name: { en: 'Boards', es: 'Tablas' }, group: 'skate_equip' },
@@ -174,7 +154,7 @@ const catalogBrands = computed(() => {
     const name = (p.brand || '').trim()
     if (name) names.add(name)
   }
-  return [...names].sort((a, b) => a.localeCompare(b))
+  return [...names].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
 })
 
 function brandLogo(name: string) {
@@ -247,22 +227,132 @@ async function fetchProducts() {
 }
 
 function groupForCategory(category: string) {
-  return shopGroups.find(g => g.dbCategories.includes(category as ProductCategory))
+  return groupForProductCategory(category)
+}
+
+function selectAll() {
+  selectedFilter.value = null
+  brandsMode.value = false
+  selectedBrand.value = null
+}
+
+function openBrandsMode() {
+  brandsMode.value = true
+  selectedBrand.value = null
+  selectedFilter.value = null
+}
+
+function selectFilter(id: ShopGroupId) {
+  brandsMode.value = false
+  selectedBrand.value = null
+  selectedFilter.value = id
+}
+
+function selectBrand(name: string) {
+  selectedBrand.value = name
+  brandsMode.value = false
+  selectedFilter.value = null
+}
+
+function clearBrand() {
+  selectedBrand.value = null
+  brandsMode.value = true
+}
+
+const showAllActive = computed(
+  () => !brandsMode.value && !selectedBrand.value && selectedFilter.value === null,
+)
+
+const brandsTileActive = computed(() => brandsMode.value || Boolean(selectedBrand.value))
+
+function productMatchesFilters(product: any) {
+  if (selectedBrand.value) {
+    return (product.brand || '').trim().toLowerCase() === selectedBrand.value.trim().toLowerCase()
+  }
+  if (brandsMode.value) return false
+  if (!selectedFilter.value) return true
+  const group = shopGroups.find(g => g.id === selectedFilter.value)
+  if (!group) return true
+  return group.dbCategories.includes(product.category)
 }
 
 const filteredProducts = computed(() => {
-  let list = products.value
-  if (filterGroup.value !== 'all') {
-    const group = shopGroups.find(g => g.id === filterGroup.value)
-    if (group) list = list.filter(p => group.dbCategories.includes(p.category))
+  const q = searchQuery.value.trim()
+  const hasSearch = Boolean(q)
+
+  let list = products.value.filter((product: any) => {
+    if (hasSearch) return true
+    return productMatchesFilters(product)
+  })
+
+  if (hasSearch) {
+    list = list.filter((p: any) => productMatchesSearch(p, q))
   }
-  const q = searchQuery.value.trim().toLowerCase()
-  if (q) {
-    list = list.filter(p =>
-      `${p.sku} ${p.name} ${p.brand || ''} ${p.size || ''} ${p.proveedor || ''} ${p.comentarios || ''} ${p.description || ''}`.toLowerCase().includes(q),
-    )
+
+  return [...list].sort(compareShopProducts)
+})
+
+const showGroupedProductSections = computed(() => {
+  if (selectedBrand.value) return true
+  if (selectedFilter.value) return false
+  return true
+})
+
+const filteredProductSections = computed(() => {
+  const list = filteredProducts.value
+  if (!showGroupedProductSections.value) {
+    return [{ id: 'one', title: null as string | null, products: list }]
   }
-  return list
+
+  const featured = list.filter((p: any) => p.is_featured)
+  const rest = list.filter((p: any) => !p.is_featured)
+  const sections: Array<{ id: string; title: string | null; products: any[] }> = []
+
+  if (featured.length) {
+    sections.push({
+      id: 'featured',
+      title: es.value ? 'Destacados' : 'Featured',
+      products: featured,
+    })
+  }
+
+  for (const group of SHOP_GROUPS) {
+    const productsInGroup = rest.filter((p: any) => group.dbCategories.includes(p.category))
+    if (!productsInGroup.length) continue
+    sections.push({
+      id: group.id,
+      title: es.value ? group.title.es : group.title.en,
+      products: productsInGroup,
+    })
+  }
+
+  const leftover = rest.filter((p: any) => !groupForProductCategory(p.category))
+  if (leftover.length) {
+    sections.push({
+      id: 'other',
+      title: es.value ? 'Otros' : 'Other',
+      products: leftover,
+    })
+  }
+
+  return sections
+})
+
+const showBrandSection = computed(() => {
+  if (loading.value) return false
+  if (searchQuery.value.trim()) return false
+  return showAllActive.value || brandsMode.value || Boolean(selectedBrand.value)
+})
+
+const showBrandsBelowProducts = computed(
+  () => showBrandSection.value && showAllActive.value,
+)
+
+watch(searchQuery, (q) => {
+  if (!q.trim()) return
+  brandsMode.value = false
+  selectedBrand.value = null
+  selectedFilter.value = null
 })
 
 const stats = computed(() => ({
@@ -305,6 +395,14 @@ function closePanel() {
   panelOpen.value = false
   editingId.value = null
   formError.value = null
+}
+
+function openBulkImport() {
+  bulkImportOpen.value = true
+}
+
+function closeBulkImport() {
+  bulkImportOpen.value = false
 }
 
 async function handleImageUpload(event: Event) {
@@ -455,6 +553,27 @@ async function toggleActive(product: any) {
     await fetchProducts()
   } catch (e) {
     console.error(e)
+  }
+}
+
+const togglingFeaturedId = ref<string | null>(null)
+
+async function toggleFeatured(product: any) {
+  if (togglingFeaturedId.value === product.id) return
+  togglingFeaturedId.value = product.id
+  const next = !product.is_featured
+  product.is_featured = next
+  try {
+    const { error } = await client
+      .from('products')
+      .update({ is_featured: next, updated_at: new Date().toISOString() })
+      .eq('id', product.id)
+    if (error) throw error
+  } catch (e) {
+    product.is_featured = !next
+    console.error(e)
+  } finally {
+    togglingFeaturedId.value = null
   }
 }
 
@@ -649,7 +768,7 @@ const productPhotoUploadHint = computed(() =>
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <div class="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div class="max-w-7xl mx-auto px-4 lg:px-6 py-6 space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 class="text-2xl font-black text-white">Skateshop</h1>
@@ -661,13 +780,20 @@ const productPhotoUploadHint = computed(() =>
             }}
           </p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap lg:flex-nowrap gap-2">
           <NuxtLink
             to="/skateshop"
             class="px-4 py-2 rounded-xl border border-white/15 text-sm font-bold text-gray-200 hover:border-gold-400/50"
           >
             {{ es ? 'Ver tienda' : 'View shop' }}
           </NuxtLink>
+          <button
+            type="button"
+            class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold hover:bg-gold-400/10"
+            @click="openBulkImport"
+          >
+            {{ es ? 'Importación masiva' : 'Bulk import' }}
+          </button>
           <button
             type="button"
             class="px-4 py-2 rounded-xl bg-gold-400 text-black text-sm font-bold hover:bg-gold-300"
@@ -693,144 +819,50 @@ const productPhotoUploadHint = computed(() =>
         </div>
       </div>
 
-      <div class="flex flex-col sm:flex-row gap-3">
+      <div class="flex flex-col gap-6">
+      <div class="order-1 space-y-3">
         <input
           v-model="searchQuery"
           type="search"
-          class="flex-1 px-4 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gold-400"
-          :placeholder="es ? 'Buscar producto…' : 'Search product…'"
+          class="w-full px-4 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gold-400"
+          :placeholder="es ? 'Buscar en todas las categorías…' : 'Search all categories…'"
         />
-        <select
-          v-model="filterGroup"
-          class="px-4 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm"
-        >
-          <option value="all">{{ es ? 'Todas las categorías' : 'All categories' }}</option>
-          <option v-for="g in shopGroups" :key="g.id" :value="g.id">
-            {{ es ? g.label.es : g.label.en }}
-          </option>
-        </select>
+        <ShopCategoryFilter
+          :selected-filter="selectedFilter"
+          :brands-active="brandsTileActive"
+          :show-all-active="showAllActive"
+          @all="selectAll"
+          @filter="selectFilter"
+          @brands="openBrandsMode"
+        />
+        <p class="text-xs text-gray-500 text-center sm:text-left">
+          {{
+            searchQuery.trim()
+              ? (es
+                ? `Buscando en todo el catálogo · ${filteredProducts.length} resultado${filteredProducts.length === 1 ? '' : 's'}`
+                : `Searching the full catalog · ${filteredProducts.length} result${filteredProducts.length === 1 ? '' : 's'}`)
+              : brandsMode
+                ? (es ? 'Elige una marca para filtrar el catálogo' : 'Pick a brand to filter the catalog')
+                : (es
+                  ? `Mostrando ${filteredProducts.length} de ${stats.total}`
+                  : `Showing ${filteredProducts.length} of ${stats.total}`)
+          }}
+        </p>
       </div>
 
-      <!-- Bulk import -->
-      <section class="rounded-2xl border border-gray-800 bg-gray-900 p-4 space-y-2">
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 class="font-bold text-white text-sm">
-            {{ es ? 'Importación masiva' : 'Bulk import' }}
-          </h2>
-          <p class="text-[11px] text-gray-500">
-            {{
-              es
-                ? 'Plantilla = solo encabezados. Una hoja «Productos», columnas A–K.'
-                : 'Template = headers only. One «Productos» sheet, columns A–K.'
-            }}
-          </p>
-        </div>
-        <details class="text-[11px] text-gray-500">
-          <summary class="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
-            {{ es ? 'Ayuda' : 'Help' }}
-          </summary>
-          <p class="mt-2 leading-relaxed">
-            {{
-              es
-                ? 'Fila 1 = encabezados (nombre, marca, categoria…). Copia tus productos desde WordPress y pégalos desde la fila 2. No cambies la fila 1.'
-                : 'Row 1 = headers (nombre, marca, categoria…). Copy products from WordPress and paste from row 2. Do not change row 1.'
-            }}
-          </p>
-        </details>
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl border border-white/20 text-sm font-bold text-gray-200 hover:border-gold-400/50 disabled:opacity-50"
-            :disabled="!products.length"
-            @click="downloadCatalogExport"
-          >
-            {{ es ? 'Exportar catálogo Excel' : 'Export catalog Excel' }}
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold hover:bg-gold-400/10"
-            @click="downloadSkateshopTemplate"
-          >
-            {{ es ? 'Plantilla Excel' : 'Excel template' }}
-          </button>
-          <label class="px-4 py-2 rounded-xl bg-gray-800 text-sm font-bold text-gray-200 cursor-pointer hover:text-white">
-            {{ es ? 'Elegir Excel…' : 'Choose Excel…' }}
-            <input
-              ref="bulkFileInput"
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              class="hidden"
-              @change="onBulkFileSelected"
-            />
-          </label>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl bg-gold-400 text-black text-sm font-bold disabled:opacity-50"
-            :disabled="bulkImporting || !bulkImportReadyRows.length || bulkImportErrors.length > 0"
-            @click="runBulkImport"
-          >
-            {{ bulkImporting ? (es ? 'Importando…' : 'Importing…') : (es ? 'Importar filas' : 'Import rows') }}
-          </button>
-        </div>
-        <p v-if="bulkSelectedFileName" class="text-[11px] text-gray-500 truncate" :title="bulkSelectedFileName">
-          {{ es ? 'Archivo' : 'File' }}: {{ bulkSelectedFileName }}
-          <span v-if="/\(\d+\)(?=\.xlsx$)/i.test(bulkSelectedFileName)" class="text-gray-600">
-            — {{ es ? 'copia Windows; OK' : 'Windows copy; OK' }}
-          </span>
-        </p>
-        <div
-          v-if="bulkImportErrors.length"
-          class="rounded-xl border border-flame-500/40 bg-flame-500/10 p-3 space-y-2"
-        >
-          <p class="text-sm font-bold text-flame-400">
-            {{
-              bulkEditRows.length
-                ? (es ? 'Corrige en la tabla de abajo (o en Excel y vuelve a subir):' : 'Fix in the table below (or in Excel and re-upload):')
-                : (es ? 'Corrige en Excel y vuelve a subir el archivo:' : 'Fix in Excel and upload again:')
-            }}
-          </p>
-          <ul class="text-sm text-flame-100/90 list-disc pl-4 space-y-2">
-            <li v-for="(err, i) in bulkImportErrors" :key="'e' + i">{{ err }}</li>
-          </ul>
-          <details v-if="bulkImportErrorDetails.length" class="text-xs text-gray-500">
-            <summary class="cursor-pointer hover:text-gray-400">
-              {{ es ? 'Detalle por fila' : 'Row details' }}
-            </summary>
-            <ul class="mt-2 space-y-0.5 max-h-32 overflow-y-auto">
-              <li v-for="(d, i) in bulkImportErrorDetails" :key="'d' + i">{{ d }}</li>
-            </ul>
-          </details>
-        </div>
-        <p v-if="bulkImportReadyRows.length && !bulkImportErrors.length" class="text-sm text-glass-green">
-          {{ bulkImportReadyRows.length }}
-          {{ es ? ' productos listos para importar.' : ' products ready to import.' }}
-        </p>
-        <p v-else-if="bulkImportReadyRows.length" class="text-sm text-gray-400">
-          {{ bulkImportReadyRows.length }}
-          {{ es ? ' productos cuando corrijas los errores.' : ' products once errors are fixed.' }}
-        </p>
-        <p v-if="bulkImportWarnings && bulkEditRows.length" class="text-xs text-amber-200/80 mt-1">
-          {{ bulkImportWarnings }}
-        </p>
-        <MemberBulkImportEditor
-          v-if="bulkEditRows.length"
-          :rows="bulkEditRows"
-          :duplicate-groups="bulkDuplicateGroups"
-          :es="es"
-          @update:rows="onBulkEditRowsUpdate"
-        />
-        <p v-if="bulkMessage" class="text-sm text-gray-300">{{ bulkMessage }}</p>
-      </section>
-
-      <!-- Brand logos for Marcas filter -->
-      <section class="rounded-2xl border border-gray-800 bg-gray-900 p-4 space-y-3">
+      <!-- Brand logos: only Todo or Marcas, never while searching -->
+      <section
+        v-if="showBrandSection"
+        class="rounded-2xl border border-gray-800 bg-gray-900 p-4 space-y-3"
+        :class="showBrandsBelowProducts ? 'order-3' : 'order-2'"
+      >
         <div class="flex items-start justify-between gap-3">
           <div>
             <h2 class="font-bold text-white">{{ es ? 'Marcas' : 'Brands' }}</h2>
             <p class="text-xs text-gray-500 mt-0.5">
               {{ es
-                ? 'Sube el logo de cada marca para las tarjetas grandes en Skateshop.'
-                : 'Upload each brand logo for the big Marcas cards on Skateshop.' }}
+                ? 'Sube el logo de cada marca. Toca una marca para filtrar el catálogo.'
+                : 'Upload each brand logo. Tap a brand to filter the catalog.' }}
             </p>
           </div>
         </div>
@@ -846,20 +878,24 @@ const productPhotoUploadHint = computed(() =>
             ? 'Agrega un campo Marca a tus productos para verlas aquí.'
             : 'Add a Brand field on products to see them here.' }}
         </p>
-        <div v-else class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div v-else class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           <div
             v-for="name in catalogBrands"
             :key="name"
-            class="flex items-center gap-3 rounded-xl border border-gray-800 bg-black/40 p-3"
+            class="flex items-center gap-3 rounded-xl border bg-black/40 p-3 cursor-pointer transition-colors"
+            :class="selectedBrand === name
+              ? 'border-gold-400'
+              : 'border-gray-800 hover:border-gray-600'"
+            @click="selectBrand(name)"
           >
-            <div class="w-14 h-14 rounded-lg bg-gray-800 overflow-hidden shrink-0">
+            <div class="w-14 h-14 rounded-lg bg-white overflow-hidden shrink-0 flex items-center justify-center p-1">
               <img
                 v-if="brandLogo(name)"
                 :src="brandLogo(name)!"
                 :alt="name"
-                class="w-full h-full object-cover"
+                class="max-w-full max-h-full object-contain"
               />
-              <div v-else class="w-full h-full flex items-center justify-center text-[10px] text-gray-500 text-center px-1">
+              <div v-else class="w-full h-full flex items-center justify-center text-[10px] text-gray-500 text-center px-1 bg-gray-800 rounded-md">
                 {{ es ? 'Sin logo' : 'No logo' }}
               </div>
             </div>
@@ -869,7 +905,7 @@ const productPhotoUploadHint = computed(() =>
                 type="button"
                 class="mt-1 text-xs font-bold text-gold-400 hover:text-gold-300 disabled:opacity-50"
                 :disabled="uploadingBrand === name"
-                @click="triggerBrandUpload(name)"
+                @click.stop="triggerBrandUpload(name)"
               >
                 {{ uploadingBrand === name
                   ? (es ? 'Subiendo…' : 'Uploading…')
@@ -880,15 +916,60 @@ const productPhotoUploadHint = computed(() =>
         </div>
       </section>
 
+      <div
+        class="space-y-6"
+        :class="showBrandsBelowProducts ? 'order-2' : 'order-3'"
+      >
+      <div
+        v-if="selectedBrand"
+        class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-gray-950 px-4 py-3"
+      >
+        <p class="text-sm text-gray-300">
+          <span class="text-gray-500">{{ es ? 'Marca' : 'Brand' }}:</span>
+          <span class="font-black text-white uppercase ml-2">{{ selectedBrand }}</span>
+        </p>
+        <button
+          type="button"
+          class="text-xs font-bold text-gold-400 hover:text-gold-300"
+          @click="clearBrand"
+        >
+          {{ es ? 'Cambiar marca' : 'Change brand' }}
+        </button>
+      </div>
+
       <div v-if="loading" class="py-16 text-center">
         <div class="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
 
+      <div
+        v-else-if="brandsMode && !searchQuery.trim()"
+        class="rounded-2xl border border-gray-800 bg-gray-900 p-10 text-center"
+      >
+        <p class="text-gray-400">
+          {{ es ? 'Elige una marca arriba para ver sus productos.' : 'Pick a brand above to see its products.' }}
+        </p>
+      </div>
+
       <div v-else-if="!filteredProducts.length" class="rounded-2xl border border-gray-800 bg-gray-900 p-10 text-center">
         <p class="text-gray-400 mb-4">
-          {{ es ? 'No hay productos. Agrega el primero.' : 'No products yet. Add the first one.' }}
+          {{
+            !products.length
+              ? (es ? 'No hay productos. Agrega el primero.' : 'No products yet. Add the first one.')
+              : searchQuery.trim()
+                ? (es ? 'Ningún producto coincide con tu búsqueda.' : 'No products match your search.')
+                : (es ? 'No hay productos con este filtro.' : 'No products match this filter.')
+          }}
         </p>
         <button
+          v-if="products.length"
+          type="button"
+          class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold"
+          @click="selectAll(); searchQuery = ''"
+        >
+          {{ es ? 'Ver todos' : 'Show all' }}
+        </button>
+        <button
+          v-else
           type="button"
           class="px-4 py-2 rounded-xl bg-gold-400 text-black text-sm font-bold"
           @click="openCreate"
@@ -897,78 +978,237 @@ const productPhotoUploadHint = computed(() =>
         </button>
       </div>
 
-      <div v-else class="space-y-3">
-        <article
-          v-for="product in filteredProducts"
-          :key="product.id"
-          class="rounded-2xl border border-gray-800 bg-gray-900 p-4 flex gap-4"
+      <div v-else class="space-y-8">
+        <div
+          v-for="productGroup in filteredProductSections"
+          :key="productGroup.id"
+          class="space-y-3"
         >
-          <div class="w-20 h-20 rounded-xl bg-gray-800 overflow-hidden shrink-0">
-            <img
-              v-if="product.images?.[0]"
-              :src="product.images[0]"
-              :alt="product.name"
-              class="w-full h-full object-cover"
-            />
-            <div v-else class="w-full h-full flex items-center justify-center text-xs text-gray-500 px-1 text-center">
-              {{ es ? 'Sin foto' : 'No photo' }}
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <h2 class="font-bold text-white truncate">{{ product.name }}</h2>
-                <p class="text-xs text-gray-500 font-mono">{{ product.sku }}</p>
-                <p class="text-xs text-gray-500">
-                  {{ es ? groupForCategory(product.category)?.label.es : groupForCategory(product.category)?.label.en }}
+          <h2
+            v-if="productGroup.title"
+            class="text-sm font-black uppercase tracking-wide text-gold-400"
+          >
+            {{ productGroup.title }}
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
+            <article
+              v-for="product in productGroup.products"
+              :key="product.id"
+              class="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden flex flex-col"
+            >
+              <div class="relative h-72 bg-white overflow-hidden">
+                <img
+                  v-if="productImageUrl(product)"
+                  :src="productImageUrl(product)!"
+                  :alt="product.name"
+                  class="absolute inset-0 w-full h-full object-contain p-2"
+                />
+                <div v-else class="absolute inset-0 flex items-center justify-center text-xs text-gray-500 bg-gray-800">
+                  {{ es ? 'Sin foto' : 'No photo' }}
+                </div>
+                <button
+                  type="button"
+                  class="absolute top-1.5 left-1.5 w-8 h-8 rounded-full bg-black/70 flex items-center justify-center hover:bg-black/85 disabled:opacity-50"
+                  :title="product.is_featured
+                    ? (es ? 'Quitar de destacados' : 'Remove from featured')
+                    : (es ? 'Marcar como destacado' : 'Mark as featured')"
+                  :disabled="togglingFeaturedId === product.id"
+                  @click="toggleFeatured(product)"
+                >
+                  <svg
+                    class="w-4 h-4"
+                    :class="product.is_featured ? 'text-gold-400' : 'text-white/70'"
+                    viewBox="0 0 24 24"
+                    :fill="product.is_featured ? 'currentColor' : 'none'"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                    />
+                  </svg>
+                </button>
+                <span
+                  class="absolute top-1.5 right-1.5 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
+                  :class="product.is_active ? 'bg-black/75 text-glass-green' : 'bg-black/75 text-gray-300'"
+                >
+                  {{ product.is_active ? (es ? 'En tienda' : 'Live') : (es ? 'Oculto' : 'Hidden') }}
+                </span>
+              </div>
+              <div class="p-3 min-w-0">
+                <h2 class="text-sm font-bold text-white leading-snug line-clamp-2">{{ product.name }}</h2>
+                <p class="text-[11px] text-gray-500 font-mono mt-0.5">{{ product.sku }}</p>
+                <p class="text-[11px] text-gray-500 mt-0.5 truncate">
+                  {{ es ? groupForCategory(product.category)?.title.es : groupForCategory(product.category)?.title.en }}
                   <span v-if="product.brand"> · {{ product.brand }}</span>
                   <span v-if="product.size"> · {{ es ? 'Talla' : 'Size' }} {{ product.size }}</span>
                 </p>
-                <p v-if="product.proveedor" class="text-xs text-amber-200/70 truncate">
+                <p v-if="product.proveedor" class="text-[11px] text-amber-200/70 truncate mt-0.5">
                   {{ es ? 'Proveedor' : 'Supplier' }}: {{ product.proveedor }}
                 </p>
+                <p class="text-sm mt-2">
+                  <span class="font-bold text-gold-400">{{ formatPrice(product.price) }}</span>
+                  <span class="text-gray-500 ml-2">Stock: {{ product.stock_quantity }}</span>
+                </p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    class="px-2 py-1 rounded-lg bg-gray-800 text-[11px] font-bold text-gray-200 hover:text-white"
+                    @click="openEdit(product)"
+                  >
+                    {{ es ? 'Editar' : 'Edit' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="px-2 py-1 rounded-lg bg-gray-800 text-[11px] font-bold"
+                    :class="product.is_active ? 'text-gray-300' : 'text-glass-green'"
+                    @click="toggleActive(product)"
+                  >
+                    {{ product.is_active ? (es ? 'Ocultar' : 'Hide') : (es ? 'Publicar' : 'Publish') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="px-2 py-1 rounded-lg bg-gray-800 text-[11px] font-bold text-flame-500"
+                    @click="deleteProduct(product)"
+                  >
+                    {{ es ? 'Borrar' : 'Delete' }}
+                  </button>
+                </div>
               </div>
-              <span
-                class="text-[10px] font-bold uppercase px-2 py-1 rounded shrink-0"
-                :class="product.is_active ? 'bg-glass-green/20 text-glass-green' : 'bg-gray-700 text-gray-400'"
-              >
-                {{ product.is_active ? (es ? 'En tienda' : 'Live') : (es ? 'Oculto' : 'Hidden') }}
-              </span>
-            </div>
-            <div class="mt-2 flex items-center justify-between gap-2">
-              <div class="text-sm">
-                <span class="font-bold text-gold-400">{{ formatPrice(product.price) }}</span>
-                <span class="text-gray-500 ml-2">Stock: {{ product.stock_quantity }}</span>
-              </div>
-              <div class="flex gap-1.5">
-                <button
-                  type="button"
-                  class="px-2.5 py-1.5 rounded-lg bg-gray-800 text-xs font-bold text-gray-200 hover:text-white"
-                  @click="openEdit(product)"
-                >
-                  {{ es ? 'Editar' : 'Edit' }}
-                </button>
-                <button
-                  type="button"
-                  class="px-2.5 py-1.5 rounded-lg bg-gray-800 text-xs font-bold"
-                  :class="product.is_active ? 'text-gray-300' : 'text-glass-green'"
-                  @click="toggleActive(product)"
-                >
-                  {{ product.is_active ? (es ? 'Ocultar' : 'Hide') : (es ? 'Publicar' : 'Publish') }}
-                </button>
-                <button
-                  type="button"
-                  class="px-2.5 py-1.5 rounded-lg bg-gray-800 text-xs font-bold text-flame-500"
-                  @click="deleteProduct(product)"
-                >
-                  {{ es ? 'Borrar' : 'Delete' }}
-                </button>
-              </div>
-            </div>
+            </article>
           </div>
-        </article>
+        </div>
+      </div>
+      </div>
       </div>
     </div>
+
+    <!-- Bulk import modal -->
+    <Teleport to="body">
+      <div
+        v-if="bulkImportOpen"
+        class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 p-4"
+        @click.self="closeBulkImport"
+      >
+        <div class="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-700 bg-gray-950 shadow-2xl">
+          <div class="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-gray-800 bg-gray-950">
+            <div class="min-w-0 pr-3">
+              <h3 class="text-lg font-black text-white">
+                {{ es ? 'Importación masiva' : 'Bulk import' }}
+              </h3>
+              <p class="text-[11px] text-gray-500 mt-0.5">
+                {{
+                  es
+                    ? 'Plantilla = solo encabezados. Una hoja «Productos», columnas A–K.'
+                    : 'Template = headers only. One «Productos» sheet, columns A–K.'
+                }}
+              </p>
+            </div>
+            <button type="button" class="text-gray-400 hover:text-white shrink-0" @click="closeBulkImport">✕</button>
+          </div>
+
+          <div class="p-5 space-y-3">
+            <details class="text-[11px] text-gray-500">
+              <summary class="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
+                {{ es ? 'Ayuda' : 'Help' }}
+              </summary>
+              <p class="mt-2 leading-relaxed">
+                {{
+                  es
+                    ? 'Fila 1 = encabezados (nombre, marca, categoria…). Copia tus productos desde WordPress y pégalos desde la fila 2. No cambies la fila 1.'
+                    : 'Row 1 = headers (nombre, marca, categoria…). Copy products from WordPress and paste from row 2. Do not change row 1.'
+                }}
+              </p>
+            </details>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="px-4 py-2 rounded-xl border border-white/20 text-sm font-bold text-gray-200 hover:border-gold-400/50 disabled:opacity-50"
+                :disabled="!products.length"
+                @click="downloadCatalogExport"
+              >
+                {{ es ? 'Exportar catálogo Excel' : 'Export catalog Excel' }}
+              </button>
+              <button
+                type="button"
+                class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold hover:bg-gold-400/10"
+                @click="downloadSkateshopTemplate"
+              >
+                {{ es ? 'Plantilla Excel' : 'Excel template' }}
+              </button>
+              <label class="px-4 py-2 rounded-xl bg-gray-800 text-sm font-bold text-gray-200 cursor-pointer hover:text-white">
+                {{ es ? 'Elegir Excel…' : 'Choose Excel…' }}
+                <input
+                  ref="bulkFileInput"
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  class="hidden"
+                  @change="onBulkFileSelected"
+                />
+              </label>
+              <button
+                type="button"
+                class="px-4 py-2 rounded-xl bg-gold-400 text-black text-sm font-bold disabled:opacity-50"
+                :disabled="bulkImporting || !bulkImportReadyRows.length || bulkImportErrors.length > 0"
+                @click="runBulkImport"
+              >
+                {{ bulkImporting ? (es ? 'Importando…' : 'Importing…') : (es ? 'Importar filas' : 'Import rows') }}
+              </button>
+            </div>
+            <p v-if="bulkSelectedFileName" class="text-[11px] text-gray-500 truncate" :title="bulkSelectedFileName">
+              {{ es ? 'Archivo' : 'File' }}: {{ bulkSelectedFileName }}
+              <span v-if="/\(\d+\)(?=\.xlsx$)/i.test(bulkSelectedFileName)" class="text-gray-600">
+                — {{ es ? 'copia Windows; OK' : 'Windows copy; OK' }}
+              </span>
+            </p>
+            <div
+              v-if="bulkImportErrors.length"
+              class="rounded-xl border border-flame-500/40 bg-flame-500/10 p-3 space-y-2"
+            >
+              <p class="text-sm font-bold text-flame-400">
+                {{
+                  bulkEditRows.length
+                    ? (es ? 'Corrige en la tabla de abajo (o en Excel y vuelve a subir):' : 'Fix in the table below (or in Excel and re-upload):')
+                    : (es ? 'Corrige en Excel y vuelve a subir el archivo:' : 'Fix in Excel and upload again:')
+                }}
+              </p>
+              <ul class="text-sm text-flame-100/90 list-disc pl-4 space-y-2">
+                <li v-for="(err, i) in bulkImportErrors" :key="'e' + i">{{ err }}</li>
+              </ul>
+              <details v-if="bulkImportErrorDetails.length" class="text-xs text-gray-500">
+                <summary class="cursor-pointer hover:text-gray-400">
+                  {{ es ? 'Detalle por fila' : 'Row details' }}
+                </summary>
+                <ul class="mt-2 space-y-0.5 max-h-32 overflow-y-auto">
+                  <li v-for="(d, i) in bulkImportErrorDetails" :key="'d' + i">{{ d }}</li>
+                </ul>
+              </details>
+            </div>
+            <p v-if="bulkImportReadyRows.length && !bulkImportErrors.length" class="text-sm text-glass-green">
+              {{ bulkImportReadyRows.length }}
+              {{ es ? ' productos listos para importar.' : ' products ready to import.' }}
+            </p>
+            <p v-else-if="bulkImportReadyRows.length" class="text-sm text-gray-400">
+              {{ bulkImportReadyRows.length }}
+              {{ es ? ' productos cuando corrijas los errores.' : ' products once errors are fixed.' }}
+            </p>
+            <p v-if="bulkImportWarnings && bulkEditRows.length" class="text-xs text-amber-200/80 mt-1">
+              {{ bulkImportWarnings }}
+            </p>
+            <MemberBulkImportEditor
+              v-if="bulkEditRows.length"
+              :rows="bulkEditRows"
+              :duplicate-groups="bulkDuplicateGroups"
+              :es="es"
+              @update:rows="onBulkEditRowsUpdate"
+            />
+            <p v-if="bulkMessage" class="text-sm text-gray-300">{{ bulkMessage }}</p>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Add / Edit panel -->
     <Teleport to="body">
@@ -999,9 +1239,9 @@ const productPhotoUploadHint = computed(() =>
                 <div
                   v-for="(img, idx) in productImages"
                   :key="img + idx"
-                  class="relative aspect-square rounded-xl overflow-hidden bg-gray-800"
+                  class="relative aspect-square rounded-xl overflow-hidden bg-white"
                 >
-                  <img :src="img" class="w-full h-full object-cover" alt="" />
+                  <img :src="img" class="w-full h-full object-contain p-1" alt="" />
                   <button
                     type="button"
                     class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white text-xs"
@@ -1088,7 +1328,7 @@ const productPhotoUploadHint = computed(() =>
                     : 'border-gray-700 text-gray-400'"
                   @click="onShopGroupPick(g.id)"
                 >
-                  {{ es ? g.label.es : g.label.en }}
+                  {{ es ? g.title.es : g.title.en }}
                 </button>
               </div>
               <select
@@ -1170,6 +1410,10 @@ const productPhotoUploadHint = computed(() =>
             <label class="flex items-center gap-2 text-sm text-gray-300">
               <input v-model="form.is_active" type="checkbox" class="rounded border-gray-600" />
               {{ es ? 'Visible en /skateshop' : 'Visible on /skateshop' }}
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-300">
+              <input v-model="form.is_featured" type="checkbox" class="rounded border-gray-600" />
+              {{ es ? 'Destacado (aparece primero)' : 'Featured (shown first)' }}
             </label>
 
             <p v-if="formError" class="text-sm text-flame-500">{{ formError }}</p>

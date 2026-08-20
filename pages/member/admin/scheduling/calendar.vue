@@ -5,9 +5,11 @@ import {
   endOfMonth,
   endOfWeek,
   format,
+  isBefore,
   isSameDay,
   isSameMonth,
   isToday,
+  startOfDay,
   startOfMonth,
   startOfWeek,
 } from 'date-fns'
@@ -19,22 +21,29 @@ import {
   EVENT_LOCATIONS,
   MONTHLY_PROGRAM_PRICE_MXN,
   PROGRAM_TOTAL_CLASSES,
-  PROGRAM_WEEKS,
+  PROGRAM_WEEK_OPTIONS,
   PROGRAM_AGE_BANDS,
   PROGRAM_SKILL_TRACKS,
   SUMMER_COURSE_WEEK_OPTIONS,
   SUMMER_COURSE_WEEKDAY_PRESET,
+  SUMMER_COURSE_SLOT,
+  SUMMER_COURSE_SLOTS,
   TIME_SLOT_LABELS,
   mergedAudienceAgeRange,
   parseAudienceCategories,
+  programClassCount,
   skillLevelIdFromTrack,
   skillTrackFromLevelId,
+  PROGRESSION_AGE,
+  PROGRESSION_AUDIENCE_CATEGORIES,
+  isProgressionAudience,
   type ProgramSkillTrack,
+  type ProgramWeekCount,
 } from '~/types'
 import { DEFAULT_PROGRAM_WEEKDAYS, PRACTICE_TIME_SLOTS, RECURRING_WEEKDAY_OPTIONS, SUMMER_COURSE_WEEKDAY_OPTIONS, slotsForWeekday, slotsForWeekdays } from '~/utils/classSchedule'
-import { computeSummerCourseEndDate, generateProgramOccurrences, nearestProgramStartDate, syncProgramDateRange, computeProgramEndDate } from '~/utils/recurringProgram'
+import { computeSummerCourseEndDate, generateProgramOccurrences, nearestProgramStartDate, parseYmd, syncProgramDateRange, computeProgramEndDate } from '~/utils/recurringProgram'
 import { MEXICO_NATIONAL_HOLIDAYS_2026_2027 } from '~/utils/mexicoHolidays'
-import { getProgramSeasonBySlug, isSummerCourseSeason, PROGRAM_SEASONS } from '~/utils/programSeasons'
+import { getProgramSeasonBySlug, isSummerCourseSeason, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
 import {
   coachTierFromSkillTracks,
   coachTierLabel,
@@ -99,13 +108,15 @@ const user = useSupabaseUser()
 const client = useSupabaseClient()
 const { language } = useI18n()
 const { isAdmin: profileIsAdmin, loading: profileLoading } = useSiteProfile()
+const { seasons: programSeasons, refresh: refreshSeasons, bySlug: seasonBySlug, removeSeason } = useProgramSeasons()
+const addSeasonOpen = ref(false)
 
 const checkingAccess = ref(true)
 const accessError = ref('')
 const loading = ref(true)
 const events = ref<SchoolCalendarRow[]>([])
 const viewMonth = ref(new Date())
-const selectedDate = ref<Date | null>(null)
+const selectedDate = ref<Date>(new Date())
 const filterType = ref<SchoolCalendarEventType | 'all'>('all')
 
 const modalOpen = ref(false)
@@ -160,6 +171,7 @@ const form = ref({
   recurring_weekdays: [...DEFAULT_PROGRAM_WEEKDAYS] as number[],
   recurring_slots: ['early'] as TimeSlot[],
   recurring_class_count: PROGRAM_TOTAL_CLASSES,
+  program_weeks: 4 as ProgramWeekCount,
   summer_weeks: 1 as 1 | 2,
   skill_tracks: ['beginner'] as ProgramSkillTrack[],
   max_capacity_override: 6,
@@ -195,6 +207,25 @@ const toggleAudience = (id: AudienceCategory) => {
 
 const isSummerCourseForm = computed(() => isSummerCourseSeason(form.value.season_slug))
 
+const formSeason = computed(() => {
+  const slug = form.value.season_slug?.trim()
+  if (!slug) return undefined
+  return seasonBySlug(slug) || getProgramSeasonBySlug(slug)
+})
+
+const programOccurrenceEndDate = (): string | null => {
+  const seasonEnd = formSeason.value?.endDate || null
+  const formEnd = form.value.end_date || null
+  const raw = isSummerCourseForm.value ? (formEnd || seasonEnd) : (seasonEnd || formEnd)
+  if (seasonEnd && raw && raw > seasonEnd) return seasonEnd
+  return raw
+}
+
+const programSlotsForGenerate = (): TimeSlot[] => {
+  if (isSummerCourseForm.value) return [...SUMMER_COURSE_SLOTS]
+  return form.value.recurring_slots.length ? form.value.recurring_slots : ['early']
+}
+
 const formCoachTier = computed(() => coachTierFromSkillTracks(form.value.skill_tracks))
 
 const programPriceManual = ref(false)
@@ -225,7 +256,17 @@ const toggleSkillTrack = (track: ProgramSkillTrack) => {
     form.value.skill_tracks = [...cur, track]
   }
   form.value.skill_level = skillLevelIdFromTrack(form.value.skill_tracks[0]!)
+  applyProgressionAgesIfNeeded()
   applyProgramPriceDefault()
+}
+
+/** Intermediate (Progresión) covers ages 7–17: kids + teens bands. */
+const applyProgressionAgesIfNeeded = () => {
+  if (!isProgramForm.value) return
+  if (!form.value.skill_tracks.includes('intermediate')) return
+  const cats = new Set(form.value.audience_categories)
+  for (const id of PROGRESSION_AUDIENCE_CATEGORIES) cats.add(id)
+  form.value.audience_categories = [...cats]
 }
 
 const applySummerCoursePreset = () => {
@@ -235,14 +276,15 @@ const applySummerCoursePreset = () => {
     ?? SUMMER_COURSE_WEEK_OPTIONS[0]
   form.value.summer_weeks = opt.weeks
   form.value.recurring_class_count = opt.classes
-  if (!form.value.recurring_slots.length) form.value.recurring_slots = ['early']
+  form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
+  form.value.time_slot = SUMMER_COURSE_SLOT
   applyProgramDateSync({ syncStart: true })
   applyProgramPriceDefault(true)
 }
 
 const applyStandardSeasonPreset = () => {
   form.value.recurring_weekdays = [...DEFAULT_PROGRAM_WEEKDAYS]
-  form.value.recurring_class_count = PROGRAM_TOTAL_CLASSES
+  form.value.recurring_class_count = programClassCount(form.value.program_weeks || 4)
   applyProgramDateSync({ syncStart: true })
 }
 
@@ -285,6 +327,14 @@ watch(
     if (isSummerCourseSeason(slug)) applySummerCoursePreset()
     else applyStandardSeasonPreset()
     applyProgramTitle(true)
+  },
+)
+
+watch(
+  () => form.value.program_weeks,
+  weeks => {
+    if (!isProgramForm.value || editingId.value || isSummerCourseForm.value) return
+    form.value.recurring_class_count = programClassCount(weeks)
   },
 )
 
@@ -339,10 +389,12 @@ const buildProgramTitle = (): string => {
     : es
       ? 'Principiante'
       : 'Beginner'
-  const ages = form.value.audience_categories
-    .map(id => PROGRAM_AGE_TITLE[id as keyof typeof PROGRAM_AGE_TITLE])
-    .filter(Boolean)
-    .map(a => (es ? a.es : a.en))
+  const ages = isProgressionAudience(form.value.audience_categories)
+    ? ['7-17']
+    : form.value.audience_categories
+      .map(id => PROGRAM_AGE_TITLE[id as keyof typeof PROGRAM_AGE_TITLE])
+      .filter(Boolean)
+      .map(a => (es ? a.es : a.en))
   let base =
     ages.length === 0
       ? `${typePart} ${skillPart}`
@@ -418,6 +470,9 @@ const formStartWeekday = computed(() => {
 })
 
 const classSessionSlotOptions = computed((): TimeSlot[] => {
+  if (isClassSessionForm.value && isSummerCourseForm.value && !editingId.value) {
+    return [...SUMMER_COURSE_SLOTS]
+  }
   if (isClassSessionForm.value && (form.value.is_recurring || isSummerCourseForm.value) && !editingId.value) {
     return slotsForWeekdays(form.value.recurring_weekdays)
   }
@@ -426,15 +481,26 @@ const classSessionSlotOptions = computed((): TimeSlot[] => {
   return slotsForWeekday(wd)
 })
 
+const recurringSlotOptions = computed((): TimeSlot[] =>
+  isSummerCourseForm.value ? [...SUMMER_COURSE_SLOTS] : slotsForWeekdays(form.value.recurring_weekdays),
+)
+
 const recurringPreview = computed(() => {
   if ((!form.value.is_recurring && !isSummerCourseForm.value) || !form.value.start_date || editingId.value) return []
   return generateProgramOccurrences({
     startDate: form.value.start_date,
-    endDate: isSummerCourseForm.value ? form.value.end_date : null,
+    endDate: programOccurrenceEndDate(),
     weekdays: form.value.recurring_weekdays,
-    slots: form.value.recurring_slots.length ? form.value.recurring_slots : ['early'],
+    slots: programSlotsForGenerate(),
     maxClasses: Math.max(1, Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES),
+    allowListedSlots: true,
   })
+})
+
+const programFitsSeason = computed(() => {
+  if (editingId.value || !formSeason.value) return true
+  const needed = Math.max(1, Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES)
+  return recurringPreview.value.length >= needed
 })
 
 const syncingProgramDates = ref(false)
@@ -445,36 +511,51 @@ const applyProgramDateSync = (opts?: { syncStart?: boolean }) => {
   syncingProgramDates.value = true
   try {
     const maxClasses = Math.max(1, Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES)
+    const season = formSeason.value
+    const seasonStart = season?.startDate || null
+    const seasonEnd = season?.endDate || null
+    const from = seasonStart ? parseYmd(seasonStart) : new Date()
+    const slots = programSlotsForGenerate()
 
     if (isSummerCourseForm.value) {
-      if (opts?.syncStart !== false) {
-        const startDate = nearestProgramStartDate(new Date(), form.value.recurring_weekdays)
-        form.value.start_date = startDate
-        form.value.end_date = computeSummerCourseEndDate(startDate, maxClasses)
-      } else if (form.value.start_date) {
-        form.value.end_date = computeSummerCourseEndDate(form.value.start_date, maxClasses)
+      form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
+      form.value.time_slot = SUMMER_COURSE_SLOT
+      let startDate =
+        opts?.syncStart === false && form.value.start_date
+          ? form.value.start_date
+          : nearestProgramStartDate(from, form.value.recurring_weekdays)
+      if (seasonStart && startDate < seasonStart) {
+        startDate = nearestProgramStartDate(parseYmd(seasonStart), form.value.recurring_weekdays)
       }
+      if (seasonEnd && startDate > seasonEnd) startDate = seasonEnd
+      form.value.start_date = startDate
+      form.value.end_date = computeSummerCourseEndDate(startDate, maxClasses, seasonEnd)
       return
     }
 
-    const slots = (form.value.recurring_slots.length
-      ? form.value.recurring_slots
-      : ['early']) as TimeSlot[]
     if (opts?.syncStart !== false) {
       const { startDate, endDate } = syncProgramDateRange({
-        from: new Date(),
+        from,
         weekdays: form.value.recurring_weekdays,
         slots,
         maxClasses,
+        endCap: seasonEnd,
+        allowListedSlots: true,
       })
       form.value.start_date = startDate
       form.value.end_date = endDate
     } else if (form.value.start_date) {
+      const startDate = seasonStart && form.value.start_date < seasonStart
+        ? nearestProgramStartDate(parseYmd(seasonStart), form.value.recurring_weekdays)
+        : form.value.start_date
+      form.value.start_date = startDate
       form.value.end_date = computeProgramEndDate({
-        startDate: form.value.start_date,
+        startDate,
         weekdays: form.value.recurring_weekdays,
         slots,
         maxClasses,
+        endCap: seasonEnd,
+        allowListedSlots: true,
       })
     }
   } finally {
@@ -487,6 +568,11 @@ const applyProgramDateSync = (opts?: { syncStart?: boolean }) => {
 watch(
   () => form.value.recurring_weekdays,
   weekdays => {
+    if (isSummerCourseForm.value) {
+      form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
+      form.value.time_slot = SUMMER_COURSE_SLOT
+      return
+    }
     const allowed = new Set(slotsForWeekdays(weekdays))
     form.value.recurring_slots = form.value.recurring_slots.filter(s => allowed.has(s))
     if (!form.value.recurring_slots.length && allowed.size) {
@@ -529,6 +615,10 @@ const toggleRecurringWeekday = (v: number) => {
 }
 
 const toggleRecurringSlot = (slot: TimeSlot) => {
+  if (isSummerCourseForm.value) {
+    form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
+    return
+  }
   const cur = [...form.value.recurring_slots]
   const i = cur.indexOf(slot)
   if (i >= 0) form.value.recurring_slots = cur.filter(s => s !== slot)
@@ -634,6 +724,11 @@ const calendarDbErrorMessage = (msg: string) => {
     return es
       ? 'Falta la columna temporada. En Supabase SQL Editor ejecuta: supabase/migrations/add_program_season_slug.sql'
       : 'Missing season_slug column. In Supabase SQL Editor run: supabase/migrations/add_program_season_slug.sql'
+  }
+  if (m.includes('summer') && (m.includes('time_slot') || m.includes('enum') || m.includes('check'))) {
+    return es
+      ? 'Falta el horario de verano (9:00–13:00). En Supabase SQL Editor ejecuta: supabase/migrations/add_summer_time_slot.sql'
+      : 'Missing summer course slot (9:00 AM–1:00 PM). In Supabase SQL Editor run: supabase/migrations/add_summer_time_slot.sql'
   }
   if (
     m.includes('program_series_id')
@@ -777,7 +872,18 @@ const overlapsDay = (ev: SchoolCalendarRow, day: Date) => {
   return s <= d && e >= d
 }
 
-const eventsOnDay = (day: Date) => filteredEvents.value.filter(ev => overlapsDay(ev, day))
+const eventsOnDay = (day: Date) =>
+  filteredEvents.value.filter(ev => {
+    if (!overlapsDay(ev, day)) return false
+    if (
+      selectedSeasonSlugs.value.length
+      && isProgramType(ev.event_type)
+      && !isEventInSelectedSeason(ev)
+    ) {
+      return false
+    }
+    return true
+  })
 
 const monthLabel = computed(() => {
   const loc = language.value === 'es' ? es : undefined
@@ -788,15 +894,176 @@ const weekdayLabels = computed(() =>
   language.value === 'es' ? ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
 )
 
-const querySeasonSlug = () => {
-  const q = route.query.temporada
-  return typeof q === 'string' ? q.trim() : ''
+const parseSelectedSeasonSlugs = (): string[] => {
+  const multi = route.query.temporadas
+  if (typeof multi === 'string' && multi.trim()) {
+    return multi.split(',').map(s => s.trim()).filter(Boolean)
+  }
+  if (Array.isArray(multi)) {
+    return multi.flatMap(v => (typeof v === 'string' ? v.split(',') : [])).map(s => s.trim()).filter(Boolean)
+  }
+  const single = route.query.temporada
+  return typeof single === 'string' && single.trim() ? [single.trim()] : []
 }
 
+const selectedSeasonSlugs = computed(() => parseSelectedSeasonSlugs())
+
+const selectedSeasons = computed(() =>
+  selectedSeasonSlugs.value
+    .map(slug => seasonBySlug(slug) || getProgramSeasonBySlug(slug))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s)),
+)
+
+const seasonColorFor = (slug: string) => {
+  const idx = programSeasons.value.findIndex(s => s.slug === slug)
+  return seasonHighlightColor(idx >= 0 ? idx : 0)
+}
+
+const isSeasonSelected = (slug: string) => selectedSeasonSlugs.value.includes(slug)
+
+const querySeasonSlug = () => selectedSeasonSlugs.value[0] || ''
+
 const activeQuerySeason = computed(() => {
-  const slug = querySeasonSlug()
-  return slug ? getProgramSeasonBySlug(slug) : undefined
+  if (selectedSeasons.value.length !== 1) return undefined
+  return selectedSeasons.value[0]
 })
+
+const seasonsCoveringDay = (day: Date) => {
+  const ymd = format(day, 'yyyy-MM-dd')
+  return selectedSeasons.value.filter(s => ymd >= s.startDate && ymd <= s.endDate)
+}
+
+const daySeasonStyle = (day: Date) => {
+  const covering = seasonsCoveringDay(day)
+  if (!covering.length) return {}
+  const inMonth = isSameMonth(day, viewMonth.value)
+  const fills = covering.map(s => inMonth ? seasonColorFor(s.slug).fill : seasonColorFor(s.slug).fillMuted)
+  if (fills.length === 1) return { backgroundColor: fills[0] }
+  return { backgroundImage: stripedSeasonFill(fills) }
+}
+
+const seasonSlugForProgramDay = (day: Date) => {
+  const covering = seasonsCoveringDay(day)
+  if (covering.length === 1) return covering[0].slug
+  const regular = covering.find(s => !isSummerCourseSeason(s.slug))
+  return regular?.slug || covering[0]?.slug || querySeasonSlug()
+}
+
+/** Tagged slug, or the unique selected temporada covering this program’s dates. */
+const eventSeasonSlug = (ev: SchoolCalendarRow): string => {
+  const tagged = ev.season_slug?.trim()
+  if (tagged) return tagged
+  if (!isProgramType(ev.event_type) || !selectedSeasons.value.length) return ''
+  const covering = selectedSeasons.value.filter(
+    s => s.startDate <= (ev.end_date || ev.start_date) && s.endDate >= ev.start_date,
+  )
+  return covering.length === 1 ? covering[0].slug : ''
+}
+
+const isEventInSelectedSeason = (ev: SchoolCalendarRow) => {
+  if (!selectedSeasonSlugs.value.length || !isProgramType(ev.event_type)) return false
+  const slug = eventSeasonSlug(ev)
+  return Boolean(slug && selectedSeasonSlugs.value.includes(slug))
+}
+
+const eventChipHighlightStyle = (ev: SchoolCalendarRow, day?: Date) => {
+  if (!isProgramType(ev.event_type)) return {}
+  const seasonOn = selectedSeasonSlugs.value.length > 0
+  if (seasonOn && !isEventInSelectedSeason(ev)) return {}
+  const track = skillTrackFromLevelId(ev.skill_level)
+  const skill = SKILL_CHIP_COLOR[track]
+  const past = day ? isPastDay(day) : false
+  const seasonSlug = eventSeasonSlug(ev)
+  const seasonAccent = seasonOn && seasonSlug ? seasonColorFor(seasonSlug).solid : ''
+  return {
+    backgroundColor: past && !seasonOn ? skill.muted : skill.solid,
+    borderColor: seasonAccent || skill.solid,
+    color: '#fff',
+    boxShadow: seasonAccent ? `inset 3px 0 0 ${seasonAccent}` : undefined,
+  }
+}
+
+const SKILL_CHIP_COLOR: Record<ProgramSkillTrack, { solid: string; muted: string }> = {
+  beginner: { solid: '#059669', muted: 'rgba(5, 150, 105, 0.40)' },
+  intermediate: { solid: '#7c3aed', muted: 'rgba(124, 58, 237, 0.40)' },
+  advanced: { solid: '#d97706', muted: 'rgba(217, 119, 6, 0.40)' },
+}
+
+const SKILL_CHIP_SHORT: Record<ProgramSkillTrack, { es: string; en: string }> = {
+  beginner: { es: 'Princ.', en: 'Beg.' },
+  intermediate: { es: 'Inter.', en: 'Int.' },
+  advanced: { es: 'Avanz.', en: 'Adv.' },
+}
+
+const formatChipClock = (t: string | null | undefined) => {
+  if (!t) return ''
+  const [hh, mm] = t.slice(0, 5).split(':').map(Number)
+  if (!Number.isFinite(hh)) return ''
+  const h12 = ((hh + 11) % 12) + 1
+  if (!mm) return String(h12)
+  return `${h12}:${String(mm).padStart(2, '0')}`
+}
+
+const eventChipTime = (ev: SchoolCalendarRow) => {
+  if (ev.start_time && ev.end_time) {
+    const a = formatChipClock(ev.start_time)
+    const b = formatChipClock(ev.end_time)
+    if (a && b) return `${a}–${b}`
+  }
+  const slot = ev.time_slot
+  if (slot === 'summer') return '9–1'
+  if (slot === 'morning') return '7–8:30'
+  if (slot === 'early') return '5:30–7'
+  if (slot === 'late') return '7–8:30'
+  if (slot === 'monday') return '4:30–6'
+  return ''
+}
+
+const eventChipLabel = (ev: SchoolCalendarRow) => {
+  if (!isProgramType(ev.event_type)) return ev.title
+  const track = skillTrackFromLevelId(ev.skill_level)
+  const short = SKILL_CHIP_SHORT[track]
+  const skill = language.value === 'es' ? short.es : short.en
+  const kind = ev.event_type === 'class_individual'
+    ? (language.value === 'es' ? 'Ind.' : 'Ind.')
+    : (language.value === 'es' ? 'Grupal' : 'Group')
+  const ages =
+    ev.min_age != null && ev.max_age != null
+      ? `${ev.min_age}–${ev.max_age}`
+      : ev.min_age != null
+        ? `${ev.min_age}+`
+        : ''
+  const time = eventChipTime(ev)
+  return [kind, skill, ages, time ? `· ${time}` : ''].filter(Boolean).join(' ')
+}
+
+const eventChipEmoji = (ev: SchoolCalendarRow) => {
+  if (!isProgramType(ev.event_type)) return EVENT_META[ev.event_type]?.emoji || '🏷️'
+  const track = skillTrackFromLevelId(ev.skill_level)
+  return PROGRAM_SKILL_TRACKS.find(t => t.id === track)?.emoji || EVENT_META[ev.event_type]?.emoji || '🛹'
+}
+
+const isProgramChipTinted = (ev: SchoolCalendarRow) => {
+  if (!isProgramType(ev.event_type)) return false
+  if (!selectedSeasonSlugs.value.length) return true
+  return isEventInSelectedSeason(ev)
+}
+
+const seasonSelectError = ref('')
+
+const persistSelectedSeasons = (slugs: string[]) => {
+  const query = { ...route.query } as Record<string, string | string[] | undefined>
+  delete query.temporada
+  if (slugs.length) query.temporadas = slugs.join(',')
+  else delete query.temporadas
+  router.replace({ query })
+}
+
+const onSeasonCreated = async (season: { slug: string }) => {
+  addSeasonOpen.value = false
+  await refreshSeasons()
+  await router.push(`/temporadas/${season.slug}`)
+}
 
 const defaultForm = (ymd: string, mode: CreateMode, seasonSlug = '') => ({
   title: '',
@@ -808,7 +1075,7 @@ const defaultForm = (ymd: string, mode: CreateMode, seasonSlug = '') => ({
   description: '',
   visible_to_parents: true,
   is_bookable: mode === 'program',
-  time_slot: 'early' as TimeSlot,
+  time_slot: (isSummerCourseSeason(seasonSlug) ? SUMMER_COURSE_SLOT : 'early') as TimeSlot,
   skill_level: 'beginner_1' as SkateSkillLevelId,
   min_age: 5,
   max_age: 12,
@@ -827,8 +1094,9 @@ const defaultForm = (ymd: string, mode: CreateMode, seasonSlug = '') => ({
   practice_time_slot: 'early' as TimeSlot,
   is_recurring: mode === 'program',
   recurring_weekdays: [...DEFAULT_PROGRAM_WEEKDAYS] as number[],
-  recurring_slots: ['early'] as TimeSlot[],
-  recurring_class_count: PROGRAM_TOTAL_CLASSES,
+  recurring_slots: isSummerCourseSeason(seasonSlug) ? [...SUMMER_COURSE_SLOTS] : (['early'] as TimeSlot[]),
+  recurring_class_count: isSummerCourseSeason(seasonSlug) ? 5 : PROGRAM_TOTAL_CLASSES,
+  program_weeks: 4 as ProgramWeekCount,
   summer_weeks: 1 as 1 | 2,
   skill_tracks: ['beginner'] as ProgramSkillTrack[],
   max_capacity_override: mode === 'program' ? 6 : 6,
@@ -840,7 +1108,7 @@ const openCreateForDay = (day: Date, mode: CreateMode = 'event') => {
   editingId.value = null
   createMode.value = mode
   const ymd = format(day, 'yyyy-MM-dd')
-  const seasonFromQuery = mode === 'program' ? querySeasonSlug() : ''
+  const seasonFromQuery = mode === 'program' ? seasonSlugForProgramDay(day) : ''
   form.value = defaultForm(ymd, mode, seasonFromQuery)
   if (mode === 'event' && filterType.value !== 'all' && EVENT_ONLY_TYPES.includes(filterType.value as SchoolCalendarEventType)) {
     form.value.event_type = filterType.value as SchoolCalendarEventType
@@ -896,9 +1164,20 @@ const openEdit = (ev: SchoolCalendarRow, e?: Event) => {
     recurring_weekdays: [...DEFAULT_PROGRAM_WEEKDAYS],
     recurring_slots: ['early'],
     recurring_class_count: PROGRAM_TOTAL_CLASSES,
+    program_weeks: 4 as ProgramWeekCount,
     summer_weeks: 1 as 1 | 2,
     max_capacity_override: ev.max_capacity_override ?? (ev.event_type === 'class_individual' ? 1 : 6),
     season_slug: ev.season_slug ?? '',
+  }
+  applyProgressionAgesIfNeeded()
+  if (
+    form.value.skill_tracks.includes('intermediate')
+    && !form.value.audience_categories.includes('adults_18_plus')
+  ) {
+    if (!form.value.audience_categories.includes('tots_5_7')) {
+      form.value.min_age = PROGRESSION_AGE.minAge
+    }
+    form.value.max_age = Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
   }
   modalOpen.value = true
   formError.value = ''
@@ -982,9 +1261,29 @@ const submitEvent = async () => {
 
   if (
     (form.value.event_type === 'class_session' || form.value.event_type === 'class_individual')
+    && formSeason.value
+  ) {
+    const season = formSeason.value
+    const start = form.value.start_date
+    const end = form.value.end_date?.trim() || start
+    if (start < season.startDate || start > season.endDate || end < season.startDate || end > season.endDate) {
+      formError.value =
+        language.value === 'es'
+          ? `Las fechas deben quedar dentro de la temporada (${season.startDate} – ${season.endDate}).`
+          : `Dates must stay inside the season (${season.startDate} – ${season.endDate}).`
+      return
+    }
+  }
+
+  if (
+    (form.value.event_type === 'class_session' || form.value.event_type === 'class_individual')
     && (form.value.is_recurring || isSummerCourseForm.value)
     && !editingId.value
   ) {
+    if (isSummerCourseForm.value) {
+      form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
+      form.value.time_slot = SUMMER_COURSE_SLOT
+    }
     if (!form.value.recurring_weekdays.length) {
       formError.value =
         language.value === 'es' ? 'Elige al menos un día de la semana' : 'Choose at least one weekday'
@@ -1024,8 +1323,15 @@ const submitEvent = async () => {
       slot: TimeSlot,
       programSeriesId: string | null,
     ) => {
-      const slotTimes = TIME_SLOT_LABELS[slot]
+      const slotTimes = TIME_SLOT_LABELS[slot] ?? TIME_SLOT_LABELS.summer
       const capOverride = Number(form.value.max_capacity_override) || null
+      const progression = form.value.skill_tracks.includes('intermediate')
+      const minAge = progression && !form.value.audience_categories.includes('tots_5_7')
+        ? PROGRESSION_AGE.minAge
+        : (Number(form.value.min_age) || null)
+      const maxAge = progression && !form.value.audience_categories.includes('adults_18_plus')
+        ? Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
+        : (Number(form.value.max_age) || null)
       return {
         title,
         event_type: form.value.event_type as 'class_session' | 'class_individual',
@@ -1044,8 +1350,8 @@ const submitEvent = async () => {
           ? form.value.audience_categories
           : null,
         skill_level: skillLevelIdFromTrack(form.value.skill_tracks[0]!),
-        min_age: Number(form.value.min_age) || null,
-        max_age: Number(form.value.max_age) || null,
+        min_age: minAge,
+        max_age: maxAge,
         skatepark: form.value.location || DEFAULT_SKATEPARK,
         price_mxn: priceNum,
         program_series_id: programSeriesId,
@@ -1056,24 +1362,44 @@ const submitEvent = async () => {
     }
 
     if (isRecurringClass) {
+      if (isSummerCourseForm.value) {
+        form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
+        form.value.time_slot = SUMMER_COURSE_SLOT
+      }
       const occurrences = generateProgramOccurrences({
         startDate: form.value.start_date,
-        endDate: isSummerCourseForm.value ? form.value.end_date : null,
+        endDate: programOccurrenceEndDate(),
         weekdays: form.value.recurring_weekdays,
-        slots: form.value.recurring_slots,
+        slots: programSlotsForGenerate(),
         maxClasses: Math.max(1, Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES),
+        allowListedSlots: true,
       })
       if (!occurrences.length) {
         formError.value =
           language.value === 'es'
-            ? 'No se generaron clases: revisa que el horario exista en los días elegidos (ej. 5:30–7 PM en Mar/Jue/Sáb/Dom; mañana solo fin de semana).'
-            : 'No classes generated: check that the time slot is valid for selected days (e.g. 5:30–7 PM on Tue/Thu/Sat/Sun; morning weekends only).'
+            ? 'No se generaron clases dentro de la temporada. Revisa fechas, días y horarios.'
+            : 'No classes were generated inside the season. Check dates, days, and times.'
         saving.value = false
         return
       }
       const seriesId = crypto.randomUUID()
       const rows = occurrences.map(o => buildClassPayload(o.date, o.slot, seriesId))
       let { error: bulkErr } = await client.from('school_calendar_events').insert(rows)
+      const bulkMsg = bulkErr?.message || ''
+      if (bulkErr && /summer|time_slot|invalid input value for enum/i.test(bulkMsg)) {
+        const fallbackRows = rows.map(r =>
+          r.time_slot === 'summer'
+            ? { ...r, time_slot: 'morning' as TimeSlot, start_time: '09:00:00', end_time: '13:00:00' }
+            : r,
+        )
+        ;({ error: bulkErr } = await client.from('school_calendar_events').insert(fallbackRows))
+        if (!bulkErr) {
+          formError.value =
+            language.value === 'es'
+              ? 'Clases creadas 9:00–13:00. En Supabase SQL Editor ejecuta supabase/migrations/add_summer_time_slot.sql'
+              : 'Classes created 9:00–13:00. In Supabase SQL Editor run supabase/migrations/add_summer_time_slot.sql'
+        }
+      }
       if (
         bulkErr?.message?.includes('program_series_id')
         || bulkErr?.message?.includes('max_capacity_override')
@@ -1117,8 +1443,12 @@ const submitEvent = async () => {
       time_slot: isClass ? form.value.time_slot : null,
       audience_category: form.value.audience_categories[0] ?? null,
       skill_level: isClass ? form.value.skill_level : null,
-      min_age: isClass ? Number(form.value.min_age) || null : null,
-      max_age: isClass ? Number(form.value.max_age) || null : null,
+      min_age: isClass ? (form.value.skill_tracks.includes('intermediate') && !form.value.audience_categories.includes('tots_5_7')
+        ? PROGRESSION_AGE.minAge
+        : (Number(form.value.min_age) || null)) : null,
+      max_age: isClass ? (form.value.skill_tracks.includes('intermediate') && !form.value.audience_categories.includes('adults_18_plus')
+        ? Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
+        : (Number(form.value.max_age) || null)) : null,
       skatepark: isClass ? form.value.location || DEFAULT_SKATEPARK : null,
       price_mxn: isClass ? priceNum : null,
       max_capacity_override: isClass ? Number(form.value.max_capacity_override) || null : null,
@@ -1217,13 +1547,95 @@ const goToday = () => {
   selectedDate.value = new Date()
 }
 
-const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, selectedDate.value)
+const isSelectedDay = (day: Date) => isSameDay(day, selectedDate.value)
+
+const isPastDay = (day: Date) => isBefore(startOfDay(day), startOfDay(new Date()))
+
+const todayYmd = () => format(new Date(), 'yyyy-MM-dd')
+
+const seasonIsPast = (startDate: string, endDate: string) => endDate < todayYmd()
+
+const seasonIsCurrent = (startDate: string, endDate: string) => {
+  const t = todayYmd()
+  return t >= startDate && t <= endDate
+}
+
+const highlightedSeasons = computed(() => selectedSeasons.value)
+
+const isDayInHighlightedSeason = (day: Date) => seasonsCoveringDay(day).length > 0
+
+const seasonMerida = (season: { startDate: string; endDate: string; status: string }) => {
+  if (seasonIsPast(season.startDate, season.endDate)) {
+    return { kind: 'done' as const, label: language.value === 'es' ? 'Completada' : 'Completed' }
+  }
+  if (season.status === 'enrolling') {
+    return { kind: 'enroll' as const, label: language.value === 'es' ? 'Inscribirse' : 'Register' }
+  }
+  return {
+    kind: 'soon' as const,
+    label: seasonStatusLabel(season.status as 'enrolling' | 'soon' | 'closed', language.value === 'es'),
+  }
+}
+
+const toggleSeason = (slug: string) => {
+  const season = seasonBySlug(slug) || getProgramSeasonBySlug(slug)
+  if (!season) return
+  seasonSelectError.value = ''
+  const current = [...selectedSeasonSlugs.value]
+  const idx = current.indexOf(slug)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+    persistSelectedSeasons(current)
+    return
+  }
+  const overlap = findOverlappingRegularSeason(season, selectedSeasons.value)
+  if (overlap) {
+    seasonSelectError.value = language.value === 'es'
+      ? `No se puede seleccionar: se cruza con ${overlap.name.es}. Solo el curso de verano puede coincidir con otra temporada.`
+      : `Can't select: it overlaps ${overlap.name.en}. Only summer camp may overlap another season.`
+    return
+  }
+  current.push(slug)
+  persistSelectedSeasons(current)
+  if (seasonIsCurrent(season.startDate, season.endDate)) {
+    viewMonth.value = new Date()
+    return
+  }
+  viewMonth.value = new Date(`${season.startDate}T12:00:00`)
+}
+
+const removingSeasonSlug = ref('')
+
+const confirmRemoveSeason = async (season: { slug: string; name: { es: string; en: string } }) => {
+  const name = language.value === 'es' ? season.name.es : season.name.en
+  const ok = window.confirm(
+    language.value === 'es'
+      ? `¿Quitar “${name}”? También desaparecerá de la página de inicio.`
+      : `Remove “${name}”? It will also disappear from the home page.`,
+  )
+  if (!ok) return
+  removingSeasonSlug.value = season.slug
+  seasonSelectError.value = ''
+  try {
+    await removeSeason(season.slug)
+    persistSelectedSeasons(selectedSeasonSlugs.value.filter(s => s !== season.slug))
+  } catch (e: unknown) {
+    const err = e as { data?: { message?: string }; message?: string }
+    seasonSelectError.value = err?.data?.message || err?.message || 'Error'
+  } finally {
+    removingSeasonSlug.value = ''
+  }
+}
+
+const selectDay = (day: Date) => {
+  selectedDate.value = day
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-black pb-24">
     <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-      <div class="px-4 py-4 max-w-4xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="px-4 py-4 max-w-7xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex items-center gap-3 min-w-0">
           <button type="button" class="p-2 -ml-2 text-gold-400 shrink-0" @click="router.push('/member/staff/dashboard')">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1260,19 +1672,30 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
           >
             + {{ language === 'es' ? 'Añadir programa' : 'Add program' }}
           </button>
+          <button
+            type="button"
+            class="px-4 py-2.5 rounded-full font-semibold text-sm text-white border border-cyan-400/60 bg-cyan-500/15 hover:bg-cyan-500/25"
+            @click="addSeasonOpen = true"
+          >
+            + {{ language === 'es' ? 'Añadir temporada' : 'Add season' }}
+          </button>
         </div>
       </div>
     </header>
 
     <div
       v-if="activeQuerySeason && profileIsAdmin"
-      class="border-b border-teal-500/30 bg-teal-500/10 px-4 py-3"
+      class="border-b px-4 py-3"
+      :style="{
+        borderColor: `${seasonColorFor(activeQuerySeason.slug).solid}55`,
+        backgroundColor: seasonColorFor(activeQuerySeason.slug).fillMuted,
+      }"
     >
-      <p class="max-w-4xl mx-auto text-sm text-teal-100">
+      <p class="max-w-7xl mx-auto text-sm text-white">
         <span class="font-bold">{{ activeQuerySeason.icon }}
           {{ language === 'es' ? activeQuerySeason.name.es : activeQuerySeason.name.en }}
         </span>
-        <span class="text-teal-200/80">
+        <span class="text-white/80">
           · {{
             language === 'es'
               ? 'Los programas nuevos se asignarán a esta temporada'
@@ -1301,8 +1724,8 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
       {{ language === 'es' ? 'Redirigiendo…' : 'Redirecting…' }}
     </div>
 
-    <div v-else class="px-4 py-6 max-w-4xl mx-auto space-y-4">
-      <div v-if="formError && !modalOpen" class="rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-200">
+    <div v-else class="px-4 py-6 max-w-7xl mx-auto">
+      <div v-if="formError && !modalOpen" class="rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-200 mb-4">
         {{ formError }}
         <p class="text-xs text-red-300/80 mt-2">
           {{
@@ -1312,6 +1735,88 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
           }}
         </p>
       </div>
+
+      <div class="lg:flex lg:gap-6 lg:items-start">
+        <aside class="lg:w-72 lg:shrink-0 mb-6 lg:mb-0 lg:sticky lg:top-24">
+          <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
+            {{ language === 'es' ? 'Temporadas del programa' : 'Program seasons' }}
+          </h2>
+          <p class="text-[11px] text-gray-500 mb-2">
+            {{
+              language === 'es'
+                ? 'Toca para seleccionar. Puedes elegir varias. El curso de verano puede coincidir con otra temporada.'
+                : 'Tap to select. You can pick more than one. Summer camp may overlap another season.'
+            }}
+          </p>
+          <p v-if="seasonSelectError" class="text-[11px] text-amber-300 mb-2">{{ seasonSelectError }}</p>
+          <div class="rounded-2xl border border-gray-800 bg-gray-950 overflow-y-auto max-h-[70vh]">
+            <div
+              v-for="season in programSeasons"
+              :key="season.slug"
+              class="relative border-b border-gray-800 last:border-b-0"
+              :class="seasonIsPast(season.startDate, season.endDate) ? 'opacity-45' : ''"
+              :style="isSeasonSelected(season.slug)
+                ? {
+                    backgroundColor: seasonColorFor(season.slug).fillMuted,
+                    boxShadow: `inset 0 0 0 1px ${seasonColorFor(season.slug).solid}`,
+                  }
+                : {}"
+            >
+              <button
+                type="button"
+                class="w-full text-left px-3 py-3 pr-10 transition-colors"
+                :class="isSeasonSelected(season.slug) ? '' : 'hover:bg-gray-900'"
+                @click="toggleSeason(season.slug)"
+              >
+                <p
+                  class="text-sm font-bold leading-snug flex items-center gap-2"
+                  :class="seasonIsPast(season.startDate, season.endDate) ? 'text-gray-500' : 'text-white'"
+                >
+                  <span
+                    class="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                    :style="{ backgroundColor: seasonColorFor(season.slug).solid }"
+                    aria-hidden="true"
+                  />
+                  <span class="mr-0.5" aria-hidden="true">{{ season.icon }}</span>
+                  {{ language === 'es' ? season.name.es : season.name.en }}
+                </p>
+                <p class="text-[11px] text-gray-500 mt-0.5">
+                  {{ language === 'es' ? season.dates.es : season.dates.en }}
+                </p>
+                <p class="mt-1.5 flex items-center justify-between gap-2">
+                  <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Mérida</span>
+                  <span
+                    v-if="seasonMerida(season).kind === 'enroll'"
+                    class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-teal-700 text-white text-[10px] font-bold"
+                  >
+                    {{ seasonMerida(season).label }}
+                  </span>
+                  <span
+                    v-else
+                    class="text-[11px] font-semibold"
+                    :class="seasonMerida(season).kind === 'done' ? 'text-gray-500' : 'text-gray-400'"
+                  >
+                    {{ seasonMerida(season).label }}
+                  </span>
+                </p>
+              </button>
+              <button
+                type="button"
+                class="absolute top-2 right-2 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40"
+                :disabled="removingSeasonSlug === season.slug"
+                :title="language === 'es' ? 'Quitar temporada' : 'Remove season'"
+                :aria-label="language === 'es' ? 'Quitar temporada' : 'Remove season'"
+                @click.stop="confirmRemoveSeason(season)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="min-w-0 flex-1 space-y-4">
 
       <!-- Toolbar -->
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1382,6 +1887,34 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
             <span class="text-sm leading-none shrink-0" aria-hidden="true">{{ EVENT_META[t].emoji }}</span>
             {{ tLabel(t) }}
           </span>
+          <span
+            v-for="track in PROGRAM_SKILL_TRACKS"
+            :key="'leg-sk-' + track.id"
+            class="inline-flex items-center gap-1.5"
+          >
+            <span
+              class="w-3 h-3 rounded-sm shrink-0"
+              :style="{ backgroundColor: SKILL_CHIP_COLOR[track.id].solid }"
+            />
+            {{ track.emoji }}
+            {{ language === 'es' ? track.label.es : track.label.en }}
+          </span>
+        </div>
+        <div v-if="highlightedSeasons.length" class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span
+            v-for="season in highlightedSeasons"
+            :key="'leg-season-' + season.slug"
+            class="inline-flex items-center gap-1.5"
+          >
+            <span
+              class="w-3 h-3 rounded-sm shrink-0"
+              :style="{ backgroundColor: seasonColorFor(season.slug).solid }"
+            />
+            {{ language === 'es' ? season.name.es : season.name.en }}
+            <span class="text-gray-500">
+              · {{ language === 'es' ? season.dates.es : season.dates.en }}
+            </span>
+          </span>
         </div>
       </div>
 
@@ -1400,22 +1933,34 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
           </div>
         </div>
         <div class="grid grid-cols-7 auto-rows-fr">
-          <button
+          <div
             v-for="(day, idx) in monthRange.days"
             :key="idx"
-            type="button"
-            class="min-h-[88px] sm:min-h-[100px] border-b border-r border-gray-800 p-1.5 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60"
+            role="button"
+            tabindex="0"
+            class="min-h-[88px] sm:min-h-[100px] border-b border-r border-gray-800 p-1.5 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
             :class="{
-              'bg-gray-950/50': !isSameMonth(day, viewMonth),
+              'bg-gray-950/50': !isSameMonth(day, viewMonth) && !isDayInHighlightedSeason(day),
+              'opacity-50': isPastDay(day) && !isDayInHighlightedSeason(day),
               'ring-2 ring-inset ring-white': isSelectedDay(day),
             }"
-            @click="openCreateForDay(day, 'event')"
+            :style="daySeasonStyle(day)"
+            @click="selectDay(day)"
+            @keydown.enter.prevent="selectDay(day)"
+            @keydown.space.prevent="selectDay(day)"
           >
             <div
               class="text-xs font-semibold mb-1"
               :class="[
-                isSameMonth(day, viewMonth) ? 'text-white' : 'text-gray-600',
-                isToday(day) ? 'text-gold-400' : '',
+                isToday(day)
+                  ? 'text-gold-400'
+                  : isDayInHighlightedSeason(day)
+                    ? 'text-white'
+                    : isPastDay(day)
+                      ? 'text-gray-500'
+                      : isSameMonth(day, viewMonth)
+                        ? 'text-white'
+                        : 'text-gray-600',
               ]"
             >
               {{ format(day, 'd') }}
@@ -1425,20 +1970,28 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                 v-for="ev in eventsOnDay(day).slice(0, 2)"
                 :key="ev.id"
                 type="button"
-                class="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate bg-gray-800/90 text-gray-200 border border-gray-700 hover:border-gold-500/50"
+                class="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate border transition-colors"
+                :class="isProgramChipTinted(ev)
+                  ? 'text-white font-semibold border-transparent'
+                  : isPastDay(day)
+                    ? 'bg-gray-900/80 text-gray-500 border-gray-800'
+                    : 'bg-gray-800/90 text-gray-200 border-gray-700 hover:border-gold-500/50'"
+                :style="eventChipHighlightStyle(ev, day)"
+                :title="ev.title"
                 @click.stop="openEdit(ev, $event)"
               >
                 <span
                   v-if="isProgramType(ev.event_type)"
                   class="inline-block mr-0.5 align-middle text-[11px] leading-none"
+                  :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
                   aria-hidden="true"
-                >{{ EVENT_META[ev.event_type]?.emoji || '🛹' }}</span>
+                >{{ eventChipEmoji(ev) }}</span>
                 <span
                   v-else
                   class="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle"
-                  :class="EVENT_META[ev.event_type]?.dot || 'bg-gray-500'"
+                  :class="isPastDay(day) ? 'bg-gray-600' : (EVENT_META[ev.event_type]?.dot || 'bg-gray-500')"
                 />
-                {{ ev.title }}
+                {{ eventChipLabel(ev) }}
               </button>
               <span
                 v-if="eventsOnDay(day).length > 2"
@@ -1447,17 +2000,19 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                 +{{ eventsOnDay(day).length - 2 }}
               </span>
             </div>
-          </button>
+          </div>
         </div>
       </div>
 
       <p class="text-xs text-gray-600 text-center">
         {{
           language === 'es'
-            ? 'Usa “Añadir evento” o “Añadir programa”. Toca un chip para editar o borrar.'
-            : 'Use “Add event” or “Add program”. Tap a chip to edit or delete.'
+            ? 'Hoy queda seleccionado al abrir. Toca un día para marcarlo. Usa “Añadir evento” o “Añadir programa”. Toca un chip para editar.'
+            : 'Today is selected when you open the calendar. Tap a day to select it. Use “Add event” or “Add program”. Tap a chip to edit.'
         }}
       </p>
+        </div>
+      </div>
     </div>
 
     <Teleport to="body">
@@ -1581,7 +2136,7 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                   <option value="">
                     {{ language === 'es' ? '— Elige temporada —' : '— Select season —' }}
                   </option>
-                  <option v-for="s in PROGRAM_SEASONS" :key="s.slug" :value="s.slug">
+                  <option v-for="s in programSeasons" :key="s.slug" :value="s.slug">
                     {{ language === 'es' ? s.name.es : s.name.en }}
                     · {{ language === 'es' ? s.dates.es : s.dates.en }}
                   </option>
@@ -1600,7 +2155,7 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                     class="rounded-lg border px-1 py-2 text-center text-[11px] font-semibold transition-all"
                     :class="
                       isAudienceSelected(band.id)
-                        ? 'border-teal-500 bg-teal-500/15 text-white'
+                        ? 'border-teal-400 bg-teal-500 text-black ring-2 ring-teal-300'
                         : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                     "
                     @click="toggleAudience(band.id)"
@@ -1680,8 +2235,8 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                 />
                 {{
                   language === 'es'
-                    ? `Programa de ${PROGRAM_WEEKS} semanas (${PROGRAM_TOTAL_CLASSES} clases)`
-                    : `${PROGRAM_WEEKS}-week program (${PROGRAM_TOTAL_CLASSES} classes)`
+                    ? 'Programa recurrente · Mar / Jue / Sáb · las fechas siguen la temporada'
+                    : 'Recurring program · Tue / Thu / Sat · dates follow the season'
                 }}
               </label>
               <p v-if="!editingId && isSummerCourseForm" class="text-sm text-cyan-200 font-medium">
@@ -1717,11 +2272,50 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                     </button>
                   </div>
                 </div>
+                <div v-else class="space-y-2">
+                  <p class="text-xs font-medium text-gray-400">
+                    {{ language === 'es' ? 'Duración del programa' : 'Program length' }}
+                  </p>
+                  <div class="grid grid-cols-2 gap-1.5">
+                    <button
+                      v-for="weeks in PROGRAM_WEEK_OPTIONS"
+                      :key="weeks"
+                      type="button"
+                      class="rounded-lg border px-2 py-2 text-center text-[11px] font-semibold transition-all"
+                      :class="
+                        form.program_weeks === weeks
+                          ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                          : 'border-gray-600 text-gray-400'
+                      "
+                      @click="form.program_weeks = weeks"
+                    >
+                      {{
+                        language === 'es'
+                          ? `${weeks} semanas · ${weeks === 4 ? '12 clases' : '24 clases'}`
+                          : `${weeks} weeks · ${weeks === 4 ? '12 classes' : '24 classes'}`
+                      }}
+                      <span class="block text-[10px] font-normal text-gray-400 mt-0.5">
+                        {{
+                          weeks === 4
+                            ? language === 'es'
+                              ? 'Padres: 1 clase, 8 o 12'
+                              : 'Parents: 1 class, 8 or 12'
+                            : language === 'es'
+                              ? 'Padres: 1 clase, 16 o 24'
+                              : 'Parents: 1 class, 16 or 24'
+                        }}
+                      </span>
+                    </button>
+                  </div>
+                </div>
                 <div>
                   <p class="text-xs font-medium text-gray-400 mb-2">
                     {{ language === 'es' ? 'Días de la semana' : 'Days of the week' }}
                     <span v-if="isSummerCourseForm" class="text-cyan-300/80 font-normal">
                       · {{ language === 'es' ? 'Lun–Vie' : 'Mon–Fri' }}
+                    </span>
+                    <span v-else class="text-cyan-300/80 font-normal">
+                      · {{ language === 'es' ? 'Mar / Jue / Sáb' : 'Tue / Thu / Sat' }}
                     </span>
                   </p>
                   <div class="flex flex-wrap gap-2">
@@ -1735,7 +2329,7 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                           ? 'border-cyan-400 bg-cyan-500/20 text-white'
                           : 'border-gray-600 text-gray-400'
                       "
-                      :disabled="isSummerCourseForm"
+                      :disabled="true"
                       @click="toggleRecurringWeekday(d.v)"
                     >
                       {{ language === 'es' ? d.es : d.en }}
@@ -1746,22 +2340,43 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                 <div class="grid grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Inicio' : 'Start date' }} *</label>
-                    <input v-model="form.start_date" type="date" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm" />
+                    <input
+                      v-model="form.start_date"
+                      type="date"
+                      :min="formSeason?.startDate || undefined"
+                      :max="formSeason?.endDate || undefined"
+                      class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                      :class="{ 'opacity-80': Boolean(formSeason) }"
+                    />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Fin' : 'End date' }}</label>
-                    <input v-model="form.end_date" type="date" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm" />
+                    <input
+                      v-model="form.end_date"
+                      type="date"
+                      :min="formSeason?.startDate || form.start_date || undefined"
+                      :max="formSeason?.endDate || undefined"
+                      class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                      :class="{ 'opacity-80': Boolean(formSeason) }"
+                    />
                   </div>
                 </div>
                 <p class="text-[10px] text-gray-500 -mt-1">
                   {{
                     isSummerCourseForm
                       ? language === 'es'
-                        ? 'Fin = inicio + N días naturales (5 o 10 según duración). Días Lun–Vie.'
-                        : 'End = start + N calendar days (5 or 10 by duration). Mon–Fri only.'
+                        ? 'Inicio/fin = temporada de verano. Lun–Vie 9:00 AM – 1:00 PM. No se crean clases fuera de esas fechas.'
+                        : 'Start/end = summer season. Mon–Fri 9:00 AM – 1:00 PM. Classes cannot be created outside that window.'
                       : language === 'es'
-                        ? 'Inicio = primer día elegido más cercano · Fin = última de las N clases (omite festivos MX).'
-                        : 'Start = nearest first selected weekday · End = last of N classes (skips MX holidays).'
+                        ? 'Inicio/fin siguen la temporada seleccionada. Las clases no pueden salir de ese rango (omite festivos MX).'
+                        : 'Start/end follow the selected season. Classes cannot be created outside that window (MX holidays skipped).'
+                  }}
+                </p>
+                <p v-if="formSeason && !programFitsSeason" class="text-[11px] text-amber-400">
+                  {{
+                    language === 'es'
+                      ? `Esta temporada solo alcanza ${recurringPreview.length} clase(s) de ${form.recurring_class_count}. Acorta la duración o elige otra temporada.`
+                      : `This season only fits ${recurringPreview.length} of ${form.recurring_class_count} classes. Shorten the program or pick another season.`
                   }}
                 </p>
 
@@ -1771,7 +2386,7 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                   </p>
                   <div class="flex flex-wrap gap-2">
                     <button
-                      v-for="slot in slotsForWeekdays(form.recurring_weekdays)"
+                      v-for="slot in recurringSlotOptions"
                       :key="slot"
                       type="button"
                       class="px-3 py-1.5 rounded-full border text-xs font-bold transition-colors"
@@ -1780,6 +2395,7 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                           ? 'border-cyan-400 bg-cyan-500/20 text-white'
                           : 'border-gray-600 text-gray-400'
                       "
+                      :disabled="isSummerCourseForm"
                       @click="toggleRecurringSlot(slot)"
                     >
                       {{ TIME_SLOT_LABELS[slot].display }}
@@ -1789,11 +2405,11 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
                     {{
                       isSummerCourseForm
                         ? language === 'es'
-                          ? 'Horarios disponibles según el día (Lun–Vie).'
-                          : 'Available times depend on weekday (Mon–Fri).'
+                          ? 'Curso de verano: 9:00 AM – 1:00 PM (Lun–Vie).'
+                          : 'Summer course: 9:00 AM – 1:00 PM (Mon–Fri).'
                         : language === 'es'
-                          ? 'Mañana 7–8:30 solo Sáb · Tarde/noche Mar/Jue/Sáb · Lunes 4:30–6 PM'
-                          : 'Morning 7–8:30 Sat only · Early/late Tue/Thu/Sat · Monday 4:30–6 PM'
+                          ? 'Tarde/noche Mar/Jue/Sáb · Mañana 7–8:30 solo sábado.'
+                          : 'Early/late Tue/Thu/Sat · Morning 7–8:30 Saturday only.'
                     }}
                   </p>
                   <p
@@ -1824,16 +2440,23 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
 
                 <div class="grid grid-cols-2 gap-3">
                   <div v-if="!isSummerCourseForm">
-                    <label class="block text-xs font-medium text-gray-400 mb-1">
-                      {{ language === 'es' ? 'Número de clases' : 'Number of classes' }}
-                    </label>
-                    <input
-                      v-model.number="form.recurring_class_count"
-                      type="number"
-                      min="1"
-                      max="52"
-                      class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
-                    />
+                    <p class="block text-xs font-medium text-gray-400 mb-1">
+                      {{ language === 'es' ? 'Clases en el calendario' : 'Classes on the calendar' }}
+                    </p>
+                    <p class="px-3 py-2 rounded-xl bg-gray-800/80 border border-gray-700 text-sm text-white">
+                      {{ form.recurring_class_count }}
+                      <span class="text-gray-400 font-normal">
+                        · {{
+                          form.program_weeks === 8
+                            ? language === 'es'
+                              ? 'padres: 1 clase, 16 ($2,000) o 24 ($3,000)'
+                              : 'parents: 1 class, 16 ($2,000) or 24 ($3,000)'
+                            : language === 'es'
+                              ? 'padres: 1 clase, 8 ($1,000) o 12 ($1,500)'
+                              : 'parents: 1 class, 8 ($1,000) or 12 ($1,500)'
+                        }}
+                      </span>
+                    </p>
                   </div>
                   <div :class="isSummerCourseForm ? 'col-span-2' : ''">
                     <label class="block text-xs font-medium text-gray-400 mb-1">
@@ -2002,5 +2625,11 @@ const isSelectedDay = (day: Date) => selectedDate.value && isSameDay(day, select
         </div>
       </div>
     </Teleport>
+
+    <AdminSeasonCreateModal
+      :open="addSeasonOpen"
+      @close="addSeasonOpen = false"
+      @created="onSeasonCreated"
+    />
   </div>
 </template>

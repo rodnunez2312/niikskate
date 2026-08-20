@@ -253,8 +253,10 @@ export const useClasses = () => {
     
     const timeSlotTimes: Record<TimeSlot, { start: string; end: string }> = {
       monday: { start: '16:30:00', end: '18:00:00' },
+      morning: { start: '07:00:00', end: '08:30:00' },
       early: { start: '17:30:00', end: '19:00:00' },
       late: { start: '19:00:00', end: '20:30:00' },
+      summer: { start: '09:00:00', end: '13:00:00' },
     }
     
     try {

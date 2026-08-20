@@ -4,7 +4,8 @@ import {
   getSessionUserId,
   type BookableSessionRow,
 } from '~/server/utils/bookableSessions'
-import { getProgramSeasonBySlug } from '~/utils/programSeasons'
+import { getProgramSeasonBySlug, mergeProgramSeasons } from '~/utils/programSeasons'
+import { loadHiddenSeasonSlugs, rowToProgramSeason, type ProgramSeasonRow } from '~/server/utils/programSeasonRows'
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const skatepark = typeof query.skatepark === 'string' ? query.skatepark.trim() : ''
@@ -43,7 +44,20 @@ export default defineEventHandler(async (event) => {
 
   let rows = (data || []) as BookableSessionRow[]
   if (seasonSlug) {
-    const season = getProgramSeasonBySlug(seasonSlug)
+    let season = getProgramSeasonBySlug(seasonSlug, mergeProgramSeasons())
+    try {
+      const hidden = await loadHiddenSeasonSlugs(supabase)
+      season = getProgramSeasonBySlug(seasonSlug, mergeProgramSeasons([], hidden)) || season
+      const { data: seasonRow } = await supabase
+        .from('program_seasons')
+        .select('slug, name_es, name_en, start_date, end_date, status, icon')
+        .eq('slug', seasonSlug)
+        .maybeSingle()
+      if (seasonRow) season = rowToProgramSeason(seasonRow as ProgramSeasonRow)
+      if (hidden.includes(seasonSlug) && !seasonRow) season = undefined
+    } catch {
+      /* built-in catalog is enough */
+    }
     rows = rows.filter(r => {
       if (r.season_slug) return r.season_slug === seasonSlug
       if (season) {

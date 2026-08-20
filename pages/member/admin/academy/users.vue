@@ -22,7 +22,7 @@ import {
   normalizeNiikEmailLocal,
   NIIK_SKATE_EMAIL_DOMAIN,
 } from '~/utils/skaterNiikEmail'
-import { getProgramSeasonBySlug, PROGRAM_SEASONS } from '~/utils/programSeasons'
+import { getProgramSeasonBySlug } from '~/utils/programSeasons'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -33,6 +33,7 @@ const router = useRouter()
 const user = useSupabaseUser()
 const client = useSupabaseClient()
 const { language } = useI18n()
+const { seasons: programSeasons } = useProgramSeasons()
 
 // State
 const isAdmin = ref(false)
@@ -1325,7 +1326,7 @@ const scheduleSummary = (u: User) => {
               class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
             >
               <option value="">{{ language === 'es' ? '— Elige temporada —' : '— Select season —' }}</option>
-              <option v-for="s in PROGRAM_SEASONS" :key="s.slug" :value="s.slug">
+              <option v-for="s in programSeasons" :key="s.slug" :value="s.slug">
                 {{ language === 'es' ? s.name.es : s.name.en }}
                 · {{ language === 'es' ? s.dates.es : s.dates.en }}
               </option>

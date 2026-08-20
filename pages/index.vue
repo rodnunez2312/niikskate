@@ -1,23 +1,54 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'public' })
 
-import { PROGRAM_SEASONS, seasonStatusLabel } from '~/utils/programSeasons'
-import { PROGRAM_TOTAL_CLASSES, PROGRAM_WEEKS } from '~/types'
+import { seasonStatusLabel } from '~/utils/programSeasons'
 
 const { language } = useI18n()
 const es = computed(() => language.value === 'es')
+const { isAdmin } = useSiteProfile()
+const { seasons: seasonCatalog, refresh: refreshSeasons, removeSeason } = useProgramSeasons()
+const router = useRouter()
+
+const addSeasonOpen = ref(false)
+const removingSeasonSlug = ref('')
+const seasonRemoveError = ref('')
 
 const seasons = computed(() =>
-  PROGRAM_SEASONS.map(s => ({
+  seasonCatalog.value.map(s => ({
     slug: s.slug,
     icon: s.icon,
     name: es.value ? s.name.es : s.name.en,
     dates: es.value ? s.dates.es : s.dates.en,
-    status: seasonStatusLabel(s.status, es),
+    status: seasonStatusLabel(s.status, es.value),
     statusKey: s.status,
-    href: s.status === 'enrolling' ? `/temporadas/${s.slug}` : null,
+    href: `/temporadas/${s.slug}`,
   })),
 )
+
+const onSeasonCreated = async (season: { slug: string }) => {
+  addSeasonOpen.value = false
+  await refreshSeasons()
+  await router.push(`/temporadas/${season.slug}`)
+}
+
+const confirmRemoveSeason = async (row: { slug: string; name: string }) => {
+  const ok = window.confirm(
+    es.value
+      ? `¿Quitar “${row.name}”? También desaparecerá del calendario.`
+      : `Remove “${row.name}”? It will also disappear from the calendar.`,
+  )
+  if (!ok) return
+  removingSeasonSlug.value = row.slug
+  seasonRemoveError.value = ''
+  try {
+    await removeSeason(row.slug)
+  } catch (e: unknown) {
+    const err = e as { data?: { message?: string }; message?: string }
+    seasonRemoveError.value = err?.data?.message || err?.message || 'Error'
+  } finally {
+    removingSeasonSlug.value = ''
+  }
+}
 
 const donateAmounts = [100, 250, 500, 1000]
 const selectedDonate = ref(250)
@@ -203,9 +234,20 @@ watch(parentQuotes, () => {
         </p>
 
         <div class="mt-14">
-          <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-6 text-center">
-            {{ es ? 'Temporadas del programa' : 'Program seasons' }}
-          </h2>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 text-center sm:text-left">
+              {{ es ? 'Temporadas del programa' : 'Program seasons' }}
+            </h2>
+            <button
+              v-if="isAdmin"
+              type="button"
+              class="self-center sm:self-auto px-4 py-2.5 rounded-full font-semibold text-sm text-white bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400"
+              @click="addSeasonOpen = true"
+            >
+              + {{ es ? 'Añadir temporada' : 'Add season' }}
+            </button>
+          </div>
+          <p v-if="isAdmin && seasonRemoveError" class="text-sm text-red-300 mb-3">{{ seasonRemoveError }}</p>
           <div class="overflow-x-auto">
             <table class="w-full min-w-[560px] text-left border-collapse">
               <thead>
@@ -213,6 +255,7 @@ watch(parentQuotes, () => {
                   <th class="py-3 pr-4 font-semibold">{{ es ? 'Temporada' : 'Season' }}</th>
                   <th class="py-3 pr-4 font-semibold">{{ es ? 'Fechas' : 'Dates' }}</th>
                   <th class="py-3 font-semibold">Mérida</th>
+                  <th v-if="isAdmin" class="py-3 w-12" />
                 </tr>
               </thead>
               <tbody>
@@ -230,13 +273,27 @@ watch(parentQuotes, () => {
                   <td class="py-4 pr-4 text-gray-300">{{ row.dates }}</td>
                   <td class="py-4 font-semibold">
                     <NuxtLink
-                      v-if="row.href"
+                      v-if="row.statusKey === 'enrolling'"
                       :to="row.href"
-                      class="text-gold-400 hover:text-gold-300 underline underline-offset-4"
+                      class="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-teal-700 text-white text-xs font-bold hover:bg-teal-600"
                     >
-                      {{ row.status }}
+                      {{ es ? 'Inscribirse' : 'Register' }}
                     </NuxtLink>
-                    <span v-else class="text-amber-200/80">{{ row.status }}</span>
+                    <span v-else class="text-gray-400 text-sm">{{ row.status }}</span>
+                  </td>
+                  <td v-if="isAdmin" class="py-4 pl-2 text-right">
+                    <button
+                      type="button"
+                      class="inline-flex p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40"
+                      :disabled="removingSeasonSlug === row.slug"
+                      :title="es ? 'Quitar temporada' : 'Remove season'"
+                      :aria-label="es ? 'Quitar temporada' : 'Remove season'"
+                      @click="confirmRemoveSeason(row)"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -250,8 +307,8 @@ watch(parentQuotes, () => {
               <p>
                 {{
                   es
-                    ? `Cada temporada dura ${PROGRAM_WEEKS} semanas con hasta ${PROGRAM_TOTAL_CLASSES} clases en Mérida, Yucatán: Skatepark La Plancha. Desde $1,000 MXN/mes (hasta 2 clases/semana). Paquete completo (24 clases): $1,500 MXN.`
-                    : `Each season runs ${PROGRAM_WEEKS} weeks with up to ${PROGRAM_TOTAL_CLASSES} classes in Mérida, Yucatán at Skatepark La Plancha. From $1,000 MXN/month (up to 2 classes/week). Full package (24 classes): $1,500 MXN.`
+                    ? 'Cada temporada puede ser de 4 semanas (8 clases $1,000 o 12 clases $1,500) o 8 semanas (16 clases $2,000 o 24 clases $3,000). También hay clase suelta. Entrenamos martes, jueves y sábado en Skatepark La Plancha, Mérida.'
+                    : 'Each season can run 4 weeks (8 classes $1,000 or 12 classes $1,500) or 8 weeks (16 classes $2,000 or 24 classes $3,000). Single classes are also available. We train Tuesday, Thursday, and Saturday at Skatepark La Plancha, Mérida.'
                 }}
               </p>
               <p>
@@ -619,6 +676,12 @@ watch(parentQuotes, () => {
         </div>
       </div>
     </section>
+
+    <AdminSeasonCreateModal
+      :open="addSeasonOpen"
+      @close="addSeasonOpen = false"
+      @created="onSeasonCreated"
+    />
   </div>
 </template>
 
