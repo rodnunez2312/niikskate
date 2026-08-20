@@ -872,8 +872,8 @@ const overlapsDay = (ev: SchoolCalendarRow, day: Date) => {
   return s <= d && e >= d
 }
 
-const eventsOnDay = (day: Date) =>
-  filteredEvents.value.filter(ev => {
+const eventsOnDay = (day: Date) => {
+  const list = filteredEvents.value.filter(ev => {
     if (!overlapsDay(ev, day)) return false
     if (
       selectedSeasonSlugs.value.length
@@ -884,6 +884,29 @@ const eventsOnDay = (day: Date) =>
     }
     return true
   })
+
+  const skillOrder: Record<ProgramSkillTrack, number> = {
+    beginner: 0,
+    intermediate: 1,
+    advanced: 2,
+  }
+
+  return list.sort((a, b) => {
+    const aProg = isProgramType(a.event_type) ? 0 : 1
+    const bProg = isProgramType(b.event_type) ? 0 : 1
+    if (aProg !== bProg) return aProg - bProg
+
+    const aSkill = skillOrder[skillTrackFromLevelId(a.skill_level)] ?? 9
+    const bSkill = skillOrder[skillTrackFromLevelId(b.skill_level)] ?? 9
+    if (aSkill !== bSkill) return aSkill - bSkill
+
+    const at = a.start_time || ''
+    const bt = b.start_time || ''
+    if (at !== bt) return at.localeCompare(bt)
+
+    return a.title.localeCompare(b.title)
+  })
+}
 
 const monthLabel = computed(() => {
   const loc = language.value === 'es' ? es : undefined
@@ -1627,6 +1650,158 @@ const confirmRemoveSeason = async (season: { slug: string; name: { es: string; e
   }
 }
 
+type ProgramSeriesSummary = {
+  key: string
+  seriesId: string | null
+  representative: SchoolCalendarRow
+  title: string
+  seasonSlug: string
+  startDate: string
+  endDate: string
+  classCount: number
+  isPast: boolean
+  isActive: boolean
+}
+
+const showPastPrograms = ref(false)
+const deletingProgramKey = ref('')
+
+const resolveEventSeasonSlug = (ev: SchoolCalendarRow): string => {
+  const tagged = ev.season_slug?.trim()
+  if (tagged) return tagged
+  const end = ev.end_date || ev.start_date
+  const covering = programSeasons.value.filter(
+    s => s.startDate <= end && s.endDate >= ev.start_date,
+  )
+  if (covering.length === 1) return covering[0].slug
+  const regular = covering.find(s => !isSummerCourseSeason(s.slug))
+  return regular?.slug || covering[0]?.slug || ''
+}
+
+const programSeriesSummaries = computed((): ProgramSeriesSummary[] => {
+  const groups = new Map<string, SchoolCalendarRow[]>()
+  for (const ev of events.value) {
+    if (!isProgramType(ev.event_type)) continue
+    const key = ev.program_series_id || ev.id
+    const list = groups.get(key) || []
+    list.push(ev)
+    groups.set(key, list)
+  }
+
+  const today = todayYmd()
+  const summaries: ProgramSeriesSummary[] = []
+
+  for (const [key, occs] of groups) {
+    const sorted = [...occs].sort((a, b) => a.start_date.localeCompare(b.start_date))
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+    const startDate = first.start_date
+    const endDate = last.start_date
+    const seasonSlug = resolveEventSeasonSlug(first)
+    const isPast = endDate < today
+    const isActive = startDate <= today && endDate >= today
+
+    summaries.push({
+      key,
+      seriesId: first.program_series_id ?? null,
+      representative: first,
+      title: first.title,
+      seasonSlug,
+      startDate,
+      endDate,
+      classCount: sorted.length,
+      isPast,
+      isActive,
+    })
+  }
+
+  return summaries.sort((a, b) => a.startDate.localeCompare(b.startDate))
+})
+
+const filteredProgramSummaries = computed(() => {
+  let list = programSeriesSummaries.value
+
+  if (selectedSeasonSlugs.value.length) {
+    list = list.filter(p => p.seasonSlug && selectedSeasonSlugs.value.includes(p.seasonSlug))
+  }
+
+  if (!showPastPrograms.value) {
+    list = list.filter(p => !p.isPast)
+  }
+
+  return list
+})
+
+const programSidebarSeasonLabel = (slug: string) => {
+  if (!slug) return ''
+  const season = seasonBySlug(slug) || getProgramSeasonBySlug(slug)
+  if (!season) return slug
+  return language.value === 'es' ? season.name.es : season.name.en
+}
+
+const programStatusBadge = (program: ProgramSeriesSummary) => {
+  if (program.isPast) {
+    return { kind: 'done' as const, label: language.value === 'es' ? 'Completado' : 'Completed' }
+  }
+  if (program.isActive) {
+    return { kind: 'active' as const, label: language.value === 'es' ? 'Activo' : 'Active' }
+  }
+  return { kind: 'soon' as const, label: language.value === 'es' ? 'Próximo' : 'Upcoming' }
+}
+
+const formatProgramDateRange = (start: string, end: string) => {
+  const loc = language.value === 'es' ? es : undefined
+  const s = parseYmd(start)
+  const e = parseYmd(end)
+  if (start === end) return format(s, 'd MMM yyyy', { locale: loc })
+  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
+    return `${format(s, 'd', { locale: loc })} – ${format(e, 'd MMM yyyy', { locale: loc })}`
+  }
+  return `${format(s, 'd MMM', { locale: loc })} – ${format(e, 'd MMM yyyy', { locale: loc })}`
+}
+
+const openEditProgram = (program: ProgramSeriesSummary) => {
+  openEdit(program.representative)
+}
+
+const confirmDeleteProgram = async (program: ProgramSeriesSummary) => {
+  const label = program.title
+  const ok = window.confirm(
+    language.value === 'es'
+      ? program.classCount > 1
+        ? `¿Eliminar el programa “${label}” y sus ${program.classCount} clases?`
+        : `¿Eliminar el programa “${label}”?`
+      : program.classCount > 1
+        ? `Delete program “${label}” and all ${program.classCount} classes?`
+        : `Delete program “${label}”?`,
+  )
+  if (!ok) return
+
+  deletingProgramKey.value = program.key
+  formError.value = ''
+  try {
+    if (program.seriesId) {
+      const { error } = await client
+        .from('school_calendar_events')
+        .delete()
+        .eq('program_series_id', program.seriesId)
+      if (error) throw error
+    } else {
+      const { error } = await client
+        .from('school_calendar_events')
+        .delete()
+        .eq('id', program.representative.id)
+      if (error) throw error
+    }
+    await loadEvents()
+  } catch (e: unknown) {
+    const err = e as { message?: string }
+    formError.value = err?.message || String(e)
+  } finally {
+    deletingProgramKey.value = ''
+  }
+}
+
 const selectDay = (day: Date) => {
   selectedDate.value = day
 }
@@ -1724,7 +1899,7 @@ const selectDay = (day: Date) => {
       {{ language === 'es' ? 'Redirigiendo…' : 'Redirecting…' }}
     </div>
 
-    <div v-else class="px-4 py-6 max-w-7xl mx-auto">
+    <div v-else class="px-4 py-6 max-w-[90rem] mx-auto">
       <div v-if="formError && !modalOpen" class="rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-200 mb-4">
         {{ formError }}
         <p class="text-xs text-red-300/80 mt-2">
@@ -1938,7 +2113,7 @@ const selectDay = (day: Date) => {
             :key="idx"
             role="button"
             tabindex="0"
-            class="min-h-[88px] sm:min-h-[100px] border-b border-r border-gray-800 p-1.5 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
+            class="min-h-[100px] sm:min-h-[112px] border-b border-r border-gray-800 p-1.5 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
             :class="{
               'bg-gray-950/50': !isSameMonth(day, viewMonth) && !isDayInHighlightedSeason(day),
               'opacity-50': isPastDay(day) && !isDayInHighlightedSeason(day),
@@ -1965,12 +2140,14 @@ const selectDay = (day: Date) => {
             >
               {{ format(day, 'd') }}
             </div>
-            <div class="flex flex-col gap-0.5">
+            <div
+              class="flex flex-col gap-0.5 max-h-[4.75rem] sm:max-h-[5.75rem] overflow-y-auto overscroll-contain"
+            >
               <button
-                v-for="ev in eventsOnDay(day).slice(0, 2)"
+                v-for="ev in eventsOnDay(day)"
                 :key="ev.id"
                 type="button"
-                class="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate border transition-colors"
+                class="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate border transition-colors shrink-0"
                 :class="isProgramChipTinted(ev)
                   ? 'text-white font-semibold border-transparent'
                   : isPastDay(day)
@@ -1993,12 +2170,6 @@ const selectDay = (day: Date) => {
                 />
                 {{ eventChipLabel(ev) }}
               </button>
-              <span
-                v-if="eventsOnDay(day).length > 2"
-                class="text-[10px] text-gray-500 pl-0.5"
-              >
-                +{{ eventsOnDay(day).length - 2 }}
-              </span>
             </div>
           </div>
         </div>
@@ -2007,11 +2178,133 @@ const selectDay = (day: Date) => {
       <p class="text-xs text-gray-600 text-center">
         {{
           language === 'es'
-            ? 'Hoy queda seleccionado al abrir. Toca un día para marcarlo. Usa “Añadir evento” o “Añadir programa”. Toca un chip para editar.'
-            : 'Today is selected when you open the calendar. Tap a day to select it. Use “Add event” or “Add program”. Tap a chip to edit.'
+            ? 'Hoy queda seleccionado al abrir. Toca un día para marcarlo. Si hay varios programas el mismo día, desplázate dentro de la celda. Usa el panel Programas a la derecha para ver la serie completa.'
+            : 'Today is selected when you open the calendar. Tap a day to select it. Scroll inside a day cell when several programs share that date. Use the Programs panel on the right for the full series list.'
         }}
       </p>
         </div>
+
+        <aside class="lg:w-72 lg:shrink-0 mt-6 lg:mt-0 lg:sticky lg:top-24">
+          <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
+            {{ language === 'es' ? 'Programas' : 'Programs' }}
+          </h2>
+          <p class="text-[11px] text-gray-500 mb-2">
+            {{
+              selectedSeasonSlugs.length
+                ? language === 'es'
+                  ? 'Programas de la(s) temporada(s) seleccionada(s).'
+                  : 'Programs in the selected season(s).'
+                : language === 'es'
+                  ? 'Todos los programas activos y próximos.'
+                  : 'All active and upcoming programs.'
+            }}
+          </p>
+          <label class="flex items-center gap-2 text-[11px] text-gray-400 mb-2 cursor-pointer select-none">
+            <input
+              v-model="showPastPrograms"
+              type="checkbox"
+              class="rounded border-gray-600 text-teal-500 focus:ring-teal-500"
+            />
+            {{ language === 'es' ? 'Mostrar completados' : 'Show completed' }}
+          </label>
+          <div class="rounded-2xl border border-gray-800 bg-gray-950 overflow-y-auto max-h-[70vh]">
+            <p
+              v-if="!filteredProgramSummaries.length"
+              class="px-3 py-6 text-center text-[11px] text-gray-500"
+            >
+              {{
+                language === 'es'
+                  ? selectedSeasonSlugs.length
+                    ? 'No hay programas en esta temporada.'
+                    : 'No hay programas activos o próximos.'
+                  : selectedSeasonSlugs.length
+                    ? 'No programs in this season.'
+                    : 'No active or upcoming programs.'
+              }}
+            </p>
+            <div
+              v-for="program in filteredProgramSummaries"
+              :key="program.key"
+              class="relative border-b border-gray-800 last:border-b-0"
+              :class="program.isPast ? 'opacity-45' : ''"
+              :style="program.seasonSlug
+                ? {
+                    backgroundColor: seasonColorFor(program.seasonSlug).fillMuted,
+                    boxShadow: `inset 3px 0 0 ${seasonColorFor(program.seasonSlug).solid}`,
+                  }
+                : {}"
+            >
+              <button
+                type="button"
+                class="w-full text-left px-3 py-3 pr-[4.5rem] transition-colors hover:bg-gray-900/60"
+                @click="openEditProgram(program)"
+              >
+                <p
+                  class="text-sm font-bold leading-snug flex items-center gap-2"
+                  :class="program.isPast ? 'text-gray-500' : 'text-white'"
+                >
+                  <span
+                    class="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                    :style="{
+                      backgroundColor: SKILL_CHIP_COLOR[skillTrackFromLevelId(program.representative.skill_level)].solid,
+                    }"
+                    aria-hidden="true"
+                  />
+                  <span class="text-base leading-none" aria-hidden="true">{{ eventChipEmoji(program.representative) }}</span>
+                  <span class="line-clamp-2">{{ program.title }}</span>
+                </p>
+                <p class="text-[11px] text-gray-500 mt-0.5">
+                  {{ formatProgramDateRange(program.startDate, program.endDate) }}
+                  · {{ program.classCount }}
+                  {{ language === 'es' ? (program.classCount === 1 ? 'clase' : 'clases') : (program.classCount === 1 ? 'class' : 'classes') }}
+                </p>
+                <p v-if="program.seasonSlug && !selectedSeasonSlugs.length" class="text-[10px] text-gray-500 mt-0.5 truncate">
+                  {{ programSidebarSeasonLabel(program.seasonSlug) }}
+                </p>
+                <p class="mt-1.5 flex items-center justify-between gap-2">
+                  <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold truncate">
+                    {{ eventChipLabel(program.representative) }}
+                  </span>
+                  <span
+                    class="text-[11px] font-semibold shrink-0"
+                    :class="{
+                      'text-teal-400': programStatusBadge(program).kind === 'active',
+                      'text-gray-400': programStatusBadge(program).kind === 'soon',
+                      'text-gray-500': programStatusBadge(program).kind === 'done',
+                    }"
+                  >
+                    {{ programStatusBadge(program).label }}
+                  </span>
+                </p>
+              </button>
+              <div class="absolute top-2 right-2 flex items-center gap-0.5">
+                <button
+                  type="button"
+                  class="p-1.5 rounded-lg text-gray-500 hover:text-cyan-300 hover:bg-cyan-950/40"
+                  :title="language === 'es' ? 'Editar programa' : 'Edit program'"
+                  :aria-label="language === 'es' ? 'Editar programa' : 'Edit program'"
+                  @click.stop="openEditProgram(program)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40"
+                  :disabled="deletingProgramKey === program.key"
+                  :title="language === 'es' ? 'Eliminar programa' : 'Delete program'"
+                  :aria-label="language === 'es' ? 'Eliminar programa' : 'Delete program'"
+                  @click.stop="confirmDeleteProgram(program)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
 
