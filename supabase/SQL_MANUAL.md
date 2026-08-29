@@ -38,6 +38,24 @@ Run migration: `supabase/migrations/add_birthday_and_class_individual.sql` (birt
 
 Run migration: `supabase/migrations/seed_mexico_holidays_2026_2027.sql` (national holidays 2026–2027; also auto-seeded when opening admin calendar)
 
+Run migration: `supabase/migrations/add_skateramp_projects.sql` (Skateramps studio + public catalog projects)
+
+Run migration: `supabase/migrations/add_strength_exercises.sql` (strength library: 5 pillars, body areas, training phases + `class_plans.strength_block`)
+
+Run migration: `supabase/migrations/add_finance_module.sql` (**required for the Finanzas section** at `/member/admin/finance`) — creates `finance_price_list` (seeded with the full class price sheet: Coach Niik / Pro Street / Pro Bowl), `finance_payments` (income), `finance_expenses` (costs), `finance_student_enrollments` (per-skater control sheet) and `finance_settings` (break-even inputs). Safe to re-run: every statement is idempotent and the price seed uses `ON CONFLICT DO NOTHING`, so edits made in the app are never overwritten.
+
+Run migration: `supabase/migrations/add_coupons.sql` (**required for Finanzas → Cupones** and for the code box at checkout) — creates `coupons`, `coupon_skaters` (the allow-list) and `coupon_redemptions`, and seeds `NIIKDAY1S`, which pins the beginner 8-class monthly at $800. The seeded coupon is restricted, so it does nothing until you add skaters to it in Finanzas → Cupones. Customers deliberately have **no** read policy on `coupons`: validation runs through `/api/coupons/validate` with the service role so codes cannot be enumerated.
+
+Run migration: `supabase/migrations/fix_detached_program_occurrences.sql` (only if renaming a class in the admin calendar once split an extra copy of a program out of the sidebar — reattaches classes whose `program_series_id` was cleared)
+
+Run migration: `supabase/migrations/fix_skills_library_sync_rls_and_restore.sql` (fixes *"new row violates row-level security policy for table skills_library"* on **Sincronizar desde Excel**, and re-activates the library if a failed sync left every trick switched off)
+
+Run migration: `supabase/migrations/add_skater_challenges.sql` (**required for Desafíos** on the skater panel) — creates `skater_challenges`, the coach-set goals shown above the trick bag. Challenges are free text and deliberately unrelated to `skills_library`, so they never move the "Trucos aprendidos" counter. Staff create and delete them; the skater (or their guardian's kid account) can tick one off, and only staff can reopen it.
+
+Run migration: `supabase/migrations/add_skater_self_trick_completion.sql` (**required so skaters can mark their own tricks done**) — adds an INSERT policy on `student_progress` for `auth.uid() = student_id`, gated on the trick already being in that skater's `student_skill_focus` bag. Without it, a skater tapping "¡Ya lo logré!" flips the bag status but the trick never unlocks. Undoing a completion stays coach/admin-only.
+
+Run migration: `supabase/migrations/split_strength_from_trick_manual.sql` (**required before the next "Sync from Excel"**) — strength moved to its own Excel sheet, so every trick's `#` shifted down by 24 (320 → 296 rows). `skills_library` upserts on `manual_id`, so syncing without re-keying first would rewrite rows in place and re-point skaters' trick bags at the wrong tricks. The script refuses to run unless the library is in the exact pre-split shape.
+
 ```sql
 -- List a parent's crew
 SELECT id, first_name, last_name, date_of_birth, age
@@ -129,6 +147,11 @@ Your schema has **several** payment surfaces; use the one that matches the produ
 
 | Table | Typical use |
 |--------|-------------|
+| **`finance_payments`** | **Academy income ledger** written by Finanzas → Ingresos. Free of the `orders`/`bookings` requirement, so a cash class payment can be recorded on its own. `academy_cut_mxn` and `coach_pay_mxn` are generated from `amount_mxn * academy_pct`. |
+| **`finance_expenses`** | **Cost ledger** (rent, coaches paid directly, supplies…). `is_recurring` + `recurrence` mark the fixed monthly costs used for break-even. |
+| **`finance_price_list`** | Editable class price sheet per coach tier: `list_mxn`, `discount_pct`, `final_mxn`, `sessions`, `academy_pct`, `min_fee_mxn`. |
+| **`finance_student_enrollments`** | Per-skater control sheet: classes paid, committed weekdays, attendance, absences, `remaining_sessions` (generated). |
+| **`coupons`** / **`coupon_skaters`** / **`coupon_redemptions`** | Discount codes, their skater allow-list, and one audit row per use with `original_mxn` / `discount_mxn` / `final_mxn` frozen at redemption. |
 | **`user_credits`** | Class packages / tokens: `price_paid_mxn`, `price_paid_usd`, `payment_method`, `payment_status`, optional `guest_booking_id`. |
 | **`guest_bookings`** | Checkout payload (`booking_data`), link to user via `linked_user_id`. |
 | **`class_reservations`** | Booked slots; status may include payment-pending workflow (see enum `credit_status` in DB). |
@@ -136,6 +159,65 @@ Your schema has **several** payment surfaces; use the one that matches the produ
 | **`orders` / `order_items`** | Shop / POS-style orders. |
 | **`payments`** | Individual payment lines tied to **`orders`** and/or **`bookings`** (`order_id` XOR `booking_id` enforced by CHECK). |
 | **`coach_payments`** | **Coach payroll** (amounts you pay coaches)—not customer payments. |
+
+### 3.1 Month result (Finanzas overview, in SQL)
+
+```sql
+SELECT
+  (SELECT COALESCE(SUM(academy_cut_mxn), 0)
+     FROM finance_payments
+    WHERE status = 'paid'
+      AND paid_on >= date_trunc('month', CURRENT_DATE)) AS academy_net_mxn,
+  (SELECT COALESCE(SUM(amount_mxn), 0)
+     FROM finance_expenses
+    WHERE status = 'paid'
+      AND incurred_on >= date_trunc('month', CURRENT_DATE)) AS spend_mxn;
+```
+
+### 3.1b Add the day-1 skaters to NIIKDAY1S in bulk
+
+The UI does this one skater at a time; this is the shortcut when you already know the emails.
+
+```sql
+INSERT INTO coupon_skaters (coupon_id, skater_id)
+SELECT c.id, p.id
+FROM coupons c
+JOIN profiles p ON p.email IN ('parent1@example.com', 'parent2@example.com')
+WHERE c.code = 'NIIKDAY1S'
+ON CONFLICT DO NOTHING;
+```
+
+### 3.1c Coupon usage and what it cost
+
+```sql
+SELECT c.code,
+       c.label_es,
+       count(r.id)                       AS uses,
+       COALESCE(SUM(r.discount_mxn), 0)  AS discounted_mxn
+FROM coupons c
+LEFT JOIN coupon_redemptions r ON r.coupon_id = c.id
+GROUP BY c.code, c.label_es
+ORDER BY discounted_mxn DESC;
+```
+
+### 3.2 Students who ran out of classes or owe a payment
+
+```sql
+SELECT student_name,
+       plan_label,
+       sessions_paid,
+       attended,
+       absences,
+       remaining_sessions,
+       last_payment_on,
+       CURRENT_DATE - last_payment_on AS days_since_payment
+FROM finance_student_enrollments
+WHERE is_active
+  AND (remaining_sessions <= 0
+       OR last_payment_on IS NULL
+       OR last_payment_on < CURRENT_DATE - INTERVAL '33 days')
+ORDER BY remaining_sessions, last_payment_on NULLS FIRST;
+```
 
 ---
 

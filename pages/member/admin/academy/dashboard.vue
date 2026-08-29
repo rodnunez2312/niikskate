@@ -253,17 +253,21 @@ const formatDate = (date: string) => {
             </svg>
           </NuxtLink>
 
-          <!-- Payments -->
+          <!-- Finance -->
           <NuxtLink 
-            to="/member/admin/payments"
+            to="/member/admin/finance"
             class="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all"
           >
             <div class="w-12 h-12 rounded-xl bg-gold-400/20 flex items-center justify-center text-2xl">
-              💰
+              💵
             </div>
             <div class="flex-1">
-              <p class="font-semibold text-white">{{ language === 'es' ? 'Pagos' : 'Payments' }}</p>
-              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Registrar y ver pagos' : 'Record and view payments' }}</p>
+              <p class="font-semibold text-white">{{ language === 'es' ? 'Finanzas' : 'Finance' }}</p>
+              <p class="text-sm text-gray-400">
+                {{ language === 'es'
+                  ? 'Ingresos, gastos, precios y punto de equilibrio'
+                  : 'Income, expenses, prices and break-even' }}
+              </p>
             </div>
             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

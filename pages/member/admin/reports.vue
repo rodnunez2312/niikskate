@@ -36,7 +36,11 @@ onMounted(async () => {
       client.from('bookings').select('*', { count: 'exact', head: true }),
       client.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       client.from('class_reservations').select('*', { count: 'exact', head: true }).gte('reservation_date', monthStart.slice(0, 10)),
-      client.from('payments').select('amount').gte('created_at', monthStart),
+      client
+        .from('finance_payments')
+        .select('amount_mxn')
+        .eq('status', 'paid')
+        .gte('paid_on', monthStart.slice(0, 10)),
     ])
 
     stats.value.totalCustomers = customers.count || 0
@@ -45,7 +49,10 @@ onMounted(async () => {
     stats.value.totalBookings = bookings.count || 0
     stats.value.pendingBookings = pendingBookings.count || 0
     stats.value.classesThisMonth = reservations.count || 0
-    stats.value.paymentsThisMonth = (payments.data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+    stats.value.paymentsThisMonth = (payments.data || []).reduce(
+      (s, p) => s + Number((p as { amount_mxn?: number }).amount_mxn || 0),
+      0,
+    )
   } finally {
     loading.value = false
   }
@@ -73,9 +80,9 @@ const cards = computed(() => [
     to: '/member/admin/scheduling/attendance',
   },
   {
-    label: language.value === 'es' ? 'Pagos del mes' : 'Payments this month',
+    label: language.value === 'es' ? 'Ingresos del mes' : 'Income this month',
     value: formatPrice(stats.value.paymentsThisMonth),
-    to: '/member/admin/payments',
+    to: '/member/admin/finance',
   },
 ])
 </script>

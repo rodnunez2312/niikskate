@@ -6,8 +6,6 @@ export type SkillGroupProgram = {
   is_active?: boolean | null
 }
 
-export { assignableSkillGroups } from '~/utils/skillGroupLevels'
-
 /** @deprecated Skaters use Level 1–5; Strength Training is planning-only. */
 export async function resolveDefaultSkaterSkillGroupId(
   client: ReturnType<typeof useSupabaseClient>,

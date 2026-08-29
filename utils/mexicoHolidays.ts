@@ -34,3 +34,9 @@ export const mexicoHolidayDateSet = new Set(
 export function isMexicoNationalHoliday(dateStr: string): boolean {
   return mexicoHolidayDateSet.has(dateStr)
 }
+
+export function mexicoHolidayName(dateStr: string, spanish = true): string {
+  const holiday = MEXICO_NATIONAL_HOLIDAYS_2026_2027.find(h => h.date === dateStr)
+  if (!holiday) return ''
+  return spanish ? holiday.title.es : holiday.title.en
+}

@@ -64,6 +64,15 @@ export const TIME_SLOT_LABELS: Record<TimeSlot, { start: string; end: string; di
   summer: { start: '09:00', end: '13:00', display: '9:00 AM – 1:00 PM' },
 }
 
+/** Human name for each slot — 'early'/'late' are the evening Session 1 / Session 2. */
+export const TIME_SLOT_NAMES: Record<TimeSlot, { en: string; es: string }> = {
+  monday: { en: 'Monday afternoon', es: 'Lunes tarde' },
+  morning: { en: 'Morning', es: 'Mañana' },
+  early: { en: 'Session 1', es: 'Sesión 1' },
+  late: { en: 'Session 2', es: 'Sesión 2' },
+  summer: { en: 'Summer course', es: 'Curso de verano' },
+}
+
 /** Slots admins can pick when building a recurring program. */
 export const PROGRAM_SESSION_SLOTS: TimeSlot[] = ['morning', 'early', 'late']
 
@@ -338,6 +347,31 @@ export const DAY_LABELS: Record<DayOfWeek, string> = {
   sunday: 'Sunday',
 }
 
+export const DAY_LABELS_ES: Record<DayOfWeek, string> = {
+  monday: 'Lunes',
+  tuesday: 'Martes',
+  thursday: 'Jueves',
+  saturday: 'Sábado',
+  sunday: 'Domingo',
+}
+
+export const DAY_SHORT_LABELS: Record<DayOfWeek, { en: string; es: string }> = {
+  monday: { en: 'Mon', es: 'Lun' },
+  tuesday: { en: 'Tue', es: 'Mar' },
+  thursday: { en: 'Thu', es: 'Jue' },
+  saturday: { en: 'Sat', es: 'Sáb' },
+  sunday: { en: 'Sun', es: 'Dom' },
+}
+
+/** JS getDay() number for each schedulable weekday. */
+export const DAY_OF_WEEK_NUMBERS: Record<DayOfWeek, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  thursday: 4,
+  saturday: 6,
+}
+
 export interface SkateProgramCard {
   id: string
   programSeriesId: string | null
@@ -438,28 +472,36 @@ export const PROGRAM_DAYS_PER_WEEK = 3
 export const PROGRAM_TOTAL_CLASSES = PROGRAM_WEEKS * PROGRAM_DAYS_PER_WEEK
 export const PROGRAM_CLASSES_PER_WEEK_INCLUDED = 2
 export const PROGRAM_INCLUDED_CLASSES = PROGRAM_WEEKS * PROGRAM_CLASSES_PER_WEEK_INCLUDED
+export const PROGRAM_PACK_4_MXN = 600
 export const PROGRAM_PACK_8_MXN = 1000
 export const PROGRAM_PACK_12_MXN = 1500
 export const PROGRAM_PACK_16_MXN = 2000
 export const PROGRAM_PACK_24_MXN = 3000
 
-export type ParentClassPack = 1 | 8 | 12 | 16 | 24
-export type ParentMultiClassPack = 8 | 12 | 16 | 24
+export type ParentClassPack = 1 | 4 | 8 | 12 | 16 | 24
+export type ParentMultiClassPack = 4 | 8 | 12 | 16 | 24
 
-export function programClassCount(weeks: ProgramWeekCount): number {
-  return weeks * PROGRAM_DAYS_PER_WEEK
+/** Total classes generated for a program: one per training day, every week. */
+export function programClassCount(
+  weeks: ProgramWeekCount,
+  daysPerWeek: number = PROGRAM_DAYS_PER_WEEK,
+): number {
+  return weeks * Math.max(1, daysPerWeek)
 }
 
 export function packPriceMxn(pack: ParentMultiClassPack): number {
+  if (pack === 4) return PROGRAM_PACK_4_MXN
   if (pack === 8) return PROGRAM_PACK_8_MXN
   if (pack === 12) return PROGRAM_PACK_12_MXN
   if (pack === 16) return PROGRAM_PACK_16_MXN
   return PROGRAM_PACK_24_MXN
 }
 
-/** 8-week series (≥16 sessions) uses 16/24 packs; 4-week uses 8/12. */
+/** 8-week series (≥16 sessions) uses 16/24 packs; 4-week uses 8/12; one day a week is a 4-pack. */
 export function multiClassPacksForSeriesLength(sessionCount: number): ParentMultiClassPack[] {
-  return sessionCount >= 16 ? [16, 24] : [8, 12]
+  if (sessionCount >= 16) return [16, 24]
+  if (sessionCount >= 8) return [8, 12]
+  return [4]
 }
 
 /** Summer course (curso de verano): Mon–Fri, 9:00 AM – 1:00 PM, 5 or 10 class days. */
@@ -984,6 +1026,11 @@ export interface Attendance {
 // CLASS PLANNING TYPES
 // =====================================================
 
+export interface ClassPlanSectionRow {
+  id: 'games' | 'drills' | 'closure'
+  skill_ids: string[]
+}
+
 export interface ClassPlan {
   id: string
   coach_id: string
@@ -991,7 +1038,10 @@ export interface ClassPlan {
   plan_date: string
   time_slot: TimeSlot
   title?: string
-  planned_skills?: string[] // Array of skill IDs
+  skill_track?: ProgramSkillTrack | null
+  audience_category?: AudienceCategory | null
+  plan_sections?: ClassPlanSectionRow[]
+  planned_skills?: string[] // Array of skill IDs (flat union of plan_sections)
   skills?: Skill[] // Populated skills
   warmup_notes?: string
   main_activity_notes?: string

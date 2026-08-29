@@ -8,12 +8,22 @@ const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language } = useI18n()
 
+type FocusRow = {
+  id: string
+  skill_id: string
+  coach_note: string | null
+  status?: SkaterTrickBagStatus
+  skill?: Skill
+}
+
 const loading = ref(true)
 const profile = ref<any>(null)
 const programName = ref<string | null>(null)
 const skillGroupName = ref<string | null>(null)
 const programPct = ref(0)
-const skillFocus = ref<Array<{ id: string; skill_id: string; coach_note: string | null; status?: string; skill?: Skill }>>([])
+const skillFocus = ref<FocusRow[]>([])
+const updatingFocusId = ref<string | null>(null)
+const focusError = ref<string | null>(null)
 
 onMounted(async () => {
   if (!user.value) return
@@ -68,6 +78,44 @@ function skillLabel(skill?: Skill) {
   if (!skill) return '—'
   return language.value === 'es' ? skill.name_es || skill.name : skill.name
 }
+
+/**
+ * The skater owns their own bag once a coach has filled it: they move a trick to
+ * "en progreso" and tick it off when they land it. Undoing stays with the coach.
+ */
+async function setFocusStatus(row: FocusRow, status: SkaterTrickBagStatus) {
+  if (!user.value || updatingFocusId.value || row.status === status) return
+  updatingFocusId.value = row.id
+  focusError.value = null
+  const previous = row.status
+  const stamp = new Date().toISOString()
+  row.status = status
+  try {
+    const { error } = await client
+      .from('student_skill_focus')
+      .update({ status, completed_at: status === 'done' ? stamp : null })
+      .eq('id', row.id)
+    if (error) throw error
+
+    if (status === 'done') {
+      const { error: progressError } = await client.from('student_progress').insert({
+        student_id: user.value.id,
+        skill_id: row.skill_id,
+        proficiency: 3,
+        learned_at: stamp,
+        marked_by: user.value.id,
+      })
+      // 23505: already unlocked by a coach, nothing to do.
+      if (progressError && progressError.code !== '23505') throw progressError
+    }
+  } catch (e: any) {
+    row.status = previous
+    focusError.value =
+      e?.message || (language.value === 'es' ? 'No se pudo actualizar' : 'Could not update')
+  } finally {
+    updatingFocusId.value = null
+  }
+}
 </script>
 
 <template>
@@ -106,15 +154,25 @@ function skillLabel(skill?: Skill) {
         </div>
       </div>
 
+      <MemberSkaterChallengesCard :student-id="user?.id ?? null" can-complete />
+
       <section class="space-y-3">
         <h2 class="text-sm font-bold text-gold-400 uppercase tracking-wide">
           {{ language === 'es' ? 'Bolsa de trucos' : 'Trick bag' }}
         </h2>
+        <p class="text-xs text-gray-500 -mt-1">
+          {{
+            language === 'es'
+              ? 'Cuando lo logres, márcalo como completado. Si te equivocas, pídele a tu coach que lo deshaga.'
+              : 'Tick a trick off once you land it. Ask your coach if you need it undone.'
+          }}
+        </p>
+        <p v-if="focusError" class="text-xs text-flame-500">{{ focusError }}</p>
         <ul v-if="skillFocus.length" class="space-y-2">
           <li
             v-for="f in skillFocus"
             :key="f.id"
-            class="rounded-xl bg-gray-900 border border-amber-500/30 px-4 py-3"
+            class="rounded-xl bg-gray-900 border border-amber-500/30 px-4 py-3 space-y-2"
           >
             <div class="flex items-center justify-between gap-2">
               <p class="text-white font-medium text-sm">{{ skillLabel(f.skill) }}</p>
@@ -123,10 +181,33 @@ function skillLabel(skill?: Skill) {
                 class="text-xs px-2 py-0.5 rounded shrink-0"
                 :class="f.status === 'done' ? 'bg-emerald-500/20 text-emerald-300' : f.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'"
               >
-                {{ trickBagStatusLabel(f.status as SkaterTrickBagStatus, language === 'es') }}
+                {{ trickBagStatusLabel(f.status, language === 'es') }}
               </span>
             </div>
-            <p v-if="f.coach_note" class="text-gray-400 text-xs mt-1">{{ f.coach_note }}</p>
+            <p v-if="f.coach_note" class="text-gray-400 text-xs">{{ f.coach_note }}</p>
+            <div v-if="f.status !== 'done'" class="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                class="min-h-[44px] rounded-xl border text-xs font-bold disabled:opacity-50"
+                :class="
+                  f.status === 'pending'
+                    ? 'border-amber-400 bg-amber-500/20 text-amber-200'
+                    : 'border-gray-700 text-gray-300'
+                "
+                :disabled="updatingFocusId === f.id"
+                @click="setFocusStatus(f, 'pending')"
+              >
+                {{ language === 'es' ? 'Lo estoy intentando' : "I'm working on it" }}
+              </button>
+              <button
+                type="button"
+                class="min-h-[44px] rounded-xl bg-emerald-500 text-black text-xs font-black disabled:opacity-50"
+                :disabled="updatingFocusId === f.id"
+                @click="setFocusStatus(f, 'done')"
+              >
+                {{ language === 'es' ? '¡Ya lo logré!' : 'I landed it!' }}
+              </button>
+            </div>
           </li>
         </ul>
         <p v-else class="text-sm text-gray-500 rounded-xl border border-gray-800 bg-gray-900/50 p-4">

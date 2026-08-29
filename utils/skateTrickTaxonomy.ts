@@ -1,7 +1,13 @@
-/** Canonical taxonomy from NiikSkate_Tricks_Manual.xlsx (Skate_Manual sheet). */
+/**
+ * Canonical taxonomy from NiikSkate_Tricks_Manual.xlsx (Skate_Manual sheet).
+ *
+ * Strength exercises live in the Strength_Training sheet and the
+ * `strength_exercises` table; see utils/strengthTraining.ts. They are no longer
+ * part of the trick taxonomy, so 'Strength Training' and area 'Warmup' are gone.
+ * Legacy normalizers below still recognise them for rows synced before the split.
+ */
 
 export const SKATE_TRICK_AREAS = [
-  'Warmup',
   'Flatground',
   'Street',
   'Park',
@@ -11,7 +17,6 @@ export const SKATE_TRICK_AREAS = [
 ] as const
 
 export const SKATE_TRICK_STRUCTURES = [
-  'Strength Training',
   'Level 1: Foundations',
   'Level 2: Balance & Control',
   'Level 3: Basic Tricks',
@@ -22,7 +27,6 @@ export const SKATE_TRICK_STRUCTURES = [
 export const SKATE_TRICK_TYPES = ['Exercise', 'Drill', 'Trick'] as const
 
 export const SKATE_TRICK_PROGRAMS = [
-  'Strength Training',
   'Foundations',
   'Beginners',
   'Intermediate',
@@ -76,7 +80,6 @@ export function nextTrickBagStatus(status: SkaterTrickBagStatus): SkaterTrickBag
 
 /** Program levels shown in Skate Program sidebar (skill_groups). */
 export const SKATE_PROGRAM_LEVELS = [
-  { sort_order: 0, name: 'Strength Training', description: 'Strength and mobility drills for class planning', color: '#64748b' },
   { sort_order: 1, name: 'Level 1: Foundations', description: 'Basic board control and safety', color: '#16a34a' },
   { sort_order: 2, name: 'Level 2: Balance & Control', description: 'Developing balance and basic movements', color: '#2563eb' },
   { sort_order: 3, name: 'Level 3: Basic Tricks', description: 'First tricks and transitions', color: '#4f46e5' },

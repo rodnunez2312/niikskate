@@ -1,511 +1,10 @@
 {
   "source": "Skate_Manual",
   "sourceFile": "NiikSkate_Ticks_Manual.xlsx",
-  "generatedAt": "2026-08-13T14:23:47.623Z",
+  "generatedAt": "2026-08-28T04:23:00.561Z",
   "tricks": [
     {
       "manual_id": 1,
-      "name": "Estiramiento de brazos, pierna, caderas, espalda",
-      "name_es": "Estiramiento de brazos, pierna, caderas, espalda",
-      "description": "Estiramiento de brazos, pierna, caderas, espalda",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Balance",
-        "Resistencia",
-        "Core",
-        "Agilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 1
-    },
-    {
-      "manual_id": 2,
-      "name": "Tobillos - circulos",
-      "name_es": "Tobillos - circulos",
-      "description": "Tobillos - circulos",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas",
-        "Confianza"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 2
-    },
-    {
-      "manual_id": 3,
-      "name": "Tobillos - Reverse calf raise",
-      "name_es": "Tobillos - Reverse calf raise",
-      "description": "Tobillos - Reverse calf raise",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas",
-        "Confianza"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 3
-    },
-    {
-      "manual_id": 4,
-      "name": "Sentadillas",
-      "name_es": "Sentadillas",
-      "description": "Sentadillas",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Balance",
-        "Resistencia",
-        "Core",
-        "Fuerza en Piernas",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 4
-    },
-    {
-      "manual_id": 5,
-      "name": "Hippie Jumps",
-      "name_es": "Hippie Jumps",
-      "description": "Hippie Jumps",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas",
-        "Agilidad",
-        "Confianza"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 5
-    },
-    {
-      "manual_id": 6,
-      "name": "Hippie Jumps con Indy y Melon",
-      "name_es": "Hippie Jumps con Indy y Melon",
-      "description": "Hippie Jumps con Indy y Melon",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas",
-        "Agilidad",
-        "Confianza"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 6
-    },
-    {
-      "manual_id": 7,
-      "name": "Cadera, cuello y munecas",
-      "name_es": "Cadera, cuello y munecas",
-      "description": "Cadera, cuello y munecas",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Resistencia",
-        "Tiempo de Reacción",
-        "Control de Tabla"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 7
-    },
-    {
-      "manual_id": 8,
-      "name": "Good morning",
-      "name_es": "Good morning",
-      "description": "Good morning",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Core",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 8
-    },
-    {
-      "manual_id": 9,
-      "name": "Side Lunges",
-      "name_es": "Side Lunges",
-      "description": "Side Lunges",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Balance",
-        "Resistencia",
-        "Core",
-        "Fuerza en Piernas",
-        "Agilidad",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 9
-    },
-    {
-      "manual_id": 10,
-      "name": "Side to side",
-      "name_es": "Side to side",
-      "description": "Side to side",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Core",
-        "Agilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 10
-    },
-    {
-      "manual_id": 11,
-      "name": "Vuelta al parque",
-      "name_es": "Vuelta al parque",
-      "description": "Vuelta al parque",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Balance",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 11
-    },
-    {
-      "manual_id": 12,
-      "name": "Escalera",
-      "name_es": "Escalera",
-      "description": "Escalera",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 12
-    },
-    {
-      "manual_id": 13,
-      "name": "Balance board",
-      "name_es": "Balance board",
-      "description": "Balance board",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 13
-    },
-    {
-      "manual_id": 14,
-      "name": "Skater Squat",
-      "name_es": "Skater Squat",
-      "description": "Skater Squat",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas",
-        "Confianza"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 14
-    },
-    {
-      "manual_id": 15,
-      "name": "Pistol Squat",
-      "name_es": "Pistol Squat",
-      "description": "Pistol Squat",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas",
-        "Confianza"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 15
-    },
-    {
-      "manual_id": 16,
-      "name": "Balance board",
-      "name_es": "Balance board",
-      "description": "Balance board",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Balance",
-        "Core",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 16
-    },
-    {
-      "manual_id": 17,
-      "name": "Skate lunge",
-      "name_es": "Skate lunge",
-      "description": "Hacer moviminto del skate atras y adelante mientras el pie del push esta en el piso",
-      "comentarios": "Hacer moviminto del skate atras y adelante mientras el pie del push esta en el piso",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 17
-    },
-    {
-      "manual_id": 18,
-      "name": "Powerpush",
-      "name_es": "Powerpush",
-      "description": "Powerpush",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Balance",
-        "Resistencia",
-        "Fuerza en Piernas"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 18
-    },
-    {
-      "manual_id": 19,
-      "name": "Medio flips",
-      "name_es": "Medio flips",
-      "description": "Medio flips",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "motor_skills": [
-        "Coordinación",
-        "Balance",
-        "Fuerza en Piernas"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 19
-    },
-    {
-      "manual_id": 20,
-      "name": "Box jumps x10 reps",
-      "name_es": "Box jumps x10 reps",
-      "description": "Box jumps x10 reps",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "url": "https://doseskateboarding.com/articles/strengthen-skateboarding-performance",
-      "motor_skills": [
-        "Balance",
-        "Fuerza en Piernas",
-        "Agilidad",
-        "Confianza",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 20
-    },
-    {
-      "manual_id": 21,
-      "name": "Side plank x30 seg",
-      "name_es": "Side plank x30 seg",
-      "description": "Side plank x30 seg",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "url": "https://doseskateboarding.com/articles/strengthen-skateboarding-performance",
-      "motor_skills": [
-        "Core",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 21
-    },
-    {
-      "manual_id": 22,
-      "name": "Single leg squats x10 reps",
-      "name_es": "Single leg squats x10 reps",
-      "description": "Single leg squats x10 reps",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "url": "https://doseskateboarding.com/articles/strengthen-skateboarding-performance",
-      "motor_skills": [
-        "Balance",
-        "Resistencia",
-        "Core",
-        "Fuerza en Piernas",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 22
-    },
-    {
-      "manual_id": 23,
-      "name": "V-ups x10 reps",
-      "name_es": "V-ups x10 reps",
-      "description": "V-ups x10 reps",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "url": "https://doseskateboarding.com/articles/strengthen-skateboarding-performance",
-      "motor_skills": [
-        "Core",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 23
-    },
-    {
-      "manual_id": 24,
-      "name": "Lateral Leg raises x10 reps",
-      "name_es": "Lateral Leg raises x10 reps",
-      "description": "Lateral Leg raises x10 reps",
-      "area": "Warmup",
-      "structure": "Strength Training",
-      "trick_type": "Exercise",
-      "categoria": "Strength Training",
-      "difficulty": "beginner",
-      "category": "excercise",
-      "program": "Strength Training",
-      "url": "https://doseskateboarding.com/articles/strengthen-skateboarding-performance",
-      "motor_skills": [
-        "Balance",
-        "Fuerza en Piernas",
-        "Estabilidad"
-      ],
-      "activity_type": "Exercise",
-      "sort_order": 24
-    },
-    {
-      "manual_id": 25,
       "name": "360 tabla sin llantas",
       "name_es": "360 tabla sin llantas",
       "description": "Marcar con gis o conos para hacer el tic toc y marca los lados izq y der. Despues hacer tic tocs, siguen 180, hasta lograr hacer un 360.",
@@ -523,10 +22,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 25
+      "sort_order": 1
     },
     {
-      "manual_id": 26,
+      "manual_id": 2,
       "name": "Reloj",
       "name_es": "Reloj",
       "description": "Reloj",
@@ -542,10 +41,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 26
+      "sort_order": 2
     },
     {
-      "manual_id": 27,
+      "manual_id": 3,
       "name": "Tic tac",
       "name_es": "Tic tac",
       "description": "1. Giro Izquierda y Derecha\r\n2. Giro 180 BS\r\n3. Giro 360 BS\r\n4. Giro 180 FS\r\n5. Giro 360 FS\r\n6. Tic toc con cinta/gis\r\nHaz mas grande la separacion entre las cintas/gis",
@@ -564,10 +63,10 @@
         "Core"
       ],
       "activity_type": "Drill",
-      "sort_order": 27
+      "sort_order": 3
     },
     {
-      "manual_id": 28,
+      "manual_id": 4,
       "name": "Carrera de obstaculos",
       "name_es": "Carrera de obstaculos",
       "description": "Carrera de obstaculos",
@@ -584,10 +83,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 28
+      "sort_order": 4
     },
     {
-      "manual_id": 29,
+      "manual_id": 5,
       "name": "Carrera de velocidad",
       "name_es": "Carrera de velocidad",
       "description": "Carrera de velocidad",
@@ -603,10 +102,10 @@
         "Resistencia"
       ],
       "activity_type": "Drill",
-      "sort_order": 29
+      "sort_order": 5
     },
     {
-      "manual_id": 30,
+      "manual_id": 6,
       "name": "Escalera",
       "name_es": "Escalera",
       "description": "Hacer la escalera con un pie, despues brincar dentro del circulo, despues brincar encima de una patineta encima de un circulo de yoga e intentar meter los aros en el cono",
@@ -624,10 +123,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 30
+      "sort_order": 6
     },
     {
-      "manual_id": 31,
+      "manual_id": 7,
       "name": "Penguins and Monster walks",
       "name_es": "Penguins and Monster walks",
       "description": "1. Poner una madera en el piso\r\n2. Separar cada madera la distancia de un skate.\r\n3. Comenzar con Nose/Tail lifts\r\n4. Despues con Monster walks (giros 180)",
@@ -648,10 +147,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 31
+      "sort_order": 7
     },
     {
-      "manual_id": 32,
+      "manual_id": 8,
       "name": "Principiantes Course #1",
       "name_es": "Principiantes Course #1",
       "description": "Paso 1: Tic toc sin llantas\r\nPaso 2: duelo, tabla sin llantas boca abajo\r\nPaso 3: Balanceo - escalera skater\r\nPaso 4: Balanceo - escalera primo\r\nPaso 5: Balanceo - 4 obstaculos:\t1. Madera - encima skate (solo tabla) al revés\t2. Madera - encima skate (solo tabla)\t3. Madera redonda - balanceo en skate (solo tabla)\r\nSubirte a tu Skate (con llantas)",
@@ -670,10 +169,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 32
+      "sort_order": 8
     },
     {
-      "manual_id": 33,
+      "manual_id": 9,
       "name": "Trabajo en equipo",
       "name_es": "Trabajo en equipo",
       "description": "Equilibrio y coordinacion: en el pasto formar un circulo y subirse a su skate. tomar un balon y pasarlo, quien tenga el balon sus companieros del lado izquierdo y derecho hacen una sentadilla.",
@@ -691,10 +190,10 @@
         "Fuerza en Piernas"
       ],
       "activity_type": "Drill",
-      "sort_order": 33
+      "sort_order": 9
     },
     {
-      "manual_id": 34,
+      "manual_id": 10,
       "name": "Brincar de tabla sin llantas al cajon, del cajon a una tabla con llantas",
       "name_es": "Brincar de tabla sin llantas al cajon, del cajon a una tabla con llantas",
       "description": "Brincar de tabla sin llantas al cajon, del cajon a una tabla con llantas",
@@ -711,10 +210,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 34
+      "sort_order": 10
     },
     {
-      "manual_id": 35,
+      "manual_id": 11,
       "name": "Drill 1: Empujarse > subir botador > bajar de fakie",
       "name_es": "Drill 1: Empujarse > subir botador > bajar de fakie",
       "description": "Empujarse 2 veces, subir mini rampa y bajar de fakie.",
@@ -732,10 +231,10 @@
         "Confianza"
       ],
       "activity_type": "Drill",
-      "sort_order": 35
+      "sort_order": 11
     },
     {
-      "manual_id": 36,
+      "manual_id": 12,
       "name": "Drill 2: Tic toc > subir botador > kick turn",
       "name_es": "Drill 2: Tic toc > subir botador > kick turn",
       "description": "Avanzar hacia el fun box grande (segun proceso). Subir y girar 180 (kick-turn)",
@@ -753,10 +252,10 @@
         "Fuerza en Piernas"
       ],
       "activity_type": "Drill",
-      "sort_order": 36
+      "sort_order": 12
     },
     {
-      "manual_id": 37,
+      "manual_id": 13,
       "name": "Drill 3: Frenar > Tail scratch (stop)",
       "name_es": "Drill 3: Frenar > Tail scratch (stop)",
       "description": "Como frenar en la patineta, enseniar las diferentes maneras de freno hasta llegar al tail scratch\r\nPaso 1: detenido\r\nPaso 2: andando\r\nPaso 3: andando giro 180",
@@ -774,10 +273,10 @@
         "Balance"
       ],
       "activity_type": "Drill",
-      "sort_order": 37
+      "sort_order": 13
     },
     {
-      "manual_id": 38,
+      "manual_id": 14,
       "name": "Drill 4: Carving > Caveman > Ghostride > Tic tacs",
       "name_es": "Drill 4: Carving > Caveman > Ghostride > Tic tacs",
       "description": "1. Poner conos para el circuito\r\n2. Carving\r\n3. Caveman\r\n4. Ghostride\r\n5. Tic tacs\r\n6. Powerslides\r\n7. Manual Taps\r\n8. Manual 3-5 segundos\r\nBaby Ollies",
@@ -803,10 +302,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 38
+      "sort_order": 14
     },
     {
-      "manual_id": 39,
+      "manual_id": 15,
       "name": "Equilibrio con un pie en movimiento de skate",
       "name_es": "Equilibrio con un pie en movimiento de skate",
       "description": "Paso 1: usar la tabla sin ruedas, pararse en un pie (6 seg.)\r\nPaso 2: usar skate sin movimiento, pararse en un pie (10 seg.)\r\nPaso 3: usar skate con movimiento, pararse en un pie (10 seg. +)",
@@ -824,10 +323,10 @@
         "Fuerza en Piernas"
       ],
       "activity_type": "Drill",
-      "sort_order": 39
+      "sort_order": 15
     },
     {
-      "manual_id": 40,
+      "manual_id": 16,
       "name": "Salto de tabla. Poner tablas en el piso y saltarlas. Subir y bajar botador, regresar la tabla a su lugar.",
       "name_es": "Salto de tabla. Poner tablas en el piso y saltarlas. Subir y bajar botador, regresar la tabla a su lugar.",
       "description": "Salto de tabla. Poner tablas en el piso y saltarlas. Subir y bajar botador, regresar la tabla a su lugar.",
@@ -844,10 +343,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 40
+      "sort_order": 16
     },
     {
-      "manual_id": 41,
+      "manual_id": 17,
       "name": "Step up",
       "name_es": "Step up",
       "description": "Paso 1: detenido\r\nPaso 2: andando\r\nPaso 3: andando sobre una tabla\r\nPaso 4: andando un gap\r\nPaso 5: andando subiendo una banqueta/funbox",
@@ -866,10 +365,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 41
+      "sort_order": 17
     },
     {
-      "manual_id": 42,
+      "manual_id": 18,
       "name": "Strong Push",
       "name_es": "Strong Push",
       "description": "Strong Push",
@@ -886,10 +385,10 @@
         "Fuerza en Piernas"
       ],
       "activity_type": "Drill",
-      "sort_order": 42
+      "sort_order": 18
     },
     {
-      "manual_id": 43,
+      "manual_id": 19,
       "name": "Tic tac",
       "name_es": "Tic tac",
       "description": "1. Inclinacion hacia adelante/atras\r\n2. Girar 360 BS/FS\r\n3. Sin la tabla impulso para tic tocs\r\n4. Con tabla avanzar haciendo tic tocs (sin empujarse)",
@@ -911,10 +410,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 43
+      "sort_order": 19
     },
     {
-      "manual_id": 44,
+      "manual_id": 20,
       "name": "Basic board control and safety",
       "name_es": "Basic board control and safety",
       "description": "Basic board control and safety",
@@ -926,10 +425,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 44
+      "sort_order": 20
     },
     {
-      "manual_id": 45,
+      "manual_id": 21,
       "name": "Stance Identification",
       "name_es": "Stance Identification",
       "description": "Stance Identification",
@@ -941,10 +440,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 45
+      "sort_order": 21
     },
     {
-      "manual_id": 46,
+      "manual_id": 22,
       "name": "Mounting Board Safely",
       "name_es": "Mounting Board Safely",
       "description": "Mounting Board Safely",
@@ -956,10 +455,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 46
+      "sort_order": 22
     },
     {
-      "manual_id": 47,
+      "manual_id": 23,
       "name": "Dismounting Board Safely",
       "name_es": "Dismounting Board Safely",
       "description": "Dismounting Board Safely",
@@ -971,10 +470,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 47
+      "sort_order": 23
     },
     {
-      "manual_id": 48,
+      "manual_id": 24,
       "name": "Pushing",
       "name_es": "Pushing",
       "description": "Pushing",
@@ -986,10 +485,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 48
+      "sort_order": 24
     },
     {
-      "manual_id": 49,
+      "manual_id": 25,
       "name": "regular",
       "name_es": "regular",
       "description": "regular",
@@ -1001,10 +500,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 49
+      "sort_order": 25
     },
     {
-      "manual_id": 50,
+      "manual_id": 26,
       "name": "Foot Brake Stop",
       "name_es": "Foot Brake Stop",
       "description": "Foot Brake Stop",
@@ -1016,10 +515,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 50
+      "sort_order": 26
     },
     {
-      "manual_id": 51,
+      "manual_id": 27,
       "name": "Tic-Tac",
       "name_es": "Tic-Tac",
       "description": "Tic-Tac",
@@ -1031,10 +530,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 51
+      "sort_order": 27
     },
     {
-      "manual_id": 52,
+      "manual_id": 28,
       "name": "Basic Kick Turn",
       "name_es": "Basic Kick Turn",
       "description": "Basic Kick Turn",
@@ -1046,10 +545,10 @@
       "category": "iniciacion",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 52
+      "sort_order": 28
     },
     {
-      "manual_id": 53,
+      "manual_id": 29,
       "name": "Riding on Flat Surface",
       "name_es": "Riding on Flat Surface",
       "description": "Riding on Flat Surface",
@@ -1061,10 +560,10 @@
       "category": "street",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 53
+      "sort_order": 29
     },
     {
-      "manual_id": 54,
+      "manual_id": 30,
       "name": "Riding Over Cracks",
       "name_es": "Riding Over Cracks",
       "description": "Riding Over Cracks",
@@ -1076,10 +575,10 @@
       "category": "street",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 54
+      "sort_order": 30
     },
     {
-      "manual_id": 55,
+      "manual_id": 31,
       "name": "Controlled Speed on Sidewalk",
       "name_es": "Controlled Speed on Sidewalk",
       "description": "Controlled Speed on Sidewalk",
@@ -1091,10 +590,10 @@
       "category": "street",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 55
+      "sort_order": 31
     },
     {
-      "manual_id": 56,
+      "manual_id": 32,
       "name": "Walking with Board",
       "name_es": "Walking with Board",
       "description": "Walking with Board",
@@ -1106,10 +605,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 56
+      "sort_order": 32
     },
     {
-      "manual_id": 57,
+      "manual_id": 33,
       "name": "Standing on Board",
       "name_es": "Standing on Board",
       "description": "Standing on Board",
@@ -1121,10 +620,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 57
+      "sort_order": 33
     },
     {
-      "manual_id": 58,
+      "manual_id": 34,
       "name": "stationary",
       "name_es": "stationary",
       "description": "stationary",
@@ -1136,10 +635,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 58
+      "sort_order": 34
     },
     {
-      "manual_id": 59,
+      "manual_id": 35,
       "name": "Gentle Slope Roll",
       "name_es": "Gentle Slope Roll",
       "description": "Gentle Slope Roll",
@@ -1151,10 +650,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 59
+      "sort_order": 35
     },
     {
-      "manual_id": 60,
+      "manual_id": 36,
       "name": "Skatepak Etiquette",
       "name_es": "Skatepak Etiquette",
       "description": "Skatepak Etiquette",
@@ -1166,10 +665,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 60
+      "sort_order": 36
     },
     {
-      "manual_id": 61,
+      "manual_id": 37,
       "name": "Bowl Safety Awareness",
       "name_es": "Bowl Safety Awareness",
       "description": "Bowl Safety Awareness",
@@ -1181,10 +680,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 61
+      "sort_order": 37
     },
     {
-      "manual_id": 62,
+      "manual_id": 38,
       "name": "Watching Others",
       "name_es": "Watching Others",
       "description": "Watching Others",
@@ -1196,10 +695,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 62
+      "sort_order": 38
     },
     {
-      "manual_id": 63,
+      "manual_id": 39,
       "name": "Mini Ramp Safety Awareness",
       "name_es": "Mini Ramp Safety Awareness",
       "description": "Mini Ramp Safety Awareness",
@@ -1211,10 +710,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 63
+      "sort_order": 39
     },
     {
-      "manual_id": 64,
+      "manual_id": 40,
       "name": "Standing on Board on Flat Bottom",
       "name_es": "Standing on Board on Flat Bottom",
       "description": "Standing on Board on Flat Bottom",
@@ -1226,10 +725,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 64
+      "sort_order": 40
     },
     {
-      "manual_id": 65,
+      "manual_id": 41,
       "name": "Ramp Observation",
       "name_es": "Ramp Observation",
       "description": "Ramp Observation",
@@ -1241,10 +740,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 65
+      "sort_order": 41
     },
     {
-      "manual_id": 66,
+      "manual_id": 42,
       "name": "Vert Ramp Awareness",
       "name_es": "Vert Ramp Awareness",
       "description": "Vert Ramp Awareness",
@@ -1256,10 +755,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 66
+      "sort_order": 42
     },
     {
-      "manual_id": 67,
+      "manual_id": 43,
       "name": "Vert Safety Rules",
       "name_es": "Vert Safety Rules",
       "description": "Vert Safety Rules",
@@ -1271,10 +770,10 @@
       "category": "vert_bowl",
       "program": "Foundations",
       "activity_type": "Drill",
-      "sort_order": 67
+      "sort_order": 43
     },
     {
-      "manual_id": 68,
+      "manual_id": 44,
       "name": "Developing balance and basic movements",
       "name_es": "Developing balance and basic movements",
       "description": "Developing balance and basic movements",
@@ -1286,10 +785,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 68
+      "sort_order": 44
     },
     {
-      "manual_id": 69,
+      "manual_id": 45,
       "name": "Manual - nose",
       "name_es": "Manual - nose",
       "description": "Manual - nose",
@@ -1301,10 +800,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 69
+      "sort_order": 45
     },
     {
-      "manual_id": 70,
+      "manual_id": 46,
       "name": "Manual - tail",
       "name_es": "Manual - tail",
       "description": "Manual - tail",
@@ -1316,10 +815,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 70
+      "sort_order": 46
     },
     {
-      "manual_id": 71,
+      "manual_id": 47,
       "name": "Riding Switch",
       "name_es": "Riding Switch",
       "description": "Riding Switch",
@@ -1331,10 +830,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 71
+      "sort_order": 47
     },
     {
-      "manual_id": 72,
+      "manual_id": 48,
       "name": "Carving",
       "name_es": "Carving",
       "description": "Carving",
@@ -1346,10 +845,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 72
+      "sort_order": 48
     },
     {
-      "manual_id": 73,
+      "manual_id": 49,
       "name": "Speed Control - carving",
       "name_es": "Speed Control - carving",
       "description": "Speed Control - carving",
@@ -1361,10 +860,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 73
+      "sort_order": 49
     },
     {
-      "manual_id": 74,
+      "manual_id": 50,
       "name": "Quick Stop - powerslide intro",
       "name_es": "Quick Stop - powerslide intro",
       "description": "Quick Stop - powerslide intro",
@@ -1376,10 +875,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 74
+      "sort_order": 50
     },
     {
-      "manual_id": 75,
+      "manual_id": 51,
       "name": "Riding Over Small Objects",
       "name_es": "Riding Over Small Objects",
       "description": "Riding Over Small Objects",
@@ -1391,10 +890,10 @@
       "category": "street",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 75
+      "sort_order": 51
     },
     {
-      "manual_id": 76,
+      "manual_id": 52,
       "name": "Curb Ride Up",
       "name_es": "Curb Ride Up",
       "description": "Curb Ride Up",
@@ -1406,10 +905,10 @@
       "category": "street",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 76
+      "sort_order": 52
     },
     {
-      "manual_id": 77,
+      "manual_id": 53,
       "name": "Curb Ride Down",
       "name_es": "Curb Ride Down",
       "description": "Curb Ride Down",
@@ -1421,10 +920,10 @@
       "category": "street",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 77
+      "sort_order": 53
     },
     {
-      "manual_id": 78,
+      "manual_id": 54,
       "name": "Pumping Basics",
       "name_es": "Pumping Basics",
       "description": "Pumping Basics",
@@ -1436,10 +935,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 78
+      "sort_order": 54
     },
     {
-      "manual_id": 79,
+      "manual_id": 55,
       "name": "Bank Roll-In",
       "name_es": "Bank Roll-In",
       "description": "Bank Roll-In",
@@ -1451,10 +950,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 79
+      "sort_order": 55
     },
     {
-      "manual_id": 80,
+      "manual_id": 56,
       "name": "Bank Roll-Out",
       "name_es": "Bank Roll-Out",
       "description": "Bank Roll-Out",
@@ -1466,10 +965,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 80
+      "sort_order": 56
     },
     {
-      "manual_id": 81,
+      "manual_id": 57,
       "name": "Gentle Ramp Descent",
       "name_es": "Gentle Ramp Descent",
       "description": "Gentle Ramp Descent",
@@ -1481,10 +980,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 81
+      "sort_order": 57
     },
     {
-      "manual_id": 82,
+      "manual_id": 58,
       "name": "Bowl Wall Riding - low",
       "name_es": "Bowl Wall Riding - low",
       "description": "Bowl Wall Riding - low",
@@ -1496,10 +995,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 82
+      "sort_order": 58
     },
     {
-      "manual_id": 83,
+      "manual_id": 59,
       "name": "Carving in Shallow Bowl",
       "name_es": "Carving in Shallow Bowl",
       "description": "Carving in Shallow Bowl",
@@ -1511,10 +1010,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 83
+      "sort_order": 59
     },
     {
-      "manual_id": 84,
+      "manual_id": 60,
       "name": "Rolling on Flat Bottom",
       "name_es": "Rolling on Flat Bottom",
       "description": "Rolling on Flat Bottom",
@@ -1526,10 +1025,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 84
+      "sort_order": 60
     },
     {
-      "manual_id": 85,
+      "manual_id": 61,
       "name": "Pumping Basics",
       "name_es": "Pumping Basics",
       "description": "Pumping Basics",
@@ -1541,10 +1040,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 85
+      "sort_order": 61
     },
     {
-      "manual_id": 86,
+      "manual_id": 62,
       "name": "Riding Up Transition",
       "name_es": "Riding Up Transition",
       "description": "Riding Up Transition",
@@ -1556,10 +1055,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 86
+      "sort_order": 62
     },
     {
-      "manual_id": 87,
+      "manual_id": 63,
       "name": "Kick Turn on",
       "name_es": "Kick Turn on",
       "description": "Kick Turn on",
@@ -1571,10 +1070,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 87
+      "sort_order": 63
     },
     {
-      "manual_id": 88,
+      "manual_id": 64,
       "name": "Vert Ramp Orientation",
       "name_es": "Vert Ramp Orientation",
       "description": "Vert Ramp Orientation",
@@ -1586,10 +1085,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 88
+      "sort_order": 64
     },
     {
-      "manual_id": 89,
+      "manual_id": 65,
       "name": "Knee Slide Bail Practice",
       "name_es": "Knee Slide Bail Practice",
       "description": "Knee Slide Bail Practice",
@@ -1601,10 +1100,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 89
+      "sort_order": 65
     },
     {
-      "manual_id": 90,
+      "manual_id": 66,
       "name": "Riding Low on Vert Wall",
       "name_es": "Riding Low on Vert Wall",
       "description": "Riding Low on Vert Wall",
@@ -1616,10 +1115,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Drill",
-      "sort_order": 90
+      "sort_order": 66
     },
     {
-      "manual_id": 91,
+      "manual_id": 67,
       "name": "Walking",
       "name_es": "Walking",
       "description": "1. Inclinacion hacia adeltan\r\n2. Camina con tu patineta como si tuvieras los pies en un snowboard",
@@ -1637,10 +1136,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 91
+      "sort_order": 67
     },
     {
-      "manual_id": 92,
+      "manual_id": 68,
       "name": "Skill 1: Balance y equilibrio > Powerpush & Balance one foot",
       "name_es": "Skill 1: Balance y equilibrio > Powerpush & Balance one foot",
       "description": "1. Primero sin tabla, posicion: Powerpush\r\n2. Ahora la tabla al reves, patea la llanta trasera\r\n3. Subirte a la tabla balanceo con un pie\r\n4. Andando balanceo con un pie\r\nPowerpush sin tocar el piso",
@@ -1658,10 +1157,10 @@
         "Fuerza en Piernas"
       ],
       "activity_type": "Drill",
-      "sort_order": 92
+      "sort_order": 68
     },
     {
-      "manual_id": 93,
+      "manual_id": 69,
       "name": "Skill 2: Empujarse y frenar > Push & Stop",
       "name_es": "Skill 2: Empujarse y frenar > Push & Stop",
       "description": "1. Con la tabla al reves. Subete al board y patea la llanta trasera.\r\na. Powerpush (Equilibrio: cuerpo adelante, pie de atras levantado)\r\nb. Vuelta hacia la izquierda/derecha (inclinar tobillos)\r\n2. Andar y detenerte:\r\na. Pon todo tu peso en tu pie de adelante.\r\nb. Empujate andanddo\r\nC. Frena bajando un pie",
@@ -1680,10 +1179,10 @@
         "Tiempo de Reacción"
       ],
       "activity_type": "Drill",
-      "sort_order": 93
+      "sort_order": 69
     },
     {
-      "manual_id": 94,
+      "manual_id": 70,
       "name": "Skill 3: Girar > Como girar BS/FS",
       "name_es": "Skill 3: Girar > Como girar BS/FS",
       "description": "Skill 3: Girar > Como girar BS/FS",
@@ -1700,10 +1199,10 @@
         "Core"
       ],
       "activity_type": "Drill",
-      "sort_order": 94
+      "sort_order": 70
     },
     {
-      "manual_id": 95,
+      "manual_id": 71,
       "name": "Skill 4: Bajar un escalon > Roll of a Ledge",
       "name_es": "Skill 4: Bajar un escalon > Roll of a Ledge",
       "description": "How to: Roll off a ledge\r\n\t1. Sin skate y despues con Skate: Bend your knees, perform manual while standing, bend knees when landing\r\n\t2. Con tus manos simula la caida del roll off\r\n\t3. Poner una cinta en el piso o banqueta baja, e intentarlo en movimiento\r\nIntentarlo en una caida baja, y despues ir subiendo poco a poco la altura",
@@ -1727,10 +1226,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 95
+      "sort_order": 71
     },
     {
-      "manual_id": 96,
+      "manual_id": 72,
       "name": "Skill 5: Como caerse > How to bail",
       "name_es": "Skill 5: Como caerse > How to bail",
       "description": "1. The run out\r\n\t2. The foot drag\r\n\t3. Kick-out\r\n\t4. Double foot drag\r\n\t5. Pop-out runout\r\n                6. Heel-drag",
@@ -1749,10 +1248,10 @@
         "Tiempo de Reacción"
       ],
       "activity_type": "Drill",
-      "sort_order": 96
+      "sort_order": 72
     },
     {
-      "manual_id": 97,
+      "manual_id": 73,
       "name": "Pop",
       "name_es": "Pop",
       "description": "Pop",
@@ -1769,10 +1268,10 @@
         "Fuerza en Piernas"
       ],
       "activity_type": "Drill",
-      "sort_order": 97
+      "sort_order": 73
     },
     {
-      "manual_id": 98,
+      "manual_id": 74,
       "name": "Pop and grab the board",
       "name_es": "Pop and grab the board",
       "description": "Pop and grab the board",
@@ -1791,10 +1290,10 @@
         "Confianza"
       ],
       "activity_type": "Drill",
-      "sort_order": 98
+      "sort_order": 74
     },
     {
-      "manual_id": 99,
+      "manual_id": 75,
       "name": "Carrera de impulso - solo tic tocs",
       "name_es": "Carrera de impulso - solo tic tocs",
       "description": "No se vale empujarse con el pie !",
@@ -1812,10 +1311,10 @@
         "Core"
       ],
       "activity_type": "Drill",
-      "sort_order": 99
+      "sort_order": 75
     },
     {
-      "manual_id": 100,
+      "manual_id": 76,
       "name": "Manuals - distancia",
       "name_es": "Manuals - distancia",
       "description": "Con conos establecer la distancia y ve aumentando la distancia hasta llegar manual de 5-6 segundos",
@@ -1833,10 +1332,10 @@
         "Core"
       ],
       "activity_type": "Drill",
-      "sort_order": 100
+      "sort_order": 76
     },
     {
-      "manual_id": 101,
+      "manual_id": 77,
       "name": "Walk the dog - Carrera",
       "name_es": "Walk the dog - Carrera",
       "description": "Hacer equipos y ver quien logra llegar mas lejos !",
@@ -1854,10 +1353,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 101
+      "sort_order": 77
     },
     {
-      "manual_id": 102,
+      "manual_id": 78,
       "name": "Hippy Jumps",
       "name_es": "Hippy Jumps",
       "description": "Empieza abajo y ve subiendo la altura segun la confianza de los chic@s. Seguridad primero, ponte trucha !\r\nPaso 1: Brincar en la tabla - sin movimiento\r\nPaso 2: Marchar en tu skate - sin movimiento\r\nPaso 3: Bajarte del skate y volver a subirte - sin movimiento\r\nRepetir paso 1-3 pero ahora en movimiento\r\nPaso 4: Caminar y cruzar el tubo\r\nPaso 5: Brincar desde una banqueta hacia tu skate\r\nPaso 6: Brincar desde un 2 escalones o mas hacia tu skate",
@@ -1878,10 +1377,10 @@
         "Confianza"
       ],
       "activity_type": "Drill",
-      "sort_order": 102
+      "sort_order": 78
     },
     {
-      "manual_id": 103,
+      "manual_id": 79,
       "name": "Juego: Skate",
       "name_es": "Juego: Skate",
       "description": "Juego: Skate",
@@ -1899,10 +1398,10 @@
         "Confianza"
       ],
       "activity_type": "Drill",
-      "sort_order": 103
+      "sort_order": 79
     },
     {
-      "manual_id": 104,
+      "manual_id": 80,
       "name": "Manual Taps (2 seg)",
       "name_es": "Manual Taps (2 seg)",
       "description": "Manual Taps (2 seg)",
@@ -1920,10 +1419,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 104
+      "sort_order": 80
     },
     {
-      "manual_id": 105,
+      "manual_id": 81,
       "name": "Ghost Ride - piso",
       "name_es": "Ghost Ride - piso",
       "description": "Ghost Ride - piso",
@@ -1939,10 +1438,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 105
+      "sort_order": 81
     },
     {
-      "manual_id": 106,
+      "manual_id": 82,
       "name": "Ghost Ride - cajon",
       "name_es": "Ghost Ride - cajon",
       "description": "Ghost Ride - cajon",
@@ -1959,10 +1458,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 106
+      "sort_order": 82
     },
     {
-      "manual_id": 107,
+      "manual_id": 83,
       "name": "Bajar el cajon/banqueta",
       "name_es": "Bajar el cajon/banqueta",
       "description": "Bajar el cajon/banqueta",
@@ -1980,10 +1479,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 107
+      "sort_order": 83
     },
     {
-      "manual_id": 108,
+      "manual_id": 84,
       "name": "Doble Ollie, despues subir y bajar rampa con slappy",
       "name_es": "Doble Ollie, despues subir y bajar rampa con slappy",
       "description": "Doble Ollie, despues subir y bajar rampa con slappy",
@@ -2004,10 +1503,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 108
+      "sort_order": 84
     },
     {
-      "manual_id": 109,
+      "manual_id": 85,
       "name": "Trown down & Caveman",
       "name_es": "Trown down & Caveman",
       "description": "Trown down & Caveman",
@@ -2027,10 +1526,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 109
+      "sort_order": 85
     },
     {
-      "manual_id": 110,
+      "manual_id": 86,
       "name": "Ollie, Lift the body, step up, hippie jumps",
       "name_es": "Ollie, Lift the body, step up, hippie jumps",
       "description": "Ollie, Lift the body, step up, hippie jumps",
@@ -2051,10 +1550,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 110
+      "sort_order": 86
     },
     {
-      "manual_id": 111,
+      "manual_id": 87,
       "name": "Drill #2: Jump off/on",
       "name_es": "Drill #2: Jump off/on",
       "description": "Drill #2: Jump off/on",
@@ -2077,10 +1576,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 111
+      "sort_order": 87
     },
     {
-      "manual_id": 112,
+      "manual_id": 88,
       "name": "Lift the body",
       "name_es": "Lift the body",
       "description": "How to: Lift the body (levantar cuerpo)\r\n\t1. Como si fueras a bajar la banqueta, primero con una cinta en el piso, levantas el manual\r\n\t2. Pones una cuerda en el piso y la pegas con cinta\r\n\t3. Ahora con una barra o palo más grande\r\n\t4. Junta una tablas en la orilla de la banqueta\r\nJunta dos tablas con cinta",
@@ -2101,10 +1600,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 112
+      "sort_order": 88
     },
     {
-      "manual_id": 113,
+      "manual_id": 89,
       "name": "Powerslide",
       "name_es": "Powerslide",
       "description": "How to: Powerslide\r\n        1. Sin skateboard, dobla rodillas y arrastra tu pie de atras 90 grados y pon todo tu peso en el pie de enfrente\r\n        2. Penguin/Monster walks pero sin levantar el nose, arrastrando las 4 llantas.\r\n        3. Andando haz un giro 180 arrastrando las 4 llantas. Ahora practica powerslides cortos, pratica aumentado la velocidad y hazlo sobrepasando una tabla.\r\n        4. Ahora en el piso, baja tu cuerpo y usando tu mano de pivote gira 180",
@@ -2126,10 +1625,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 113
+      "sort_order": 89
     },
     {
-      "manual_id": 114,
+      "manual_id": 90,
       "name": "Slalom",
       "name_es": "Slalom",
       "description": "Slalom",
@@ -2146,10 +1645,10 @@
         "Agilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 114
+      "sort_order": 90
     },
     {
-      "manual_id": 115,
+      "manual_id": 91,
       "name": "Hippy Jump Avanzado",
       "name_es": "Hippy Jump Avanzado",
       "description": "Paso 1: Parado\r\nPaso 2: Andando\r\nPaso 3: Brinca con los pies bien extendidos\r\nPaso 4: Paso a otra tabla\r\nPaso 5: Brincar a otra tabla\r\nPaso 6: Paso sobre el tubo\r\nPaso 7: Brincar el tubo\r\nPaso 8: Brincar el tubo con pies extendidos\r\nPaso 9: Brincar el tubo con FS/BS body varial",
@@ -2171,10 +1670,10 @@
         "Confianza"
       ],
       "activity_type": "Drill",
-      "sort_order": 115
+      "sort_order": 91
     },
     {
-      "manual_id": 116,
+      "manual_id": 92,
       "name": "Juego: Skate",
       "name_es": "Juego: Skate",
       "description": "Juego: Skate",
@@ -2192,10 +1691,10 @@
         "Confianza"
       ],
       "activity_type": "Drill",
-      "sort_order": 116
+      "sort_order": 92
     },
     {
-      "manual_id": 117,
+      "manual_id": 93,
       "name": "Brincar del cajon a la tabla",
       "name_es": "Brincar del cajon a la tabla",
       "description": "Brincar del cajon a la tabla",
@@ -2216,10 +1715,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 117
+      "sort_order": 93
     },
     {
-      "manual_id": 118,
+      "manual_id": 94,
       "name": "Toe taps, Single leg snakes, Toe touches and Switcheroo",
       "name_es": "Toe taps, Single leg snakes, Toe touches and Switcheroo",
       "description": "Drills - balance",
@@ -2238,10 +1737,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 118
+      "sort_order": 94
     },
     {
-      "manual_id": 119,
+      "manual_id": 95,
       "name": "Backside pivot, front side pivot, pivot walks, backside revert, frontside revert, BS powerslide, FS powerslide",
       "name_es": "Backside pivot, front side pivot, pivot walks, backside revert, frontside revert, BS powerslide, FS powerslide",
       "description": "Drills - board control",
@@ -2260,10 +1759,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 119
+      "sort_order": 95
     },
     {
-      "manual_id": 120,
+      "manual_id": 96,
       "name": "Pegar una cuerda en el piso y hacer un fakie ollie sin pop",
       "name_es": "Pegar una cuerda en el piso y hacer un fakie ollie sin pop",
       "description": "Pegar una cuerda en el piso y hacer un fakie ollie sin pop",
@@ -2281,10 +1780,10 @@
         "Confianza"
       ],
       "activity_type": "Drill",
-      "sort_order": 120
+      "sort_order": 96
     },
     {
-      "manual_id": 121,
+      "manual_id": 97,
       "name": "Step on, step off",
       "name_es": "Step on, step off",
       "description": "Step on, step off",
@@ -2303,10 +1802,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Drill",
-      "sort_order": 121
+      "sort_order": 97
     },
     {
-      "manual_id": 122,
+      "manual_id": 98,
       "name": "Saltar y caer en la tabla",
       "name_es": "Saltar y caer en la tabla",
       "description": "Saltar y caer en la tabla",
@@ -2327,10 +1826,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 122
+      "sort_order": 98
     },
     {
-      "manual_id": 123,
+      "manual_id": 99,
       "name": "Manual (5 segs)",
       "name_es": "Manual (5 segs)",
       "description": "Manual (5 segs)",
@@ -2348,10 +1847,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 123
+      "sort_order": 99
     },
     {
-      "manual_id": 124,
+      "manual_id": 100,
       "name": "Monster Walks",
       "name_es": "Monster Walks",
       "description": "Monster Walks",
@@ -2367,10 +1866,10 @@
         "Fuerza en Piernas"
       ],
       "activity_type": "Trick",
-      "sort_order": 124
+      "sort_order": 100
     },
     {
-      "manual_id": 125,
+      "manual_id": 101,
       "name": "Penguin steps (180 y 360)",
       "name_es": "Penguin steps (180 y 360)",
       "description": "Penguin steps (180 y 360)",
@@ -2387,10 +1886,10 @@
         "Agilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 125
+      "sort_order": 101
     },
     {
-      "manual_id": 126,
+      "manual_id": 102,
       "name": "Trow Down",
       "name_es": "Trow Down",
       "description": "Trow Down",
@@ -2406,10 +1905,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Trick",
-      "sort_order": 126
+      "sort_order": 102
     },
     {
-      "manual_id": 127,
+      "manual_id": 103,
       "name": "Shuv it",
       "name_es": "Shuv it",
       "description": "How to: Shuv-it\r\n\t1. Sin tabla, patea hacia atrás con tu pie derecho (regular), caes con el pie izquierdo y después el pie derecho\r\n\t2. Con tabla, sin llantas, haz el giro y cae con el pie izquierdo (regular)\r\n\t3. Con las manos haz el giro de shuv-it y caes con las 2 manos sobre la tabla\r\n\t4. Ahora con el skate, haz el giro + pop de shuv-it con un solo pie sin caerle.\r\n\t5. Intenta hacer shuvit y caer con dos pies en el piso\r\nIntenta hacer tu shuv-it bajando una banqueta",
@@ -2431,10 +1930,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Trick",
-      "sort_order": 127
+      "sort_order": 103
     },
     {
-      "manual_id": 128,
+      "manual_id": 104,
       "name": "Nose stall",
       "name_es": "Nose stall",
       "description": "Nose stall",
@@ -2452,10 +1951,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 128
+      "sort_order": 104
     },
     {
-      "manual_id": 129,
+      "manual_id": 105,
       "name": "Manual",
       "name_es": "Manual",
       "description": "Manual",
@@ -2473,10 +1972,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 129
+      "sort_order": 105
     },
     {
-      "manual_id": 130,
+      "manual_id": 106,
       "name": "Ollie",
       "name_es": "Ollie",
       "description": "How to: Ollie\r\n\t1. Haz pop al skate y agarra con una mano\r\n\t2. Subete al skate y haz pop, agarra con una mano \r\n\t3. Sin tabla, con las agujetas amarradas\r\n\t4. Haz el movimiento de ollie agarrando la nose\r\n\t5. Movimiento rapido de ollie (parado sin movimiento)\r\nOllie en el pasto o agarrandote de algun barandal",
@@ -2499,10 +1998,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Trick",
-      "sort_order": 130
+      "sort_order": 106
     },
     {
-      "manual_id": 131,
+      "manual_id": 107,
       "name": "Kick turn",
       "name_es": "Kick turn",
       "description": "Kick turn",
@@ -2519,10 +2018,10 @@
         "Core"
       ],
       "activity_type": "Trick",
-      "sort_order": 131
+      "sort_order": 107
     },
     {
-      "manual_id": 132,
+      "manual_id": 108,
       "name": "Fakie 180",
       "name_es": "Fakie 180",
       "description": "Fakie 180",
@@ -2540,10 +2039,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 132
+      "sort_order": 108
     },
     {
-      "manual_id": 133,
+      "manual_id": 109,
       "name": "Caveman",
       "name_es": "Caveman",
       "description": "Caveman",
@@ -2561,10 +2060,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 133
+      "sort_order": 109
     },
     {
-      "manual_id": 134,
+      "manual_id": 110,
       "name": "Sex Change (giro 180 cuerpo)",
       "name_es": "Sex Change (giro 180 cuerpo)",
       "description": "Sex Change (giro 180 cuerpo)",
@@ -2583,10 +2082,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 134
+      "sort_order": 110
     },
     {
-      "manual_id": 135,
+      "manual_id": 111,
       "name": "360 en piso",
       "name_es": "360 en piso",
       "description": "360 en piso",
@@ -2605,10 +2104,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 135
+      "sort_order": 111
     },
     {
-      "manual_id": 136,
+      "manual_id": 112,
       "name": "Fakie 360",
       "name_es": "Fakie 360",
       "description": "Fakie 360",
@@ -2627,10 +2126,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 136
+      "sort_order": 112
     },
     {
-      "manual_id": 137,
+      "manual_id": 113,
       "name": "Fakie Ollie",
       "name_es": "Fakie Ollie",
       "description": "Fakie Ollie",
@@ -2650,10 +2149,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 137
+      "sort_order": 113
     },
     {
-      "manual_id": 138,
+      "manual_id": 114,
       "name": "Pumping Challenge",
       "name_es": "Pumping Challenge",
       "description": "Pumping Challenge",
@@ -2675,10 +2174,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 138
+      "sort_order": 114
     },
     {
-      "manual_id": 139,
+      "manual_id": 115,
       "name": "Confianza en el Bowl",
       "name_es": "Confianza en el Bowl",
       "description": "Confianza en el Bowl",
@@ -2697,10 +2196,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 139
+      "sort_order": 115
     },
     {
-      "manual_id": 140,
+      "manual_id": 116,
       "name": "rock to fakie a fake 180 rock",
       "name_es": "rock to fakie a fake 180 rock",
       "description": "rock to fakie a fake 180 rock",
@@ -2721,10 +2220,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 140
+      "sort_order": 116
     },
     {
-      "manual_id": 141,
+      "manual_id": 117,
       "name": "Linea en bowl",
       "name_es": "Linea en bowl",
       "description": "Linea en bowl",
@@ -2747,10 +2246,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 141
+      "sort_order": 117
     },
     {
-      "manual_id": 142,
+      "manual_id": 118,
       "name": "Mini ramp",
       "name_es": "Mini ramp",
       "description": "Beginner ramp tricks:\r\n- Rock to fakie\r\n- Switch rock\r\n- Axel stall\r\n- Rock n roll\r\n- One foot tail\r\n- 5-0",
@@ -2776,10 +2275,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 142
+      "sort_order": 118
     },
     {
-      "manual_id": 143,
+      "manual_id": 119,
       "name": "Early grabs en piso",
       "name_es": "Early grabs en piso",
       "description": "How to: Early grabs\r\n\t1. Early grab ollie en piso, elije entre tu mano izquierda o derecha\r\n\t2. Early grab to fakie en el Quarter pipe, despues intentalo bajando una banqueta y/o una rampa.\r\n\t3. Early grab con V turn  (90 grados), entrando a la rampa de diagonal\r\nTrata de llegar al coping y hacer un BS crooked 5-0.",
@@ -2799,10 +2298,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 143
+      "sort_order": 119
     },
     {
-      "manual_id": 144,
+      "manual_id": 120,
       "name": "Rock to fakie - fakie a rock",
       "name_es": "Rock to fakie - fakie a rock",
       "description": "Rock to fakie - fakie a rock",
@@ -2821,10 +2320,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 144
+      "sort_order": 120
     },
     {
-      "manual_id": 145,
+      "manual_id": 121,
       "name": "Pump (impulso y momentum)",
       "name_es": "Pump (impulso y momentum)",
       "description": "How to: Pumping\r\n\t1. Sin skate, en la base de la rampa, bajas y te impulsas hacia adelante con tu pie trasero.\r\n\t2. Con tabla sin ruedas, en la base de la rampas, te agachas y te impulsas hacia adelante con tu pie trasero. Primero ligeramente, cada vez más fuerte, te desplazas hacia adelante.\r\n\t3. En el piso, bajas y subes imitando el impulso hacia adelante. Primero lento despues lo haces rapidamente, subir y bajar.\r\nEn tu skate, comienza a impulsarte hasta obtener momentum (pumping)",
@@ -2846,10 +2345,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 145
+      "sort_order": 121
     },
     {
-      "manual_id": 146,
+      "manual_id": 122,
       "name": "Carving Backside",
       "name_es": "Carving Backside",
       "description": "Carving Backside",
@@ -2868,10 +2367,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 146
+      "sort_order": 122
     },
     {
-      "manual_id": 147,
+      "manual_id": 123,
       "name": "Carving Frontside",
       "name_es": "Carving Frontside",
       "description": "Carving Frontside",
@@ -2892,10 +2391,10 @@
         "Estabilidad"
       ],
       "activity_type": "Drill",
-      "sort_order": 147
+      "sort_order": 123
     },
     {
-      "manual_id": 148,
+      "manual_id": 124,
       "name": "Drop-in: Bank",
       "name_es": "Drop-in: Bank",
       "description": "Drop-in: Bank",
@@ -2914,10 +2413,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Trick",
-      "sort_order": 148
+      "sort_order": 124
     },
     {
-      "manual_id": 149,
+      "manual_id": 125,
       "name": "Drop in: Vert",
       "name_es": "Drop in: Vert",
       "description": "Drop in: Vert",
@@ -2939,10 +2438,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 149
+      "sort_order": 125
     },
     {
-      "manual_id": 150,
+      "manual_id": 126,
       "name": "Kick turn",
       "name_es": "Kick turn",
       "description": "Kick turn",
@@ -2962,10 +2461,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 150
+      "sort_order": 126
     },
     {
-      "manual_id": 151,
+      "manual_id": 127,
       "name": "Roll in",
       "name_es": "Roll in",
       "description": "Roll in",
@@ -2986,10 +2485,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 151
+      "sort_order": 127
     },
     {
-      "manual_id": 152,
+      "manual_id": 128,
       "name": "Early grabs",
       "name_es": "Early grabs",
       "description": "Early grabs",
@@ -3009,10 +2508,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 152
+      "sort_order": 128
     },
     {
-      "manual_id": 153,
+      "manual_id": 129,
       "name": "BS 50-50 Kickturn",
       "name_es": "BS 50-50 Kickturn",
       "description": "BS 50-50 Kickturn",
@@ -3033,10 +2532,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 153
+      "sort_order": 129
     },
     {
-      "manual_id": 154,
+      "manual_id": 130,
       "name": "FS 50-50 Kickturn",
       "name_es": "FS 50-50 Kickturn",
       "description": "FS 50-50 Kickturn",
@@ -3057,10 +2556,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 154
+      "sort_order": 130
     },
     {
-      "manual_id": 155,
+      "manual_id": 131,
       "name": "FS Kick turn",
       "name_es": "FS Kick turn",
       "description": "FS Kick turn",
@@ -3081,10 +2580,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 155
+      "sort_order": 131
     },
     {
-      "manual_id": 156,
+      "manual_id": 132,
       "name": "BS Kick turn",
       "name_es": "BS Kick turn",
       "description": "BS Kick turn",
@@ -3105,10 +2604,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 156
+      "sort_order": 132
     },
     {
-      "manual_id": 157,
+      "manual_id": 133,
       "name": "Ollie",
       "name_es": "Ollie",
       "description": "Ollie",
@@ -3120,10 +2619,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 157
+      "sort_order": 133
     },
     {
-      "manual_id": 158,
+      "manual_id": 134,
       "name": "Shuvit",
       "name_es": "Shuvit",
       "description": "Shuvit",
@@ -3135,10 +2634,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 158
+      "sort_order": 134
     },
     {
-      "manual_id": 159,
+      "manual_id": 135,
       "name": "No Comply",
       "name_es": "No Comply",
       "description": "No Comply",
@@ -3150,10 +2649,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 159
+      "sort_order": 135
     },
     {
-      "manual_id": 160,
+      "manual_id": 136,
       "name": "Boneless",
       "name_es": "Boneless",
       "description": "Boneless",
@@ -3165,10 +2664,10 @@
       "category": "iniciacion",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 160
+      "sort_order": 136
     },
     {
-      "manual_id": 161,
+      "manual_id": 137,
       "name": "Ollie Up Curb",
       "name_es": "Ollie Up Curb",
       "description": "Ollie Up Curb",
@@ -3180,10 +2679,10 @@
       "category": "street",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 161
+      "sort_order": 137
     },
     {
-      "manual_id": 162,
+      "manual_id": 138,
       "name": "Ollie Down Curb",
       "name_es": "Ollie Down Curb",
       "description": "Ollie Down Curb",
@@ -3195,10 +2694,10 @@
       "category": "street",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 162
+      "sort_order": 138
     },
     {
-      "manual_id": 163,
+      "manual_id": 139,
       "name": "Powerslide",
       "name_es": "Powerslide",
       "description": "Powerslide",
@@ -3210,10 +2709,10 @@
       "category": "street",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 163
+      "sort_order": 139
     },
     {
-      "manual_id": 164,
+      "manual_id": 140,
       "name": "Drop-In",
       "name_es": "Drop-In",
       "description": "Drop-In",
@@ -3225,10 +2724,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 164
+      "sort_order": 140
     },
     {
-      "manual_id": 165,
+      "manual_id": 141,
       "name": "Fakie Roll Back",
       "name_es": "Fakie Roll Back",
       "description": "Fakie Roll Back",
@@ -3240,10 +2739,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 165
+      "sort_order": 141
     },
     {
-      "manual_id": 166,
+      "manual_id": 142,
       "name": "Kick Turn on Ramp",
       "name_es": "Kick Turn on Ramp",
       "description": "Kick Turn on Ramp",
@@ -3255,10 +2754,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 166
+      "sort_order": 142
     },
     {
-      "manual_id": 167,
+      "manual_id": 143,
       "name": "Rock to Fakie",
       "name_es": "Rock to Fakie",
       "description": "Rock to Fakie",
@@ -3270,10 +2769,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 167
+      "sort_order": 143
     },
     {
-      "manual_id": 168,
+      "manual_id": 144,
       "name": "Pumping in",
       "name_es": "Pumping in",
       "description": "Pumping in",
@@ -3285,10 +2784,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 168
+      "sort_order": 144
     },
     {
-      "manual_id": 169,
+      "manual_id": 145,
       "name": "Frontside Carve",
       "name_es": "Frontside Carve",
       "description": "Frontside Carve",
@@ -3300,10 +2799,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 169
+      "sort_order": 145
     },
     {
-      "manual_id": 170,
+      "manual_id": 146,
       "name": "Backside Carve",
       "name_es": "Backside Carve",
       "description": "Backside Carve",
@@ -3315,10 +2814,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 170
+      "sort_order": 146
     },
     {
-      "manual_id": 171,
+      "manual_id": 147,
       "name": "Drop-In",
       "name_es": "Drop-In",
       "description": "Drop-In",
@@ -3330,10 +2829,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 171
+      "sort_order": 147
     },
     {
-      "manual_id": 172,
+      "manual_id": 148,
       "name": "Fakie Roll Back",
       "name_es": "Fakie Roll Back",
       "description": "Fakie Roll Back",
@@ -3345,10 +2844,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 172
+      "sort_order": 148
     },
     {
-      "manual_id": 173,
+      "manual_id": 149,
       "name": "Rock to Fakie",
       "name_es": "Rock to Fakie",
       "description": "Rock to Fakie",
@@ -3360,10 +2859,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 173
+      "sort_order": 149
     },
     {
-      "manual_id": 174,
+      "manual_id": 150,
       "name": "Pumping Full Transition",
       "name_es": "Pumping Full Transition",
       "description": "Pumping Full Transition",
@@ -3375,10 +2874,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 174
+      "sort_order": 150
     },
     {
-      "manual_id": 175,
+      "manual_id": 151,
       "name": "Drop-In",
       "name_es": "Drop-In",
       "description": "Drop-In",
@@ -3390,10 +2889,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 175
+      "sort_order": 151
     },
     {
-      "manual_id": 176,
+      "manual_id": 152,
       "name": "Pumping on",
       "name_es": "Pumping on",
       "description": "Pumping on",
@@ -3405,10 +2904,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 176
+      "sort_order": 152
     },
     {
-      "manual_id": 177,
+      "manual_id": 153,
       "name": "Kick Turn on",
       "name_es": "Kick Turn on",
       "description": "Kick Turn on",
@@ -3420,10 +2919,10 @@
       "category": "vert_bowl",
       "program": "Beginners",
       "activity_type": "Trick",
-      "sort_order": 177
+      "sort_order": 153
     },
     {
-      "manual_id": 178,
+      "manual_id": 154,
       "name": "FS 180",
       "name_es": "FS 180",
       "description": "How to: FS 180\r\n        1. Scoop and land\r\n        2. Add 180 rotation\r\n        3. With board, Land it",
@@ -3445,10 +2944,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 178
+      "sort_order": 154
     },
     {
-      "manual_id": 179,
+      "manual_id": 155,
       "name": "Varial Kickflip",
       "name_es": "Varial Kickflip",
       "description": "Varial Kickflip",
@@ -3471,10 +2970,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 179
+      "sort_order": 155
     },
     {
-      "manual_id": 180,
+      "manual_id": 156,
       "name": "BS 180",
       "name_es": "BS 180",
       "description": "BS 180",
@@ -3494,10 +2993,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 180
+      "sort_order": 156
     },
     {
-      "manual_id": 181,
+      "manual_id": 157,
       "name": "Caballerial",
       "name_es": "Caballerial",
       "description": "Caballerial",
@@ -3518,10 +3017,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 181
+      "sort_order": 157
     },
     {
-      "manual_id": 182,
+      "manual_id": 158,
       "name": "Half Cab",
       "name_es": "Half Cab",
       "description": "1. While in Fakie, pop a FS 180 turn\r\nTo do Caballerial, with your front foot do a revert 180",
@@ -3544,10 +3043,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 182
+      "sort_order": 158
     },
     {
-      "manual_id": 183,
+      "manual_id": 159,
       "name": "No comply",
       "name_es": "No comply",
       "description": "No comply",
@@ -3570,10 +3069,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 183
+      "sort_order": 159
     },
     {
-      "manual_id": 184,
+      "manual_id": 160,
       "name": "Roll-in to fakie",
       "name_es": "Roll-in to fakie",
       "description": "Roll-in to fakie",
@@ -3593,10 +3092,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 184
+      "sort_order": 160
     },
     {
-      "manual_id": 185,
+      "manual_id": 161,
       "name": "Fakie roll-in",
       "name_es": "Fakie roll-in",
       "description": "Fakie roll-in",
@@ -3616,10 +3115,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 185
+      "sort_order": 161
     },
     {
-      "manual_id": 186,
+      "manual_id": 162,
       "name": "Boardslide",
       "name_es": "Boardslide",
       "description": "How to: Boardslide\r\n\t1. Sin tabla sube el pie y bájalo girando 90 grados\r\n\t2. De frente al funbox, sube tu eje delantero y bájalo girando 90 grados\r\n\t3. Pon un skate sin ejes encima de otro skate, corre y brinca en el skateboard\r\n\t4. Pon un ladrillo y sube tu skate de boardslide para balancearte\r\n\t5. Balance board\r\nIntenta en el funbox al principio y después usa el rail una vez que ganes confianza",
@@ -3643,10 +3142,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 186
+      "sort_order": 162
     },
     {
-      "manual_id": 187,
+      "manual_id": 163,
       "name": "Tail stall",
       "name_es": "Tail stall",
       "description": "Tail stall",
@@ -3665,10 +3164,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 187
+      "sort_order": 163
     },
     {
-      "manual_id": 188,
+      "manual_id": 164,
       "name": "Nose slide",
       "name_es": "Nose slide",
       "description": "Nose slide",
@@ -3688,10 +3187,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Trick",
-      "sort_order": 188
+      "sort_order": 164
     },
     {
-      "manual_id": 189,
+      "manual_id": 165,
       "name": "Transfer - bajo",
       "name_es": "Transfer - bajo",
       "description": "Transfer - bajo",
@@ -3712,10 +3211,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 189
+      "sort_order": 165
     },
     {
-      "manual_id": 190,
+      "manual_id": 166,
       "name": "Fakie 360",
       "name_es": "Fakie 360",
       "description": "Fakie 360",
@@ -3734,10 +3233,10 @@
         "Confianza"
       ],
       "activity_type": "Trick",
-      "sort_order": 190
+      "sort_order": 166
     },
     {
-      "manual_id": 191,
+      "manual_id": 167,
       "name": "Spine - rock to rock",
       "name_es": "Spine - rock to rock",
       "description": "Spine - rock to rock",
@@ -3757,10 +3256,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 191
+      "sort_order": 167
     },
     {
-      "manual_id": 192,
+      "manual_id": 168,
       "name": "Slash",
       "name_es": "Slash",
       "description": "Slash",
@@ -3780,10 +3279,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 192
+      "sort_order": 168
     },
     {
-      "manual_id": 193,
+      "manual_id": 169,
       "name": "Axle stall",
       "name_es": "Axle stall",
       "description": "Axle stall",
@@ -3802,10 +3301,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 193
+      "sort_order": 169
     },
     {
-      "manual_id": 194,
+      "manual_id": 170,
       "name": "Rock to fakie",
       "name_es": "Rock to fakie",
       "description": "Rock to fakie",
@@ -3825,10 +3324,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 194
+      "sort_order": 170
     },
     {
-      "manual_id": 195,
+      "manual_id": 171,
       "name": "Rock 'n roll",
       "name_es": "Rock 'n roll",
       "description": "Primero en una rampa, despues en una transicion",
@@ -3851,10 +3350,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 195
+      "sort_order": 171
     },
     {
-      "manual_id": 196,
+      "manual_id": 172,
       "name": "Fakie Rock",
       "name_es": "Fakie Rock",
       "description": "Fakie Rock",
@@ -3874,10 +3373,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 196
+      "sort_order": 172
     },
     {
-      "manual_id": 197,
+      "manual_id": 173,
       "name": "Half Cab Rock to Fakie",
       "name_es": "Half Cab Rock to Fakie",
       "description": "Half Cab Rock to Fakie",
@@ -3898,10 +3397,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 197
+      "sort_order": 173
     },
     {
-      "manual_id": 198,
+      "manual_id": 174,
       "name": "Pop rock",
       "name_es": "Pop rock",
       "description": "Pop rock",
@@ -3922,10 +3421,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 198
+      "sort_order": 174
     },
     {
-      "manual_id": 199,
+      "manual_id": 175,
       "name": "Backside Ollie",
       "name_es": "Backside Ollie",
       "description": "How to: Backside Ollie\r\n\t1. Poner 2 cintas en el bank\r\n\t2. Practica primero ollie to fakie\r\n\t3. Practica el 180 FS en el bank\r\n180 FS en el 1/4",
@@ -3949,10 +3448,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 199
+      "sort_order": 175
     },
     {
-      "manual_id": 200,
+      "manual_id": 176,
       "name": "Frontside Ollie",
       "name_es": "Frontside Ollie",
       "description": "Frontside Ollie",
@@ -3974,10 +3473,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 200
+      "sort_order": 176
     },
     {
-      "manual_id": 201,
+      "manual_id": 177,
       "name": "50-50",
       "name_es": "50-50",
       "description": "50-50",
@@ -3996,10 +3495,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 201
+      "sort_order": 177
     },
     {
-      "manual_id": 202,
+      "manual_id": 178,
       "name": "Fakie Tail stall",
       "name_es": "Fakie Tail stall",
       "description": "Fakie Tail stall",
@@ -4018,10 +3517,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 202
+      "sort_order": 178
     },
     {
-      "manual_id": 203,
+      "manual_id": 179,
       "name": "Fakie Tail Nose Grab",
       "name_es": "Fakie Tail Nose Grab",
       "description": "Fakie Tail Nose Grab",
@@ -4043,10 +3542,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 203
+      "sort_order": 179
     },
     {
-      "manual_id": 204,
+      "manual_id": 180,
       "name": "One Foot Tail",
       "name_es": "One Foot Tail",
       "description": "One Foot Tail",
@@ -4066,10 +3565,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 204
+      "sort_order": 180
     },
     {
-      "manual_id": 205,
+      "manual_id": 181,
       "name": "Nose stall",
       "name_es": "Nose stall",
       "description": "Nose stall",
@@ -4088,10 +3587,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 205
+      "sort_order": 181
     },
     {
-      "manual_id": 206,
+      "manual_id": 182,
       "name": "Feeble stall",
       "name_es": "Feeble stall",
       "description": "Feeble stall",
@@ -4111,10 +3610,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 206
+      "sort_order": 182
     },
     {
-      "manual_id": 207,
+      "manual_id": 183,
       "name": "Ollie to rock",
       "name_es": "Ollie to rock",
       "description": "Ollie to rock",
@@ -4136,10 +3635,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 207
+      "sort_order": 183
     },
     {
-      "manual_id": 208,
+      "manual_id": 184,
       "name": "Roll-in 50/50",
       "name_es": "Roll-in 50/50",
       "description": "Roll-in 50/50",
@@ -4160,10 +3659,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 208
+      "sort_order": 184
     },
     {
-      "manual_id": 209,
+      "manual_id": 185,
       "name": "Fakie 360 Kick turn",
       "name_es": "Fakie 360 Kick turn",
       "description": "Fakie 360 Kick turn",
@@ -4184,10 +3683,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 209
+      "sort_order": 185
     },
     {
-      "manual_id": 210,
+      "manual_id": 186,
       "name": "360 Rock",
       "name_es": "360 Rock",
       "description": "360 Rock",
@@ -4208,10 +3707,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 210
+      "sort_order": 186
     },
     {
-      "manual_id": 211,
+      "manual_id": 187,
       "name": "Nollie Pop Rock",
       "name_es": "Nollie Pop Rock",
       "description": "Nollie Pop Rock",
@@ -4232,10 +3731,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Trick",
-      "sort_order": 211
+      "sort_order": 187
     },
     {
-      "manual_id": 212,
+      "manual_id": 188,
       "name": "Ollie to Fakie",
       "name_es": "Ollie to Fakie",
       "description": "Ollie to Fakie",
@@ -4257,10 +3756,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 212
+      "sort_order": 188
     },
     {
-      "manual_id": 213,
+      "manual_id": 189,
       "name": "Early Grab to Fakie",
       "name_es": "Early Grab to Fakie",
       "description": "Early Grab to Fakie",
@@ -4282,10 +3781,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 213
+      "sort_order": 189
     },
     {
-      "manual_id": 214,
+      "manual_id": 190,
       "name": "Fakie Tail Stall Madonna",
       "name_es": "Fakie Tail Stall Madonna",
       "description": "Fakie Tail Stall Madonna",
@@ -4307,10 +3806,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 214
+      "sort_order": 190
     },
     {
-      "manual_id": 215,
+      "manual_id": 191,
       "name": "Fakie 360 turn",
       "name_es": "Fakie 360 turn",
       "description": "Fakie 360 turn",
@@ -4331,10 +3830,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 215
+      "sort_order": 191
     },
     {
-      "manual_id": 216,
+      "manual_id": 192,
       "name": "Fakie Smith stall",
       "name_es": "Fakie Smith stall",
       "description": "Fakie Smith stall",
@@ -4353,10 +3852,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 216
+      "sort_order": 192
     },
     {
-      "manual_id": 217,
+      "manual_id": 193,
       "name": "Smith stall",
       "name_es": "Smith stall",
       "description": "Smith stall",
@@ -4376,10 +3875,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 217
+      "sort_order": 193
     },
     {
-      "manual_id": 218,
+      "manual_id": 194,
       "name": "FS Tail stall",
       "name_es": "FS Tail stall",
       "description": "FS Tail stall",
@@ -4398,10 +3897,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 218
+      "sort_order": 194
     },
     {
-      "manual_id": 219,
+      "manual_id": 195,
       "name": "BS Tail stall",
       "name_es": "BS Tail stall",
       "description": "BS Tail stall",
@@ -4420,10 +3919,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 219
+      "sort_order": 195
     },
     {
-      "manual_id": 220,
+      "manual_id": 196,
       "name": "50-50 grind to fakie",
       "name_es": "50-50 grind to fakie",
       "description": "50-50 grind to fakie",
@@ -4443,10 +3942,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 220
+      "sort_order": 196
     },
     {
-      "manual_id": 221,
+      "manual_id": 197,
       "name": "FS 50-50 grind",
       "name_es": "FS 50-50 grind",
       "description": "FS 50-50 grind",
@@ -4466,10 +3965,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 221
+      "sort_order": 197
     },
     {
-      "manual_id": 222,
+      "manual_id": 198,
       "name": "FS 5-0 grind",
       "name_es": "FS 5-0 grind",
       "description": "FS 5-0 grind",
@@ -4490,10 +3989,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 222
+      "sort_order": 198
     },
     {
-      "manual_id": 223,
+      "manual_id": 199,
       "name": "Nose stall Revert",
       "name_es": "Nose stall Revert",
       "description": "Nose stall Revert",
@@ -4514,10 +4013,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 223
+      "sort_order": 199
     },
     {
-      "manual_id": 224,
+      "manual_id": 200,
       "name": "Boardslide en coping",
       "name_es": "Boardslide en coping",
       "description": "Boardslide en coping",
@@ -4539,13 +4038,373 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
+      "sort_order": 200
+    },
+    {
+      "manual_id": 201,
+      "name": "Kickflip",
+      "name_es": "Kickflip",
+      "description": "Kickflip",
+      "area": "Flatground",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 201
+    },
+    {
+      "manual_id": 202,
+      "name": "Heelflip",
+      "name_es": "Heelflip",
+      "description": "Heelflip",
+      "area": "Flatground",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 202
+    },
+    {
+      "manual_id": 203,
+      "name": "Pop Shuvit",
+      "name_es": "Pop Shuvit",
+      "description": "Pop Shuvit",
+      "area": "Flatground",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 203
+    },
+    {
+      "manual_id": 204,
+      "name": "Frontside 180",
+      "name_es": "Frontside 180",
+      "description": "Frontside 180",
+      "area": "Flatground",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 204
+    },
+    {
+      "manual_id": 205,
+      "name": "50-50 Grind",
+      "name_es": "50-50 Grind",
+      "description": "50-50 Grind",
+      "area": "Street",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "street",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 205
+    },
+    {
+      "manual_id": 206,
+      "name": "Nose Slide",
+      "name_es": "Nose Slide",
+      "description": "Nose Slide",
+      "area": "Street",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "street",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 206
+    },
+    {
+      "manual_id": 207,
+      "name": "Tail Slide",
+      "name_es": "Tail Slide",
+      "description": "Tail Slide",
+      "area": "Street",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "street",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 207
+    },
+    {
+      "manual_id": 208,
+      "name": "Axle Stall",
+      "name_es": "Axle Stall",
+      "description": "Axle Stall",
+      "area": "Park",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 208
+    },
+    {
+      "manual_id": 209,
+      "name": "Rock and Roll",
+      "name_es": "Rock and Roll",
+      "description": "Rock and Roll",
+      "area": "Park",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 209
+    },
+    {
+      "manual_id": 210,
+      "name": "50-50 On",
+      "name_es": "50-50 On",
+      "description": "50-50 On",
+      "area": "Park",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 210
+    },
+    {
+      "manual_id": 211,
+      "name": "Disaster",
+      "name_es": "Disaster",
+      "description": "Disaster",
+      "area": "Park",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 211
+    },
+    {
+      "manual_id": 212,
+      "name": "Frontside Grind",
+      "name_es": "Frontside Grind",
+      "description": "Frontside Grind",
+      "area": "Bowl",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 212
+    },
+    {
+      "manual_id": 213,
+      "name": "Backside Grind",
+      "name_es": "Backside Grind",
+      "description": "Backside Grind",
+      "area": "Bowl",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 213
+    },
+    {
+      "manual_id": 214,
+      "name": "Tail Stall",
+      "name_es": "Tail Stall",
+      "description": "Tail Stall",
+      "area": "Bowl",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 214
+    },
+    {
+      "manual_id": 215,
+      "name": "Axle Stall",
+      "name_es": "Axle Stall",
+      "description": "Axle Stall",
+      "area": "Mini Ramp",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 215
+    },
+    {
+      "manual_id": 216,
+      "name": "Tail Stall",
+      "name_es": "Tail Stall",
+      "description": "Tail Stall",
+      "area": "Mini Ramp",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 216
+    },
+    {
+      "manual_id": 217,
+      "name": "50-50 On",
+      "name_es": "50-50 On",
+      "description": "50-50 On",
+      "area": "Mini Ramp",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 217
+    },
+    {
+      "manual_id": 218,
+      "name": "Rock and Roll",
+      "name_es": "Rock and Roll",
+      "description": "Rock and Roll",
+      "area": "Mini Ramp",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 218
+    },
+    {
+      "manual_id": 219,
+      "name": "Axle Stall",
+      "name_es": "Axle Stall",
+      "description": "Axle Stall",
+      "area": "Vert",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 219
+    },
+    {
+      "manual_id": 220,
+      "name": "Rock to Fakie",
+      "name_es": "Rock to Fakie",
+      "description": "Rock to Fakie",
+      "area": "Vert",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 220
+    },
+    {
+      "manual_id": 221,
+      "name": "Tail Stall",
+      "name_es": "Tail Stall",
+      "description": "Tail Stall",
+      "area": "Vert",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 221
+    },
+    {
+      "manual_id": 222,
+      "name": "Fakie Rock",
+      "name_es": "Fakie Rock",
+      "description": "Fakie Rock",
+      "area": "Vert",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "vert_bowl",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 222
+    },
+    {
+      "manual_id": 223,
+      "name": "Kickflip",
+      "name_es": "Kickflip",
+      "description": "Kickflip",
+      "area": "Flatground",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "program": "Intermediate",
+      "activity_type": "Trick",
+      "sort_order": 223
+    },
+    {
+      "manual_id": 224,
+      "name": "Heelflip",
+      "name_es": "Heelflip",
+      "description": "Heelflip",
+      "area": "Flatground",
+      "structure": "Level 4: Progression",
+      "trick_type": "Trick",
+      "categoria": "Level 4: Progression",
+      "difficulty": "intermediate",
+      "category": "iniciacion",
+      "program": "Intermediate",
+      "activity_type": "Trick",
       "sort_order": 224
     },
     {
       "manual_id": 225,
-      "name": "Kickflip",
-      "name_es": "Kickflip",
-      "description": "Kickflip",
+      "name": "Backside",
+      "name_es": "Backside",
+      "description": "Backside",
       "area": "Flatground",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4558,9 +4417,9 @@
     },
     {
       "manual_id": 226,
-      "name": "Heelflip",
-      "name_es": "Heelflip",
-      "description": "Heelflip",
+      "name": "Varial",
+      "name_es": "Varial",
+      "description": "Varial",
       "area": "Flatground",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4573,39 +4432,39 @@
     },
     {
       "manual_id": 227,
-      "name": "Pop Shuvit",
-      "name_es": "Pop Shuvit",
-      "description": "Pop Shuvit",
-      "area": "Flatground",
+      "name": "Boardslide",
+      "name_es": "Boardslide",
+      "description": "Boardslide",
+      "area": "Street",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
       "categoria": "Level 4: Progression",
       "difficulty": "intermediate",
-      "category": "iniciacion",
+      "category": "street",
       "program": "Intermediate",
       "activity_type": "Trick",
       "sort_order": 227
     },
     {
       "manual_id": 228,
-      "name": "Frontside 180",
-      "name_es": "Frontside 180",
-      "description": "Frontside 180",
-      "area": "Flatground",
+      "name": "Lipslide",
+      "name_es": "Lipslide",
+      "description": "Lipslide",
+      "area": "Street",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
       "categoria": "Level 4: Progression",
       "difficulty": "intermediate",
-      "category": "iniciacion",
+      "category": "street",
       "program": "Intermediate",
       "activity_type": "Trick",
       "sort_order": 228
     },
     {
       "manual_id": 229,
-      "name": "50-50 Grind",
-      "name_es": "50-50 Grind",
-      "description": "50-50 Grind",
+      "name": "5-O",
+      "name_es": "5-O",
+      "description": "5-O",
       "area": "Street",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4618,9 +4477,9 @@
     },
     {
       "manual_id": 230,
-      "name": "Nose Slide",
-      "name_es": "Nose Slide",
-      "description": "Nose Slide",
+      "name": "Crooked",
+      "name_es": "Crooked",
+      "description": "Crooked",
       "area": "Street",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4633,24 +4492,24 @@
     },
     {
       "manual_id": 231,
-      "name": "Tail Slide",
-      "name_es": "Tail Slide",
-      "description": "Tail Slide",
-      "area": "Street",
+      "name": "Blunt",
+      "name_es": "Blunt",
+      "description": "Blunt",
+      "area": "Park",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
       "categoria": "Level 4: Progression",
       "difficulty": "intermediate",
-      "category": "street",
+      "category": "vert_bowl",
       "program": "Intermediate",
       "activity_type": "Trick",
       "sort_order": 231
     },
     {
       "manual_id": 232,
-      "name": "Axle Stall",
-      "name_es": "Axle Stall",
-      "description": "Axle Stall",
+      "name": "Feeble",
+      "name_es": "Feeble",
+      "description": "Feeble",
       "area": "Park",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4663,9 +4522,9 @@
     },
     {
       "manual_id": 233,
-      "name": "Rock and Roll",
-      "name_es": "Rock and Roll",
-      "description": "Rock and Roll",
+      "name": "Smith",
+      "name_es": "Smith",
+      "description": "Smith",
       "area": "Park",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4678,9 +4537,9 @@
     },
     {
       "manual_id": 234,
-      "name": "50-50 On",
-      "name_es": "50-50 On",
-      "description": "50-50 On",
+      "name": "Pivot",
+      "name_es": "Pivot",
+      "description": "Pivot",
       "area": "Park",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4693,10 +4552,10 @@
     },
     {
       "manual_id": 235,
-      "name": "Disaster",
-      "name_es": "Disaster",
-      "description": "Disaster",
-      "area": "Park",
+      "name": "Frontside",
+      "name_es": "Frontside",
+      "description": "Frontside",
+      "area": "Bowl",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
       "categoria": "Level 4: Progression",
@@ -4708,9 +4567,9 @@
     },
     {
       "manual_id": 236,
-      "name": "Frontside Grind",
-      "name_es": "Frontside Grind",
-      "description": "Frontside Grind",
+      "name": "Backside",
+      "name_es": "Backside",
+      "description": "Backside",
       "area": "Bowl",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4723,9 +4582,9 @@
     },
     {
       "manual_id": 237,
-      "name": "Backside Grind",
-      "name_es": "Backside Grind",
-      "description": "Backside Grind",
+      "name": "Layback",
+      "name_es": "Layback",
+      "description": "Layback",
       "area": "Bowl",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4738,10 +4597,10 @@
     },
     {
       "manual_id": 238,
-      "name": "Tail Stall",
-      "name_es": "Tail Stall",
-      "description": "Tail Stall",
-      "area": "Bowl",
+      "name": "Blunt to Fakie",
+      "name_es": "Blunt to Fakie",
+      "description": "Blunt to Fakie",
+      "area": "Mini Ramp",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
       "categoria": "Level 4: Progression",
@@ -4753,9 +4612,9 @@
     },
     {
       "manual_id": 239,
-      "name": "Axle Stall",
-      "name_es": "Axle Stall",
-      "description": "Axle Stall",
+      "name": "Disaster",
+      "name_es": "Disaster",
+      "description": "Disaster",
       "area": "Mini Ramp",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4768,9 +4627,9 @@
     },
     {
       "manual_id": 240,
-      "name": "Tail Stall",
-      "name_es": "Tail Stall",
-      "description": "Tail Stall",
+      "name": "Feeble Stall",
+      "name_es": "Feeble Stall",
+      "description": "Feeble Stall",
       "area": "Mini Ramp",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4783,9 +4642,9 @@
     },
     {
       "manual_id": 241,
-      "name": "50-50 On",
-      "name_es": "50-50 On",
-      "description": "50-50 On",
+      "name": "Smith Stall",
+      "name_es": "Smith Stall",
+      "description": "Smith Stall",
       "area": "Mini Ramp",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4798,9 +4657,9 @@
     },
     {
       "manual_id": 242,
-      "name": "Rock and Roll",
-      "name_es": "Rock and Roll",
-      "description": "Rock and Roll",
+      "name": "Pivot Fakie",
+      "name_es": "Pivot Fakie",
+      "description": "Pivot Fakie",
       "area": "Mini Ramp",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4813,9 +4672,9 @@
     },
     {
       "manual_id": 243,
-      "name": "Axle Stall",
-      "name_es": "Axle Stall",
-      "description": "Axle Stall",
+      "name": "Frontside Air",
+      "name_es": "Frontside Air",
+      "description": "Frontside Air",
       "area": "Vert",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4828,9 +4687,9 @@
     },
     {
       "manual_id": 244,
-      "name": "Rock to Fakie",
-      "name_es": "Rock to Fakie",
-      "description": "Rock to Fakie",
+      "name": "Backside Air",
+      "name_es": "Backside Air",
+      "description": "Backside Air",
       "area": "Vert",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4843,9 +4702,9 @@
     },
     {
       "manual_id": 245,
-      "name": "Tail Stall",
-      "name_es": "Tail Stall",
-      "description": "Tail Stall",
+      "name": "Indy Grab",
+      "name_es": "Indy Grab",
+      "description": "Indy Grab",
       "area": "Vert",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4858,9 +4717,9 @@
     },
     {
       "manual_id": 246,
-      "name": "Fakie Rock",
-      "name_es": "Fakie Rock",
-      "description": "Fakie Rock",
+      "name": "Method Air",
+      "name_es": "Method Air",
+      "description": "Method Air",
       "area": "Vert",
       "structure": "Level 4: Progression",
       "trick_type": "Trick",
@@ -4873,366 +4732,6 @@
     },
     {
       "manual_id": 247,
-      "name": "Kickflip",
-      "name_es": "Kickflip",
-      "description": "Kickflip",
-      "area": "Flatground",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "iniciacion",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 247
-    },
-    {
-      "manual_id": 248,
-      "name": "Heelflip",
-      "name_es": "Heelflip",
-      "description": "Heelflip",
-      "area": "Flatground",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "iniciacion",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 248
-    },
-    {
-      "manual_id": 249,
-      "name": "Backside",
-      "name_es": "Backside",
-      "description": "Backside",
-      "area": "Flatground",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "iniciacion",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 249
-    },
-    {
-      "manual_id": 250,
-      "name": "Varial",
-      "name_es": "Varial",
-      "description": "Varial",
-      "area": "Flatground",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "iniciacion",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 250
-    },
-    {
-      "manual_id": 251,
-      "name": "Boardslide",
-      "name_es": "Boardslide",
-      "description": "Boardslide",
-      "area": "Street",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "street",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 251
-    },
-    {
-      "manual_id": 252,
-      "name": "Lipslide",
-      "name_es": "Lipslide",
-      "description": "Lipslide",
-      "area": "Street",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "street",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 252
-    },
-    {
-      "manual_id": 253,
-      "name": "5-O",
-      "name_es": "5-O",
-      "description": "5-O",
-      "area": "Street",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "street",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 253
-    },
-    {
-      "manual_id": 254,
-      "name": "Crooked",
-      "name_es": "Crooked",
-      "description": "Crooked",
-      "area": "Street",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "street",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 254
-    },
-    {
-      "manual_id": 255,
-      "name": "Blunt",
-      "name_es": "Blunt",
-      "description": "Blunt",
-      "area": "Park",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 255
-    },
-    {
-      "manual_id": 256,
-      "name": "Feeble",
-      "name_es": "Feeble",
-      "description": "Feeble",
-      "area": "Park",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 256
-    },
-    {
-      "manual_id": 257,
-      "name": "Smith",
-      "name_es": "Smith",
-      "description": "Smith",
-      "area": "Park",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 257
-    },
-    {
-      "manual_id": 258,
-      "name": "Pivot",
-      "name_es": "Pivot",
-      "description": "Pivot",
-      "area": "Park",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 258
-    },
-    {
-      "manual_id": 259,
-      "name": "Frontside",
-      "name_es": "Frontside",
-      "description": "Frontside",
-      "area": "Bowl",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 259
-    },
-    {
-      "manual_id": 260,
-      "name": "Backside",
-      "name_es": "Backside",
-      "description": "Backside",
-      "area": "Bowl",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 260
-    },
-    {
-      "manual_id": 261,
-      "name": "Layback",
-      "name_es": "Layback",
-      "description": "Layback",
-      "area": "Bowl",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 261
-    },
-    {
-      "manual_id": 262,
-      "name": "Blunt to Fakie",
-      "name_es": "Blunt to Fakie",
-      "description": "Blunt to Fakie",
-      "area": "Mini Ramp",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 262
-    },
-    {
-      "manual_id": 263,
-      "name": "Disaster",
-      "name_es": "Disaster",
-      "description": "Disaster",
-      "area": "Mini Ramp",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 263
-    },
-    {
-      "manual_id": 264,
-      "name": "Feeble Stall",
-      "name_es": "Feeble Stall",
-      "description": "Feeble Stall",
-      "area": "Mini Ramp",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 264
-    },
-    {
-      "manual_id": 265,
-      "name": "Smith Stall",
-      "name_es": "Smith Stall",
-      "description": "Smith Stall",
-      "area": "Mini Ramp",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 265
-    },
-    {
-      "manual_id": 266,
-      "name": "Pivot Fakie",
-      "name_es": "Pivot Fakie",
-      "description": "Pivot Fakie",
-      "area": "Mini Ramp",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 266
-    },
-    {
-      "manual_id": 267,
-      "name": "Frontside Air",
-      "name_es": "Frontside Air",
-      "description": "Frontside Air",
-      "area": "Vert",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 267
-    },
-    {
-      "manual_id": 268,
-      "name": "Backside Air",
-      "name_es": "Backside Air",
-      "description": "Backside Air",
-      "area": "Vert",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 268
-    },
-    {
-      "manual_id": 269,
-      "name": "Indy Grab",
-      "name_es": "Indy Grab",
-      "description": "Indy Grab",
-      "area": "Vert",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 269
-    },
-    {
-      "manual_id": 270,
-      "name": "Method Air",
-      "name_es": "Method Air",
-      "description": "Method Air",
-      "area": "Vert",
-      "structure": "Level 4: Progression",
-      "trick_type": "Trick",
-      "categoria": "Level 4: Progression",
-      "difficulty": "intermediate",
-      "category": "vert_bowl",
-      "program": "Intermediate",
-      "activity_type": "Trick",
-      "sort_order": 270
-    },
-    {
-      "manual_id": 271,
       "name": "Mute Grab",
       "name_es": "Mute Grab",
       "description": "Mute Grab",
@@ -5244,10 +4743,10 @@
       "category": "vert_bowl",
       "program": "Intermediate",
       "activity_type": "Trick",
-      "sort_order": 271
+      "sort_order": 247
     },
     {
-      "manual_id": 272,
+      "manual_id": 248,
       "name": "360 flip",
       "name_es": "360 flip",
       "description": "360 flip",
@@ -5267,10 +4766,10 @@
         "Control de Tabla"
       ],
       "activity_type": "Trick",
-      "sort_order": 272
+      "sort_order": 248
     },
     {
-      "manual_id": 273,
+      "manual_id": 249,
       "name": "Hardflip",
       "name_es": "Hardflip",
       "description": "Hardflip",
@@ -5291,10 +4790,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 273
+      "sort_order": 249
     },
     {
-      "manual_id": 274,
+      "manual_id": 250,
       "name": "Blunt to fake",
       "name_es": "Blunt to fake",
       "description": "Blunt to fake",
@@ -5316,10 +4815,10 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
-      "sort_order": 274
+      "sort_order": 250
     },
     {
-      "manual_id": 275,
+      "manual_id": 251,
       "name": "Blunt 180",
       "name_es": "Blunt 180",
       "description": "Blunt 180",
@@ -5341,13 +4840,373 @@
         "Estabilidad"
       ],
       "activity_type": "Trick",
+      "sort_order": 251
+    },
+    {
+      "manual_id": 252,
+      "name": "360 Flip",
+      "name_es": "360 Flip",
+      "description": "360 Flip",
+      "area": "Flatground",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "iniciacion",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 252
+    },
+    {
+      "manual_id": 253,
+      "name": "Hardflip",
+      "name_es": "Hardflip",
+      "description": "Hardflip",
+      "area": "Flatground",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "iniciacion",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 253
+    },
+    {
+      "manual_id": 254,
+      "name": "Inward Heelflip",
+      "name_es": "Inward Heelflip",
+      "description": "Inward Heelflip",
+      "area": "Flatground",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "iniciacion",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 254
+    },
+    {
+      "manual_id": 255,
+      "name": "Nollie Kickflip",
+      "name_es": "Nollie Kickflip",
+      "description": "Nollie Kickflip",
+      "area": "Flatground",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "iniciacion",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 255
+    },
+    {
+      "manual_id": 256,
+      "name": "Feeble Grind",
+      "name_es": "Feeble Grind",
+      "description": "Feeble Grind",
+      "area": "Street",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "street",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 256
+    },
+    {
+      "manual_id": 257,
+      "name": "Smith Grind",
+      "name_es": "Smith Grind",
+      "description": "Smith Grind",
+      "area": "Street",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "street",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 257
+    },
+    {
+      "manual_id": 258,
+      "name": "Nosegrind",
+      "name_es": "Nosegrind",
+      "description": "Nosegrind",
+      "area": "Street",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "street",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 258
+    },
+    {
+      "manual_id": 259,
+      "name": "Hurricane Grind",
+      "name_es": "Hurricane Grind",
+      "description": "Hurricane Grind",
+      "area": "Street",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "street",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 259
+    },
+    {
+      "manual_id": 260,
+      "name": "Air to Fakie",
+      "name_es": "Air to Fakie",
+      "description": "Air to Fakie",
+      "area": "Park",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 260
+    },
+    {
+      "manual_id": 261,
+      "name": "Melon Grab",
+      "name_es": "Melon Grab",
+      "description": "Melon Grab",
+      "area": "Park",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 261
+    },
+    {
+      "manual_id": 262,
+      "name": "Stalefish",
+      "name_es": "Stalefish",
+      "description": "Stalefish",
+      "area": "Park",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 262
+    },
+    {
+      "manual_id": 263,
+      "name": "Mute Air",
+      "name_es": "Mute Air",
+      "description": "Mute Air",
+      "area": "Park",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 263
+    },
+    {
+      "manual_id": 264,
+      "name": "Frontside Ollie",
+      "name_es": "Frontside Ollie",
+      "description": "Frontside Ollie",
+      "area": "Bowl",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 264
+    },
+    {
+      "manual_id": 265,
+      "name": "Backside Ollie",
+      "name_es": "Backside Ollie",
+      "description": "Backside Ollie",
+      "area": "Bowl",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 265
+    },
+    {
+      "manual_id": 266,
+      "name": "Air to Fakie",
+      "name_es": "Air to Fakie",
+      "description": "Air to Fakie",
+      "area": "Mini Ramp",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 266
+    },
+    {
+      "manual_id": 267,
+      "name": "Backside Ollie",
+      "name_es": "Backside Ollie",
+      "description": "Backside Ollie",
+      "area": "Mini Ramp",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 267
+    },
+    {
+      "manual_id": 268,
+      "name": "Frontside Ollie",
+      "name_es": "Frontside Ollie",
+      "description": "Frontside Ollie",
+      "area": "Mini Ramp",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 268
+    },
+    {
+      "manual_id": 269,
+      "name": "Nosegrind Stall",
+      "name_es": "Nosegrind Stall",
+      "description": "Nosegrind Stall",
+      "area": "Mini Ramp",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 269
+    },
+    {
+      "manual_id": 270,
+      "name": "Lipslide",
+      "name_es": "Lipslide",
+      "description": "Lipslide",
+      "area": "Mini Ramp",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 270
+    },
+    {
+      "manual_id": 271,
+      "name": "Stalefish Air",
+      "name_es": "Stalefish Air",
+      "description": "Stalefish Air",
+      "area": "Vert",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 271
+    },
+    {
+      "manual_id": 272,
+      "name": "Melon Grab",
+      "name_es": "Melon Grab",
+      "description": "Melon Grab",
+      "area": "Vert",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 272
+    },
+    {
+      "manual_id": 273,
+      "name": "Lien Air",
+      "name_es": "Lien Air",
+      "description": "Lien Air",
+      "area": "Vert",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 273
+    },
+    {
+      "manual_id": 274,
+      "name": "540 Air",
+      "name_es": "540 Air",
+      "description": "540 Air",
+      "area": "Vert",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "vert_bowl",
+      "program": "Advanced",
+      "activity_type": "Trick",
+      "sort_order": 274
+    },
+    {
+      "manual_id": 275,
+      "name": "Laser Flip",
+      "name_es": "Laser Flip",
+      "description": "Laser Flip",
+      "area": "Flatground",
+      "structure": "Level 5: Advanced",
+      "trick_type": "Trick",
+      "categoria": "Level 5: Advanced",
+      "difficulty": "advanced",
+      "category": "iniciacion",
+      "program": "Advanced",
+      "activity_type": "Trick",
       "sort_order": 275
     },
     {
       "manual_id": 276,
-      "name": "360 Flip",
-      "name_es": "360 Flip",
-      "description": "360 Flip",
+      "name": "Impossible",
+      "name_es": "Impossible",
+      "description": "Impossible",
       "area": "Flatground",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5360,9 +5219,9 @@
     },
     {
       "manual_id": 277,
-      "name": "Hardflip",
-      "name_es": "Hardflip",
-      "description": "Hardflip",
+      "name": "360 Shuvit",
+      "name_es": "360 Shuvit",
+      "description": "360 Shuvit",
       "area": "Flatground",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5375,9 +5234,9 @@
     },
     {
       "manual_id": 278,
-      "name": "Inward Heelflip",
-      "name_es": "Inward Heelflip",
-      "description": "Inward Heelflip",
+      "name": "Switch Kickflip",
+      "name_es": "Switch Kickflip",
+      "description": "Switch Kickflip",
       "area": "Flatground",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5390,24 +5249,24 @@
     },
     {
       "manual_id": 279,
-      "name": "Nollie Kickflip",
-      "name_es": "Nollie Kickflip",
-      "description": "Nollie Kickflip",
-      "area": "Flatground",
+      "name": "Overcrook",
+      "name_es": "Overcrook",
+      "description": "Overcrook",
+      "area": "Street",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
       "categoria": "Level 5: Advanced",
       "difficulty": "advanced",
-      "category": "iniciacion",
+      "category": "street",
       "program": "Advanced",
       "activity_type": "Trick",
       "sort_order": 279
     },
     {
       "manual_id": 280,
-      "name": "Feeble Grind",
-      "name_es": "Feeble Grind",
-      "description": "Feeble Grind",
+      "name": "Noseblunt",
+      "name_es": "Noseblunt",
+      "description": "Noseblunt",
       "area": "Street",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5420,9 +5279,9 @@
     },
     {
       "manual_id": 281,
-      "name": "Smith Grind",
-      "name_es": "Smith Grind",
-      "description": "Smith Grind",
+      "name": "Tailslide Pop Out",
+      "name_es": "Tailslide Pop Out",
+      "description": "Tailslide Pop Out",
       "area": "Street",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5435,9 +5294,9 @@
     },
     {
       "manual_id": 282,
-      "name": "Nosegrind",
-      "name_es": "Nosegrind",
-      "description": "Nosegrind",
+      "name": "Boardslide 180 Out",
+      "name_es": "Boardslide 180 Out",
+      "description": "Boardslide 180 Out",
       "area": "Street",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5450,24 +5309,24 @@
     },
     {
       "manual_id": 283,
-      "name": "Hurricane Grind",
-      "name_es": "Hurricane Grind",
-      "description": "Hurricane Grind",
-      "area": "Street",
+      "name": "540 Air",
+      "name_es": "540 Air",
+      "description": "540 Air",
+      "area": "Park",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
       "categoria": "Level 5: Advanced",
       "difficulty": "advanced",
-      "category": "street",
+      "category": "vert_bowl",
       "program": "Advanced",
       "activity_type": "Trick",
       "sort_order": 283
     },
     {
       "manual_id": 284,
-      "name": "Air to Fakie",
-      "name_es": "Air to Fakie",
-      "description": "Air to Fakie",
+      "name": "Frontside Invert",
+      "name_es": "Frontside Invert",
+      "description": "Frontside Invert",
       "area": "Park",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5480,9 +5339,9 @@
     },
     {
       "manual_id": 285,
-      "name": "Melon Grab",
-      "name_es": "Melon Grab",
-      "description": "Melon Grab",
+      "name": "Handplant",
+      "name_es": "Handplant",
+      "description": "Handplant",
       "area": "Park",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5495,10 +5354,10 @@
     },
     {
       "manual_id": 286,
-      "name": "Stalefish",
-      "name_es": "Stalefish",
-      "description": "Stalefish",
-      "area": "Park",
+      "name": "Frontside Invert",
+      "name_es": "Frontside Invert",
+      "description": "Frontside Invert",
+      "area": "Bowl",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
       "categoria": "Level 5: Advanced",
@@ -5510,10 +5369,10 @@
     },
     {
       "manual_id": 287,
-      "name": "Mute Air",
-      "name_es": "Mute Air",
-      "description": "Mute Air",
-      "area": "Park",
+      "name": "Miller Flip",
+      "name_es": "Miller Flip",
+      "description": "Miller Flip",
+      "area": "Bowl",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
       "categoria": "Level 5: Advanced",
@@ -5525,9 +5384,9 @@
     },
     {
       "manual_id": 288,
-      "name": "Frontside Ollie",
-      "name_es": "Frontside Ollie",
-      "description": "Frontside Ollie",
+      "name": "Eggplant",
+      "name_es": "Eggplant",
+      "description": "Eggplant",
       "area": "Bowl",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5540,10 +5399,10 @@
     },
     {
       "manual_id": 289,
-      "name": "Backside Ollie",
-      "name_es": "Backside Ollie",
-      "description": "Backside Ollie",
-      "area": "Bowl",
+      "name": "540 Air",
+      "name_es": "540 Air",
+      "description": "540 Air",
+      "area": "Mini Ramp",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
       "categoria": "Level 5: Advanced",
@@ -5555,9 +5414,9 @@
     },
     {
       "manual_id": 290,
-      "name": "Air to Fakie",
-      "name_es": "Air to Fakie",
-      "description": "Air to Fakie",
+      "name": "Frontside Invert",
+      "name_es": "Frontside Invert",
+      "description": "Frontside Invert",
       "area": "Mini Ramp",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5570,9 +5429,9 @@
     },
     {
       "manual_id": 291,
-      "name": "Backside Ollie",
-      "name_es": "Backside Ollie",
-      "description": "Backside Ollie",
+      "name": "Kickflip to Fakie",
+      "name_es": "Kickflip to Fakie",
+      "description": "Kickflip to Fakie",
       "area": "Mini Ramp",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5585,9 +5444,9 @@
     },
     {
       "manual_id": 292,
-      "name": "Frontside Ollie",
-      "name_es": "Frontside Ollie",
-      "description": "Frontside Ollie",
+      "name": "Handplant",
+      "name_es": "Handplant",
+      "description": "Handplant",
       "area": "Mini Ramp",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5600,10 +5459,10 @@
     },
     {
       "manual_id": 293,
-      "name": "Nosegrind Stall",
-      "name_es": "Nosegrind Stall",
-      "description": "Nosegrind Stall",
-      "area": "Mini Ramp",
+      "name": "McTwist",
+      "name_es": "McTwist",
+      "description": "McTwist",
+      "area": "Vert",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
       "categoria": "Level 5: Advanced",
@@ -5615,10 +5474,10 @@
     },
     {
       "manual_id": 294,
-      "name": "Lipslide",
-      "name_es": "Lipslide",
-      "description": "Lipslide",
-      "area": "Mini Ramp",
+      "name": "Frontside Invert",
+      "name_es": "Frontside Invert",
+      "description": "Frontside Invert",
+      "area": "Vert",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
       "categoria": "Level 5: Advanced",
@@ -5630,9 +5489,9 @@
     },
     {
       "manual_id": 295,
-      "name": "Stalefish Air",
-      "name_es": "Stalefish Air",
-      "description": "Stalefish Air",
+      "name": "Handplant",
+      "name_es": "Handplant",
+      "description": "Handplant",
       "area": "Vert",
       "structure": "Level 5: Advanced",
       "trick_type": "Trick",
@@ -5645,366 +5504,6 @@
     },
     {
       "manual_id": 296,
-      "name": "Melon Grab",
-      "name_es": "Melon Grab",
-      "description": "Melon Grab",
-      "area": "Vert",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 296
-    },
-    {
-      "manual_id": 297,
-      "name": "Lien Air",
-      "name_es": "Lien Air",
-      "description": "Lien Air",
-      "area": "Vert",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 297
-    },
-    {
-      "manual_id": 298,
-      "name": "540 Air",
-      "name_es": "540 Air",
-      "description": "540 Air",
-      "area": "Vert",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 298
-    },
-    {
-      "manual_id": 299,
-      "name": "Laser Flip",
-      "name_es": "Laser Flip",
-      "description": "Laser Flip",
-      "area": "Flatground",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "iniciacion",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 299
-    },
-    {
-      "manual_id": 300,
-      "name": "Impossible",
-      "name_es": "Impossible",
-      "description": "Impossible",
-      "area": "Flatground",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "iniciacion",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 300
-    },
-    {
-      "manual_id": 301,
-      "name": "360 Shuvit",
-      "name_es": "360 Shuvit",
-      "description": "360 Shuvit",
-      "area": "Flatground",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "iniciacion",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 301
-    },
-    {
-      "manual_id": 302,
-      "name": "Switch Kickflip",
-      "name_es": "Switch Kickflip",
-      "description": "Switch Kickflip",
-      "area": "Flatground",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "iniciacion",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 302
-    },
-    {
-      "manual_id": 303,
-      "name": "Overcrook",
-      "name_es": "Overcrook",
-      "description": "Overcrook",
-      "area": "Street",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "street",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 303
-    },
-    {
-      "manual_id": 304,
-      "name": "Noseblunt",
-      "name_es": "Noseblunt",
-      "description": "Noseblunt",
-      "area": "Street",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "street",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 304
-    },
-    {
-      "manual_id": 305,
-      "name": "Tailslide Pop Out",
-      "name_es": "Tailslide Pop Out",
-      "description": "Tailslide Pop Out",
-      "area": "Street",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "street",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 305
-    },
-    {
-      "manual_id": 306,
-      "name": "Boardslide 180 Out",
-      "name_es": "Boardslide 180 Out",
-      "description": "Boardslide 180 Out",
-      "area": "Street",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "street",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 306
-    },
-    {
-      "manual_id": 307,
-      "name": "540 Air",
-      "name_es": "540 Air",
-      "description": "540 Air",
-      "area": "Park",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 307
-    },
-    {
-      "manual_id": 308,
-      "name": "Frontside Invert",
-      "name_es": "Frontside Invert",
-      "description": "Frontside Invert",
-      "area": "Park",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 308
-    },
-    {
-      "manual_id": 309,
-      "name": "Handplant",
-      "name_es": "Handplant",
-      "description": "Handplant",
-      "area": "Park",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 309
-    },
-    {
-      "manual_id": 310,
-      "name": "Frontside Invert",
-      "name_es": "Frontside Invert",
-      "description": "Frontside Invert",
-      "area": "Bowl",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 310
-    },
-    {
-      "manual_id": 311,
-      "name": "Miller Flip",
-      "name_es": "Miller Flip",
-      "description": "Miller Flip",
-      "area": "Bowl",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 311
-    },
-    {
-      "manual_id": 312,
-      "name": "Eggplant",
-      "name_es": "Eggplant",
-      "description": "Eggplant",
-      "area": "Bowl",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 312
-    },
-    {
-      "manual_id": 313,
-      "name": "540 Air",
-      "name_es": "540 Air",
-      "description": "540 Air",
-      "area": "Mini Ramp",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 313
-    },
-    {
-      "manual_id": 314,
-      "name": "Frontside Invert",
-      "name_es": "Frontside Invert",
-      "description": "Frontside Invert",
-      "area": "Mini Ramp",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 314
-    },
-    {
-      "manual_id": 315,
-      "name": "Kickflip to Fakie",
-      "name_es": "Kickflip to Fakie",
-      "description": "Kickflip to Fakie",
-      "area": "Mini Ramp",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 315
-    },
-    {
-      "manual_id": 316,
-      "name": "Handplant",
-      "name_es": "Handplant",
-      "description": "Handplant",
-      "area": "Mini Ramp",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 316
-    },
-    {
-      "manual_id": 317,
-      "name": "McTwist",
-      "name_es": "McTwist",
-      "description": "McTwist",
-      "area": "Vert",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 317
-    },
-    {
-      "manual_id": 318,
-      "name": "Frontside Invert",
-      "name_es": "Frontside Invert",
-      "description": "Frontside Invert",
-      "area": "Vert",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 318
-    },
-    {
-      "manual_id": 319,
-      "name": "Handplant",
-      "name_es": "Handplant",
-      "description": "Handplant",
-      "area": "Vert",
-      "structure": "Level 5: Advanced",
-      "trick_type": "Trick",
-      "categoria": "Level 5: Advanced",
-      "difficulty": "advanced",
-      "category": "vert_bowl",
-      "program": "Advanced",
-      "activity_type": "Trick",
-      "sort_order": 319
-    },
-    {
-      "manual_id": 320,
       "name": "Gay Twist",
       "name_es": "Gay Twist",
       "description": "Gay Twist",
@@ -6016,7 +5515,7 @@
       "category": "vert_bowl",
       "program": "Advanced",
       "activity_type": "Trick",
-      "sort_order": 320
+      "sort_order": 296
     }
   ]
 }

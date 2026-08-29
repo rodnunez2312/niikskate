@@ -53,10 +53,17 @@ const skillFocusRows = ref<any[]>([])
 const assignFilterStructure = ref('')
 const assignFilterArea = ref('')
 const assignFilterType = ref('')
+const assignSearch = ref('')
 const assigningSkillId = ref<string | null>(null)
 const updatingFocusId = ref<string | null>(null)
 const revertingSkillId = ref<string | null>(null)
 const focusError = ref<string | null>(null)
+
+// Multi-select: an intermediate skater already lands most of the 296-trick
+// library, so onboarding them one row at a time is not workable.
+const selectedAssignIds = ref<string[]>([])
+const selectedFocusIds = ref<string[]>([])
+const bulkBusy = ref(false)
 
 const commentModalOpen = ref(false)
 const commentFocusId = ref<string | null>(null)
@@ -500,43 +507,31 @@ const updateSkillFocusStatus = async (focusId: string, status: SkaterTrickBagSta
   if (!row) return
 
   updatingFocusId.value = focusId
+  focusError.value = null
   const prevStatus = row.status
+  const prevCompletedAt = row.completed_at ?? null
+  const stamp = new Date().toISOString()
   row.status = status
-  if (status === 'done') row.completed_at = new Date().toISOString()
+  row.completed_at = status === 'done' ? stamp : null
 
   try {
-    const payload: Record<string, unknown> = { status }
-    if (status === 'done') payload.completed_at = row.completed_at
     const { error } = await client
       .from('student_skill_focus')
-      .update(payload)
+      .update({ status, completed_at: row.completed_at })
       .eq('id', focusId)
     if (error) throw error
-
-    if (status === 'done' && row.skill_id && studentId.value && !isSkillLearned(row.skill_id)) {
-      const learnedAt = new Date().toISOString()
-      const { error: progErr } = await client.from('student_progress').insert({
-        student_id: studentId.value,
-        skill_id: row.skill_id,
-        proficiency: 3,
-        learned_at: learnedAt,
-      })
-      if (!progErr) {
-        const skill = row.skill || skills.value.find(s => s.id === row.skill_id)
-        studentProgress.value.push({
-          student_id: studentId.value,
-          skill_id: row.skill_id,
-          proficiency: 3,
-          learned_at: learnedAt,
-          skill,
-        })
-        await loadProgramProgressForGroup()
-      }
-    }
-  } catch (e) {
+  } catch (e: any) {
     row.status = prevStatus
-    if (status === 'done') row.completed_at = null
-    console.error(e)
+    row.completed_at = prevCompletedAt
+    focusError.value = e?.message || (language.value === 'es' ? 'No se pudo actualizar' : 'Could not update')
+    updatingFocusId.value = null
+    return
+  }
+
+  try {
+    if (status === 'done' && row.skill_id) await unlockSkills([row.skill_id], stamp)
+  } catch (e: any) {
+    focusError.value = e?.message || (language.value === 'es' ? 'No se pudo desbloquear' : 'Could not unlock')
   } finally {
     updatingFocusId.value = null
   }
@@ -564,9 +559,6 @@ const unblockedTricks = computed(() =>
     .sort((a, b) => compareSkillsByManualId(a.skill, b.skill)),
 )
 
-const challengesCompleted = computed(() => unblockedTricks.value.length)
-const challengesTotal = computed(() => Math.max(skills.value.length, 1))
-
 const assignablePool = computed(() =>
   skills.value.filter(sk => !focusBlockedSkillIds.value.includes(sk.id)),
 )
@@ -576,6 +568,16 @@ function matchesAssignFilters(sk: any): boolean {
   if (assignFilterArea.value && sk.area !== assignFilterArea.value) return false
   if (assignFilterType.value && sk.trick_type !== assignFilterType.value) return false
   return true
+}
+
+function matchesAssignSearch(sk: any): boolean {
+  const query = assignSearch.value.trim().toLowerCase()
+  if (!query) return true
+  const haystack = [sk.name, sk.name_es, sk.area, sk.trick_type, trickManualLabel(sk)]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return query.split(/\s+/).every(term => haystack.includes(term))
 }
 
 const assignStructureOptions = computed(() => {
@@ -624,10 +626,154 @@ const isSkillLearned = (skillId: string) =>
 const assignTrickTableRows = computed(() =>
   assignablePool.value
     .filter(sk => matchesAssignFilters(sk))
+    .filter(sk => matchesAssignSearch(sk))
     .filter(sk => !isSkillLearned(sk.id))
     .sort(compareSkillsByManualId)
     .map(skill => ({ skill })),
 )
+
+const visibleAssignIds = computed(() => assignTrickTableRows.value.map(r => r.skill.id))
+const selectedAssignSet = computed(() => new Set(selectedAssignIds.value))
+const allVisibleAssignSelected = computed(
+  () =>
+    visibleAssignIds.value.length > 0
+    && visibleAssignIds.value.every(id => selectedAssignSet.value.has(id)),
+)
+
+const toggleAssignSelection = (skillId: string) => {
+  selectedAssignIds.value = selectedAssignSet.value.has(skillId)
+    ? selectedAssignIds.value.filter(id => id !== skillId)
+    : [...selectedAssignIds.value, skillId]
+}
+
+const toggleAllVisibleAssign = () => {
+  if (allVisibleAssignSelected.value) {
+    const visible = new Set(visibleAssignIds.value)
+    selectedAssignIds.value = selectedAssignIds.value.filter(id => !visible.has(id))
+    return
+  }
+  selectedAssignIds.value = [...new Set([...selectedAssignIds.value, ...visibleAssignIds.value])]
+}
+
+const selectedFocusSet = computed(() => new Set(selectedFocusIds.value))
+const allActiveBagSelected = computed(
+  () =>
+    activeTrickBag.value.length > 0
+    && activeTrickBag.value.every(f => selectedFocusSet.value.has(f.id)),
+)
+
+const toggleFocusSelection = (focusId: string) => {
+  selectedFocusIds.value = selectedFocusSet.value.has(focusId)
+    ? selectedFocusIds.value.filter(id => id !== focusId)
+    : [...selectedFocusIds.value, focusId]
+}
+
+const toggleAllActiveBag = () => {
+  selectedFocusIds.value = allActiveBagSelected.value ? [] : activeTrickBag.value.map(f => f.id)
+}
+
+/** Writes the student_progress unlocks for tricks that just reached "done". */
+const unlockSkills = async (skillIds: string[], learnedAt: string) => {
+  const newIds = [...new Set(skillIds)].filter(id => id && !isSkillLearned(id))
+  if (!newIds.length || !studentId.value) return
+  const { error } = await client.from('student_progress').insert(
+    newIds.map(skillId => ({
+      student_id: studentId.value,
+      skill_id: skillId,
+      proficiency: 3,
+      learned_at: learnedAt,
+      marked_by: user.value?.id ?? null,
+    })),
+  )
+  if (error) throw error
+  for (const skillId of newIds) {
+    studentProgress.value.push({
+      student_id: studentId.value,
+      skill_id: skillId,
+      proficiency: 3,
+      learned_at: learnedAt,
+      skill: skills.value.find(s => s.id === skillId),
+    })
+  }
+  await loadProgramProgressForGroup()
+}
+
+/** Assign — or assign and immediately complete — every ticked trick in one round trip. */
+const bulkAddSelected = async (status: 'assigned' | 'done') => {
+  const ids = selectedAssignIds.value.filter(id => !focusBlockedSkillIds.value.includes(id))
+  if (!ids.length || !studentId.value || bulkBusy.value) return
+  bulkBusy.value = true
+  focusError.value = null
+  const stamp = new Date().toISOString()
+  try {
+    const { data, error } = await client
+      .from('student_skill_focus')
+      .insert(
+        ids.map(skillId => ({
+          student_id: studentId.value,
+          skill_id: skillId,
+          assigned_by: user.value?.id ?? null,
+          status,
+          completed_at: status === 'done' ? stamp : null,
+        })),
+      )
+      .select('*')
+    if (error) throw error
+
+    for (const row of data ?? []) {
+      skillFocusRows.value.unshift({ ...row, skill: skills.value.find(s => s.id === row.skill_id) })
+    }
+    if (status === 'done') await unlockSkills(ids, stamp)
+    selectedAssignIds.value = []
+  } catch (e: any) {
+    focusError.value = e?.message || (language.value === 'es' ? 'No se pudo actualizar' : 'Could not update')
+    await loadStudent()
+  } finally {
+    bulkBusy.value = false
+  }
+}
+
+const bulkSetFocusStatus = async (status: SkaterTrickBagStatus) => {
+  const ids = [...selectedFocusIds.value]
+  if (!ids.length || bulkBusy.value) return
+  bulkBusy.value = true
+  focusError.value = null
+  const stamp = new Date().toISOString()
+  try {
+    const { error } = await client
+      .from('student_skill_focus')
+      .update({ status, completed_at: status === 'done' ? stamp : null })
+      .in('id', ids)
+    if (error) throw error
+
+    const rows = skillFocusRows.value.filter(f => ids.includes(f.id))
+    for (const row of rows) {
+      row.status = status
+      row.completed_at = status === 'done' ? stamp : null
+    }
+    if (status === 'done') await unlockSkills(rows.map(r => r.skill_id), stamp)
+    selectedFocusIds.value = []
+  } catch (e: any) {
+    focusError.value = e?.message || (language.value === 'es' ? 'No se pudo actualizar' : 'Could not update')
+    await loadStudent()
+  } finally {
+    bulkBusy.value = false
+  }
+}
+
+// Drop ticks for tricks that left the pool. Keyed on the pool rather than the
+// visible rows so changing a filter mid-selection does not wipe it.
+watch(assignablePool, pool => {
+  if (!selectedAssignIds.value.length) return
+  const available = new Set(pool.map(sk => sk.id))
+  selectedAssignIds.value = selectedAssignIds.value.filter(id => available.has(id))
+})
+
+watch(activeTrickBag, rows => {
+  if (!selectedFocusIds.value.length) return
+  const available = new Set(rows.map(f => f.id))
+  selectedFocusIds.value = selectedFocusIds.value.filter(id => available.has(id))
+})
 
 const trickBagStatusClass = (status: string) => {
   if (status === 'assigned') return 'bg-sky-500/25 text-sky-300 border-sky-400/50 hover:bg-sky-500/35'
@@ -1169,38 +1315,11 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </p>
         </div>
 
+        <!-- Coach-set challenges: goals outside the trick bag -->
+        <MemberSkaterChallengesCard :student-id="studentId" :can-manage="canEditSkaterProfile" />
+
         <!-- Progress & achievements (icon + label + bar + count) -->
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Desafíos completados' : 'Challenges completed' }}</p>
-              <div class="h-2 bg-gray-800 rounded-full overflow-hidden mt-1">
-                <div class="h-full bg-amber-500/80 rounded-full transition-all" :style="{ width: `${(challengesCompleted / challengesTotal) * 100}%` }"></div>
-              </div>
-            </div>
-            <span class="text-sm font-bold text-white shrink-0">{{ challengesCompleted }}/{{ challengesTotal }}</span>
-          </div>
-          <div
-            v-if="unblockedTricks.length"
-            class="ml-12 max-h-[360px] overflow-y-auto rounded-lg border border-gray-800/80 bg-gray-950/50 divide-y divide-gray-800/80"
-          >
-            <div
-              v-for="row in unblockedTricks"
-              :key="row.skill_id"
-              class="flex items-center justify-between gap-2 px-3 py-2 text-xs"
-            >
-              <span class="text-gray-300 truncate">
-                {{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}
-              </span>
-              <span class="text-gray-500 font-mono shrink-0">{{ trickManualLabel(row.skill) || '—' }}</span>
-            </div>
-          </div>
-          <p v-else class="ml-12 text-xs text-gray-500">
-            {{ language === 'es' ? 'Aún no hay desafíos completados.' : 'No completed challenges yet.' }}
-          </p>
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -1235,8 +1354,8 @@ watch(studentId, () => loadStudent(), { immediate: false })
           <p class="hidden lg:block text-xs text-gray-500">
             {{
               language === 'es'
-                ? 'Arriba: trucos completados. Abajo: asignados y en progreso. Usa + en la tabla para asignar; clic en el estado para avanzar (Asignado → En progreso → Completado).'
-                : 'Top: completed tricks. Below: assigned and in progress. Use + in the table to assign; click status to advance (Assigned → In progress → Completed).'
+                ? 'Arriba: trucos completados. Abajo: asignados y en progreso. Marca varias casillas para asignarlos o completarlos de golpe, o usa + para uno solo; clic en el estado para avanzar (Asignado → En progreso → Completado).'
+                : 'Top: completed tricks. Below: assigned and in progress. Tick several boxes to assign or complete them in one go, or use + for a single trick; click status to advance (Assigned → In progress → Completed).'
             }}
           </p>
 
@@ -1254,6 +1373,8 @@ watch(studentId, () => loadStudent(), { immediate: false })
             :updating-focus-id="updatingFocusId"
             :assigning-skill-id="assigningSkillId"
             :reverting-skill-id="revertingSkillId"
+            :selected-skill-ids="selectedAssignIds"
+            :bulk-busy="bulkBusy"
             @update:filter-structure="assignFilterStructure = $event"
             @update:filter-area="assignFilterArea = $event"
             @update:filter-type="assignFilterType = $event"
@@ -1262,12 +1383,15 @@ watch(studentId, () => loadStudent(), { immediate: false })
             @undo="undoCompletedTrick"
             @dismiss="dismissSkillFocus"
             @comment="openCommentModal"
+            @toggle-select="toggleAssignSelection"
+            @clear-selection="selectedAssignIds = []"
+            @bulk-add="bulkAddSelected"
           />
 
           <!-- Unlocked tricks / challenges -->
           <div class="hidden lg:block space-y-2 min-w-0">
             <h4 class="text-sm font-semibold text-emerald-400">
-              {{ language === 'es' ? 'Trucos / Desafíos desbloqueados' : 'Unlocked tricks / challenges' }}
+              {{ language === 'es' ? 'Trucos desbloqueados' : 'Unlocked tricks' }}
               <span class="text-gray-500 font-normal">({{ unblockedTricks.length }})</span>
             </h4>
             <div class="overflow-x-auto rounded-lg border border-gray-800">
@@ -1344,10 +1468,63 @@ watch(studentId, () => loadStudent(), { immediate: false })
               {{ language === 'es' ? 'Asignados y en progreso' : 'Assigned and in progress' }}
               <span class="text-gray-500 font-normal">({{ activeTrickBag.length }})</span>
             </h4>
+            <div
+              v-if="selectedFocusIds.length"
+              class="flex items-center gap-2 flex-wrap rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+            >
+              <span class="text-xs font-semibold text-amber-200">
+                {{
+                  language === 'es'
+                    ? `${selectedFocusIds.length} seleccionados`
+                    : `${selectedFocusIds.length} selected`
+                }}
+              </span>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-lg bg-sky-500 text-white text-xs font-bold disabled:opacity-50"
+                :disabled="bulkBusy"
+                @click="bulkSetFocusStatus('assigned')"
+              >
+                {{ language === 'es' ? 'Asignado' : 'Assigned' }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-lg bg-amber-500 text-black text-xs font-bold disabled:opacity-50"
+                :disabled="bulkBusy"
+                @click="bulkSetFocusStatus('pending')"
+              >
+                {{ language === 'es' ? 'En progreso' : 'In progress' }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold disabled:opacity-50"
+                :disabled="bulkBusy"
+                @click="bulkSetFocusStatus('done')"
+              >
+                {{ language === 'es' ? 'Marcar completados' : 'Mark completed' }}
+              </button>
+              <button
+                type="button"
+                class="ml-auto text-xs text-gray-400 hover:text-white"
+                @click="selectedFocusIds = []"
+              >
+                {{ language === 'es' ? 'Limpiar' : 'Clear' }}
+              </button>
+            </div>
             <div class="overflow-x-auto rounded-lg border border-gray-800">
-              <table class="w-full min-w-[880px] text-sm text-left">
+              <table class="w-full min-w-[920px] text-sm text-left">
                 <thead class="bg-gray-800/80 text-gray-400 text-xs uppercase tracking-wide">
                   <tr>
+                    <th class="px-3 py-2 font-medium w-10">
+                      <input
+                        type="checkbox"
+                        class="w-4 h-4 accent-amber-500 cursor-pointer"
+                        :checked="allActiveBagSelected"
+                        :disabled="!activeTrickBag.length"
+                        :aria-label="language === 'es' ? 'Seleccionar todos' : 'Select all'"
+                        @change="toggleAllActiveBag"
+                      />
+                    </th>
                     <th class="px-3 py-2 font-medium w-12">#</th>
                     <th
                       class="px-3 py-2 font-medium w-32 cursor-help"
@@ -1368,7 +1545,17 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     v-for="f in activeTrickBag"
                     :key="f.id"
                     class="hover:bg-gray-800/40"
+                    :class="selectedFocusSet.has(f.id) ? 'bg-amber-500/5' : ''"
                   >
+                    <td class="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        class="w-4 h-4 accent-amber-500 cursor-pointer"
+                        :checked="selectedFocusSet.has(f.id)"
+                        :aria-label="language === 'es' ? 'Seleccionar truco' : 'Select trick'"
+                        @change="toggleFocusSelection(f.id)"
+                      />
+                    </td>
                     <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ trickManualLabel(f.skill) || '—' }}</td>
                     <td class="px-3 py-2">
                       <button
@@ -1440,7 +1627,7 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 </tbody>
                 <tbody v-else>
                   <tr>
-                    <td colspan="8" class="px-3 py-6 text-center text-gray-500 text-sm">
+                    <td colspan="9" class="px-3 py-6 text-center text-gray-500 text-sm">
                       {{ language === 'es' ? 'No hay trucos asignados ni en progreso.' : 'No assigned or in-progress tricks.' }}
                     </td>
                   </tr>
@@ -1458,11 +1645,17 @@ watch(studentId, () => loadStudent(), { immediate: false })
               <p class="text-xs text-gray-500 mt-1">
                 {{
                   language === 'es'
-                    ? 'Filtra por Program, Area o Type (Todas = todos los trucos). Pulsa + para asignar.'
-                    : 'Filter by Program, Area, or Type (All = every trick). Press + to assign.'
+                    ? 'Filtra o busca, marca las casillas y asigna o completa todos de una vez. Pulsa + para asignar uno solo.'
+                    : 'Filter or search, tick the boxes, then assign or complete them all at once. Press + for a single trick.'
                 }}
               </p>
             </div>
+            <input
+              v-model="assignSearch"
+              type="search"
+              class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+              :placeholder="language === 'es' ? 'Buscar truco por nombre o #…' : 'Search trick by name or #…'"
+            />
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div class="min-w-0">
                 <label class="block text-xs text-gray-500 mb-1">Program</label>
@@ -1496,10 +1689,74 @@ watch(studentId, () => loadStudent(), { immediate: false })
               </div>
             </div>
 
+            <div
+              class="flex items-center gap-2 flex-wrap rounded-lg border px-3 py-2"
+              :class="
+                selectedAssignIds.length
+                  ? 'border-sky-500/40 bg-sky-500/10'
+                  : 'border-gray-800 bg-gray-950/40'
+              "
+            >
+              <span
+                class="text-xs font-semibold"
+                :class="selectedAssignIds.length ? 'text-sky-200' : 'text-gray-500'"
+              >
+                {{
+                  language === 'es'
+                    ? `${selectedAssignIds.length} seleccionados de ${assignTrickTableRows.length} visibles`
+                    : `${selectedAssignIds.length} selected of ${assignTrickTableRows.length} shown`
+                }}
+              </span>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-lg bg-sky-500 text-white text-xs font-bold disabled:opacity-40"
+                :disabled="bulkBusy || !selectedAssignIds.length"
+                @click="bulkAddSelected('assigned')"
+              >
+                {{ language === 'es' ? 'Asignar seleccionados' : 'Assign selected' }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold disabled:opacity-40"
+                :disabled="bulkBusy || !selectedAssignIds.length"
+                :title="
+                  language === 'es'
+                    ? 'Ya los sabe: van directo a completados'
+                    : 'Already landed: goes straight to completed'
+                "
+                @click="bulkAddSelected('done')"
+              >
+                {{ language === 'es' ? 'Marcar como ya dominados' : 'Mark as already landed' }}
+              </button>
+              <button
+                v-if="selectedAssignIds.length"
+                type="button"
+                class="ml-auto text-xs text-gray-400 hover:text-white"
+                @click="selectedAssignIds = []"
+              >
+                {{ language === 'es' ? 'Limpiar' : 'Clear' }}
+              </button>
+            </div>
+
             <div class="overflow-x-auto overflow-y-auto max-h-[440px] rounded-lg border border-gray-800">
-              <table class="w-full min-w-[880px] text-sm text-left">
+              <table class="w-full min-w-[920px] text-sm text-left">
                 <thead class="sticky top-0 z-10 bg-gray-800/95 backdrop-blur-sm text-gray-400 text-xs uppercase tracking-wide">
                   <tr>
+                    <th class="px-3 py-2 font-medium w-10">
+                      <input
+                        type="checkbox"
+                        class="w-4 h-4 accent-sky-500 cursor-pointer"
+                        :checked="allVisibleAssignSelected"
+                        :disabled="!assignTrickTableRows.length"
+                        :title="
+                          language === 'es'
+                            ? 'Seleccionar todo lo visible con estos filtros'
+                            : 'Select everything shown under these filters'
+                        "
+                        :aria-label="language === 'es' ? 'Seleccionar todos' : 'Select all'"
+                        @change="toggleAllVisibleAssign"
+                      />
+                    </th>
                     <th class="px-3 py-2 font-medium w-12">#</th>
                     <th
                       class="px-3 py-2 font-medium w-32 cursor-help"
@@ -1518,7 +1775,17 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     v-for="row in assignTrickTableRows"
                     :key="row.skill.id"
                     class="hover:bg-gray-800/40"
+                    :class="selectedAssignSet.has(row.skill.id) ? 'bg-sky-500/5' : ''"
                   >
+                    <td class="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        class="w-4 h-4 accent-sky-500 cursor-pointer"
+                        :checked="selectedAssignSet.has(row.skill.id)"
+                        :aria-label="language === 'es' ? 'Seleccionar truco' : 'Select trick'"
+                        @change="toggleAssignSelection(row.skill.id)"
+                      />
+                    </td>
                     <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ trickManualLabel(row.skill) || '—' }}</td>
                     <td class="px-3 py-2">
                       <button
@@ -1543,7 +1810,7 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 </tbody>
                 <tbody v-else>
                   <tr>
-                    <td colspan="6" class="px-3 py-8 text-center text-gray-500 text-sm">
+                    <td colspan="7" class="px-3 py-8 text-center text-gray-500 text-sm">
                       {{
                         assignablePool.length === 0
                           ? (language === 'es' ? 'No hay trucos disponibles para asignar.' : 'No tricks available to assign.')

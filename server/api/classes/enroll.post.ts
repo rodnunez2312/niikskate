@@ -13,6 +13,7 @@ import {
   ineligibilityReason,
   isAgeEligibleForSession,
 } from '~/utils/ageEligibility'
+import { redeemCoupon } from '~/server/utils/couponEngine'
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
@@ -42,8 +43,8 @@ export default defineEventHandler(async (event) => {
   const packRaw = body?.pack
   const packNum = Number(packRaw)
   const pack =
-    packNum === 8 || packNum === 12 || packNum === 16 || packNum === 24
-      ? (packNum as 8 | 12 | 16 | 24)
+    packNum === 4 || packNum === 8 || packNum === 12 || packNum === 16 || packNum === 24
+      ? (packNum as 4 | 8 | 12 | 16 | 24)
       : null
   const weekdays = Array.isArray(body?.weekdays)
     ? [...new Set(
@@ -56,6 +57,9 @@ export default defineEventHandler(async (event) => {
   if (!eventId) {
     throw createError({ statusCode: 400, message: 'eventId is required' })
   }
+
+  const couponCode = typeof body?.couponCode === 'string' ? body.couponCode.trim() : ''
+  const couponSubtotalMxn = Number(body?.couponSubtotalMxn)
 
   const supabase = getServiceSupabase()
 
@@ -117,6 +121,35 @@ export default defineEventHandler(async (event) => {
     return getDay(new Date(y, m - 1, d))
   }
 
+  /**
+   * Log the coupon once the skater is actually in. A rejected or broken coupon
+   * must never undo a successful enrollment, so failures are reported alongside
+   * the booking instead of thrown.
+   */
+  const applyCouponIfAny = async () => {
+    if (!couponCode || !Number.isFinite(couponSubtotalMxn) || couponSubtotalMxn < 0) return null
+    try {
+      const result = await redeemCoupon(
+        supabase,
+        {
+          code: couponCode,
+          subtotalMxn: couponSubtotalMxn,
+          classKind: typeof body?.couponClassKind === 'string' ? body.couponClassKind : null,
+          coachTier: typeof body?.couponCoachTier === 'string' ? body.couponCoachTier : null,
+          userId,
+          crewMemberId,
+        },
+        { context: 'season_enroll', calendarEventId: row.id },
+      )
+      return result.ok
+        ? { applied: true as const, discountMxn: result.discountMxn, finalMxn: result.finalMxn }
+        : { applied: false as const, reason: result.reason }
+    } catch (e) {
+      console.warn('[enroll] coupon redemption failed:', e)
+      return { applied: false as const, reason: 'server_error' as const }
+    }
+  }
+
   const enrollIntoSession = async (sessionRow: typeof row) => {
     if (!sessionRow.time_slot) return 'skip' as const
     if (sessionRow.start_date < new Date().toISOString().slice(0, 10)) return 'skip' as const
@@ -157,14 +190,15 @@ export default defineEventHandler(async (event) => {
     return 'ok' as const
   }
 
-  if (pack === 8 || pack === 12 || pack === 16 || pack === 24) {
+  if (pack === 4 || pack === 8 || pack === 12 || pack === 16 || pack === 24) {
     if ((pack === 8 || pack === 16) && weekdays.length !== 2) {
       throw createError({
         statusCode: 400,
         message: 'Elige 2 días por semana (martes, jueves o sábado).',
       })
     }
-    const wantedDays = pack === 12 || pack === 24 ? [2, 4, 6] : weekdays
+    // A 4-class pack covers a one-day-a-week series, so take every class in it.
+    const wantedDays = pack === 4 ? [] : pack === 12 || pack === 24 ? [2, 4, 6] : weekdays
     let targets = [row]
     if (row.program_series_id) {
       const { data: seriesRows, error: seriesErr } = await supabase
@@ -178,7 +212,9 @@ export default defineEventHandler(async (event) => {
       if (seriesErr) throw createError({ statusCode: 400, message: seriesErr.message })
       if (seriesRows?.length) targets = seriesRows as typeof row[]
     }
-    targets = targets.filter(t => wantedDays.includes(ymdToWeekday(t.start_date)))
+    if (wantedDays.length) {
+      targets = targets.filter(t => wantedDays.includes(ymdToWeekday(t.start_date)))
+    }
     if (!targets.length) {
       throw createError({ statusCode: 400, message: 'No matching classes for that package' })
     }
@@ -193,12 +229,14 @@ export default defineEventHandler(async (event) => {
     if (!joined && !already) {
       throw createError({ statusCode: 409, message: 'Those classes are full' })
     }
+    const coupon = await applyCouponIfAny()
     const updated = await enrichSession(supabase, row)
     return {
       ok: true,
       alreadyEnrolled: joined === 0 && already > 0,
       pack,
       enrolledCount: joined,
+      coupon,
       session: updated,
     }
   }
@@ -216,6 +254,7 @@ export default defineEventHandler(async (event) => {
   if (single === 'full' || single === 'skip') {
     throw createError({ statusCode: 409, message: 'This class is full' })
   }
+  const coupon = await applyCouponIfAny()
   const updated = await enrichSession(supabase, row)
-  return { ok: true, alreadyEnrolled: false, session: updated }
+  return { ok: true, alreadyEnrolled: false, coupon, session: updated }
 })

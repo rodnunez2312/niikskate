@@ -28,6 +28,7 @@ const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language } = useI18n()
 const { syncing, syncNiikLibrary } = useNiikLibrarySync()
+const { syncing: syncingStrength, syncStrengthLibrary } = useStrengthLibrary()
 
 const pickMode = computed(() => route.query.pick === 'plan')
 const loading = ref(true)
@@ -362,16 +363,28 @@ async function deleteTrick(skill: any) {
   }
 }
 
+/** One workbook, two sheets: Skate_Manual (tricks) and Strength_Training. */
 async function syncFromExcel() {
+  const es = language.value === 'es'
+  const lines: string[] = []
+
   const res = await syncNiikLibrary({ force: true })
   if (res.ok) {
     await fetchSkills()
-    alert(language.value === 'es'
-      ? `Listo: ${res.activeCount} trucos activos (Excel #1–#${res.total}).\n${res.inserted} nuevos, ${res.updated} actualizados.`
-      : `Done: ${res.activeCount} active tricks (Excel #1–#${res.total}).\n${res.inserted} new, ${res.updated} updated.`)
+    lines.push(es
+      ? `${res.activeCount} trucos activos (Excel #1–#${res.total}): ${res.inserted} nuevos, ${res.updated} actualizados.`
+      : `${res.activeCount} active tricks (Excel #1–#${res.total}): ${res.inserted} new, ${res.updated} updated.`)
   } else {
-    alert(res.message || 'Sync failed')
+    lines.push(`${es ? 'Trucos' : 'Tricks'}: ${res.message || 'sync failed'}`)
   }
+
+  const strength = await syncStrengthLibrary()
+  lines.push(strength.ok
+    ? `${es ? 'Fuerza' : 'Strength'}: ${strength.upserted} ${es ? 'ejercicios' : 'exercises'}`
+      + (strength.deactivated ? ` (-${strength.deactivated})` : '')
+    : `${es ? 'Fuerza' : 'Strength'}: ${strength.message || 'sync failed'}`)
+
+  alert(lines.join('\n'))
 }
 
 function togglePick(id: string) {
@@ -487,11 +500,11 @@ function closeDetail() {
           <button
             v-if="userRole === 'admin' || userRole === 'coach'"
             type="button"
-            :disabled="syncing"
+            :disabled="syncing || syncingStrength"
             class="text-sm px-4 py-2 rounded-xl bg-gray-800 text-gray-200 hover:bg-gray-700 disabled:opacity-50"
             @click="syncFromExcel"
           >
-            {{ syncing ? '…' : (language === 'es' ? 'Sincronizar Excel' : 'Sync Excel') }}
+            {{ syncing || syncingStrength ? '…' : (language === 'es' ? 'Sincronizar Excel' : 'Sync Excel') }}
           </button>
         </div>
       </div>

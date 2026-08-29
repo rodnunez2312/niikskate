@@ -159,7 +159,7 @@ async function loadDashboard() {
         label: es.value
           ? `${pendingPay} reserva${pendingPay === 1 ? '' : 's'} con pago pendiente`
           : `${pendingPay} reservation${pendingPay === 1 ? '' : 's'} pending payment`,
-        href: '/member/admin/payments',
+        href: '/member/admin/finance/income',
       })
     }
     attentionItems.value = attention

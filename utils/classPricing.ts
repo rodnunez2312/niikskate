@@ -24,6 +24,7 @@ function skillTrackFromLevelId(id: string | null | undefined): ProgramSkillTrack
 export type CoachPricingTier = 'principiante' | 'pro_street' | 'pro_bowl'
 
 export type ClassPackageKind =
+  | 'monthly_4'
   | 'monthly_8'
   | 'monthly_12'
   | 'monthly_16'
@@ -45,6 +46,12 @@ export type ClassPriceRow = {
 }
 
 const PRINCIPIANTE: Record<ClassPackageKind, ClassPriceRow> = {
+  monthly_4: {
+    listMxn: 600,
+    sessions: 4,
+    coachPayPerDayMxn: 90,
+    label: { es: '4 clases (1 por semana · 4 sem)', en: '4 classes (1/week · 4 wk)' },
+  },
   monthly_8: {
     listMxn: 1000,
     sessions: 8,
@@ -112,6 +119,11 @@ const PRINCIPIANTE: Record<ClassPackageKind, ClassPriceRow> = {
 }
 
 const PRO_STREET: Partial<Record<ClassPackageKind, ClassPriceRow>> = {
+  monthly_4: {
+    listMxn: 600,
+    sessions: 4,
+    label: { es: '4 clases (1 por semana · 4 sem)', en: '4 classes (1/week · 4 wk)' },
+  },
   monthly_8: {
     listMxn: 1000,
     sessions: 8,
@@ -296,6 +308,7 @@ export function resolveProgramPackageKind(input: {
     return 'individual_pack_5'
   }
   const n = input.classCount ?? SEASON_TOTAL_CLASSES
+  if (n <= 4) return 'monthly_4'
   if (n <= 8) return 'monthly_8'
   if (n <= 12) return 'monthly_12'
   if (n <= 16) return 'monthly_16'
@@ -355,6 +368,7 @@ export type PricingReferenceRow = {
 }
 
 const PRICING_REFERENCE_KINDS: ClassPackageKind[] = [
+  'monthly_4',
   'monthly_8',
   'monthly_12',
   'monthly_16',
@@ -370,6 +384,7 @@ const PRICING_REFERENCE_KINDS: ClassPackageKind[] = [
 /** Which package rows appear in the admin pricing popover per coach tier. */
 export const PRICING_POPOVER_KINDS: Record<CoachPricingTier, ClassPackageKind[]> = {
   principiante: [
+    'monthly_4',
     'monthly_8',
     'monthly_12',
     'monthly_16',
@@ -380,6 +395,7 @@ export const PRICING_POPOVER_KINDS: Record<CoachPricingTier, ClassPackageKind[]>
     'group_pack_5',
   ],
   pro_street: [
+    'monthly_4',
     'monthly_8',
     'monthly_12',
     'monthly_16',
@@ -471,14 +487,15 @@ export function programPriceHint(
       : `Summer course Mon–Fri · $${perDay.toLocaleString('en-US')}/day · 5 days $${five.toLocaleString('en-US')} · 10 days $${ten.toLocaleString('en-US')} MXN.`
   }
 
+  const pack4 = getClassPriceMxn(tier, 'monthly_4')
   const pack16 = getClassPriceMxn(tier, 'monthly_16')
   const pack24 = getClassPriceMxn(tier, 'monthly_24')
   if (es) {
-    return `${coach}: 4 sem — 8 clases $${monthly.toLocaleString('es-MX')} o 12 $${fullSeason.toLocaleString('es-MX')}`
+    return `${coach}: 4 sem — 4 clases $${pack4.toLocaleString('es-MX')}, 8 $${monthly.toLocaleString('es-MX')} o 12 $${fullSeason.toLocaleString('es-MX')}`
       + ` · 8 sem — 16 clases $${pack16.toLocaleString('es-MX')} o 24 $${pack24.toLocaleString('es-MX')}`
       + ` · grupal $${groupDropIn.toLocaleString('es-MX')} · individual $${indDropIn.toLocaleString('es-MX')} MXN.`
   }
-  return `${coach}: 4 wk — 8 classes $${monthly.toLocaleString('en-US')} or 12 $${fullSeason.toLocaleString('en-US')}`
+  return `${coach}: 4 wk — 4 classes $${pack4.toLocaleString('en-US')}, 8 $${monthly.toLocaleString('en-US')} or 12 $${fullSeason.toLocaleString('en-US')}`
     + ` · 8 wk — 16 classes $${pack16.toLocaleString('en-US')} or 24 $${pack24.toLocaleString('en-US')}`
     + ` · group $${groupDropIn.toLocaleString('en-US')} · individual $${indDropIn.toLocaleString('en-US')} MXN.`
 }

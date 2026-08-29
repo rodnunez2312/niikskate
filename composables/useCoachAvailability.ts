@@ -1,4 +1,6 @@
 import type { CoachAvailability, CoachDateAvailability, DayOfWeek, TimeSlot } from '~/types'
+import { DAY_OF_WEEK_NUMBERS } from '~/types'
+import { slotsForWeekday } from '~/utils/classSchedule'
 
 export const useCoachAvailability = () => {
   const client = useSupabaseClient()
@@ -9,9 +11,23 @@ export const useCoachAvailability = () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // Days and time slots for the schedule
-  const classDays: DayOfWeek[] = ['monday', 'tuesday', 'thursday', 'saturday', 'sunday']
-  const timeSlots: TimeSlot[] = ['monday', 'morning', 'early', 'late']
+  // Days that host classes. Slots differ per day, so never assume a full matrix.
+  const classDays: DayOfWeek[] = ['monday', 'tuesday', 'thursday', 'saturday']
+
+  /** Slots actually offered per day (Monday 4:30 only, Saturday adds the 7 AM morning). */
+  const daySlots = Object.fromEntries(
+    classDays.map(day => [day, slotsForWeekday(DAY_OF_WEEK_NUMBERS[day])]),
+  ) as Record<DayOfWeek, TimeSlot[]>
+
+  const slotsForDay = (day: DayOfWeek): TimeSlot[] => daySlots[day] ?? []
+
+  /** Every valid day+slot pair — the only combinations that should be stored. */
+  const availabilitySlots: Array<{ day: DayOfWeek; slot: TimeSlot }> = classDays.flatMap(day =>
+    slotsForDay(day).map(slot => ({ day, slot })),
+  )
+
+  /** Distinct slots across all class days (kept for callers that need a flat list). */
+  const timeSlots: TimeSlot[] = [...new Set(availabilitySlots.map(s => s.slot))]
 
   // Fetch coach's availability for a specific month
   const fetchMonthlyAvailability = async (coachId: string, year: number, month: number) => {
@@ -130,17 +146,14 @@ export const useCoachAvailability = () => {
     loading.value = true
     error.value = null
     
-    const records = Object.entries(availabilityMap).map(([key, isAvailable]) => {
-      const [dayOfWeek, timeSlot] = key.split('-') as [DayOfWeek, TimeSlot]
-      return {
-        coach_id: coachId,
-        year,
-        month,
-        day_of_week: dayOfWeek,
-        time_slot: timeSlot,
-        is_available: isAvailable,
-      }
-    })
+    const records = availabilitySlots.map(({ day, slot }) => ({
+      coach_id: coachId,
+      year,
+      month,
+      day_of_week: day,
+      time_slot: slot,
+      is_available: availabilityMap[`${day}-${slot}`] ?? false,
+    }))
     
     try {
       const { data, error: upsertError } = await client
@@ -211,6 +224,75 @@ export const useCoachAvailability = () => {
     }
   }
 
+  /** Save many date overrides in one round trip (calendar day confirmations). */
+  const setDateOverrides = async (
+    coachId: string,
+    rows: Array<{ date: string; timeSlot: TimeSlot; isAvailable: boolean; reason?: string }>,
+  ) => {
+    if (!rows.length) return { success: true, data: [] as CoachDateAvailability[] }
+
+    loading.value = true
+    error.value = null
+
+    try {
+      const { data, error: upsertError } = await client
+        .from('coach_date_availability')
+        .upsert(
+          rows.map(r => ({
+            coach_id: coachId,
+            date: r.date,
+            time_slot: r.timeSlot,
+            is_available: r.isAvailable,
+            reason: r.reason ?? null,
+          })),
+          { onConflict: 'coach_id,date,time_slot' },
+        )
+        .select()
+
+      if (upsertError) throw upsertError
+
+      const saved = (data || []) as CoachDateAvailability[]
+      const savedKeys = new Set(saved.map(o => `${o.date}-${o.time_slot}`))
+      dateOverrides.value = [
+        ...dateOverrides.value.filter(o => !savedKeys.has(`${o.date}-${o.time_slot}`)),
+        ...saved,
+      ]
+
+      return { success: true, data: saved }
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Failed to save date availability'
+      error.value = errorMsg
+      return { success: false, error: errorMsg }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /** Drop every override on a date so the monthly default applies again. */
+  const clearDateOverrides = async (coachId: string, date: string) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      const { error: deleteError } = await client
+        .from('coach_date_availability')
+        .delete()
+        .eq('coach_id', coachId)
+        .eq('date', date)
+
+      if (deleteError) throw deleteError
+
+      dateOverrides.value = dateOverrides.value.filter(o => o.date !== date)
+      return { success: true }
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Failed to clear date availability'
+      error.value = errorMsg
+      return { success: false, error: errorMsg }
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Remove a date-specific override
   const removeDateOverride = async (coachId: string, date: string, timeSlot: TimeSlot) => {
     loading.value = true
@@ -272,11 +354,16 @@ export const useCoachAvailability = () => {
     error,
     classDays,
     timeSlots,
+    daySlots,
+    slotsForDay,
+    availabilitySlots,
     fetchMonthlyAvailability,
     fetchDateOverrides,
     setAvailability,
     setBulkAvailability,
     setDateOverride,
+    setDateOverrides,
+    clearDateOverrides,
     removeDateOverride,
     isAvailableFor,
     hasDateOverride,

@@ -2,7 +2,6 @@
 import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { isClassDay } from '~/utils/classSchedule'
-import classPlanningData from '~/data/class-planning.json'
 import {
   SKATE_TRICK_AREAS,
   SKATE_TRICK_STRUCTURES,
@@ -16,6 +15,21 @@ import {
   compareSkillsByManualId,
 } from '~/utils/skateTrickTaxonomy'
 import { hasEmbeddableVideoPreview } from '~/utils/videoEmbed'
+import ClassPlanTrickPickerSheet from '~/components/member/ClassPlanTrickPickerSheet.vue'
+import {
+  CLASS_PLAN_BEGINNER_AUDIENCES,
+  CLASS_PLAN_TRICK_SECTIONS,
+  allSectionSkillIds,
+  difficultyForSkillTrack,
+  emptyPlanSections,
+  normalizePlanSections,
+  sectionDef,
+  type ClassPlanSection,
+  type ClassPlanSectionId,
+} from '~/utils/classPlanSections'
+import { PROGRAM_SKILL_TRACKS, type ProgramSkillTrack } from '~/types'
+import StrengthSessionBuilder from '~/components/member/StrengthSessionBuilder.vue'
+import type { StrengthBlockSnapshot } from '~/utils/strengthSessionGenerator'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -32,6 +46,7 @@ const loading = ref(true)
 const saving = ref(false)
 const skills = ref<any[]>([])
 const { syncing, syncNiikLibrary: doSyncNiikLibrary } = useNiikLibrarySync()
+const { syncing: syncingStrength, syncStrengthLibrary } = useStrengthLibrary()
 const classPlans = ref<any[]>([])
 const selectedDate = ref(new Date())
 const selectedSession = ref<'early' | 'late'>('early')
@@ -39,58 +54,82 @@ const selectedSession = ref<'early' | 'late'>('early')
 // Plan form
 const plan = ref({
   title: '',
+  skill_track: '' as ProgramSkillTrack | '',
+  audience_category: '' as string,
+  plan_sections: emptyPlanSections() as ClassPlanSection[],
+  strength_block: null as StrengthBlockSnapshot | null,
   warmup_notes: '',
   main_activity_notes: '',
-  planned_skills: [] as string[]
+  planned_skills: [] as string[],
 })
 
-type WarmupExerciseRow = {
-  id: number
-  name: string
-  name_en?: string
-  strength_training?: boolean
-  skills?: string[]
+const trickPickerOpen = ref(false)
+const trickPickerSectionId = ref<ClassPlanSectionId>('drills')
+const trickPickerSectionIds = ref<string[]>([])
+
+const es = computed(() => language.value === 'es')
+
+function sectionSkills(sectionId: ClassPlanSectionId) {
+  const ids = plan.value.plan_sections.find(s => s.id === sectionId)?.skill_ids || []
+  return skills.value.filter(s => ids.includes(s.id))
 }
 
-const allWarmupExercises = classPlanningData.warmup_exercises as WarmupExerciseRow[]
-const strengthWarmupExercises = computed(() => allWarmupExercises.filter(e => e.strength_training === true))
-const selectedStrengthWarmupIds = ref<number[]>([])
-
-function warmupExerciseLabel(e: WarmupExerciseRow) {
-  return language.value === 'es' ? e.name : (e.name_en || e.name)
+function openTrickPicker(sectionId: ClassPlanSectionId) {
+  trickPickerSectionId.value = sectionId
+  trickPickerSectionIds.value = [
+    ...(plan.value.plan_sections.find(s => s.id === sectionId)?.skill_ids || []),
+  ]
+  trickPickerOpen.value = true
 }
 
-function syncWarmupNotesFromSelection() {
-  const list = strengthWarmupExercises.value
-    .filter(e => selectedStrengthWarmupIds.value.includes(e.id))
-    .sort((a, b) => a.id - b.id)
-  plan.value.warmup_notes = list.map(e => warmupExerciseLabel(e)).join('\n')
+function applyTrickPicker(ids: string[]) {
+  const slot = plan.value.plan_sections.find(s => s.id === trickPickerSectionId.value)
+  if (slot) slot.skill_ids = [...ids]
+  plan.value.planned_skills = allSectionSkillIds(plan.value.plan_sections)
 }
 
-function parseWarmupNotesToSelection(notes: string) {
-  if (!notes?.trim()) {
-    selectedStrengthWarmupIds.value = []
-    return
+function removeSectionSkill(sectionId: ClassPlanSectionId, skillId: string) {
+  const slot = plan.value.plan_sections.find(s => s.id === sectionId)
+  if (!slot) return
+  slot.skill_ids = slot.skill_ids.filter(id => id !== skillId)
+  plan.value.planned_skills = allSectionSkillIds(plan.value.plan_sections)
+}
+
+function selectSkillTrack(track: ProgramSkillTrack) {
+  plan.value.skill_track = plan.value.skill_track === track ? '' : track
+  if (plan.value.skill_track !== 'beginner') plan.value.audience_category = ''
+}
+
+function selectBeginnerAudience(id: string) {
+  plan.value.audience_category = plan.value.audience_category === id ? '' : id
+}
+
+const trickPickerMeta = computed(() => {
+  const def = sectionDef(trickPickerSectionId.value)
+  return {
+    label: es.value ? def.label.es : def.label.en,
+    defaultProgram: def.defaultProgram,
+    difficulty: difficultyForSkillTrack(plan.value.skill_track),
   }
-  const norm = (s: string) => s.trim().toLowerCase()
-  const lines = notes.split('\n').map(l => l.trim()).filter(Boolean)
-  const ids: number[] = []
-  for (const line of lines) {
-    const ex = allWarmupExercises.find(
-      e =>
-        e.strength_training &&
-        (norm(e.name) === norm(line) || (e.name_en && norm(e.name_en) === norm(line))),
-    )
-    if (ex && !ids.includes(ex.id)) ids.push(ex.id)
-  }
-  selectedStrengthWarmupIds.value = ids
+})
+
+const totalPlannedTricks = computed(() =>
+  plan.value.plan_sections.reduce((n, s) => n + s.skill_ids.length, 0),
+)
+
+/** Older plans stored `{}` before the strength block existed. */
+function normalizeStrengthBlock(value: unknown): StrengthBlockSnapshot | null {
+  const block = value as StrengthBlockSnapshot | null
+  return block?.blocks?.length ? block : null
 }
 
-function toggleStrengthWarmup(id: number) {
-  const i = selectedStrengthWarmupIds.value.indexOf(id)
-  if (i >= 0) selectedStrengthWarmupIds.value.splice(i, 1)
-  else selectedStrengthWarmupIds.value.push(id)
-  syncWarmupNotesFromSelection()
+/** Plain-text mirror of the generated session, kept for the printable plan. */
+function strengthBlockToNotes(block: StrengthBlockSnapshot | null): string {
+  if (!block?.blocks?.length) return ''
+  const lines = block.blocks.flatMap(b =>
+    b.exercises.map(ex => `${ex.name}${ex.prescription ? ` — ${ex.prescription}` : ''}`),
+  )
+  return lines.join('\n')
 }
 
 // Current user role (admin-only: sync from Excel)
@@ -633,8 +672,11 @@ onMounted(async () => {
     if (raw) {
       const ids: string[] = JSON.parse(raw)
       if (ids.length) {
-        const merged = [...new Set([...plan.value.planned_skills, ...ids])]
-        plan.value.planned_skills = merged
+        const drills = plan.value.plan_sections.find(s => s.id === 'drills')
+        if (drills) {
+          drills.skill_ids = [...new Set([...drills.skill_ids, ...ids])]
+        }
+        plan.value.planned_skills = allSectionSkillIds(plan.value.plan_sections)
       }
       sessionStorage.removeItem('niik-plan-pick-skills')
     }
@@ -717,6 +759,28 @@ const forceSyncLibrary = async () => {
   }
 }
 
+/** One workbook, two sheets: tricks and the strength library sync together. */
+const syncLibrariesFromExcel = async () => {
+  const lines: string[] = []
+  const tricks = await autoSyncNiikLibrary(true)
+  lines.push(
+    tricks.ok
+      ? `${language.value === 'es' ? 'Trucos' : 'Tricks'}: ${tricks.total}`
+      : `${language.value === 'es' ? 'Trucos' : 'Tricks'}: ${tricks.message}`,
+  )
+
+  const strength = await syncStrengthLibrary()
+  lines.push(
+    strength.ok
+      ? `${language.value === 'es' ? 'Fuerza' : 'Strength'}: ${strength.upserted}`
+        + (strength.deactivated ? ` (-${strength.deactivated})` : '')
+      : `${language.value === 'es' ? 'Fuerza' : 'Strength'}: ${strength.message}`,
+  )
+
+  await fetchSkills()
+  alert(lines.join('\n'))
+}
+
 const fetchClassPlans = async () => {
   try {
     const { data } = await client
@@ -739,21 +803,29 @@ const loadExistingPlan = async () => {
   )
   
   if (existingPlan) {
+    const sections = normalizePlanSections(existingPlan.plan_sections, existingPlan.planned_skills)
     plan.value = {
       title: existingPlan.title || '',
+      skill_track: existingPlan.skill_track || '',
+      audience_category: existingPlan.audience_category || '',
+      plan_sections: sections,
+      strength_block: normalizeStrengthBlock(existingPlan.strength_block),
       warmup_notes: existingPlan.warmup_notes || '',
       main_activity_notes: existingPlan.main_activity_notes || '',
-      planned_skills: existingPlan.planned_skills || []
+      planned_skills: allSectionSkillIds(sections),
     }
   } else {
     plan.value = {
       title: '',
+      skill_track: '',
+      audience_category: '',
+      plan_sections: emptyPlanSections(),
+      strength_block: null,
       warmup_notes: '',
       main_activity_notes: '',
-      planned_skills: []
+      planned_skills: [],
     }
   }
-  parseWarmupNotesToSelection(plan.value.warmup_notes)
 }
 
 // Check if date is a class day
@@ -789,7 +861,6 @@ const toggleSkill = (skillId: string) => {
 const savePlan = async () => {
   saving.value = true
   try {
-    syncWarmupNotesFromSelection()
     const dateStr = format(selectedDate.value, 'yyyy-MM-dd')
     
     const { error } = await client
@@ -799,9 +870,16 @@ const savePlan = async () => {
         plan_date: dateStr,
         time_slot: selectedSession.value,
         title: plan.value.title,
-        warmup_notes: plan.value.warmup_notes,
+        skill_track: plan.value.skill_track || null,
+        audience_category:
+          plan.value.skill_track === 'beginner' && plan.value.audience_category
+            ? plan.value.audience_category
+            : null,
+        plan_sections: plan.value.plan_sections,
+        strength_block: plan.value.strength_block ?? {},
+        warmup_notes: strengthBlockToNotes(plan.value.strength_block),
         main_activity_notes: plan.value.main_activity_notes,
-        planned_skills: plan.value.planned_skills
+        planned_skills: allSectionSkillIds(plan.value.plan_sections),
       }, {
         onConflict: 'coach_id,plan_date,time_slot'
       })
@@ -812,17 +890,30 @@ const savePlan = async () => {
     alert(language.value === 'es' ? '¡Plan guardado!' : 'Plan saved!')
   } catch (e) {
     console.error('Error saving plan:', e)
+    const msg = (e as { message?: string })?.message || String(e)
+    const migration = msg.includes('strength_block')
+      ? 'supabase/migrations/add_strength_exercises.sql'
+      : msg.includes('plan_sections') || msg.includes('skill_track')
+        ? 'supabase/migrations/add_class_plan_skill_and_sections.sql'
+        : null
+    alert(
+      migration
+        ? (language.value === 'es'
+          ? `Ejecuta ${migration} en Supabase.`
+          : `Run ${migration} in Supabase.`)
+        : msg,
+    )
   } finally {
     saving.value = false
   }
 }
 
-// Program summary counts from Excel "Program" column: Strength Training, Iniciacion, Street, Park/Bowl only
+// Program summary counts from the Excel "Program" column. Strength is no longer a
+// trick program; it lives in the Strength_Training sheet.
 const programSummary = computed(() => {
   const list = skills.value
   const prog = (s: any) => (s.program || '').trim()
   return {
-    strengthTraining: list.filter(s => prog(s) === 'Strength Training').length,
     iniciacion: list.filter(s => prog(s) === 'Iniciacion').length,
     street: list.filter(s => prog(s) === 'Street').length,
     parkBowl: list.filter(s => prog(s) === 'Park/Bowl').length,
@@ -1005,9 +1096,6 @@ const categoryTagClass = (category?: string) => {
 
 // Watch session changes
 watch(selectedSession, () => loadExistingPlan())
-watch(language, () => {
-  if (selectedStrengthWarmupIds.value.length > 0) syncWarmupNotesFromSelection()
-})
 watch(activeTab, () => {
   if (activeTab.value !== 'tricks') closeTrickDetail()
 })
@@ -1106,127 +1194,147 @@ function goProgramResourceHub() {
         <!-- Plan Form -->
         <div class="space-y-4">
           <!-- Title -->
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <label class="block text-sm text-gray-400 mb-2">
-              {{ language === 'es' ? 'Título de la Clase' : 'Class Title' }}
-            </label>
-            <input
-              v-model="plan.title"
-              type="text"
-              :placeholder="language === 'es' ? 'Ej: Introducción al Ollie' : 'E.g., Intro to Ollie'"
-              class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500"
-            />
-          </div>
-
-          <!-- Warmup: strength training exercises only (from class-planning.json) -->
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <label class="block text-sm text-gray-400 mb-1">
-              💪 {{ language === 'es' ? 'Calentamiento (fuerza)' : 'Warmup (strength)' }}
-            </label>
-            <p class="text-xs text-gray-600 mb-3">
-              {{
-                language === 'es'
-                  ? 'Solo ejercicios de entrenamiento de fuerza; el plan guarda los nombres elegidos.'
-                  : 'Strength training exercises only; the saved plan stores the names you pick.'
-              }}
-            </p>
-            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
-              <button
-                v-for="exercise in strengthWarmupExercises"
-                :key="exercise.id"
-                type="button"
-                class="w-full p-3 rounded-lg flex items-center gap-3 transition-all text-left"
-                :class="selectedStrengthWarmupIds.includes(exercise.id)
-                  ? 'bg-glass-green/20 border border-glass-green/50'
-                  : 'bg-gray-800 border border-gray-700 hover:border-gray-600'"
-                @click="toggleStrengthWarmup(exercise.id)"
-              >
-                <div
-                  class="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-                  :class="selectedStrengthWarmupIds.includes(exercise.id) ? 'bg-glass-green' : 'bg-gray-700'"
-                >
-                  <svg
-                    v-if="selectedStrengthWarmupIds.includes(exercise.id)"
-                    class="w-4 h-4 text-white"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                  <span v-else class="text-xs text-gray-400">{{ exercise.id }}</span>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p
-                    class="text-sm font-medium truncate"
-                    :class="selectedStrengthWarmupIds.includes(exercise.id) ? 'text-white' : 'text-gray-300'"
-                  >
-                    {{ language === 'es' ? exercise.name : (exercise.name_en || exercise.name) }}
-                  </p>
-                  <p v-if="exercise.skills?.length" class="text-xs text-gray-500 truncate">
-                    {{ exercise.skills.join(', ') }}
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <!-- Selected Tricks -->
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-3">
-              <label class="text-sm text-gray-400">
-                🛹 {{ language === 'es' ? 'Trucos Seleccionados' : 'Selected Tricks' }} ({{ plan.planned_skills.length }})
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">
+                {{ language === 'es' ? 'Título de la Clase' : 'Class Title' }}
               </label>
-              <NuxtLink
-                to="/member/coach/tricks?pick=plan"
-                class="text-gold-400 text-sm font-semibold"
-              >
-                {{ language === 'es' ? '+ Agregar' : '+ Add' }}
-              </NuxtLink>
+              <input
+                v-model="plan.title"
+                type="text"
+                :placeholder="language === 'es' ? 'Ej: Introducción al Ollie' : 'E.g., Intro to Ollie'"
+                class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500"
+              />
             </div>
-            
-            <div v-if="selectedSkillsDetails.length === 0" class="text-center py-4 text-gray-500">
-              {{ language === 'es' ? 'No hay trucos seleccionados' : 'No tricks selected' }}
-            </div>
-            
-            <div v-else class="space-y-2">
-              <div
-                v-for="skill in selectedSkillsDetails"
-                :key="skill.id"
-                class="flex items-center gap-3 p-2 bg-gray-800 rounded-lg"
-              >
-                <span class="w-8 h-8 rounded-full bg-gold-400/20 flex items-center justify-center text-gold-400 text-sm">
-                  🛹
-                </span>
-                <div class="flex-1">
-                  <p class="text-white text-sm font-semibold">
-                    {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
-                  </p>
-                  <p class="text-xs text-gray-500">{{ skill.category }} • {{ difficultyStars(skill.difficulty) }}</p>
-                  <div v-if="skill.motor_skills?.length" class="flex flex-wrap gap-1 mt-1">
-                    <span 
-                      v-for="tag in skill.motor_skills" 
-                      :key="tag"
-                      class="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px]"
-                    >
-                      {{ tag }}
-                    </span>
-                  </div>
-                </div>
+
+            <!-- Skill track -->
+            <div>
+              <p class="text-xs text-gray-500 mb-2">
+                {{ language === 'es' ? 'Nivel de la clase' : 'Class level' }}
+              </p>
+              <div class="grid grid-cols-3 gap-2">
                 <button
-                  @click="toggleSkill(skill.id)"
-                  class="p-1 text-flame-500"
+                  v-for="track in PROGRAM_SKILL_TRACKS"
+                  :key="track.id"
+                  type="button"
+                  class="py-2.5 px-2 rounded-xl text-xs font-bold border transition-all"
+                  :class="plan.skill_track === track.id
+                    ? 'border-gold-400 bg-gold-400/20 text-white'
+                    : 'border-gray-700 bg-gray-800 text-gray-400'"
+                  @click="selectSkillTrack(track.id)"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <span class="block text-base mb-0.5">{{ track.emoji }}</span>
+                  {{ language === 'es' ? track.label.es : track.label.en }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Beginner audience: tots / kids / adults -->
+            <div v-if="plan.skill_track === 'beginner'">
+              <p class="text-xs text-gray-500 mb-2">
+                {{ language === 'es' ? 'Público principiante' : 'Beginner audience' }}
+              </p>
+              <div class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="band in CLASS_PLAN_BEGINNER_AUDIENCES"
+                  :key="band.id"
+                  type="button"
+                  class="py-2.5 px-2 rounded-xl text-xs font-bold border transition-all"
+                  :class="plan.audience_category === band.id
+                    ? 'border-teal-400 bg-teal-500/20 text-white'
+                    : 'border-gray-700 bg-gray-800 text-gray-400'"
+                  @click="selectBeginnerAudience(band.id)"
+                >
+                  <span class="block text-base mb-0.5">{{ band.emoji }}</span>
+                  {{ language === 'es' ? band.nickname.es : band.nickname.en }}
                 </button>
               </div>
             </div>
           </div>
+
+          <!-- Strength: generated from the Excel Strength_Training library -->
+          <StrengthSessionBuilder
+            v-model="plan.strength_block"
+            :level="plan.skill_track"
+            :audience="plan.audience_category"
+          />
+
+          <!-- Class sections: pick tricks inline from bag -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 px-1">
+              🛹
+              {{ language === 'es' ? 'Secciones de la clase' : 'Class sections' }}
+              ({{ totalPlannedTricks }})
+            </p>
+
+            <div
+              v-for="section in CLASS_PLAN_TRICK_SECTIONS"
+              :key="section.id"
+              class="bg-gray-900 border border-gray-800 rounded-xl p-4"
+            >
+              <div class="flex items-center justify-between mb-3 gap-2">
+                <label class="text-sm text-gray-300 font-semibold flex items-center gap-2 min-w-0">
+                  <span>{{ section.emoji }}</span>
+                  <span class="truncate">
+                    {{ language === 'es' ? section.label.es : section.label.en }}
+                  </span>
+                  <span class="text-gray-500 font-normal">({{ sectionSkills(section.id).length }})</span>
+                </label>
+                <button
+                  type="button"
+                  class="shrink-0 text-gold-400 text-sm font-semibold px-2 py-1"
+                  @click="openTrickPicker(section.id)"
+                >
+                  {{ language === 'es' ? '+ Trucos' : '+ Tricks' }}
+                </button>
+              </div>
+
+              <div
+                v-if="!sectionSkills(section.id).length"
+                class="text-center py-3 text-gray-500 text-sm"
+              >
+                {{ language === 'es' ? 'Toca + Trucos para elegir de la bolsa' : 'Tap + Tricks to pick from the bag' }}
+              </div>
+
+              <div v-else class="space-y-2">
+                <div
+                  v-for="skill in sectionSkills(section.id)"
+                  :key="skill.id"
+                  class="flex items-center gap-3 p-2 bg-gray-800 rounded-lg"
+                >
+                  <span class="w-8 h-8 rounded-full bg-gold-400/20 flex items-center justify-center text-gold-400 text-sm shrink-0">
+                    🛹
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-white text-sm font-semibold truncate">
+                      {{ language === 'es' ? skill.name_es || skill.name : skill.name }}
+                    </p>
+                    <p class="text-xs text-gray-500 truncate">{{ skill.area }} · {{ difficultyStars(skill.difficulty) }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="p-2 text-flame-500 shrink-0"
+                    @click="removeSectionSkill(section.id, skill.id)"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ClassPlanTrickPickerSheet
+            :open="trickPickerOpen"
+            :skills="skills"
+            :selected-ids="trickPickerSectionIds"
+            :section-label="trickPickerMeta.label"
+            :difficulty-filter="trickPickerMeta.difficulty || undefined"
+            :default-program="trickPickerMeta.defaultProgram"
+            @close="trickPickerOpen = false"
+            @confirm="applyTrickPicker"
+          />
 
           <!-- Main Activity -->
           <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -1258,17 +1366,7 @@ function goProgramResourceHub() {
       <!-- Tricks Tab -->
       <div v-else-if="activeTab === 'tricks'">
         <!-- Program summary cards: click to filter by program -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <button
-            type="button"
-            class="rounded-xl p-4 text-center transition-all border"
-            :class="selectedProgram === 'Strength Training' ? 'bg-gold-400/20 border-gold-400' : 'bg-gray-900 border-gray-800 hover:border-gray-700'"
-            @click="selectedProgram = selectedProgram === 'Strength Training' ? '' : 'Strength Training'"
-          >
-            <span class="text-2xl block mb-1">💪</span>
-            <p class="text-2xl font-bold text-white">{{ programSummary.strengthTraining }}</p>
-            <p class="text-xs" :class="selectedProgram === 'Strength Training' ? 'text-gold-400' : 'text-gray-400'">{{ language === 'es' ? 'Strength training' : 'Strength training' }}</p>
-          </button>
+        <div class="grid grid-cols-3 gap-3 mb-6">
           <button
             type="button"
             class="rounded-xl p-4 text-center transition-all border"
@@ -1316,11 +1414,11 @@ function goProgramResourceHub() {
             <button
               v-if="userRole === 'admin'"
               type="button"
-              :disabled="syncing"
+              :disabled="syncing || syncingStrength"
               class="text-xs px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50"
-              @click="autoSyncNiikLibrary(true).then(async () => { await fetchSkills() }).catch(async () => { await fetchSkills() })"
+              @click="syncLibrariesFromExcel"
             >
-              {{ syncing ? (language === 'es' ? 'Sincronizando...' : 'Syncing...') : (language === 'es' ? 'Sincronizar desde Excel' : 'Sync from Excel') }}
+              {{ syncing || syncingStrength ? (language === 'es' ? 'Sincronizando...' : 'Syncing...') : (language === 'es' ? 'Sincronizar desde Excel' : 'Sync from Excel') }}
             </button>
             <button
               type="button"

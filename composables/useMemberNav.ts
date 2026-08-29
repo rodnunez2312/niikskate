@@ -96,9 +96,9 @@ export function useMemberNav() {
       icon: 'calendar',
     },
     {
-      name: es.value ? 'Pagos' : 'Payments',
-      path: '/member/admin/payments',
-      icon: 'store',
+      name: es.value ? 'Finanzas' : 'Finance',
+      path: '/member/admin/finance',
+      icon: 'chart',
     },
     {
       name: es.value ? 'Reportes' : 'Reports',
@@ -172,6 +172,11 @@ export function useMemberNav() {
             icon: 'skills',
           },
           {
+            name: es.value ? 'Fuerza' : 'Strength',
+            path: '/member/coach/strength',
+            icon: 'skills',
+          },
+          {
             name: es.value ? 'Competencias' : 'Competitions',
             path: '/member/admin/competitions',
             icon: 'flag',
@@ -211,9 +216,9 @@ export function useMemberNav() {
             adminOnly: true,
           },
           {
-            name: es.value ? 'Pagos' : 'Payments',
-            path: '/member/admin/payments',
-            icon: 'store',
+            name: es.value ? 'Finanzas' : 'Finance',
+            path: '/member/admin/finance',
+            icon: 'chart',
             adminOnly: true,
           },
           {
@@ -249,6 +254,12 @@ export function useMemberNav() {
             name: 'Skateshop',
             path: '/member/admin/skate-products',
             icon: 'store',
+            adminOnly: true,
+          },
+          {
+            name: 'Skateramps',
+            path: '/member/admin/skateramps',
+            icon: 'skate-program',
             adminOnly: true,
           },
         ],
@@ -292,10 +303,16 @@ export function useMemberNav() {
     }
     if (path === '/member/coach/students' && route.path.startsWith('/member/coach/students')) return true
     if (path === '/member/coach/evaluations' && route.path.startsWith('/member/coach/evaluations')) return true
-    if (path === '/member/admin/payments' && route.path.startsWith('/member/admin/payments')) return true
+    // Finanzas owns its own tab bar, so any sub-route keeps the sidebar item active.
+    if (
+      path === '/member/admin/finance'
+      && (route.path.startsWith('/member/admin/finance')
+        || route.path.startsWith('/member/admin/payments'))
+    ) return true
     // Programs = skill_groups library
     if (path === '/member/coach/library' && route.path.startsWith('/member/coach/library')) return true
     if (path === '/member/coach/tricks' && route.path.startsWith('/member/coach/tricks')) return true
+    if (path === '/member/coach/strength' && route.path.startsWith('/member/coach/strength')) return true
     if (path === '/member/admin/competitions' && route.path.startsWith('/member/admin/competitions')) return true
     if (path === '/member/admin/reports' && route.path.startsWith('/member/admin/reports')) return true
     if (path === '/member/coach/profile' && route.path.startsWith('/member/coach/profile')) return true
@@ -304,6 +321,7 @@ export function useMemberNav() {
     if (path === '/member/admin/academy/dashboard' && route.path.startsWith('/member/admin/academy/dashboard')) return true
     if (path === '/member/admin/academy/users' && route.path.startsWith('/member/admin/academy/users')) return true
     if (path === '/member/admin/skate-products' && (route.path.startsWith('/member/admin/skate-products') || route.path.startsWith('/dashboard/store'))) return true
+    if (path === '/member/admin/skateramps' && route.path.startsWith('/member/admin/skateramps')) return true
     if (path === '/dashboard/store' && route.path.startsWith('/dashboard/store')) return true
     return route.path === path || route.path.startsWith(`${path}/`)
   }

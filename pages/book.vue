@@ -18,6 +18,8 @@ import {
 import { es } from 'date-fns/locale'
 import { TIME_SLOT_LABELS, type TimeSlot } from '~/types'
 import { slotsForDate } from '~/utils/classSchedule'
+import { classKindForBookOption } from '~/utils/coupons'
+import type { AppliedCoupon } from '~/components/checkout/CouponField.vue'
 
 const SESSION_OPTIONS: TimeSlot[] = ['monday', 'early', 'late']
 
@@ -293,6 +295,57 @@ onMounted(async () => {
   fetchCoaches()
 })
 
+// ---------------------------------------------------------------------------
+// Live prices from Finanzas → Precios.
+// The numbers below each option stay as a fallback for when the price sheet has
+// not been created yet, so this page never shows a blank price.
+// ---------------------------------------------------------------------------
+
+const { data: livePrices } = await useFetch('/api/classes/prices', {
+  key: 'public-class-prices',
+  default: () => ({ rows: [], available: false }),
+})
+
+const livePriceIndex = computed(() => {
+  const map = new Map<string, { price: number; list: number }>()
+  for (const row of livePrices.value?.rows ?? []) {
+    map.set(`${row.coachTier}:${row.classKind}`, { price: row.priceMxn, list: row.listMxn })
+  }
+  return map
+})
+
+const liveRowFor = (optionId: string) => {
+  const scope = classKindForBookOption(optionId)
+  if (!scope) return null
+  return livePriceIndex.value.get(`${scope.coachTier}:${scope.classKind}`) ?? null
+}
+
+/** Falls back to `fallbackMxn` whenever the sheet has no row for this package. */
+const priceMxnFor = (optionId: string, fallbackMxn: number) =>
+  liveRowFor(optionId)?.price ?? fallbackMxn
+
+const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
+
+/** "Precio regular $450 • descuento $400", kept in step with whatever the sheet says. */
+const packPriceCopy = (optionId: string, fallbackList: number, fallbackFinal: number) => {
+  const row = liveRowFor(optionId)
+  const list = row?.list ?? fallbackList
+  const final = row?.price ?? fallbackFinal
+  if (!(list > final)) return pesos(final)
+  return language.value === 'es'
+    ? `Precio regular ${pesos(list)} • descuento ${pesos(final)}`
+    : `Regular ${pesos(list)} • discount ${pesos(final)}`
+}
+
+/** Badge such as "11% OFF", derived instead of hardcoded. */
+const packDiscountBadge = (optionId: string, fallbackList: number, fallbackFinal: number) => {
+  const row = liveRowFor(optionId)
+  const list = row?.list ?? fallbackList
+  const final = row?.price ?? fallbackFinal
+  if (!(list > final) || list <= 0) return ''
+  return `${Math.round(((list - final) / list) * 100)}% OFF`
+}
+
 // Single class options (with dual pricing: MXN and USD)
 const singleClassOptions = computed(() => [
   {
@@ -309,7 +362,7 @@ const singleClassOptions = computed(() => [
         : lessonCategory.value === 'ramps_bowl'
           ? 'Ramps/Bowl'
           : 'Surfskate',
-    priceMXN: 150,
+    priceMXN: priceMxnFor('grouped', 150),
     priceUSD: 200,
     icon: '👥',
     color: 'from-green-400 to-green-600',
@@ -328,7 +381,7 @@ const singleClassOptions = computed(() => [
         : lessonCategory.value === 'ramps_bowl'
           ? 'Ramps/Bowl coaching'
           : 'Surfskate coaching',
-    priceMXN: 250,
+    priceMXN: priceMxnFor('individual', 250),
     priceUSD: 200,
     icon: '👤',
     color: 'from-purple-400 to-purple-600',
@@ -361,7 +414,7 @@ const packageOptions = computed(() => [
     id: 'monthly',
     name: language.value === 'es' ? 'Programa Mensual Principiantes' : 'Monthly Beginners Program',
     description: language.value === 'es' ? '8 clases grupales' : '8 group classes',
-    priceMXN: 800,
+    priceMXN: priceMxnFor('monthly', 800),
     priceUSD: 35,
     icon: '🏆',
     color: 'from-gold-400 to-gold-600',
@@ -371,7 +424,7 @@ const packageOptions = computed(() => [
     id: 'monthly_intermediate',
     name: language.value === 'es' ? 'Programa Mensual Competitivo' : 'Monthly Competitive Program',
     description: language.value === 'es' ? '8 clases • Bowl, Street, Surf Skate' : '8 classes • Bowl, Street, Surf Skate',
-    priceMXN: 1000,
+    priceMXN: priceMxnFor('monthly_intermediate', 1000),
     priceUSD: 50,
     icon: '⭐',
     color: 'from-purple-400 to-blue-600',
@@ -380,28 +433,28 @@ const packageOptions = computed(() => [
   {
     id: 'pkg_3',
     name: language.value === 'es' ? 'Paquete 3 Clases' : '3 Classes Package',
-    description: language.value === 'es' ? 'Precio regular $450 • descuento $405' : 'Regular $450 • discount $405',
-    priceMXN: 405,
+    description: packPriceCopy('pkg_3', 450, 405),
+    priceMXN: priceMxnFor('pkg_3', 405),
     priceUSD: 540,
     icon: '3️⃣',
     color: 'from-green-400 to-green-600',
-    badge: '10% OFF',
+    badge: packDiscountBadge('pkg_3', 450, 405),
   },
   {
     id: 'pkg_5',
     name: language.value === 'es' ? 'Paquete 5 Clases' : '5 Classes Package',
-    description: language.value === 'es' ? 'Precio regular $750 • descuento $600' : 'Regular $750 • discount $600',
-    priceMXN: 600,
+    description: packPriceCopy('pkg_5', 750, 600),
+    priceMXN: priceMxnFor('pkg_5', 600),
     priceUSD: 850,
     icon: '5️⃣',
     color: 'from-yellow-400 to-yellow-600',
-    badge: '15% OFF',
+    badge: packDiscountBadge('pkg_5', 750, 600),
   },
   {
     id: 'saturdays',
     name: language.value === 'es' ? 'Solo Sábados' : 'Saturdays Only',
     description: language.value === 'es' ? '4 clases del mes' : '4 classes per month',
-    priceMXN: 420,
+    priceMXN: priceMxnFor('saturdays', 420),
     priceUSD: 35,
     icon: '🗓️',
     color: 'from-orange-400 to-orange-600',
@@ -413,7 +466,7 @@ const proClassOptions = computed(() => [
     id: 'pro_group_single',
     name: language.value === 'es' ? 'Sesión grupal' : 'Single group session',
     description: language.value === 'es' ? 'Clase pro grupal' : 'Pro group class',
-    priceMXN: 350,
+    priceMXN: priceMxnFor('pro_group_single', 350),
     priceUSD: 22,
     icon: '👥',
     color: 'from-gold-400 to-glass-green',
@@ -422,7 +475,7 @@ const proClassOptions = computed(() => [
     id: 'pro_max_single',
     name: language.value === 'es' ? 'Sesión individual' : 'Single individual session',
     description: language.value === 'es' ? 'Clase pro individual' : 'Pro individual class',
-    priceMXN: 400,
+    priceMXN: priceMxnFor('pro_max_single', 400),
     priceUSD: 26,
     icon: '👤',
     color: 'from-gold-400 to-glass-orange',
@@ -430,48 +483,48 @@ const proClassOptions = computed(() => [
   {
     id: 'pro_group_3',
     name: language.value === 'es' ? 'Grupal 3 sesiones' : 'Group 3 sessions',
-    description: language.value === 'es' ? 'Precio regular $1,050 • descuento $945' : 'Regular $1,050 • discount $945',
-    priceMXN: 945,
+    description: packPriceCopy('pro_group_3', 1050, 945),
+    priceMXN: priceMxnFor('pro_group_3', 945),
     priceUSD: 58,
     icon: '3️⃣',
     color: 'from-gold-400 to-glass-orange',
-    badge: '10% OFF',
+    badge: packDiscountBadge('pro_group_3', 1050, 945),
   },
   {
     id: 'pro_group_5',
     name: language.value === 'es' ? 'Grupal 5 sesiones' : 'Group 5 sessions',
-    description: language.value === 'es' ? 'Precio regular $1,750 • descuento $1,400' : 'Regular $1,750 • discount $1,400',
-    priceMXN: 1400,
+    description: packPriceCopy('pro_group_5', 1750, 1400),
+    priceMXN: priceMxnFor('pro_group_5', 1400),
     priceUSD: 86,
     icon: '5️⃣',
     color: 'from-gold-500 to-glass-orange',
-    badge: '20% OFF',
+    badge: packDiscountBadge('pro_group_5', 1750, 1400),
   },
   {
     id: 'pro_ind_3',
     name: language.value === 'es' ? 'Individual 3 sesiones' : 'Individual 3 sessions',
-    description: language.value === 'es' ? 'Precio regular $1,200 • descuento $1,080' : 'Regular $1,200 • discount $1,080',
-    priceMXN: 1080,
+    description: packPriceCopy('pro_ind_3', 1200, 1080),
+    priceMXN: priceMxnFor('pro_ind_3', 1080),
     priceUSD: 67,
     icon: '3️⃣',
     color: 'from-purple-400 to-gold-500',
-    badge: '10% OFF',
+    badge: packDiscountBadge('pro_ind_3', 1200, 1080),
   },
   {
     id: 'pro_ind_5',
     name: language.value === 'es' ? 'Individual 5 sesiones' : 'Individual 5 sessions',
-    description: language.value === 'es' ? 'Precio regular $2,000 • descuento $1,600' : 'Regular $2,000 • discount $1,600',
-    priceMXN: 1600,
+    description: packPriceCopy('pro_ind_5', 2000, 1600),
+    priceMXN: priceMxnFor('pro_ind_5', 1600),
     priceUSD: 98,
     icon: '5️⃣',
     color: 'from-purple-500 to-gold-500',
-    badge: '20% OFF',
+    badge: packDiscountBadge('pro_ind_5', 2000, 1600),
   },
   {
     id: 'pro_monthly',
     name: language.value === 'es' ? 'Mensual (4 clases por semana)' : 'Monthly (4 classes per week)',
     description: language.value === 'es' ? 'Programa pro con coach invitado' : 'Pro program with guest coach',
-    priceMXN: 5000,
+    priceMXN: priceMxnFor('pro_monthly', 5000),
     priceUSD: 300,
     icon: '🏆',
     color: 'from-gold-400 to-gold-600',
@@ -739,11 +792,59 @@ const selectedClassDetails = computed(() => {
 })
 
 // Calculate total (raw MXN - for backwards compatibility)
-const totalPriceMXN = computed(() => {
+const subtotalPriceMXN = computed(() => {
   let total = selectedClassDetails.value?.priceMXN || 0
   total += equipmentTotalMXN.value
   return total
 })
+
+// ---------------------------------------------------------------------------
+// Coupon codes
+// ---------------------------------------------------------------------------
+
+const appliedCoupon = ref<AppliedCoupon | null>(null)
+
+/** The price-sheet vocabulary for whichever package is selected. */
+const couponScope = computed(() => classKindForBookOption(selectedClass.value))
+
+const couponDiscountMXN = computed(() =>
+  appliedCoupon.value ? Math.min(appliedCoupon.value.discountMxn, subtotalPriceMXN.value) : 0,
+)
+
+const totalPriceMXN = computed(() =>
+  Math.max(0, subtotalPriceMXN.value - couponDiscountMXN.value),
+)
+
+const onCouponApplied = (coupon: AppliedCoupon | null) => {
+  appliedCoupon.value = coupon
+}
+
+/** Log the redemption after the purchase row exists, so limits count real sales. */
+const redeemAppliedCoupon = async (userCreditId: string | null) => {
+  const coupon = appliedCoupon.value
+  if (!coupon) return
+  try {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData?.session?.access_token
+    if (!token) return
+    await $fetch('/api/coupons/redeem', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        code: coupon.code,
+        subtotalMxn: subtotalPriceMXN.value,
+        classKind: couponScope.value?.classKind ?? null,
+        coachTier: couponScope.value?.coachTier ?? null,
+        userCreditId,
+        context: 'book',
+        language: language.value,
+      },
+    })
+  } catch (e) {
+    // The family already paid the discounted amount; never fail the booking here.
+    console.warn('Coupon redemption not logged:', e)
+  }
+}
 
 // For display: sum the individual converted/rounded prices so math matches
 // This ensures $35 + $10 = $45, not $40
@@ -764,7 +865,7 @@ const displayTotal = computed(() => {
   // MXN
   const classPrice = classDetails?.priceMXN || 0
   const equipPrice = equipmentTotalMXN.value
-  return classPrice + equipPrice
+  return Math.max(0, classPrice + equipPrice - couponDiscountMXN.value)
 })
 
 // Format the display total
@@ -891,6 +992,9 @@ const submitBooking = async () => {
     dates: selectedDates.value.map(d => format(d, 'yyyy-MM-dd')),
     session: selectedSession.value,
     equipment: selectedEquipment.value,
+    subtotal_mxn: subtotalPriceMXN.value,
+    coupon_code: appliedCoupon.value?.code ?? null,
+    coupon_discount_mxn: couponDiscountMXN.value || null,
     total_mxn: totalPriceMXN.value,
     total_usd: displayTotal.value,
     payment_method: paymentMethod.value,
@@ -949,6 +1053,10 @@ const submitBooking = async () => {
           })
           .select('id')
           .single()
+
+        if (!creditError) {
+          await redeemAppliedCoupon(newCredit?.id ?? null)
+        }
 
         if (creditError) {
           console.error('Error creating credits:', creditError)
@@ -2024,10 +2132,42 @@ const isDateBookable = (date: Date): boolean => {
                 </div>
               </div>
 
+              <!-- Coupon: MXN only, since codes are priced in pesos -->
+              <div
+                v-if="isLoggedIn && currency === 'MXN'"
+                class="border-t border-gray-700 pt-4 mt-4"
+              >
+                <CheckoutCouponField
+                  :subtotal-mxn="subtotalPriceMXN"
+                  :class-kind="couponScope?.classKind ?? null"
+                  :coach-tier="couponScope?.coachTier ?? null"
+                  @applied="onCouponApplied"
+                />
+              </div>
+
               <!-- Total -->
-              <div v-if="isLoggedIn" class="border-t border-gray-700 pt-4 mt-4 flex justify-between items-center">
-                <span class="font-bold text-white text-lg">Total</span>
-                <span class="font-bold text-gold-400 text-2xl">{{ formattedDisplayTotal }}</span>
+              <div v-if="isLoggedIn" class="border-t border-gray-700 pt-4 mt-4 space-y-1">
+                <div
+                  v-if="couponDiscountMXN > 0"
+                  class="flex justify-between items-center text-sm"
+                >
+                  <span class="text-gray-400">{{ language === 'es' ? 'Subtotal' : 'Subtotal' }}</span>
+                  <span class="text-gray-400 line-through">${{ subtotalPriceMXN }} MXN</span>
+                </div>
+                <div
+                  v-if="couponDiscountMXN > 0"
+                  class="flex justify-between items-center text-sm"
+                >
+                  <span class="text-glass-green">
+                    {{ language === 'es' ? 'Descuento' : 'Discount' }}
+                    <span class="font-mono text-[11px]">{{ appliedCoupon?.code }}</span>
+                  </span>
+                  <span class="text-glass-green font-semibold">−${{ couponDiscountMXN }} MXN</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="font-bold text-white text-lg">Total</span>
+                  <span class="font-bold text-gold-400 text-2xl">{{ formattedDisplayTotal }}</span>
+                </div>
               </div>
             </div>
           </div>

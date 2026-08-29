@@ -8,6 +8,7 @@ import {
   isBefore,
   isSameDay,
   isSameMonth,
+  isSameYear,
   isToday,
   startOfDay,
   startOfMonth,
@@ -19,7 +20,6 @@ import type { AudienceCategory, SkateSkillLevelId, TimeSlot } from '~/types'
 import {
   DEFAULT_SKATEPARK,
   EVENT_LOCATIONS,
-  MONTHLY_PROGRAM_PRICE_MXN,
   PROGRAM_TOTAL_CLASSES,
   PROGRAM_WEEK_OPTIONS,
   PROGRAM_AGE_BANDS,
@@ -41,14 +41,22 @@ import {
   type ProgramWeekCount,
 } from '~/types'
 import { DEFAULT_PROGRAM_WEEKDAYS, PRACTICE_TIME_SLOTS, RECURRING_WEEKDAY_OPTIONS, SUMMER_COURSE_WEEKDAY_OPTIONS, slotsForWeekday, slotsForWeekdays } from '~/utils/classSchedule'
-import { computeSummerCourseEndDate, generateProgramOccurrences, nearestProgramStartDate, parseYmd, syncProgramDateRange, computeProgramEndDate } from '~/utils/recurringProgram'
-import { MEXICO_NATIONAL_HOLIDAYS_2026_2027 } from '~/utils/mexicoHolidays'
+import { bookableOccurrences, computeSummerCourseEndDate, generateProgramOccurrences, nearestProgramStartDate, parseYmd, syncProgramDateRange, computeProgramEndDate } from '~/utils/recurringProgram'
+import { MEXICO_NATIONAL_HOLIDAYS_2026_2027, mexicoHolidayName } from '~/utils/mexicoHolidays'
 import { getProgramSeasonBySlug, isSummerCourseSeason, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
 import {
   coachTierFromSkillTracks,
   coachTierLabel,
   resolveDefaultProgramPriceMxn,
+  resolveProgramPackageKind,
 } from '~/utils/classPricing'
+import {
+  classKindLabel,
+  coachTierSheetLabel,
+  effectivePriceMxn,
+  formatMoneyMxn,
+} from '~/utils/finance'
+import { useFinance } from '~/composables/useFinance'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -149,6 +157,29 @@ const deleteSeriesOpen = ref(false)
 const deleteSeriesId = ref<string | null>(null)
 const deleting = ref(false)
 
+/** Editing one class of a program: apply changes to the whole series or just that class. */
+const editScope = ref<'series' | 'single'>('series')
+const editSeriesCount = ref(0)
+
+/** Fields that describe the program itself; dates and times stay per class. */
+const SERIES_SHARED_FIELDS = [
+  'title',
+  'event_type',
+  'description',
+  'location',
+  'skatepark',
+  'visible_to_parents',
+  'is_bookable',
+  'audience_category',
+  'audience_categories',
+  'skill_level',
+  'min_age',
+  'max_age',
+  'price_mxn',
+  'max_capacity_override',
+  'season_slug',
+] as const
+
 const form = ref({
   title: '',
   event_type: 'event' as SchoolCalendarEventType,
@@ -228,12 +259,43 @@ const programSlotsForGenerate = (): TimeSlot[] => {
 
 const formCoachTier = computed(() => coachTierFromSkillTracks(form.value.skill_tracks))
 
-const programPriceManual = ref(false)
+// ---------------------------------------------------------------------------
+// Pricing — Finanzas → Precios is the only source of truth
+// ---------------------------------------------------------------------------
 
-const applyProgramPriceDefault = (force = false) => {
-  if (!isProgramForm.value || editingId.value) return
-  if (programPriceManual.value && !force) return
-  form.value.price_mxn = resolveDefaultProgramPriceMxn({
+const { priceRows: financePriceRows, loadPriceRows } = useFinance()
+
+onMounted(() => {
+  loadPriceRows()
+})
+
+/** Which package this program shape sells as: monthly_4, group_pack_5, … */
+const programPackageKind = computed(() =>
+  resolveProgramPackageKind({
+    eventType: form.value.event_type as 'class_session' | 'class_individual',
+    isRecurring: form.value.is_recurring || isSummerCourseForm.value,
+    isSummerCourse: isSummerCourseForm.value,
+    summerWeeks: form.value.summer_weeks,
+    classCount: Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES,
+  }),
+)
+
+/** The Finanzas row for this tier + package, when the sheet has one. */
+const programPriceRow = computed(
+  () =>
+    financePriceRows.value.find(
+      r =>
+        r.is_active
+        && r.coach_tier === formCoachTier.value
+        && r.class_kind === programPackageKind.value,
+    ) ?? null,
+)
+
+/** Finanzas price; the built-in table only covers packages missing from the sheet. */
+const programPriceMxn = computed(() => {
+  const row = programPriceRow.value
+  if (row) return effectivePriceMxn(row)
+  return resolveDefaultProgramPriceMxn({
     skillTracks: form.value.skill_tracks,
     eventType: form.value.event_type as 'class_session' | 'class_individual',
     isRecurring: form.value.is_recurring || isSummerCourseForm.value,
@@ -242,6 +304,36 @@ const applyProgramPriceDefault = (force = false) => {
     classCount: form.value.recurring_class_count,
     coachTier: formCoachTier.value,
   })
+})
+
+const programPriceLabel = computed(() => {
+  const es = language.value === 'es'
+  const row = programPriceRow.value
+  const pack = row ? row.label_es : classKindLabel(programPackageKind.value, es)
+  return `${pack} · ${coachTierSheetLabel(formCoachTier.value, es)}`
+})
+
+/** Splits the price the sheet's way: academy keeps its %, the coach gets the rest. */
+const priceSplitHint = computed(() => {
+  const price = Number(form.value.price_mxn) || 0
+  const pct = programPriceRow.value?.academy_pct
+  if (!price || pct == null) return ''
+  const academy = price * Number(pct)
+  return language.value === 'es'
+    ? `Academia ${formatMoneyMxn(academy)} · Coach ${formatMoneyMxn(price - academy)}`
+    : `Academy ${formatMoneyMxn(academy)} · Coach ${formatMoneyMxn(price - academy)}`
+})
+
+/** An existing program keeps the price it was sold at until it is re-synced. */
+const editedPriceIsStale = computed(
+  () =>
+    Boolean(editingId.value)
+    && isProgramForm.value
+    && Number(form.value.price_mxn) !== programPriceMxn.value,
+)
+
+const syncPriceFromFinance = () => {
+  form.value.price_mxn = programPriceMxn.value
 }
 
 const isSkillTrackSelected = (track: ProgramSkillTrack) => form.value.skill_tracks.includes(track)
@@ -257,7 +349,6 @@ const toggleSkillTrack = (track: ProgramSkillTrack) => {
   }
   form.value.skill_level = skillLevelIdFromTrack(form.value.skill_tracks[0]!)
   applyProgressionAgesIfNeeded()
-  applyProgramPriceDefault()
 }
 
 /** Intermediate (Progresión) covers ages 7–17: kids + teens bands. */
@@ -279,46 +370,19 @@ const applySummerCoursePreset = () => {
   form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
   form.value.time_slot = SUMMER_COURSE_SLOT
   applyProgramDateSync({ syncStart: true })
-  applyProgramPriceDefault(true)
 }
+
+/** One class per selected training day, every week of the program. */
+const programDaysPerWeek = computed(() => Math.max(1, form.value.recurring_weekdays.length))
 
 const applyStandardSeasonPreset = () => {
   form.value.recurring_weekdays = [...DEFAULT_PROGRAM_WEEKDAYS]
-  form.value.recurring_class_count = programClassCount(form.value.program_weeks || 4)
+  form.value.recurring_class_count = programClassCount(
+    form.value.program_weeks || 4,
+    DEFAULT_PROGRAM_WEEKDAYS.length,
+  )
   applyProgramDateSync({ syncStart: true })
 }
-
-watch(
-  () =>
-    [
-      form.value.skill_tracks.join(','),
-      form.value.event_type,
-      form.value.is_recurring,
-      form.value.season_slug,
-      form.value.summer_weeks,
-      form.value.recurring_class_count,
-    ] as const,
-  () => {
-    applyProgramPriceDefault()
-  },
-)
-
-watch(
-  () => form.value.price_mxn,
-  val => {
-    if (!isProgramForm.value || editingId.value) return
-    const expected = resolveDefaultProgramPriceMxn({
-      skillTracks: form.value.skill_tracks,
-      eventType: form.value.event_type as 'class_session' | 'class_individual',
-      isRecurring: form.value.is_recurring || isSummerCourseForm.value,
-      isSummerCourse: isSummerCourseForm.value,
-      summerWeeks: form.value.summer_weeks,
-      classCount: form.value.recurring_class_count,
-      coachTier: formCoachTier.value,
-    })
-    programPriceManual.value = Number(val) !== expected
-  },
-)
 
 watch(
   () => form.value.season_slug,
@@ -331,10 +395,10 @@ watch(
 )
 
 watch(
-  () => form.value.program_weeks,
-  weeks => {
+  () => [form.value.program_weeks, programDaysPerWeek.value] as const,
+  ([weeks, daysPerWeek]) => {
     if (!isProgramForm.value || editingId.value || isSummerCourseForm.value) return
-    form.value.recurring_class_count = programClassCount(weeks)
+    form.value.recurring_class_count = programClassCount(weeks, daysPerWeek)
   },
 )
 
@@ -355,6 +419,16 @@ const isProgramForm = computed(
 const isClassSessionForm = computed(() => isProgramForm.value)
 const isPracticeForm = computed(() => form.value.event_type === 'practice')
 const isIndividualProgram = computed(() => form.value.event_type === 'class_individual')
+
+// New programs always carry the Finanzas price for their shape.
+watch(
+  [programPriceMxn, isProgramForm],
+  () => {
+    if (!isProgramForm.value || editingId.value) return
+    form.value.price_mxn = programPriceMxn.value
+  },
+  { immediate: true },
+)
 
 /** Age phrases for auto titles: "Skater Tots (5-7)" style. */
 const PROGRAM_AGE_TITLE: Record<
@@ -463,6 +537,19 @@ const editingEvent = computed(() =>
   editingId.value ? events.value.find(e => e.id === editingId.value) ?? null : null,
 )
 
+const editingSeriesId = computed(() => editingEvent.value?.program_series_id ?? null)
+
+/** Series can span months, so ask the DB instead of counting the loaded window. */
+const loadEditSeriesCount = async (seriesId: string | null) => {
+  editSeriesCount.value = 0
+  if (!seriesId) return
+  const { count } = await client
+    .from('school_calendar_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('program_series_id', seriesId)
+  editSeriesCount.value = count ?? 0
+}
+
 const formStartWeekday = computed(() => {
   if (!form.value.start_date) return null
   const [y, m, d] = form.value.start_date.split('-').map(Number)
@@ -497,10 +584,29 @@ const recurringPreview = computed(() => {
   })
 })
 
+/** Only these are sellable — holiday dates land on the calendar but stay closed. */
+const previewBookable = computed(() => bookableOccurrences(recurringPreview.value))
+
+/** Planned dates that collide with a MX national holiday, for the warning banner. */
+const previewHolidayClashes = computed(() => {
+  const seen = new Set<string>()
+  const out: Array<{ date: string; label: string; holiday: string }> = []
+  for (const occ of recurringPreview.value) {
+    if (!occ.isHoliday || seen.has(occ.date)) continue
+    seen.add(occ.date)
+    out.push({
+      date: occ.date,
+      label: format(parseYmd(occ.date), 'd MMM', language.value === 'es' ? { locale: es } : undefined),
+      holiday: mexicoHolidayName(occ.date, language.value === 'es'),
+    })
+  }
+  return out
+})
+
 const programFitsSeason = computed(() => {
   if (editingId.value || !formSeason.value) return true
   const needed = Math.max(1, Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES)
-  return recurringPreview.value.length >= needed
+  return previewBookable.value.length >= needed
 })
 
 const syncingProgramDates = ref(false)
@@ -610,8 +716,13 @@ const toggleRecurringWeekday = (v: number) => {
   if (isSummerCourseForm.value) return
   const cur = [...form.value.recurring_weekdays]
   const i = cur.indexOf(v)
-  if (i >= 0) form.value.recurring_weekdays = cur.filter(d => d !== v)
-  else form.value.recurring_weekdays = [...cur, v].sort((a, b) => a - b)
+  if (i >= 0) {
+    // A program needs at least one training day.
+    if (cur.length <= 1) return
+    form.value.recurring_weekdays = cur.filter(d => d !== v)
+  } else {
+    form.value.recurring_weekdays = [...cur, v].sort((a, b) => a - b)
+  }
 }
 
 const toggleRecurringSlot = (slot: TimeSlot) => {
@@ -857,13 +968,49 @@ const filteredEvents = computed(() => {
   return events.value.filter(e => e.event_type === filterType.value)
 })
 
-const monthRange = computed(() => {
-  const start = startOfMonth(viewMonth.value)
-  const end = endOfMonth(viewMonth.value)
+const monthGrid = (month: Date) => {
+  const start = startOfMonth(month)
+  const end = endOfMonth(month)
   const gridStart = startOfWeek(start, { weekStartsOn: 0 })
   const gridEnd = endOfWeek(end, { weekStartsOn: 0 })
   return { start, end, gridStart, gridEnd, days: eachDayOfInterval({ start: gridStart, end: gridEnd }) }
+}
+
+/** A season selection wider than this would make the page unusable to scroll. */
+const MAX_VISIBLE_MONTHS = 4
+
+/** Whole months between two dates, inclusive of both ends. */
+const monthSpanBetween = (startYmd: string, endYmd: string) => {
+  const from = startOfMonth(parseYmd(startYmd))
+  const to = startOfMonth(parseYmd(endYmd))
+  let span = 1
+  let cursor = from
+  while (cursor < to && span < MAX_VISIBLE_MONTHS) {
+    cursor = addMonths(cursor, 1)
+    span += 1
+  }
+  return span
+}
+
+/**
+ * How many month grids to stack. A season that runs Jul 1 – Aug 31 shows both
+ * months, so the whole run is visible without paging back and forth.
+ */
+const visibleMonthCount = computed(() => {
+  if (!selectedSeasons.value.length) return 1
+  const starts = selectedSeasons.value.map(s => s.startDate).sort()
+  const ends = selectedSeasons.value.map(s => s.endDate).sort()
+  return monthSpanBetween(starts[0], ends[ends.length - 1])
 })
+
+const visibleMonths = computed(() =>
+  Array.from({ length: visibleMonthCount.value }, (_, i) =>
+    addMonths(startOfMonth(viewMonth.value), i),
+  ),
+)
+
+const monthLabelFor = (month: Date) =>
+  format(month, 'MMMM yyyy', { locale: language.value === 'es' ? es : undefined })
 
 const overlapsDay = (ev: SchoolCalendarRow, day: Date) => {
   const d = format(day, 'yyyy-MM-dd')
@@ -908,9 +1055,17 @@ const eventsOnDay = (day: Date) => {
   })
 }
 
+/** Reads as a range while a multi-month season is stacked below. */
 const monthLabel = computed(() => {
+  const months = visibleMonths.value
+  const first = monthLabelFor(months[0])
+  if (months.length < 2) return first
   const loc = language.value === 'es' ? es : undefined
-  return format(viewMonth.value, 'MMMM yyyy', { locale: loc })
+  const last = months[months.length - 1]
+  const firstShort = isSameYear(months[0], last)
+    ? format(months[0], 'MMMM', { locale: loc })
+    : first
+  return `${firstShort} – ${monthLabelFor(last)}`
 })
 
 const weekdayLabels = computed(() =>
@@ -956,10 +1111,11 @@ const seasonsCoveringDay = (day: Date) => {
   return selectedSeasons.value.filter(s => ymd >= s.startDate && ymd <= s.endDate)
 }
 
-const daySeasonStyle = (day: Date) => {
+/** `gridMonth` is the month the cell belongs to, since several months can stack. */
+const daySeasonStyle = (day: Date, gridMonth: Date = viewMonth.value) => {
   const covering = seasonsCoveringDay(day)
   if (!covering.length) return {}
-  const inMonth = isSameMonth(day, viewMonth.value)
+  const inMonth = isSameMonth(day, gridMonth)
   const fills = covering.map(s => inMonth ? seasonColorFor(s.slug).fill : seasonColorFor(s.slug).fillMuted)
   if (fills.length === 1) return { backgroundColor: fills[0] }
   return { backgroundImage: stripedSeasonFill(fills) }
@@ -1066,6 +1222,19 @@ const eventChipEmoji = (ev: SchoolCalendarRow) => {
   return PROGRAM_SKILL_TRACKS.find(t => t.id === track)?.emoji || EVENT_META[ev.event_type]?.emoji || '🛹'
 }
 
+/** Programs sitting on a holiday stay visible but closed for booking. */
+const isBlockedProgram = (ev: SchoolCalendarRow) =>
+  isProgramType(ev.event_type) && ev.is_bookable === false
+
+const blockedProgramTitle = (ev: SchoolCalendarRow) => {
+  const es = language.value === 'es'
+  const holiday = mexicoHolidayName(ev.start_date, es)
+  if (holiday) {
+    return es ? `Festivo: ${holiday} — no reservable` : `Holiday: ${holiday} — not bookable`
+  }
+  return es ? 'Clase no reservable' : 'Class not bookable'
+}
+
 const isProgramChipTinted = (ev: SchoolCalendarRow) => {
   if (!isProgramType(ev.event_type)) return false
   if (!selectedSeasonSlugs.value.length) return true
@@ -1137,7 +1306,6 @@ const openCreateForDay = (day: Date, mode: CreateMode = 'event') => {
     form.value.event_type = filterType.value as SchoolCalendarEventType
   }
   programTitleManual.value = false
-  programPriceManual.value = false
   lastAutoProgramTitle.value = ''
   modalOpen.value = true
   formError.value = ''
@@ -1202,6 +1370,8 @@ const openEdit = (ev: SchoolCalendarRow, e?: Event) => {
     }
     form.value.max_age = Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
   }
+  editScope.value = ev.program_series_id ? 'series' : 'single'
+  void loadEditSeriesCount(ev.program_series_id ?? null)
   modalOpen.value = true
   formError.value = ''
   captureFormSnapshot()
@@ -1212,6 +1382,8 @@ const closeModal = () => {
   editingId.value = null
   deleteSeriesOpen.value = false
   deleteSeriesId.value = null
+  editScope.value = 'series'
+  editSeriesCount.value = 0
   formSnapshotJson.value = ''
 }
 
@@ -1345,6 +1517,7 @@ const submitEvent = async () => {
       dateStr: string,
       slot: TimeSlot,
       programSeriesId: string | null,
+      isHoliday = false,
     ) => {
       const slotTimes = TIME_SLOT_LABELS[slot] ?? TIME_SLOT_LABELS.summer
       const capOverride = Number(form.value.max_capacity_override) || null
@@ -1355,6 +1528,12 @@ const submitEvent = async () => {
       const maxAge = progression && !form.value.audience_categories.includes('adults_18_plus')
         ? Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
         : (Number(form.value.max_age) || null)
+      const holidayNote = isHoliday
+        ? language.value === 'es'
+          ? `Festivo nacional (${mexicoHolidayName(dateStr, true)}) — clase no reservable.`
+          : `National holiday (${mexicoHolidayName(dateStr, false)}) — class not bookable.`
+        : ''
+      const baseDescription = form.value.description.trim()
       return {
         title,
         event_type: form.value.event_type as 'class_session' | 'class_individual',
@@ -1364,9 +1543,9 @@ const submitEvent = async () => {
         start_time: `${slotTimes.start}:00`,
         end_time: `${slotTimes.end}:00`,
         location: form.value.location || DEFAULT_SKATEPARK,
-        description: form.value.description.trim() || null,
+        description: [baseDescription, holidayNote].filter(Boolean).join(' · ') || null,
         visible_to_parents: form.value.visible_to_parents,
-        is_bookable: true,
+        is_bookable: !isHoliday,
         time_slot: slot,
         audience_category: form.value.audience_categories[0] ?? null,
         audience_categories: form.value.audience_categories.length
@@ -1406,7 +1585,7 @@ const submitEvent = async () => {
         return
       }
       const seriesId = crypto.randomUUID()
-      const rows = occurrences.map(o => buildClassPayload(o.date, o.slot, seriesId))
+      const rows = occurrences.map(o => buildClassPayload(o.date, o.slot, seriesId, o.isHoliday))
       let { error: bulkErr } = await client.from('school_calendar_events').insert(rows)
       const bulkMsg = bulkErr?.message || ''
       if (bulkErr && /summer|time_slot|invalid input value for enum/i.test(bulkMsg)) {
@@ -1475,7 +1654,8 @@ const submitEvent = async () => {
       skatepark: isClass ? form.value.location || DEFAULT_SKATEPARK : null,
       price_mxn: isClass ? priceNum : null,
       max_capacity_override: isClass ? Number(form.value.max_capacity_override) || null : null,
-      program_series_id: null as string | null,
+      // Editing one class must not detach it from its program series.
+      program_series_id: editingSeriesId.value,
       season_slug: isClass ? form.value.season_slug.trim() || null : null,
     }
 
@@ -1486,7 +1666,23 @@ const submitEvent = async () => {
 
     const savePayload = async (payload: Record<string, unknown>) => {
       if (editingId.value) {
-        return client.from('school_calendar_events').update(payload).eq('id', editingId.value)
+        const rowResult = await client
+          .from('school_calendar_events')
+          .update(payload)
+          .eq('id', editingId.value)
+        if (rowResult.error || editScope.value !== 'series' || !editingSeriesId.value) {
+          return rowResult
+        }
+        // Propagate program-level fields to the rest of the series, leaving each
+        // class on its own date and time slot.
+        const shared: Record<string, unknown> = {}
+        for (const key of SERIES_SHARED_FIELDS) {
+          if (key in payload) shared[key] = payload[key]
+        }
+        return client
+          .from('school_calendar_events')
+          .update(shared)
+          .eq('program_series_id', editingSeriesId.value)
       }
       return client
         .from('school_calendar_events')
@@ -1583,6 +1779,24 @@ const seasonIsCurrent = (startDate: string, endDate: string) => {
   return t >= startDate && t <= endDate
 }
 
+/** Finished seasons move to the archive so the picker only shows live work. */
+const currentSeasons = computed(() =>
+  programSeasons.value.filter(s => !seasonIsPast(s.startDate, s.endDate)),
+)
+
+const archivedSeasons = computed(() =>
+  programSeasons.value
+    .filter(s => seasonIsPast(s.startDate, s.endDate))
+    .sort((a, b) => b.endDate.localeCompare(a.endDate)),
+)
+
+const showSeasonArchive = ref(false)
+
+/** A selected archived season stays visible, otherwise it would vanish on reload. */
+const archiveIsOpen = computed(
+  () => showSeasonArchive.value || archivedSeasons.value.some(s => isSeasonSelected(s.slug)),
+)
+
 const highlightedSeasons = computed(() => selectedSeasons.value)
 
 const isDayInHighlightedSeason = (day: Date) => seasonsCoveringDay(day).length > 0
@@ -1620,12 +1834,19 @@ const toggleSeason = (slug: string) => {
   }
   current.push(slug)
   persistSelectedSeasons(current)
-  if (seasonIsCurrent(season.startDate, season.endDate)) {
-    viewMonth.value = new Date()
-    return
-  }
-  viewMonth.value = new Date(`${season.startDate}T12:00:00`)
 }
+
+/**
+ * Anchor the stacked grids on the first month of the selection so the whole season
+ * is visible, whether it was just tapped or restored from the URL on load.
+ */
+watch(
+  () => [...selectedSeasons.value].map(s => s.startDate).sort()[0],
+  (earliest) => {
+    if (earliest) viewMonth.value = startOfMonth(parseYmd(earliest))
+  },
+  { immediate: true },
+)
 
 const removingSeasonSlug = ref('')
 
@@ -1925,68 +2146,67 @@ const selectDay = (day: Date) => {
           </p>
           <p v-if="seasonSelectError" class="text-[11px] text-amber-300 mb-2">{{ seasonSelectError }}</p>
           <div class="rounded-2xl border border-gray-800 bg-gray-950 overflow-y-auto max-h-[70vh]">
-            <div
-              v-for="season in programSeasons"
-              :key="season.slug"
-              class="relative border-b border-gray-800 last:border-b-0"
-              :class="seasonIsPast(season.startDate, season.endDate) ? 'opacity-45' : ''"
-              :style="isSeasonSelected(season.slug)
-                ? {
-                    backgroundColor: seasonColorFor(season.slug).fillMuted,
-                    boxShadow: `inset 0 0 0 1px ${seasonColorFor(season.slug).solid}`,
-                  }
-                : {}"
+            <p
+              v-if="!currentSeasons.length"
+              class="px-3 py-4 text-[11px] text-gray-500 text-center"
             >
-              <button
-                type="button"
-                class="w-full text-left px-3 py-3 pr-10 transition-colors"
-                :class="isSeasonSelected(season.slug) ? '' : 'hover:bg-gray-900'"
-                @click="toggleSeason(season.slug)"
+              {{ language === 'es'
+                ? 'No hay temporadas activas. Revisa el archivo o agrega una.'
+                : 'No active seasons. Check the archive or add one.' }}
+            </p>
+            <AdminSeasonPickerCard
+              v-for="season in currentSeasons"
+              :key="season.slug"
+              :season="season"
+              :selected="isSeasonSelected(season.slug)"
+              :past="false"
+              :color="seasonColorFor(season.slug)"
+              :status="seasonMerida(season)"
+              :removing="removingSeasonSlug === season.slug"
+              @toggle="toggleSeason(season.slug)"
+              @remove="confirmRemoveSeason(season)"
+            />
+          </div>
+
+          <!-- Archive: finished seasons, out of the way but still reachable -->
+          <div v-if="archivedSeasons.length" class="mt-3">
+            <button
+              type="button"
+              class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-gray-800 bg-gray-950 text-gray-400 hover:text-gray-200 hover:border-gray-700 transition-colors"
+              @click="showSeasonArchive = !archiveIsOpen"
+            >
+              <span class="text-[11px] font-bold uppercase tracking-wider">
+                🗄️ {{ language === 'es' ? 'Archivo' : 'Archive' }}
+                <span class="text-gray-600">({{ archivedSeasons.length }})</span>
+              </span>
+              <svg
+                class="w-4 h-4 transition-transform"
+                :class="archiveIsOpen ? 'rotate-180' : ''"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
               >
-                <p
-                  class="text-sm font-bold leading-snug flex items-center gap-2"
-                  :class="seasonIsPast(season.startDate, season.endDate) ? 'text-gray-500' : 'text-white'"
-                >
-                  <span
-                    class="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                    :style="{ backgroundColor: seasonColorFor(season.slug).solid }"
-                    aria-hidden="true"
-                  />
-                  <span class="mr-0.5" aria-hidden="true">{{ season.icon }}</span>
-                  {{ language === 'es' ? season.name.es : season.name.en }}
-                </p>
-                <p class="text-[11px] text-gray-500 mt-0.5">
-                  {{ language === 'es' ? season.dates.es : season.dates.en }}
-                </p>
-                <p class="mt-1.5 flex items-center justify-between gap-2">
-                  <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Mérida</span>
-                  <span
-                    v-if="seasonMerida(season).kind === 'enroll'"
-                    class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-teal-700 text-white text-[10px] font-bold"
-                  >
-                    {{ seasonMerida(season).label }}
-                  </span>
-                  <span
-                    v-else
-                    class="text-[11px] font-semibold"
-                    :class="seasonMerida(season).kind === 'done' ? 'text-gray-500' : 'text-gray-400'"
-                  >
-                    {{ seasonMerida(season).label }}
-                  </span>
-                </p>
-              </button>
-              <button
-                type="button"
-                class="absolute top-2 right-2 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40"
-                :disabled="removingSeasonSlug === season.slug"
-                :title="language === 'es' ? 'Quitar temporada' : 'Remove season'"
-                :aria-label="language === 'es' ? 'Quitar temporada' : 'Remove season'"
-                @click.stop="confirmRemoveSeason(season)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <div
+              v-if="archiveIsOpen"
+              class="mt-2 rounded-2xl border border-gray-800 bg-gray-950 overflow-y-auto max-h-[50vh]"
+            >
+              <AdminSeasonPickerCard
+                v-for="season in archivedSeasons"
+                :key="season.slug"
+                :season="season"
+                :selected="isSeasonSelected(season.slug)"
+                :past="true"
+                :color="seasonColorFor(season.slug)"
+                :status="seasonMerida(season)"
+                :removing="removingSeasonSlug === season.slug"
+                @toggle="toggleSeason(season.slug)"
+                @remove="confirmRemoveSeason(season)"
+              />
             </div>
           </div>
         </aside>
@@ -2097,7 +2317,19 @@ const selectDay = (day: Date) => {
       <div v-if="loading" class="flex justify-center py-16">
         <div class="w-10 h-10 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
       </div>
-      <div v-else class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+      <template v-else>
+      <div
+        v-for="month in visibleMonths"
+        :key="month.toISOString()"
+        class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden"
+      >
+        <!-- Only worth naming each grid once a season stacks more than one month -->
+        <p
+          v-if="visibleMonths.length > 1"
+          class="px-3 py-2 border-b border-gray-800 text-sm font-semibold text-white capitalize"
+        >
+          {{ monthLabelFor(month) }}
+        </p>
         <div class="grid grid-cols-7 border-b border-gray-800">
           <div
             v-for="w in weekdayLabels"
@@ -2109,17 +2341,17 @@ const selectDay = (day: Date) => {
         </div>
         <div class="grid grid-cols-7 auto-rows-fr">
           <div
-            v-for="(day, idx) in monthRange.days"
+            v-for="(day, idx) in monthGrid(month).days"
             :key="idx"
             role="button"
             tabindex="0"
             class="min-h-[100px] sm:min-h-[112px] border-b border-r border-gray-800 p-1.5 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
             :class="{
-              'bg-gray-950/50': !isSameMonth(day, viewMonth) && !isDayInHighlightedSeason(day),
+              'bg-gray-950/50': !isSameMonth(day, month) && !isDayInHighlightedSeason(day),
               'opacity-50': isPastDay(day) && !isDayInHighlightedSeason(day),
               'ring-2 ring-inset ring-white': isSelectedDay(day),
             }"
-            :style="daySeasonStyle(day)"
+            :style="daySeasonStyle(day, month)"
             @click="selectDay(day)"
             @keydown.enter.prevent="selectDay(day)"
             @keydown.space.prevent="selectDay(day)"
@@ -2154,11 +2386,16 @@ const selectDay = (day: Date) => {
                     ? 'bg-gray-900/80 text-gray-500 border-gray-800'
                     : 'bg-gray-800/90 text-gray-200 border-gray-700 hover:border-gold-500/50'"
                 :style="eventChipHighlightStyle(ev, day)"
-                :title="ev.title"
+                :title="isBlockedProgram(ev) ? `${ev.title} — ${blockedProgramTitle(ev)}` : ev.title"
                 @click.stop="openEdit(ev, $event)"
               >
                 <span
-                  v-if="isProgramType(ev.event_type)"
+                  v-if="isBlockedProgram(ev)"
+                  class="inline-block mr-0.5 align-middle text-[11px] leading-none"
+                  :aria-label="blockedProgramTitle(ev)"
+                >🚫</span>
+                <span
+                  v-else-if="isProgramType(ev.event_type)"
                   class="inline-block mr-0.5 align-middle text-[11px] leading-none"
                   :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
                   aria-hidden="true"
@@ -2168,12 +2405,13 @@ const selectDay = (day: Date) => {
                   class="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle"
                   :class="isPastDay(day) ? 'bg-gray-600' : (EVENT_META[ev.event_type]?.dot || 'bg-gray-500')"
                 />
-                {{ eventChipLabel(ev) }}
+                <span :class="isBlockedProgram(ev) ? 'line-through opacity-80' : ''">{{ eventChipLabel(ev) }}</span>
               </button>
             </div>
           </div>
         </div>
       </div>
+      </template>
 
       <p class="text-xs text-gray-600 text-center">
         {{
@@ -2348,6 +2586,62 @@ const selectDay = (day: Date) => {
           <div class="p-4 space-y-4">
             <div v-if="formError" class="text-sm text-red-400">{{ formError }}</div>
 
+            <div
+              v-if="editingId && editingSeriesId"
+              class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2"
+            >
+              <p class="text-xs font-semibold text-amber-300 uppercase tracking-wide">
+                {{ language === 'es' ? 'Aplicar cambios a' : 'Apply changes to' }}
+              </p>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  class="rounded-lg border px-2 py-2 text-center text-[11px] font-semibold transition-all"
+                  :class="
+                    editScope === 'series'
+                      ? 'border-amber-400 bg-amber-500/20 text-white'
+                      : 'border-gray-600 text-gray-400'
+                  "
+                  @click="editScope = 'series'"
+                >
+                  {{ language === 'es' ? 'Todo el programa' : 'Whole program' }}
+                  <span class="block text-[10px] font-normal text-gray-400 mt-0.5">
+                    {{
+                      editSeriesCount
+                        ? language === 'es'
+                          ? `${editSeriesCount} clases`
+                          : `${editSeriesCount} classes`
+                        : language === 'es'
+                          ? 'todas las clases'
+                          : 'all classes'
+                    }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border px-2 py-2 text-center text-[11px] font-semibold transition-all"
+                  :class="
+                    editScope === 'single'
+                      ? 'border-amber-400 bg-amber-500/20 text-white'
+                      : 'border-gray-600 text-gray-400'
+                  "
+                  @click="editScope = 'single'"
+                >
+                  {{ language === 'es' ? 'Solo esta clase' : 'This class only' }}
+                  <span class="block text-[10px] font-normal text-gray-400 mt-0.5">
+                    {{ form.start_date }}
+                  </span>
+                </button>
+              </div>
+              <p class="text-[10px] text-gray-500 leading-snug">
+                {{
+                  language === 'es'
+                    ? 'Nombre, precio, nivel, edades y cupo se aplican a todo el programa. La fecha y el horario siempre cambian solo en esta clase.'
+                    : 'Name, price, level, ages and capacity apply to the whole program. Date and time slot always change only on this class.'
+                }}
+              </p>
+            </div>
+
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Título' : 'Title' }} *</label>
               <input
@@ -2512,9 +2806,8 @@ const selectDay = (day: Date) => {
             </div>
 
             <div v-if="isClassSessionForm" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
-              <p class="text-xs font-semibold text-cyan-300 uppercase tracking-wide flex items-center gap-1.5">
+              <p class="text-xs font-semibold text-cyan-300 uppercase tracking-wide">
                 {{ language === 'es' ? 'Sesión reservable' : 'Bookable session' }}
-                <AdminPricingHelpPopover :summer-course="isSummerCourseForm" />
               </p>
 
               <label
@@ -2528,8 +2821,8 @@ const selectDay = (day: Date) => {
                 />
                 {{
                   language === 'es'
-                    ? 'Programa recurrente · Mar / Jue / Sáb · las fechas siguen la temporada'
-                    : 'Recurring program · Tue / Thu / Sat · dates follow the season'
+                    ? 'Programa recurrente · elige los días · las fechas siguen la temporada'
+                    : 'Recurring program · pick the days · dates follow the season'
                 }}
               </label>
               <p v-if="!editingId && isSummerCourseForm" class="text-sm text-cyan-200 font-medium">
@@ -2544,6 +2837,39 @@ const selectDay = (day: Date) => {
                 v-if="(form.is_recurring || isSummerCourseForm) && !editingId"
                 class="space-y-3 rounded-lg border border-cyan-500/20 bg-gray-900/40 p-3"
               >
+                <div>
+                  <p class="text-xs font-medium text-gray-400 mb-2">
+                    {{ language === 'es' ? 'Días de la semana' : 'Days of the week' }}
+                    <span v-if="isSummerCourseForm" class="text-cyan-300/80 font-normal">
+                      · {{ language === 'es' ? 'Lun–Vie' : 'Mon–Fri' }}
+                    </span>
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      v-for="d in recurringWeekdayOptions"
+                      :key="d.v"
+                      type="button"
+                      class="px-3 py-1.5 rounded-full border text-xs font-bold transition-colors disabled:opacity-60"
+                      :class="
+                        isRecurringWeekday(d.v)
+                          ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                          : 'border-gray-600 text-gray-400'
+                      "
+                      :disabled="isSummerCourseForm"
+                      @click="toggleRecurringWeekday(d.v)"
+                    >
+                      {{ language === 'es' ? d.es : d.en }}
+                    </button>
+                  </div>
+                  <p v-if="!isSummerCourseForm" class="text-[10px] text-gray-500 mt-1">
+                    {{
+                      language === 'es'
+                        ? `${programDaysPerWeek} día(s) por semana — elige solo sábado para un programa de 1 día.`
+                        : `${programDaysPerWeek} day(s) per week — pick Saturday only for a one-day program.`
+                    }}
+                  </p>
+                </div>
+
                 <div v-if="isSummerCourseForm" class="space-y-2">
                   <p class="text-xs font-medium text-gray-400">
                     {{ language === 'es' ? 'Duración' : 'Duration' }}
@@ -2584,52 +2910,12 @@ const selectDay = (day: Date) => {
                     >
                       {{
                         language === 'es'
-                          ? `${weeks} semanas · ${weeks === 4 ? '12 clases' : '24 clases'}`
-                          : `${weeks} weeks · ${weeks === 4 ? '12 classes' : '24 classes'}`
+                          ? `${weeks} semanas · ${weeks * programDaysPerWeek} clases`
+                          : `${weeks} weeks · ${weeks * programDaysPerWeek} classes`
                       }}
-                      <span class="block text-[10px] font-normal text-gray-400 mt-0.5">
-                        {{
-                          weeks === 4
-                            ? language === 'es'
-                              ? 'Padres: 1 clase, 8 o 12'
-                              : 'Parents: 1 class, 8 or 12'
-                            : language === 'es'
-                              ? 'Padres: 1 clase, 16 o 24'
-                              : 'Parents: 1 class, 16 or 24'
-                        }}
-                      </span>
                     </button>
                   </div>
                 </div>
-                <div>
-                  <p class="text-xs font-medium text-gray-400 mb-2">
-                    {{ language === 'es' ? 'Días de la semana' : 'Days of the week' }}
-                    <span v-if="isSummerCourseForm" class="text-cyan-300/80 font-normal">
-                      · {{ language === 'es' ? 'Lun–Vie' : 'Mon–Fri' }}
-                    </span>
-                    <span v-else class="text-cyan-300/80 font-normal">
-                      · {{ language === 'es' ? 'Mar / Jue / Sáb' : 'Tue / Thu / Sat' }}
-                    </span>
-                  </p>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      v-for="d in recurringWeekdayOptions"
-                      :key="d.v"
-                      type="button"
-                      class="px-3 py-1.5 rounded-full border text-xs font-bold transition-colors"
-                      :class="
-                        isRecurringWeekday(d.v)
-                          ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                          : 'border-gray-600 text-gray-400'
-                      "
-                      :disabled="true"
-                      @click="toggleRecurringWeekday(d.v)"
-                    >
-                      {{ language === 'es' ? d.es : d.en }}
-                    </button>
-                  </div>
-                </div>
-
                 <div class="grid grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Inicio' : 'Start date' }} *</label>
@@ -2661,15 +2947,15 @@ const selectDay = (day: Date) => {
                         ? 'Inicio/fin = temporada de verano. Lun–Vie 9:00 AM – 1:00 PM. No se crean clases fuera de esas fechas.'
                         : 'Start/end = summer season. Mon–Fri 9:00 AM – 1:00 PM. Classes cannot be created outside that window.'
                       : language === 'es'
-                        ? 'Inicio/fin siguen la temporada seleccionada. Las clases no pueden salir de ese rango (omite festivos MX).'
-                        : 'Start/end follow the selected season. Classes cannot be created outside that window (MX holidays skipped).'
+                        ? 'Inicio/fin siguen la temporada seleccionada. Las clases no pueden salir de ese rango.'
+                        : 'Start/end follow the selected season. Classes cannot be created outside that window.'
                   }}
                 </p>
                 <p v-if="formSeason && !programFitsSeason" class="text-[11px] text-amber-400">
                   {{
                     language === 'es'
-                      ? `Esta temporada solo alcanza ${recurringPreview.length} clase(s) de ${form.recurring_class_count}. Acorta la duración o elige otra temporada.`
-                      : `This season only fits ${recurringPreview.length} of ${form.recurring_class_count} classes. Shorten the program or pick another season.`
+                      ? `Esta temporada solo alcanza ${previewBookable.length} clase(s) de ${form.recurring_class_count}. Acorta la duración o elige otra temporada.`
+                      : `This season only fits ${previewBookable.length} of ${form.recurring_class_count} classes. Shorten the program or pick another season.`
                   }}
                 </p>
 
@@ -2706,19 +2992,43 @@ const selectDay = (day: Date) => {
                     }}
                   </p>
                   <p
-                    v-if="recurringPreview.length"
+                    v-if="previewBookable.length"
                     class="text-xs text-cyan-300/90 mt-2 font-medium"
                   >
                     {{
-                      isSummerCourseForm
-                        ? language === 'es'
-                          ? `Se crearán ${recurringPreview.length} clase(s): ${form.start_date} → ${form.end_date || recurringPreview[recurringPreview.length - 1]?.date}.`
-                          : `${recurringPreview.length} class(es): ${form.start_date} → ${form.end_date || recurringPreview[recurringPreview.length - 1]?.date}.`
-                        : language === 'es'
-                          ? `Se crearán ${recurringPreview.length} clase(s): ${form.start_date} → ${form.end_date || recurringPreview[recurringPreview.length - 1]?.date}. Se omiten festivos nacionales.`
-                          : `${recurringPreview.length} class(es): ${form.start_date} → ${form.end_date || recurringPreview[recurringPreview.length - 1]?.date}. National holidays are skipped.`
+                      language === 'es'
+                        ? `Se crearán ${previewBookable.length} clase(s) reservable(s): ${form.start_date} → ${form.end_date || previewBookable[previewBookable.length - 1]?.date}.`
+                        : `${previewBookable.length} bookable class(es): ${form.start_date} → ${form.end_date || previewBookable[previewBookable.length - 1]?.date}.`
                     }}
                   </p>
+                  <div
+                    v-if="previewHolidayClashes.length"
+                    class="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+                  >
+                    <p class="text-[11px] font-bold text-amber-300">
+                      {{
+                        language === 'es'
+                          ? `⚠️ ${previewHolidayClashes.length} clase(s) caen en festivo nacional`
+                          : `⚠️ ${previewHolidayClashes.length} class(es) land on a national holiday`
+                      }}
+                    </p>
+                    <ul class="mt-1 space-y-0.5">
+                      <li
+                        v-for="clash in previewHolidayClashes"
+                        :key="clash.date"
+                        class="text-[11px] text-amber-200/90"
+                      >
+                        {{ clash.label }} — {{ clash.holiday }}
+                      </li>
+                    </ul>
+                    <p class="text-[10px] text-amber-200/70 mt-1">
+                      {{
+                        language === 'es'
+                          ? 'Se agregan al calendario marcadas como no reservables y no cuentan para el total pagado.'
+                          : 'They are added to the calendar as non-bookable and do not count toward the paid total.'
+                      }}
+                    </p>
+                  </div>
                   <p
                     v-else-if="form.recurring_weekdays.length && form.recurring_slots.length"
                     class="text-xs text-amber-400 mt-2"
@@ -2738,17 +3048,6 @@ const selectDay = (day: Date) => {
                     </p>
                     <p class="px-3 py-2 rounded-xl bg-gray-800/80 border border-gray-700 text-sm text-white">
                       {{ form.recurring_class_count }}
-                      <span class="text-gray-400 font-normal">
-                        · {{
-                          form.program_weeks === 8
-                            ? language === 'es'
-                              ? 'padres: 1 clase, 16 ($2,000) o 24 ($3,000)'
-                              : 'parents: 1 class, 16 ($2,000) or 24 ($3,000)'
-                            : language === 'es'
-                              ? 'padres: 1 clase, 8 ($1,000) o 12 ($1,500)'
-                              : 'parents: 1 class, 8 ($1,000) or 12 ($1,500)'
-                        }}
-                      </span>
                     </p>
                   </div>
                   <div :class="isSummerCourseForm ? 'col-span-2' : ''">
@@ -2799,12 +3098,48 @@ const selectDay = (day: Date) => {
                 </div>
               </div>
 
-              <div>
-                <label class="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-1">
-                  {{ language === 'es' ? 'Precio (MXN)' : 'Price (MXN)' }}
-                  <AdminPricingHelpPopover :summer-course="isSummerCourseForm" />
-                </label>
-                <input v-model="form.price_mxn" type="number" min="0" step="1" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm" :placeholder="String(form.price_mxn || MONTHLY_PROGRAM_PRICE_MXN)" />
+            </div>
+
+            <!-- Price is read-only: Finanzas → Precios owns it -->
+            <div v-if="isClassSessionForm" class="rounded-xl border border-gray-700 bg-gray-800/60 p-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">
+                    {{ language === 'es' ? 'Precio · Finanzas' : 'Price · Finance' }}
+                  </p>
+                  <p class="text-lg font-black text-white leading-tight mt-0.5">
+                    {{ formatMoneyMxn(Number(form.price_mxn) || 0) }}
+                  </p>
+                  <p class="text-[11px] text-gray-400 truncate">{{ programPriceLabel }}</p>
+                </div>
+                <NuxtLink
+                  to="/member/admin/finance/prices"
+                  class="shrink-0 px-2.5 py-1.5 rounded-lg border border-gray-600 text-[11px] font-semibold text-gray-300 hover:border-cyan-400/60 hover:text-cyan-300"
+                >
+                  {{ language === 'es' ? 'Editar precios' : 'Edit prices' }}
+                </NuxtLink>
+              </div>
+              <p v-if="priceSplitHint" class="text-[10px] text-amber-300/80 mt-2">
+                {{ priceSplitHint }}
+              </p>
+              <p v-if="!programPriceRow" class="text-[10px] text-amber-300/80 mt-1">
+                {{ language === 'es'
+                  ? 'Este paquete aún no está en Finanzas → Precios; se usa el precio base de la academia.'
+                  : 'This package is not in Finance → Prices yet; the academy base price is used.' }}
+              </p>
+              <div v-if="editedPriceIsStale" class="mt-2 flex items-center gap-2 flex-wrap">
+                <p class="text-[10px] text-amber-300/80">
+                  {{ language === 'es'
+                    ? `Finanzas marca ${formatMoneyMxn(programPriceMxn)} para este paquete.`
+                    : `Finance lists ${formatMoneyMxn(programPriceMxn)} for this package.` }}
+                </p>
+                <button
+                  type="button"
+                  class="px-2 py-1 rounded-lg bg-cyan-600 text-white text-[10px] font-bold"
+                  @click="syncPriceFromFinance"
+                >
+                  {{ language === 'es' ? 'Actualizar precio' : 'Update price' }}
+                </button>
               </div>
             </div>
 

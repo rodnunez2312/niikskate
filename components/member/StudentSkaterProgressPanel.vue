@@ -286,6 +286,12 @@ watch(() => props.studentId, loadData, { immediate: true })
       </div>
     </div>
 
+    <MemberSkaterChallengesCard
+      v-if="studentId"
+      :student-id="studentId"
+      :can-complete="participant.type === 'self'"
+    />
+
     <!-- Achievements -->
     <div>
       <h2 class="text-sm font-bold text-gold-400 uppercase tracking-wide mb-3">

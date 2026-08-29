@@ -8,7 +8,8 @@ const isWin = process.platform === 'win32'
 const appBuildMeta = resolveAppBuildMeta()
 
 export default defineNuxtConfig({
-  devtools: { enabled: true },
+  // Devtools cost ~8s of module setup on every boot; opt in with NIIK_DEVTOOLS=1.
+  devtools: { enabled: process.env.NIIK_DEVTOOLS === '1' },
 
   vite: {
     ...(isWin
@@ -17,7 +18,14 @@ export default defineNuxtConfig({
             watch: {
               usePolling: true,
               interval: 1000,
-              ignored: ['**/.nuxt/**', '**/node_modules/**'],
+              // Polling walks every path it is given, so keep heavy/irrelevant trees out.
+              ignored: [
+                '**/.nuxt/**',
+                '**/node_modules/**',
+                '**/.git/**',
+                '**/.output/**',
+                '**/data/Niik_source/**',
+              ],
             },
           },
         }
@@ -74,6 +82,8 @@ export default defineNuxtConfig({
     },
     // Server-only: for admin create user (use in server/api)
     supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    /** Optional: ramp design AI suggestions (admin skateramps). */
+    openaiApiKey: process.env.OPENAI_API_KEY || '',
     // Server-only: Twilio WhatsApp (https://www.twilio.com/docs/whatsapp)
     twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',

@@ -1,8 +1,14 @@
 /**
- * Parse NiikSkate_Tricks_Manual.xlsx → niik-trick-library.json
+ * Parse NiikSkate_Tricks_Manual.xlsx → niik-trick-library.json + niik-strength-library.json
  *
- * Columns: Skill, Area, Structure, Type, Program, Comentarios, URL,
- *          Habilidad motriz desarrollada (+ optional motor skill x-columns)
+ * Skate_Manual sheet → tricks
+ *   Columns: Skill, Area, Structure, Type, Program, Comentarios, URL,
+ *            Habilidad motriz desarrollada (+ optional motor skill x-columns)
+ *
+ * Strength_Training sheet → strength exercises
+ *   Columns: Ejercicio, Nivel, Pilar principal, Pilar secundario, Parte del cuerpo,
+ *            Habilidad motriz desarrollada, Fase de entrenamiento, Aplicación al skate,
+ *            Equipo, Duración / Reps, Descanso, Indicaciones del coach, Prioridad de selección
  *
  * Run: npm run niik:parse
  */
@@ -31,6 +37,11 @@ function resolveExcelPath() {
 const excelPath = resolveExcelPath()
 const outPath = join(projectRoot, 'data', 'niik-trick-library.json')
 const outPathPublic = join(projectRoot, 'public', 'data', 'niik-trick-library.json')
+const strengthOutPath = join(projectRoot, 'data', 'niik-strength-library.json')
+const strengthOutPathPublic = join(projectRoot, 'public', 'data', 'niik-strength-library.json')
+
+/** Seconds charged per rep when the sheet prescribes reps instead of time. */
+const SECONDS_PER_REP = 3
 
 const MOTOR_LABELS = [
   'Coordinación',
@@ -93,6 +104,263 @@ function normalizeCategory(area, program, tipo) {
   if (['park', 'bowl', 'mini ramp', 'vert'].includes(a)) return 'vert_bowl'
   if (program === 'Foundations' || program === 'Beginners') return 'iniciacion'
   return 'iniciacion'
+}
+
+// ---------------------------------------------------------------------------
+// Strength_Training sheet
+// ---------------------------------------------------------------------------
+
+const STRENGTH_LEVELS = {
+  'básico': 'beginner',
+  'basico': 'beginner',
+  'principiante': 'beginner',
+  'intermedio': 'intermediate',
+  'avanzado': 'advanced',
+}
+
+const STRENGTH_PILLARS = ['balance', 'coordination', 'mobility', 'power', 'endurance']
+
+const STRENGTH_BODY_AREAS = {
+  'neck': 'neck',
+  'cuello': 'neck',
+  'shoulders': 'shoulders',
+  'hombros': 'shoulders',
+  'arms': 'arms',
+  'brazos': 'arms',
+  'core': 'core',
+  'lower body': 'lower_body',
+  'tren inferior': 'lower_body',
+  'ankles': 'ankles',
+  'tobillos': 'ankles',
+}
+
+const STRENGTH_PHASES = {
+  'warm-up': 'warmup',
+  'warmup': 'warmup',
+  'calentamiento': 'warmup',
+  'mobility': 'mobility',
+  'movilidad': 'mobility',
+  'activation': 'activation',
+  'activación': 'activation',
+  'activacion': 'activation',
+  'balance': 'balance',
+  'coordination': 'coordination',
+  'coordinación': 'coordination',
+  'coordinacion': 'coordination',
+  'power': 'power',
+  'potencia': 'power',
+  'strength': 'strength',
+  'fuerza': 'strength',
+  'conditioning': 'conditioning',
+  'acondicionamiento': 'conditioning',
+  'cool-down / stretch': 'stretch',
+  'cool-down': 'stretch',
+  'stretch': 'stretch',
+  'estiramiento': 'stretch',
+}
+
+const STRENGTH_PRIORITIES = {
+  'primary': 'primary',
+  'primario': 'primary',
+  'secondary': 'secondary',
+  'secundario': 'secondary',
+  'support': 'support',
+  'soporte': 'support',
+}
+
+/** Blank-ish cell: empty, dash, em dash, n/a. */
+function isBlankCell(val) {
+  const s = (val ?? '').toString().trim()
+  return !s || /^[-–—]$/.test(s) || /^n\/?a$/i.test(s)
+}
+
+function cleanCell(val) {
+  return isBlankCell(val) ? '' : (val ?? '').toString().trim()
+}
+
+function slugify(...parts) {
+  return parts
+    .map(p => (p ?? '').toString().trim())
+    .filter(Boolean)
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function mapEnum(table, val, label, rowRef, { required = false } = {}) {
+  const raw = cleanCell(val)
+  if (!raw) {
+    if (required) throw new Error(`${rowRef}: missing ${label}`)
+    return null
+  }
+  const hit = table[raw.toLowerCase()]
+  if (!hit) throw new Error(`${rowRef}: unknown ${label} "${raw}"`)
+  return hit
+}
+
+function mapPillar(val, rowRef, { required = false } = {}) {
+  const raw = cleanCell(val)
+  if (!raw) {
+    if (required) throw new Error(`${rowRef}: missing pillar`)
+    return null
+  }
+  const id = raw.toLowerCase()
+  if (!STRENGTH_PILLARS.includes(id)) throw new Error(`${rowRef}: unknown pillar "${raw}"`)
+  return id
+}
+
+function mapBodyAreas(val, rowRef) {
+  const raw = cleanCell(val)
+  if (!raw) return []
+  const out = []
+  for (const piece of raw.split(/[,;/]/)) {
+    const key = piece.trim().toLowerCase()
+    if (!key) continue
+    const id = STRENGTH_BODY_AREAS[key]
+    if (!id) throw new Error(`${rowRef}: unknown body area "${piece.trim()}"`)
+    if (!out.includes(id)) out.push(id)
+  }
+  return out
+}
+
+/**
+ * "8-10 reps por lado" → { work_seconds: 54, per_side: true, reps: 9 }
+ * Range → midpoint; min → x60; reps → x SECONDS_PER_REP; per-side/per-direction → x2.
+ */
+function parsePrescription(val) {
+  const raw = cleanCell(val)
+  if (!raw) return { work_seconds: 0, per_side: false, reps: null }
+
+  const lower = raw.toLowerCase()
+  const perSide = /por\s+(lado|dirección|direccion|pierna|brazo)|each\s+side|per\s+side/.test(lower)
+
+  const nums = (lower.match(/\d+(?:\.\d+)?/g) || []).map(Number)
+  if (!nums.length) return { work_seconds: 0, per_side: perSide, reps: null }
+  const value = nums.length >= 2 ? (nums[0] + nums[1]) / 2 : nums[0]
+
+  const isMinutes = /\bmin/.test(lower)
+  const isSeconds = /\b(seg|sec|s)\b|segundo|second/.test(lower)
+  const isReps = /rep/.test(lower)
+
+  let work
+  let reps = null
+  if (isMinutes) {
+    work = value * 60
+  } else if (isSeconds) {
+    work = value
+  } else {
+    // Bare counts ("8-12 por lado") and explicit reps both bill as reps.
+    reps = value
+    work = value * SECONDS_PER_REP
+  }
+  if (isReps && !isMinutes && !isSeconds) reps = value
+
+  return {
+    work_seconds: Math.round(work * (perSide ? 2 : 1)),
+    per_side: perSide,
+    reps: reps != null ? Math.round(reps) : null,
+  }
+}
+
+/** Rest is always a duration; blank / "—" means none. */
+function parseRestSeconds(val) {
+  const raw = cleanCell(val)
+  if (!raw) return 0
+  const lower = raw.toLowerCase()
+  const nums = (lower.match(/\d+(?:\.\d+)?/g) || []).map(Number)
+  if (!nums.length) return 0
+  const value = nums.length >= 2 ? (nums[0] + nums[1]) / 2 : nums[0]
+  return Math.round(/\bmin/.test(lower) ? value * 60 : value)
+}
+
+function parseStrengthSheet(workbook) {
+  const sheetName = workbook.SheetNames.find(n => /strength/i.test(n))
+  if (!sheetName) {
+    console.warn('No Strength_Training sheet found; skipping strength library.')
+    return null
+  }
+
+  const raw = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' })
+  const headerRow = (raw[0] || []).map(c => (c ?? '').toString().trim())
+
+  const col = (...keywords) => findHeaderIndex(headerRow, ...keywords)
+  const cEjercicio = col('Ejercicio', 'Exercise')
+  const cNivel = col('Nivel')
+  const cPilar1 = col('Pilar principal')
+  const cPilar2 = col('Pilar secundario')
+  const cCuerpo = col('Parte del cuerpo')
+  const cMotriz = col('Habilidad motriz')
+  const cFase = col('Fase de entrenamiento')
+  const cAplicacion = col('Aplicación al skate', 'Aplicacion al skate')
+  const cEquipo = col('Equipo')
+  const cDuracion = col('Duración / Reps', 'Duración', 'Duracion')
+  const cDescanso = col('Descanso')
+  const cIndicaciones = col('Indicaciones del coach', 'Indicaciones')
+  const cPrioridad = col('Prioridad de selección', 'Prioridad')
+
+  if (cEjercicio < 0) throw new Error('Strength sheet: "Ejercicio" column not found')
+
+  const exercises = []
+  const slugs = new Set()
+
+  for (let i = 1; i < raw.length; i++) {
+    const row = raw[i]
+    const name = cleanCell(row[cEjercicio])
+    if (!name) continue
+
+    const rowRef = `Strength row ${i + 1} ("${name}")`
+    const level = mapEnum(STRENGTH_LEVELS, row[cNivel], 'Nivel', rowRef, { required: true })
+    const slug = slugify(name, cleanCell(row[cNivel]))
+    if (slugs.has(slug)) {
+      throw new Error(`${rowRef}: duplicate Ejercicio + Nivel. Each pair must be unique.`)
+    }
+    slugs.add(slug)
+
+    const prescription = cleanCell(row[cDuracion])
+    const { work_seconds, per_side, reps } = parsePrescription(prescription)
+    const rest_seconds = parseRestSeconds(row[cDescanso])
+    const equipment = cleanCell(row[cEquipo])
+
+    exercises.push({
+      slug,
+      name,
+      level,
+      pillar_primary: mapPillar(row[cPilar1], rowRef, { required: true }),
+      pillar_secondary: mapPillar(row[cPilar2], rowRef),
+      body_areas: mapBodyAreas(row[cCuerpo], rowRef),
+      motor_skill_es: cleanCell(row[cMotriz]) || null,
+      training_phase: mapEnum(STRENGTH_PHASES, row[cFase], 'Fase de entrenamiento', rowRef, {
+        required: true,
+      }),
+      skate_application_es: cleanCell(row[cAplicacion]) || null,
+      equipment_es: /^ninguno$|^none$/i.test(equipment) ? null : equipment || null,
+      prescription_es: prescription || null,
+      rest_es: cleanCell(row[cDescanso]) || null,
+      coach_cue_es: cleanCell(row[cIndicaciones]) || null,
+      priority:
+        mapEnum(STRENGTH_PRIORITIES, row[cPrioridad], 'Prioridad de selección', rowRef) || 'primary',
+      work_seconds,
+      rest_seconds,
+      per_side,
+      reps,
+      est_seconds: work_seconds + rest_seconds,
+      // Heuristic: advanced work is gated out of tots/kids sessions until reviewed.
+      kid_safe: level !== 'advanced',
+      sort_order: exercises.length + 1,
+    })
+  }
+
+  const missingMotor = exercises.filter(e => !e.motor_skill_es).map(e => e.name)
+  if (missingMotor.length) {
+    console.warn(
+      `Warning: ${missingMotor.length} exercise(s) missing "Habilidad motriz desarrollada": ${missingMotor.join(', ')}`,
+    )
+  }
+
+  return { sheetName, exercises }
 }
 
 function isChecked(val) {
@@ -223,6 +491,27 @@ function main() {
   writeFileSync(outPath, jsonStr, 'utf8')
   writeFileSync(outPathPublic, jsonStr, 'utf8')
   console.log('Wrote', tricks.length, 'tricks to', outPath)
+
+  const strength = parseStrengthSheet(workbook)
+  if (strength) {
+    const strengthOutput = {
+      source: strength.sheetName,
+      sourceFile: excelPath.split(/[/\\]/).pop(),
+      generatedAt: new Date().toISOString(),
+      secondsPerRep: SECONDS_PER_REP,
+      exercises: strength.exercises,
+    }
+    const strengthStr = JSON.stringify(strengthOutput, null, 2)
+    writeFileSync(strengthOutPath, strengthStr, 'utf8')
+    writeFileSync(strengthOutPathPublic, strengthStr, 'utf8')
+
+    const stretch = strength.exercises.filter(e => e.training_phase === 'stretch')
+    const stretchSeconds = stretch.reduce((n, e) => n + e.est_seconds, 0)
+    console.log('Wrote', strength.exercises.length, 'strength exercises to', strengthOutPath)
+    console.log(
+      `Stretch block: ${stretch.length} exercises, ${Math.floor(stretchSeconds / 60)}m ${stretchSeconds % 60}s`,
+    )
+  }
 }
 
 try {

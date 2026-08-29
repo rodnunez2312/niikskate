@@ -27,6 +27,8 @@ import {
   type ProgramSkillTrack,
 } from '~/types'
 import { ineligibilityReason, isAgeEligibleForSession, sessionAgeBounds } from '~/utils/ageEligibility'
+import { classKindForPack } from '~/utils/coupons'
+import type { AppliedCoupon } from '~/components/checkout/CouponField.vue'
 import {
   applyMultiStudentDiscount,
   DEFAULT_PROGRAM_LOCATION,
@@ -294,6 +296,7 @@ const packPriceMxn = (pack: ParentMultiClassPack) => parentPackPriceMxn(pack)
 
 const packLabel = (pack: ParentClassPack, esLang: boolean) => {
   if (pack === 1) return esLang ? '1 clase' : '1 class'
+  if (pack === 4) return esLang ? '4 clases · 1/semana · 4 sem' : '4 classes · 1/week · 4 wk'
   if (pack === 8) return esLang ? '8 clases · 2/semana · 4 sem' : '8 classes · 2/week · 4 wk'
   if (pack === 12) return esLang ? '12 clases · 3/semana · 4 sem' : '12 classes · 3/week · 4 wk'
   if (pack === 16) return esLang ? '16 clases · 2/semana · 8 sem' : '16 classes · 2/week · 8 wk'
@@ -321,9 +324,45 @@ const modalSubtotalMxn = computed(() => {
 
 const modalDiscountRate = computed(() => multiStudentDiscountRate(modalSelectedKeys.value.length))
 
-const modalTotalMxn = computed(() =>
+/** After the sibling discount, before any coupon. */
+const modalAfterSiblingMxn = computed(() =>
   applyMultiStudentDiscount(modalSubtotalMxn.value, modalSelectedKeys.value.length),
 )
+
+// ---------------------------------------------------------------------------
+// Coupon codes
+// ---------------------------------------------------------------------------
+
+const appliedCoupon = ref<AppliedCoupon | null>(null)
+
+const couponClassKind = computed(() => classKindForPack(selectedPack.value))
+
+const couponCoachTier = computed(() =>
+  enrollModalSession.value
+    ? coachTierFromSkillLevel(enrollModalSession.value.skill_level)
+    : null,
+)
+
+/** Validate against the first selected skater, since allow-lists are per skater. */
+const couponCrewMemberId = computed(() => {
+  const key = modalSelectedKeys.value[0]
+  if (!key) return null
+  return participants.value.find(p => p.key === key)?.crewMemberId ?? null
+})
+
+const couponDiscountMxn = computed(() =>
+  appliedCoupon.value
+    ? Math.min(appliedCoupon.value.discountMxn, modalAfterSiblingMxn.value)
+    : 0,
+)
+
+const modalTotalMxn = computed(() =>
+  Math.max(0, modalAfterSiblingMxn.value - couponDiscountMxn.value),
+)
+
+const onCouponApplied = (coupon: AppliedCoupon | null) => {
+  appliedCoupon.value = coupon
+}
 
 const isDetailsOpen = (id: string) => detailsOpen.value.has(id)
 
@@ -554,6 +593,9 @@ async function confirmEnroll() {
     if (!token) throw new Error(language.value === 'es' ? 'Sesión expirada' : 'Session expired')
 
     const names: string[] = []
+    // The coupon covers the whole modal total, so it rides on the first request
+    // only — otherwise a family of two would burn two redemptions.
+    let couponPending = !!appliedCoupon.value
     for (const key of modalSelectedKeys.value) {
       const p = participants.value.find(x => x.key === key)
       if (!p || p.age == null) continue
@@ -572,8 +614,17 @@ async function confirmEnroll() {
             : selectedPack.value === 12 || selectedPack.value === 24
               ? [2, 4, 6]
               : [],
+          ...(couponPending
+            ? {
+                couponCode: appliedCoupon.value!.code,
+                couponSubtotalMxn: modalAfterSiblingMxn.value,
+                couponClassKind: couponClassKind.value,
+                couponCoachTier: couponCoachTier.value,
+              }
+            : {}),
         },
       })
+      couponPending = false
       names.push(p.firstName)
     }
 
@@ -1148,6 +1199,20 @@ onMounted(async () => {
                 {{ language === 'es' ? 'desc. multi-estudiante' : 'multi-student off' }}
               </span>
             </p>
+            <p v-if="couponDiscountMxn > 0" class="text-xs font-bold text-teal-700 mt-1">
+              🎟️ {{ appliedCoupon?.code }} · −{{ formatPrice(couponDiscountMxn) }}
+            </p>
+
+            <div v-if="user" class="mt-3 pt-3 border-t border-teal-600/20">
+              <CheckoutCouponField
+                variant="light"
+                :subtotal-mxn="modalAfterSiblingMxn"
+                :class-kind="couponClassKind"
+                :coach-tier="couponCoachTier"
+                :crew-member-id="couponCrewMemberId"
+                @applied="onCouponApplied"
+              />
+            </div>
           </div>
 
           <button

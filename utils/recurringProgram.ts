@@ -36,18 +36,30 @@ export function clampYmd(value: string, min?: string | null, max?: string | null
   return v
 }
 
+export type ProgramOccurrence = {
+  date: string
+  slot: TimeSlot
+  /** Lands on a MX national holiday: scheduled for reference, never bookable. */
+  isHoliday: boolean
+}
+
+/**
+ * National holidays still land on the calendar so the clash is visible, but they
+ * don't count toward `maxClasses` — the series runs long enough to deliver the
+ * full number of bookable classes.
+ */
 export function generateProgramOccurrences(opts: {
   startDate: string
   endDate?: string | null
   weekdays: number[]
   slots: TimeSlot[]
   maxClasses: number
-  /** Skip these YYYY-MM-DD dates (e.g. national holidays). */
+  /** Drop these YYYY-MM-DD dates entirely. */
   skipDates?: Set<string> | string[]
   /** Use the chosen slots on every selected weekday (summer 9–1, etc.). */
   allowListedSlots?: boolean
-}): Array<{ date: string; slot: TimeSlot }> {
-  const out: Array<{ date: string; slot: TimeSlot }> = []
+}): ProgramOccurrence[] {
+  const out: ProgramOccurrence[] = []
   const [sy, sm, sd] = opts.startDate.split('-').map(Number)
   let current = new Date(sy, sm - 1, sd)
 
@@ -67,26 +79,34 @@ export function generateProgramOccurrences(opts: {
       : new Set(opts.skipDates)
     : null
 
-  while (out.length < opts.maxClasses && current <= endLimit) {
+  let bookable = 0
+
+  while (bookable < opts.maxClasses && current <= endLimit) {
     const dateStr = format(current, 'yyyy-MM-dd')
     const dow = getDay(current)
-    const holiday =
-      (skip?.has(dateStr) ?? false) || isMexicoNationalHoliday(dateStr)
+    const isHoliday = isMexicoNationalHoliday(dateStr)
+    const dropped = skip?.has(dateStr) ?? false
 
-    if (weekdays.has(dow) && !holiday) {
+    if (weekdays.has(dow) && !dropped) {
       const allowed = slotsForWeekday(dow)
       for (const slot of slots) {
         const listedOk = opts.allowListedSlots
         const summerOk = slot === 'summer' && dow >= 1 && dow <= 5
         if (!listedOk && !allowed.includes(slot) && !summerOk) continue
-        out.push({ date: dateStr, slot })
-        if (out.length >= opts.maxClasses) break
+        out.push({ date: dateStr, slot, isHoliday })
+        if (!isHoliday) bookable += 1
+        if (bookable >= opts.maxClasses) break
       }
     }
     current = addDays(current, 1)
   }
 
   return out
+}
+
+/** Classes parents can actually pay for — holidays excluded. */
+export function bookableOccurrences(occurrences: ProgramOccurrence[]): ProgramOccurrence[] {
+  return occurrences.filter(o => !o.isHoliday)
 }
 
 /** Last of N class days (Mon–Fri for summer), not start + N calendar days. */
@@ -103,7 +123,8 @@ export function computeSummerCourseEndDate(
     maxClasses: Math.max(1, classDays),
     allowListedSlots: true,
   })
-  return occ.length ? occ[occ.length - 1].date : startDate
+  const real = bookableOccurrences(occ)
+  return real.length ? real[real.length - 1].date : startDate
 }
 
 /** Last class date for a program of `maxClasses` sessions on selected weekdays. */
@@ -123,7 +144,8 @@ export function computeProgramEndDate(opts: {
     maxClasses: Math.max(1, opts.maxClasses),
     allowListedSlots: opts.allowListedSlots,
   })
-  return occ.length ? occ[occ.length - 1].date : opts.startDate
+  const real = bookableOccurrences(occ)
+  return real.length ? real[real.length - 1].date : opts.startDate
 }
 
 /** Sync start (nearest primary weekday) + end (Nth class day), optionally capped. */

@@ -76,9 +76,8 @@ if /i "%NIIK_SKIP_CLEAN%"=="1" (
   if exist "node_modules\.cache" rmdir /s /q "node_modules\.cache" 2>nul
   if exist ".output" rmdir /s /q ".output" 2>nul
 ) else (
-  echo   Default: keeping .nuxt ^(better on OneDrive^). Set NIIK_FULL_CLEAN=1 to wipe all caches.
-  if exist "node_modules\.vite" rmdir /s /q "node_modules\.vite" 2>nul
-  if exist "node_modules\.cache" rmdir /s /q "node_modules\.cache" 2>nul
+  echo   Default: keeping .nuxt + Vite dep cache ^(much faster on OneDrive^).
+  echo   Set NIIK_FULL_CLEAN=1 to wipe all caches when something looks stale.
 )
 
 :: Fix "Cannot find module ...\.nuxt\dist\server\server.mjs" — dev stub without Nitro bundle ^(OneDrive / killed node^).
@@ -90,13 +89,25 @@ if exist ".nuxt\dev\index.mjs" if not exist ".nuxt\dist\server\server.mjs" (
 echo [3/4] Cache step done.
 echo.
 
+:: `nuxt dev` regenerates types itself, so this extra full Nuxt boot (~45s) is only
+:: worth paying when .nuxt has no types yet (fresh clone / after a full clean).
 echo [3b/4] Nuxt prepare ^(types / stubs^)...
-call "%NPM_CMD%" exec nuxi prepare
-if errorlevel 1 (
-  color 0C
-  echo   nuxi prepare failed. Fix errors above, then try again.
-  pause
-  exit /b 1
+if /i "%NIIK_PREPARE%"=="1" (
+  set "NIIK_DO_PREPARE=1"
+) else if not exist ".nuxt\tsconfig.json" (
+  set "NIIK_DO_PREPARE=1"
+) else (
+  echo   Skipped — .nuxt types already present. Set NIIK_PREPARE=1 to force.
+)
+
+if defined NIIK_DO_PREPARE (
+  call "%NPM_CMD%" exec nuxi prepare
+  if errorlevel 1 (
+    color 0C
+    echo   nuxi prepare failed. Fix errors above, then try again.
+    pause
+    exit /b 1
+  )
 )
 
 echo [4/4] Starting development server...

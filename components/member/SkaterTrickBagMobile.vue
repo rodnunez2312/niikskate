@@ -52,6 +52,8 @@ const props = defineProps<{
   updatingFocusId: string | null
   assigningSkillId: string | null
   revertingSkillId: string | null
+  selectedSkillIds: string[]
+  bulkBusy: boolean
 }>()
 
 const emit = defineEmits<{
@@ -63,6 +65,9 @@ const emit = defineEmits<{
   undo: [skillId: string]
   dismiss: [focusId: string]
   comment: [row: FocusRow]
+  'toggle-select': [skillId: string]
+  'clear-selection': []
+  'bulk-add': [status: 'assigned' | 'done']
 }>()
 
 const { language } = useI18n()
@@ -90,6 +95,24 @@ const filteredAssignRows = computed(() => {
     return name.includes(q)
   })
 })
+
+const selectedSet = computed(() => new Set(props.selectedSkillIds))
+
+const allShownSelected = computed(
+  () =>
+    filteredAssignRows.value.length > 0
+    && filteredAssignRows.value.every(row => selectedSet.value.has(row.skill.id)),
+)
+
+const toggleAllShown = () => {
+  if (allShownSelected.value) {
+    emit('clear-selection')
+    return
+  }
+  for (const row of filteredAssignRows.value) {
+    if (!selectedSet.value.has(row.skill.id)) emit('toggle-select', row.skill.id)
+  }
+}
 
 const statusBtnClass = (current: string, target: SkaterTrickBagStatus) => {
   const on = current === target
@@ -259,14 +282,38 @@ const statusBtnClass = (current: string, target: SkaterTrickBagStatus) => {
           <option v-for="opt in typeOptions" :key="opt" :value="opt">{{ opt }}</option>
         </select>
       </div>
+      <button
+        v-if="filteredAssignRows.length"
+        type="button"
+        class="w-full min-h-[44px] rounded-xl border border-gray-600 text-sm font-semibold text-gray-200"
+        @click="toggleAllShown"
+      >
+        {{
+          allShownSelected
+            ? (es ? 'Quitar selección' : 'Clear selection')
+            : (es ? `Seleccionar los ${filteredAssignRows.length} visibles` : `Select all ${filteredAssignRows.length} shown`)
+        }}
+      </button>
       <p v-if="!filteredAssignRows.length" class="text-center text-sm text-gray-500 py-8">
         {{ es ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.' }}
       </p>
       <article
         v-for="row in filteredAssignRows"
         :key="row.skill.id"
-        class="flex items-center gap-3 rounded-2xl border border-gray-700 bg-gray-800/80 p-3"
+        class="flex items-center gap-3 rounded-2xl border p-3"
+        :class="
+          selectedSet.has(row.skill.id)
+            ? 'border-sky-400 bg-sky-500/10'
+            : 'border-gray-700 bg-gray-800/80'
+        "
       >
+        <input
+          type="checkbox"
+          class="w-6 h-6 shrink-0 accent-sky-500"
+          :checked="selectedSet.has(row.skill.id)"
+          :aria-label="es ? 'Seleccionar truco' : 'Select trick'"
+          @change="emit('toggle-select', row.skill.id)"
+        />
         <div class="min-w-0 flex-1">
           <p class="text-base font-bold text-white leading-tight">{{ trickName(row.skill) }}</p>
           <p class="text-xs text-gray-400 mt-0.5">
@@ -275,13 +322,50 @@ const statusBtnClass = (current: string, target: SkaterTrickBagStatus) => {
         </div>
         <button
           type="button"
-          class="shrink-0 min-h-[52px] min-w-[88px] px-3 rounded-xl bg-sky-500 text-white font-black text-sm disabled:opacity-40"
+          class="shrink-0 min-h-[52px] min-w-[76px] px-3 rounded-xl bg-sky-500 text-white font-black text-sm disabled:opacity-40"
           :disabled="assigningSkillId === row.skill.id"
           @click="emit('assign', row.skill.id)"
         >
           + {{ es ? 'Asignar' : 'Assign' }}
         </button>
       </article>
+
+      <!-- Bulk bar floats so it stays reachable while scrolling 296 tricks -->
+      <div
+        v-if="selectedSkillIds.length"
+        class="sticky bottom-4 z-20 rounded-2xl border border-sky-400/60 bg-gray-950/95 backdrop-blur p-3 space-y-2 shadow-xl"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-bold text-sky-200">
+            {{ es ? `${selectedSkillIds.length} seleccionados` : `${selectedSkillIds.length} selected` }}
+          </span>
+          <button
+            type="button"
+            class="text-xs text-gray-400"
+            @click="emit('clear-selection')"
+          >
+            {{ es ? 'Limpiar' : 'Clear' }}
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            class="min-h-[48px] rounded-xl bg-sky-500 text-white font-black text-sm disabled:opacity-50"
+            :disabled="bulkBusy"
+            @click="emit('bulk-add', 'assigned')"
+          >
+            {{ es ? 'Asignar' : 'Assign' }}
+          </button>
+          <button
+            type="button"
+            class="min-h-[48px] rounded-xl bg-emerald-500 text-black font-black text-sm disabled:opacity-50"
+            :disabled="bulkBusy"
+            @click="emit('bulk-add', 'done')"
+          >
+            {{ es ? 'Ya los domina' : 'Already landed' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

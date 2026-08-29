@@ -120,17 +120,6 @@ export function useNiikLibrarySync() {
       }
       const existingManualIds = new Set((beforeRows || []).map(r => Number(r.manual_id)))
 
-      // Deactivate everything; upsert re-activates exactly the 320 manual rows
-      const { data: activeBefore, error: deactivateError } = await client
-        .from('skills_library')
-        .update({ is_active: false })
-        .eq('is_active', true)
-        .select('id')
-      if (deactivateError) {
-        throw new Error(`Deactivate failed: ${deactivateError.message}`)
-      }
-      result.deactivated = activeBefore?.length ?? 0
-
       const chunkSize = 50
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize)
@@ -139,6 +128,11 @@ export function useNiikLibrarySync() {
           .upsert(chunk, { onConflict: 'manual_id' })
         if (error) {
           const msg = error.message || ''
+          if (/row-level security|violates row/i.test(msg)) {
+            throw new Error(
+              `Upsert failed: run supabase/migrations/fix_skills_library_sync_rls_and_restore.sql in Supabase SQL Editor, then sync again. (${msg})`,
+            )
+          }
           if (/manual_id|unique|on conflict|column.*schema cache/i.test(msg)) {
             throw new Error(
               `Upsert failed: run supabase/migrations/add_skills_library_manual_id_unique.sql in Supabase SQL Editor, then sync again. (${msg})`,
@@ -150,6 +144,19 @@ export function useNiikLibrarySync() {
 
       result.inserted = rows.filter(r => !existingManualIds.has(r.manual_id)).length
       result.updated = rows.length - result.inserted
+
+      // Retire only what left the sheet. Deactivating everything up front would
+      // leave the library dark if the upsert above failed partway.
+      const { data: staleRows, error: staleError } = await client
+        .from('skills_library')
+        .update({ is_active: false })
+        .eq('is_active', true)
+        .not('manual_id', 'in', `(${[...manualIds].join(',')})`)
+        .select('id')
+      if (staleError) {
+        throw new Error(`Retiring removed tricks failed: ${staleError.message}`)
+      }
+      result.deactivated = staleRows?.length ?? 0
 
       const { count, error: countError } = await client
         .from('skills_library')
