@@ -39,6 +39,7 @@ CREATE POLICY "skateramp_projects_admin_all" ON skateramp_projects
   USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
   WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
+DROP TRIGGER IF EXISTS update_skateramp_projects_updated_at ON skateramp_projects;
 CREATE TRIGGER update_skateramp_projects_updated_at
   BEFORE UPDATE ON skateramp_projects
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

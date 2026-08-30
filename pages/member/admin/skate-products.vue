@@ -829,6 +829,7 @@ const productPhotoUploadHint = computed(() =>
         />
         <ShopCategoryFilter
           :selected-filter="selectedFilter"
+          show-brands
           :brands-active="brandsTileActive"
           :show-all-active="showAllActive"
           @all="selectAll"

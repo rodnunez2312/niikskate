@@ -145,6 +145,7 @@ export default defineEventHandler(async (event) => {
 
   const inbox = (config.contactInboxEmail as string)?.trim()
   let emailed = false
+  let emailError: string | null = inbox ? null : 'CONTACT_INBOX_EMAIL is not set'
 
   if (inbox) {
     const rows: [string, string][] = [
@@ -206,16 +207,21 @@ export default defineEventHandler(async (event) => {
     })
     emailed = result.sent
 
-    if (!result.sent && !result.skipped) {
-      console.error('[skateramp-request] email failed:', result.error)
-    }
-    if (emailed) {
-      await supabase
-        .from('skateramp_requests')
-        .update({ emailed_at: new Date().toISOString() })
-        .eq('id', inserted.id)
+    if (!result.sent) {
+      emailError = result.skipped
+        ? 'Email is not configured on this deployment (RESEND_API_KEY / MAIL_FROM)'
+        : result.error
+      console.error('[skateramp-request] not emailed:', emailError)
     }
   }
+
+  await supabase
+    .from('skateramp_requests')
+    .update({
+      emailed_at: emailed ? new Date().toISOString() : null,
+      email_error: emailError,
+    })
+    .eq('id', inserted.id)
 
   return { ok: true as const, id: inserted.id as string, emailed }
 })

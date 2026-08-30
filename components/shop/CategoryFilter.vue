@@ -3,8 +3,10 @@ import { SHOP_GROUPS, type ShopGroupId } from '~/utils/shopCatalog'
 
 const props = defineProps<{
   selectedFilter: ShopGroupId | null
-  brandsActive: boolean
   showAllActive: boolean
+  /** Admin-only tile: shoppers pick brands from the carousel instead. */
+  showBrands?: boolean
+  brandsActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -48,19 +50,6 @@ const tileClass = (active: boolean) =>
         {{ es ? 'Todo' : 'All' }}
       </span>
     </button>
-
-    <NuxtLink
-      to="/skateramps"
-      class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors border-gray-300 text-gray-900 hover:border-teal-500 hover:text-teal-700"
-    >
-      <svg class="w-5 h-5 sm:w-7 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M4 18V6l8-3 8 3v12l-8 3-8-3zm2-1.2 6 2.25 6-2.25V7.5l-6 2.25L6 7.5v9.3zM12 10.5 6 8.25v1.5l6 2.25 6-2.25V8.25L12 10.5z" />
-      </svg>
-      <span class="mt-1.5 mb-1 w-6 sm:w-8 border-t border-current opacity-40" />
-      <span class="text-[7px] sm:text-[10px] font-bold uppercase tracking-wide leading-tight text-center px-0.5">
-        {{ es ? 'Rampas' : 'Ramps' }}
-      </span>
-    </NuxtLink>
 
     <button
       v-for="group in SHOP_GROUPS"
@@ -116,10 +105,11 @@ const tileClass = (active: boolean) =>
     </button>
 
     <button
+      v-if="showBrands"
       type="button"
       class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors"
-      :class="tileClass(brandsActive)"
-      :aria-pressed="brandsActive"
+      :class="tileClass(Boolean(brandsActive))"
+      :aria-pressed="Boolean(brandsActive)"
       @click="emit('brands')"
     >
       <svg class="w-5 h-5 sm:w-7 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -131,5 +121,19 @@ const tileClass = (active: boolean) =>
         {{ es ? 'Marcas' : 'Brands' }}
       </span>
     </button>
+
+    <!-- Last tile: leaves the shop for the ramp build service. -->
+    <NuxtLink
+      to="/skateramps"
+      class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors border-gray-300 text-gray-900 hover:border-teal-500 hover:text-teal-700"
+    >
+      <svg class="w-5 h-5 sm:w-7 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M4 18V6l8-3 8 3v12l-8 3-8-3zm2-1.2 6 2.25 6-2.25V7.5l-6 2.25L6 7.5v9.3zM12 10.5 6 8.25v1.5l6 2.25 6-2.25V8.25L12 10.5z" />
+      </svg>
+      <span class="mt-1.5 mb-1 w-6 sm:w-8 border-t border-current opacity-40" />
+      <span class="text-[7px] sm:text-[10px] font-bold uppercase tracking-wide leading-tight text-center px-0.5">
+        {{ es ? 'Rampas' : 'Ramps' }}
+      </span>
+    </NuxtLink>
   </div>
 </template>

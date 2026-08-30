@@ -2,6 +2,7 @@
 definePageMeta({ layout: 'public' })
 
 import type { Product } from '~/types'
+import ShopBrandCarousel from '~/components/shop/BrandCarousel.vue'
 import ShopCategoryFilter from '~/components/shop/CategoryFilter.vue'
 import {
   SHOP_GROUPS,
@@ -22,37 +23,24 @@ const { formatPrice, language } = useI18n()
 const es = computed(() => language.value === 'es')
 const shopGroups = SHOP_GROUPS
 
-/** Single category filter — null means all products (unless brand picker / brand selected) */
+/** Single category filter — null means all products (unless a brand is selected) */
 const selectedFilter = ref<ShopGroupId | null>(null)
-/** Brands picker mode + selected brand name */
-const brandsMode = ref(false)
+/** Brands are browsed in the carousel; this holds the one being filtered by. */
 const selectedBrand = ref<string | null>(null)
 const brandLogos = ref<Record<string, string>>({})
 
 const showAllActive = computed(
-  () => !brandsMode.value && !selectedBrand.value && selectedFilter.value === null,
+  () => !selectedBrand.value && selectedFilter.value === null,
 )
 
 function selectAll() {
   selectedFilter.value = null
-  brandsMode.value = false
   selectedBrand.value = null
-}
-
-function openBrandsMode() {
-  brandsMode.value = true
-  selectedBrand.value = null
-  selectedFilter.value = null
 }
 
 function selectBrand(name: string) {
   selectedBrand.value = name
-  brandsMode.value = false
-}
-
-function clearBrand() {
-  selectedBrand.value = null
-  brandsMode.value = true
+  selectedFilter.value = null
 }
 
 const searchQuery = ref('')
@@ -115,9 +103,7 @@ async function loadBrandLogos() {
 onMounted(async () => {
   await Promise.all([fetchProducts({ in_stock: false }), loadBrandLogos()])
   const raw = String(route.query.cat || '')
-  if (raw === 'brands') {
-    brandsMode.value = true
-  } else if (raw.startsWith('brand:')) {
+  if (raw.startsWith('brand:')) {
     selectedBrand.value = decodeURIComponent(raw.slice(6))
   } else if (raw && shopGroups.some(g => g.id === raw)) {
     selectedFilter.value = raw as ShopGroupId
@@ -125,11 +111,10 @@ onMounted(async () => {
 })
 
 watch(
-  [selectedFilter, brandsMode, selectedBrand],
+  [selectedFilter, selectedBrand],
   () => {
     const query = { ...route.query } as Record<string, string>
-    if (brandsMode.value) query.cat = 'brands'
-    else if (selectedBrand.value) query.cat = `brand:${encodeURIComponent(selectedBrand.value)}`
+    if (selectedBrand.value) query.cat = `brand:${encodeURIComponent(selectedBrand.value)}`
     else if (!selectedFilter.value) delete query.cat
     else query.cat = selectedFilter.value
     router.replace({ query })
@@ -137,14 +122,12 @@ watch(
 )
 
 function selectFilter(id: ShopGroupId) {
-  brandsMode.value = false
   selectedBrand.value = null
   selectedFilter.value = id
 }
 
 function clearFilters() {
   selectedFilter.value = null
-  brandsMode.value = false
   selectedBrand.value = null
   searchQuery.value = ''
 }
@@ -209,17 +192,23 @@ const filteredProducts = computed(() => {
   return [...list].sort(compareShopProducts)
 })
 
-const showBrandPicker = computed(
-  () => brandsMode.value && !searchQuery.value.trim(),
+/**
+ * The strip belongs to the shop landing view only: picking a category means the
+ * visitor has narrowed down, so the products get the full page. Selecting a
+ * brand keeps it around so they can hop between brands.
+ */
+const showBrandCarousel = computed(
+  () =>
+    !loading.value
+    && selectedFilter.value === null
+    && !searchQuery.value.trim()
+    && brandCards.value.length > 0,
 )
 
 watch(searchQuery, (q) => {
   if (!q.trim()) return
-  brandsMode.value = false
   selectedBrand.value = null
 })
-
-const brandsTileActive = computed(() => brandsMode.value || Boolean(selectedBrand.value))
 
 const getProductPrice = (product: Product) => {
   const priceMXN = product.sale_price || product.price
@@ -330,18 +319,24 @@ const cartLabel = computed(() => {
         <div class="pt-1 pr-11 sm:pr-0">
           <ShopCategoryFilter
             :selected-filter="selectedFilter"
-            :brands-active="brandsTileActive"
             :show-all-active="showAllActive"
             @all="selectAll"
             @filter="selectFilter"
-            @brands="openBrandsMode"
           />
         </div>
       </div>
 
-      <!-- Brand selected bar -->
+      <ShopBrandCarousel
+        v-if="showBrandCarousel"
+        :brands="brandCards"
+        :selected="selectedBrand"
+        @select="selectBrand"
+        @clear="selectAll"
+      />
+
+      <!-- Brand selected bar: only when the carousel is not already showing the choice -->
       <div
-        v-if="selectedBrand"
+        v-if="selectedBrand && !showBrandCarousel"
         class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-gray-950 px-4 py-3"
       >
         <p class="text-sm text-gray-300">
@@ -351,9 +346,9 @@ const cartLabel = computed(() => {
         <button
           type="button"
           class="text-xs font-bold text-gold-400 hover:text-gold-300"
-          @click="clearBrand"
+          @click="selectAll"
         >
-          {{ es ? 'Cambiar marca' : 'Change brand' }}
+          {{ es ? 'Ver todo' : 'Show all' }}
         </button>
       </div>
 
@@ -365,48 +360,6 @@ const cartLabel = computed(() => {
             <div class="h-4 bg-gray-800 rounded w-2/3" />
             <div class="h-3 bg-gray-800 rounded w-1/3" />
           </div>
-        </div>
-      </div>
-
-      <!-- Brand logos (compact) -->
-      <div v-else-if="showBrandPicker" class="space-y-4">
-        <p class="text-center text-sm text-gray-400">
-          {{ es ? 'Elige una marca para ver sus productos' : 'Pick a brand to see its products' }}
-        </p>
-        <div v-if="!brandCards.length" class="text-center py-16 border border-white/10 rounded-2xl">
-          <p class="text-gray-400">
-            {{ es ? 'Aún no hay marcas en el catálogo.' : 'No brands in the catalog yet.' }}
-          </p>
-        </div>
-        <div v-else class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
-          <button
-            v-for="brand in brandCards"
-            :key="brand.name"
-            type="button"
-            class="group text-left rounded-xl border border-white/10 bg-[#111] p-2.5 sm:p-3 transition-transform hover:-translate-y-0.5 hover:border-white/20"
-            @click="selectBrand(brand.name)"
-          >
-            <div class="aspect-square rounded-lg bg-gray-900 flex items-center justify-center p-2 overflow-hidden">
-              <img
-                v-if="brand.image"
-                :src="brand.image"
-                :alt="brand.name"
-                class="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-105"
-              />
-              <img
-                v-else
-                src="/niikskate-logo.png"
-                alt=""
-                class="w-8 h-8 sm:w-10 sm:h-10 object-contain opacity-50"
-              />
-            </div>
-            <h3 class="mt-2 text-[10px] sm:text-xs font-black uppercase tracking-wide text-white text-center leading-tight truncate">
-              {{ brand.name }}
-            </h3>
-            <p class="text-[9px] text-gray-500 text-center mt-0.5">
-              {{ brand.count }} {{ es ? 'prod.' : 'items' }}
-            </p>
-          </button>
         </div>
       </div>
 

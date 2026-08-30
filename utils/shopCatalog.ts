@@ -26,7 +26,7 @@ export const SHOP_GROUPS: ShopGroup[] = [
   },
   {
     id: 'security_equip',
-    label: { en: 'Protective', es: 'Seguridad' },
+    label: { en: 'Safety gear', es: 'Equipo de seguridad' },
     title: { en: 'Security equip', es: 'Equipo de seguridad' },
     icon: 'helmet',
     dbCategories: ['protecciones', 'cascos'],
@@ -125,4 +125,21 @@ export function productImageUrl(product: { images?: string[] | null }): string |
     img => typeof img === 'string' && /^https?:\/\//i.test(img.trim()),
   )
   return url?.trim() || null
+}
+
+/**
+ * Same rule for brand logos: a `blob:` URL only resolves in the tab that made it,
+ * so storing one shows a broken image on every other device.
+ */
+export function isSharableImageUrl(url: unknown): url is string {
+  return typeof url === 'string' && /^(https?:\/\/|\/)/i.test(url.trim())
+}
+
+/** Drops logo entries that would break outside the browser that uploaded them. */
+export function sharableLogoMap(map: Record<string, unknown>): Record<string, string> {
+  const clean: Record<string, string> = {}
+  for (const [name, url] of Object.entries(map)) {
+    if (isSharableImageUrl(url)) clean[name] = url.trim()
+  }
+  return clean
 }

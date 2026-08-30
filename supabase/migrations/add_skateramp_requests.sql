@@ -44,16 +44,21 @@ CREATE TABLE IF NOT EXISTS skateramp_requests (
   -- Null when the notification email could not be sent (or is not configured);
   -- the request is still in this table, which is the source of truth.
   emailed_at TIMESTAMPTZ,
+  email_error TEXT,
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- For installs created before email_error existed.
+ALTER TABLE skateramp_requests ADD COLUMN IF NOT EXISTS email_error TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_skateramp_requests_status ON skateramp_requests(status);
 CREATE INDEX IF NOT EXISTS idx_skateramp_requests_created ON skateramp_requests(created_at DESC);
 
 COMMENT ON TABLE skateramp_requests IS 'Customer custom-ramp enquiries; admin inbox at /member/admin/skateramp-requests';
 COMMENT ON COLUMN skateramp_requests.image_urls IS 'Public URLs under images/ramp-requests/<uuid>/, uploaded server-side';
+COMMENT ON COLUMN skateramp_requests.email_error IS 'Why the notification did not go out, so the admin banner can name the cause instead of guessing';
 
 ALTER TABLE skateramp_requests ENABLE ROW LEVEL SECURITY;
 

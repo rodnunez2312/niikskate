@@ -53,8 +53,11 @@ const visibleRequests = computed(() =>
 )
 
 /** Surfaced so a silent Resend misconfiguration does not go unnoticed. */
-const undeliveredCount = computed(
-  () => requests.value.filter(r => !r.emailed_at).length,
+const undelivered = computed(() => requests.value.filter(r => !r.emailed_at))
+
+/** The endpoint records why, so the banner can name the cause instead of guessing. */
+const undeliveredReasons = computed(() =>
+  [...new Set(undelivered.value.map(r => r.email_error).filter(Boolean))].join(' · '),
 )
 
 async function loadRequests() {
@@ -198,14 +201,19 @@ function detailRows(request: SkaterampRequest) {
     </header>
 
     <div
-      v-if="undeliveredCount"
-      class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-200"
+      v-if="undelivered.length"
+      class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-200 space-y-1"
     >
-      {{
-        es
-          ? `${undeliveredCount} solicitud(es) no se enviaron por correo. Revisa RESEND_API_KEY y MAIL_FROM — los datos siguen completos aquí.`
-          : `${undeliveredCount} request(s) were not emailed. Check RESEND_API_KEY and MAIL_FROM — the data is still complete here.`
-      }}
+      <p>
+        {{
+          es
+            ? `${undelivered.length} solicitud(es) no se enviaron por correo. Los datos siguen completos aquí.`
+            : `${undelivered.length} request(s) were not emailed. The data is still complete here.`
+        }}
+      </p>
+      <p v-if="undeliveredReasons" class="text-amber-300/80 font-mono break-words">
+        {{ undeliveredReasons }}
+      </p>
     </div>
 
     <div class="flex flex-wrap gap-2">
@@ -286,6 +294,10 @@ function detailRows(request: SkaterampRequest) {
               WhatsApp {{ request.phone }}
             </a>
           </div>
+
+          <p v-if="request.email_error" class="text-[11px] text-amber-300/80 font-mono break-words">
+            {{ es ? 'Sin correo:' : 'Not emailed:' }} {{ request.email_error }}
+          </p>
 
           <dl class="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div v-for="row in detailRows(request)" :key="row.label" class="min-w-0">

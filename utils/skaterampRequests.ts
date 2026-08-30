@@ -95,6 +95,7 @@ export interface SkaterampRequest {
   status: RampRequestStatus
   admin_notes: string | null
   emailed_at: string | null
+  email_error: string | null
   created_at: string
 }
 

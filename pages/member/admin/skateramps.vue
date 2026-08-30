@@ -75,12 +75,24 @@ const selectedProject = computed(() =>
   selectedId.value ? projects.value.find(p => p.id === selectedId.value) ?? null : null,
 )
 
+/** The profile role arrives after mount, so wait for it instead of bailing out. */
+function whenProfileReady() {
+  if (!profileLoading.value) return Promise.resolve()
+  return new Promise<void>(resolve => {
+    const stop = watch(profileLoading, still => {
+      if (still) return
+      stop()
+      resolve()
+    })
+  })
+}
+
 async function ensureAdmin() {
   if (!user.value) {
     await router.push('/auth/login?redirect=/member/admin/skateramps')
     return false
   }
-  if (profileLoading.value) return false
+  await whenProfileReady()
   if (!isAdmin.value) {
     await router.push('/member/staff/dashboard')
     return false
