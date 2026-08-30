@@ -40,6 +40,8 @@ Run migration: `supabase/migrations/seed_mexico_holidays_2026_2027.sql` (nationa
 
 Run migration: `supabase/migrations/add_skateramp_projects.sql` (Skateramps studio + public catalog projects)
 
+Run migration: `supabase/migrations/add_skateramp_requests.sql` (**required for the "Contactar" form** on `/skateramps`) — creates `skateramp_requests`, the customer inbox shown at `/member/admin/skateramp-requests`. Rows are written by `/api/skateramps/request` with the service role and photos are uploaded server-side to `images/ramp-requests/<uuid>/`, so there is intentionally **no** anon INSERT policy here and no public write policy on storage. Only admins can read. Email to `niikskateacademy@gmail.com` is best-effort on top of this table: set `RESEND_API_KEY` and `MAIL_FROM` (see `.env.example`) to enable it — without them the enquiry is still captured, and the admin page flags anything that was not emailed.
+
 Run migration: `supabase/migrations/add_strength_exercises.sql` (strength library: 5 pillars, body areas, training phases + `class_plans.strength_block`)
 
 Run migration: `supabase/migrations/add_finance_module.sql` (**required for the Finanzas section** at `/member/admin/finance`) — creates `finance_price_list` (seeded with the full class price sheet: Coach Niik / Pro Street / Pro Bowl), `finance_payments` (income), `finance_expenses` (costs), `finance_student_enrollments` (per-skater control sheet) and `finance_settings` (break-even inputs). Safe to re-run: every statement is idempotent and the price seed uses `ON CONFLICT DO NOTHING`, so edits made in the app are never overwritten.

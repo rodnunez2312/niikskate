@@ -262,6 +262,12 @@ export function useMemberNav() {
             icon: 'skate-program',
             adminOnly: true,
           },
+          {
+            name: es.value ? 'Solicitudes de rampa' : 'Ramp requests',
+            path: '/member/admin/skateramp-requests',
+            icon: 'check',
+            adminOnly: true,
+          },
         ],
       },
     ]

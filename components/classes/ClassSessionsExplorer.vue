@@ -117,6 +117,17 @@ const pageTitle = computed(() => {
   return language.value === 'es' ? 'Clases grupales' : 'Group classes'
 })
 
+/**
+ * The hero must stay on one line for every season, including admin-created ones
+ * like "Curso de Verano 26", so the size follows the character count instead of
+ * a fixed clamp that only fitted the short names.
+ */
+const pageTitleStyle = computed(() => {
+  // A bold uppercase glyph advances ~0.76em at 0.12em tracking; 0.8 leaves margin.
+  const em = Math.max(pageTitle.value.length, 1) * 0.8
+  return { fontSize: `min(6.5rem, calc((min(64rem, 100vw) - 3rem) / ${em.toFixed(1)}))` }
+})
+
 const pageSubtitle = computed(() => {
   if (activeSeason.value) {
     const dates = language.value === 'es' ? activeSeason.value.dates.es : activeSeason.value.dates.en
@@ -656,8 +667,8 @@ onMounted(async () => {
     <header class="bg-[#fff9f0] pt-6 pb-4">
       <div class="max-w-5xl mx-auto px-4 text-center">
         <h1
-          class="font-black uppercase tracking-[0.12em] leading-none text-black break-words"
-          style="font-size: clamp(4.5rem, 14vw, 6.5rem)"
+          class="font-black uppercase tracking-[0.12em] leading-none text-black whitespace-nowrap"
+          :style="pageTitleStyle"
         >
           {{ pageTitle }}
         </h1>

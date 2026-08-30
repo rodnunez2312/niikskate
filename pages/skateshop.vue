@@ -254,17 +254,45 @@ const cartLabel = computed(() => {
         />
         <div class="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/40" />
       </div>
-      <div class="relative max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-        <h1 class="text-4xl sm:text-5xl font-black tracking-tight mb-3">
-          Skateshop
-        </h1>
-        <p class="text-gray-300 text-sm sm:text-base max-w-xl">
-          {{
-            es
-              ? 'Filtra por categoría (una a la vez) y agrega al carrito.'
-              : 'Filter by category (one at a time) and add to cart.'
-          }}
-        </p>
+      <div
+        class="relative max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20 flex flex-col md:flex-row md:items-end md:justify-between gap-8"
+      >
+        <div>
+          <h1 class="text-4xl sm:text-5xl font-black tracking-tight mb-3">
+            Skateshop
+          </h1>
+          <p class="text-gray-300 text-sm sm:text-base max-w-xl">
+            {{
+              es
+                ? 'Filtra por categoría (una a la vez) y agrega al carrito.'
+                : 'Filter by category (one at a time) and add to cart.'
+            }}
+          </p>
+        </div>
+
+        <div
+          class="shrink-0 md:max-w-xs w-full md:w-auto rounded-2xl border border-gold-500/40 bg-black/60 backdrop-blur-sm p-4 md:text-right"
+        >
+          <p class="text-gold-400 text-[11px] font-black uppercase tracking-[0.2em]">
+            {{ es ? 'También construimos' : 'We also build' }}
+          </p>
+          <p class="text-white text-lg font-black uppercase leading-tight mt-1">
+            {{ es ? 'Rampas a tu medida' : 'Custom ramps' }}
+          </p>
+          <p class="text-gray-400 text-xs mt-1.5 leading-snug">
+            {{
+              es
+                ? 'Mándanos fotos de tu idea y te cotizamos el diseño.'
+                : 'Send photos of your idea and we will quote the design.'
+            }}
+          </p>
+          <NuxtLink
+            to="/skateramps"
+            class="mt-3 inline-flex px-5 py-2.5 rounded-xl font-black uppercase text-xs bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-black hover:brightness-110 transition"
+          >
+            {{ es ? 'Ver skateramps' : 'See skateramps' }}
+          </NuxtLink>
+        </div>
       </div>
     </section>
 

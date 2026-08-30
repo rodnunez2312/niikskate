@@ -4,7 +4,8 @@ const { language } = useI18n()
 const { openMemberApp } = useMemberApp()
 
 function enterMemberPlatform() {
-  openMemberApp(user.value ? '/member' : '/auth/login?redirect=/member')
+  // Visitors without an account start by registering; login is linked from there.
+  openMemberApp(user.value ? '/member' : '/auth/register')
 }
 </script>
 
@@ -30,22 +31,13 @@ function enterMemberPlatform() {
           }}
         </p>
       </div>
-      <div class="flex flex-col sm:flex-row gap-2 shrink-0">
-        <button
-          type="button"
-          class="px-5 py-3 rounded-xl bg-gold-400 text-black font-bold text-sm hover:bg-gold-300 transition-colors"
-          @click="enterMemberPlatform"
-        >
-          {{ language === 'es' ? 'Abrir app / entrar' : 'Open app / sign in' }}
-        </button>
-        <NuxtLink
-          v-if="user"
-          to="/member"
-          class="px-5 py-3 rounded-xl border border-gray-600 text-gray-200 font-semibold text-sm text-center hover:bg-gray-800 transition-colors"
-        >
-          {{ language === 'es' ? 'Continuar en web' : 'Continue on web' }}
-        </NuxtLink>
-      </div>
+      <button
+        type="button"
+        class="shrink-0 px-5 py-3 rounded-xl bg-gold-400 text-black font-bold text-sm hover:bg-gold-300 transition-colors"
+        @click="enterMemberPlatform"
+      >
+        {{ language === 'es' ? 'Abrir app' : 'Open app' }}
+      </button>
     </div>
   </div>
 </template>

@@ -2,6 +2,7 @@
 definePageMeta({ layout: 'public' })
 
 import type { Product } from '~/types'
+import RampRequestModal from '~/components/skateramps/RampRequestModal.vue'
 import { compareShopProducts, productImageUrl } from '~/utils/shopCatalog'
 
 const { products, loading, fetchProducts } = useProducts()
@@ -56,6 +57,8 @@ function productForProject(p: RampProject): Product | undefined {
 const featuredProjects = computed(() =>
   rampProjects.value.filter(p => !p.product_id || !productForProject(p)),
 )
+
+const requestModalOpen = ref(false)
 </script>
 
 <template>
@@ -175,13 +178,16 @@ const featuredProjects = computed(() =>
               : 'Describe your space, skill level, and budget. We will follow up with design and pricing.'
           }}
         </p>
-        <NuxtLink
-          to="/community"
-          class="inline-flex px-6 py-3 rounded-xl font-black uppercase text-sm bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-black"
+        <button
+          type="button"
+          class="inline-flex px-6 py-3 rounded-xl font-black uppercase text-sm bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-black hover:brightness-110 transition"
+          @click="requestModalOpen = true"
         >
           {{ es ? 'Contactar' : 'Contact us' }}
-        </NuxtLink>
+        </button>
       </section>
     </div>
+
+    <RampRequestModal :open="requestModalOpen" @close="requestModalOpen = false" />
   </div>
 </template>

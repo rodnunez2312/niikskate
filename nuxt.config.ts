@@ -84,6 +84,13 @@ export default defineNuxtConfig({
     supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     /** Optional: ramp design AI suggestions (admin skateramps). */
     openaiApiKey: process.env.OPENAI_API_KEY || '',
+    /**
+     * Transactional email (Resend). Without a key the ramp request still saves
+     * and shows in the admin inbox, it just does not reach the Gmail account.
+     */
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    mailFrom: process.env.MAIL_FROM || 'NiikSkate <hola@niikskate.com>',
+    contactInboxEmail: process.env.CONTACT_INBOX_EMAIL || 'niikskateacademy@gmail.com',
     // Server-only: Twilio WhatsApp (https://www.twilio.com/docs/whatsapp)
     twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
