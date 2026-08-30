@@ -10,6 +10,7 @@ import {
   groupForProductCategory,
   productImageUrl,
   productMatchesSearch,
+  sharableLogoMap,
   type ShopGroup,
   type ShopGroupId,
 } from '~/utils/shopCatalog'
@@ -97,7 +98,8 @@ async function loadBrandLogos() {
       /* ignore */
     }
   }
-  brandLogos.value = map
+  // A blob: URL from a failed upload renders as a broken image everywhere else.
+  brandLogos.value = sharableLogoMap(map)
 }
 
 onMounted(async () => {

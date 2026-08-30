@@ -32,6 +32,7 @@ import {
   groupForProductCategory,
   productImageUrl,
   productMatchesSearch,
+  sharableLogoMap,
   type ShopGroupId,
 } from '~/utils/shopCatalog'
 
@@ -141,7 +142,8 @@ async function loadBrandLogos() {
   } catch {
     /* ignore */
   }
-  brandLogos.value = map
+  // Device-local blob: URLs used to be cached here; they never worked elsewhere.
+  brandLogos.value = sharableLogoMap(map)
 }
 
 function persistBrandLogosLocal() {
@@ -176,32 +178,41 @@ async function handleBrandLogoUpload(event: Event) {
   const name = brandUploadTarget.value
   if (!file || !name) return
   uploadingBrand.value = name
+  formError.value = null
   try {
-    const fileExt = file.name.split('.').pop()
+    // Logos stay uncompressed so PNG transparency survives on the dark storefront.
+    const fileExt = file.name.split('.').pop() || 'png'
     const safe = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     const filePath = `brands/${safe}-${Date.now()}.${fileExt}`
-    let logoUrl = ''
-    const { error } = await client.storage.from('images').upload(filePath, file, {
+    const { error: uploadError } = await client.storage.from('images').upload(filePath, file, {
       cacheControl: '3600',
       upsert: true,
+      contentType: file.type,
     })
-    if (error) {
-      logoUrl = URL.createObjectURL(file)
-    } else {
-      const { data: urlData } = client.storage.from('images').getPublicUrl(filePath)
-      logoUrl = urlData.publicUrl
+    if (uploadError) {
+      formError.value = es.value
+        ? `No se pudo subir el logo: ${uploadError.message}. Revisa que exista el bucket "images" y que admin pueda escribir en brands/.`
+        : `Logo upload failed: ${uploadError.message}. Check the "images" bucket exists and admins can write to brands/.`
+      return
     }
+    const { data: urlData } = client.storage.from('images').getPublicUrl(filePath)
+    const logoUrl = urlData.publicUrl
+
+    // Saving to the table is what makes the logo visible on other devices.
+    const { error: saveError } = await client.from('shop_brands').upsert({
+      name,
+      logo_url: logoUrl,
+      updated_at: new Date().toISOString(),
+    })
+    if (saveError) {
+      formError.value = es.value
+        ? `El logo se subió pero no se guardó para otros dispositivos: ${saveError.message}. Ejecuta supabase/migrations/add_shop_brands.sql`
+        : `Logo uploaded but not saved for other devices: ${saveError.message}. Run supabase/migrations/add_shop_brands.sql`
+      return
+    }
+
     brandLogos.value = { ...brandLogos.value, [name]: logoUrl }
     persistBrandLogosLocal()
-    try {
-      await client.from('shop_brands').upsert({
-        name,
-        logo_url: logoUrl,
-        updated_at: new Date().toISOString(),
-      })
-    } catch {
-      /* table may not exist — localStorage still works for this browser */
-    }
   } finally {
     uploadingBrand.value = null
     brandUploadTarget.value = null

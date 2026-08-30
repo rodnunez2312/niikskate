@@ -373,6 +373,22 @@ ORDER BY pay.created_at DESC
 LIMIT 50;
 ```
 
+### 5.2b Brand logos that only worked on the uploader's device
+
+A logo saved before the upload fix can hold a `blob:` URL, which resolves only in
+the browser tab that created it. The storefront now ignores those, but clear them
+so the admin catalog shows "Sin logo" and you know which ones to upload again.
+
+```sql
+-- See the broken ones
+SELECT name, logo_url FROM shop_brands
+WHERE logo_url IS NOT NULL AND logo_url NOT LIKE 'http%';
+
+-- Clear them, then re-upload from Skateshop admin -> Marcas
+UPDATE shop_brands SET logo_url = NULL, updated_at = now()
+WHERE logo_url IS NOT NULL AND logo_url NOT LIKE 'http%';
+```
+
 ### 5.3 Orders for a customer profile
 
 ```sql
