@@ -38,6 +38,8 @@ Run migration: `supabase/migrations/add_birthday_and_class_individual.sql` (birt
 
 Run migration: `supabase/migrations/seed_mexico_holidays_2026_2027.sql` (national holidays 2026–2027; also auto-seeded when opening admin calendar)
 
+Run migration: `supabase/migrations/add_brand_and_ramp_storage_policies.sql` (**required for brand logo uploads** in Admin → Skateshop → Marcas) — `storage.objects` only had policies for `products/` and `avatars/`, so every write to `brands/` was denied by RLS and the logo silently fell back to a device-local `blob:` URL. Also covers `skateramps/`, which had the same gap for the ramp studio reference photos.
+
 Run migration: `supabase/migrations/add_skateramp_projects.sql` (Skateramps studio + public catalog projects)
 
 Run migration: `supabase/migrations/add_skateramp_requests.sql` (**required for the "Contactar" form** on `/skateramps`) — creates `skateramp_requests`, the customer inbox shown at `/member/admin/skateramp-requests`. Rows are written by `/api/skateramps/request` with the service role and photos are uploaded server-side to `images/ramp-requests/<uuid>/`, so there is intentionally **no** anon INSERT policy here and no public write policy on storage. Only admins can read. Email to `niikskateacademy@gmail.com` is best-effort on top of this table: set `RESEND_API_KEY` and `MAIL_FROM` (see `.env.example`) to enable it — without them the enquiry is still captured, and the admin page flags anything that was not emailed. Safe to re-run: it adds `email_error` to tables created before that column existed, which is what the admin banner reads to name the cause instead of guessing at the config.

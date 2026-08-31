@@ -60,6 +60,8 @@ const brandLogos = ref<Record<string, string>>({})
 const uploadingBrand = ref<string | null>(null)
 const brandFileInput = ref<HTMLInputElement | null>(null)
 const brandUploadTarget = ref<string | null>(null)
+/** Separate from formError, which only renders inside the product modal. */
+const brandError = ref<string | null>(null)
 const bulkImporting = ref(false)
 const bulkPreview = ref<ParseShopProductCsvResult | null>(null)
 const bulkImportErrors = ref<string[]>([])
@@ -178,7 +180,7 @@ async function handleBrandLogoUpload(event: Event) {
   const name = brandUploadTarget.value
   if (!file || !name) return
   uploadingBrand.value = name
-  formError.value = null
+  brandError.value = null
   try {
     // Logos stay uncompressed so PNG transparency survives on the dark storefront.
     const fileExt = file.name.split('.').pop() || 'png'
@@ -190,9 +192,9 @@ async function handleBrandLogoUpload(event: Event) {
       contentType: file.type,
     })
     if (uploadError) {
-      formError.value = es.value
-        ? `No se pudo subir el logo: ${uploadError.message}. Revisa que exista el bucket "images" y que admin pueda escribir en brands/.`
-        : `Logo upload failed: ${uploadError.message}. Check the "images" bucket exists and admins can write to brands/.`
+      brandError.value = es.value
+        ? `No se pudo subir el logo: ${uploadError.message}. Ejecuta supabase/migrations/add_brand_and_ramp_storage_policies.sql`
+        : `Logo upload failed: ${uploadError.message}. Run supabase/migrations/add_brand_and_ramp_storage_policies.sql`
       return
     }
     const { data: urlData } = client.storage.from('images').getPublicUrl(filePath)
@@ -205,7 +207,7 @@ async function handleBrandLogoUpload(event: Event) {
       updated_at: new Date().toISOString(),
     })
     if (saveError) {
-      formError.value = es.value
+      brandError.value = es.value
         ? `El logo se subió pero no se guardó para otros dispositivos: ${saveError.message}. Ejecuta supabase/migrations/add_shop_brands.sql`
         : `Logo uploaded but not saved for other devices: ${saveError.message}. Run supabase/migrations/add_shop_brands.sql`
       return
@@ -213,6 +215,8 @@ async function handleBrandLogoUpload(event: Event) {
 
     brandLogos.value = { ...brandLogos.value, [name]: logoUrl }
     persistBrandLogosLocal()
+  } catch (e: any) {
+    brandError.value = e?.message || (es.value ? 'No se pudo subir el logo.' : 'Could not upload the logo.')
   } finally {
     uploadingBrand.value = null
     brandUploadTarget.value = null
@@ -885,6 +889,12 @@ const productPhotoUploadHint = computed(() =>
           class="hidden"
           @change="handleBrandLogoUpload"
         />
+        <p
+          v-if="brandError"
+          class="rounded-xl border border-flame-500/40 bg-flame-500/10 px-3 py-2 text-xs text-flame-400 break-words"
+        >
+          {{ brandError }}
+        </p>
         <p v-if="!catalogBrands.length" class="text-sm text-gray-500">
           {{ es
             ? 'Agrega un campo Marca a tus productos para verlas aquí.'
