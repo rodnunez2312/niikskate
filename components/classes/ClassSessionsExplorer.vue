@@ -3,9 +3,9 @@ import { format, getDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { CrewParticipant } from '~/composables/useCrew'
 import {
-  coachTierFromSkillLevel,
   coachTierLabel,
   getClassPriceMxn,
+  normalizeCoachTier,
   programPriceHint,
 } from '~/utils/classPricing'
 import {
@@ -20,10 +20,13 @@ import {
   packPriceMxn as parentPackPriceMxn,
   parseAudienceCategories,
   skillTrackFromLevelId,
+  isSingleClassPack,
+  PARENT_SINGLE_CLASSES,
   type AudienceCategory,
   type BookableClassSession,
   type ParentClassPack,
   type ParentMultiClassPack,
+  type ParentSingleClass,
   type ProgramSkillTrack,
 } from '~/types'
 import { ineligibilityReason, isAgeEligibleForSession, sessionAgeBounds } from '~/utils/ageEligibility'
@@ -58,7 +61,7 @@ const router = useRouter()
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language, formatPrice } = useI18n()
-const { participants, refreshCrew, activeKey, setActive } = useCrew()
+const { participants, refreshCrew, activeKey } = useCrew()
 
 const loading = ref(true)
 const enrollingId = ref<string | null>(null)
@@ -79,6 +82,8 @@ const selectedDays = ref<number[]>([])
 const selectedAgeBand = ref<AudienceCategory | null>(null)
 /** Optional browse filter by skill track — null = show all */
 const selectedSkillTrack = ref<ProgramSkillTrack | null>(null)
+/** Crew members to show recommendations for — empty = every class */
+const recommendKeys = ref<Set<string>>(new Set())
 
 const enrollModalSession = ref<BookableClassSession | null>(null)
 const selectedPack = ref<ParentClassPack>(8)
@@ -201,12 +206,22 @@ const selectSeason = (slug: string) => {
   pickedSeasonSlug.value = slug
 }
 
-function selectFamilySkater(key: string) {
-  setActive(key)
-  const p = participants.value.find(x => x.key === key)
-  if (!p || p.age == null) return
-  const band = PROGRAM_AGE_BANDS.find(b => ageInBand(p.age!, b.id))
-  if (band) selectedAgeBand.value = band.id
+/**
+ * Purely a local "show me what fits these skaters" filter. It deliberately
+ * leaves both the age/level buttons and the app-wide Familia switcher alone,
+ * so picking a skater here cannot silently re-filter the rest of the page.
+ */
+function toggleRecommendSkater(key: string) {
+  const next = new Set(recommendKeys.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  recommendKeys.value = next
+}
+
+const isRecommendFor = (key: string) => recommendKeys.value.has(key)
+
+const clearRecommendFilter = () => {
+  recommendKeys.value = new Set()
 }
 
 const sessionDay = (dateStr: string) => {
@@ -241,12 +256,21 @@ const sessionMatchesLevelFilter = (s: BookableClassSession) => {
   return skillTrackFromLevelId(s.skill_level) === selectedSkillTrack.value
 }
 
+/** A class is recommended when at least one picked skater is old enough for it. */
+const sessionMatchesRecommendFilter = (s: BookableClassSession) => {
+  if (!recommendKeys.value.size) return true
+  return participants.value.some(
+    p => recommendKeys.value.has(p.key) && participantEligible(p, s),
+  )
+}
+
 const filteredSessions = computed(() =>
   sessions.value.filter(s => {
     if (!matchesSkatepark(s)) return false
     if (selectedDays.value.length && !selectedDays.value.includes(sessionDay(s.start_date))) return false
     if (!sessionMatchesAgeBandFilter(s)) return false
     if (!sessionMatchesLevelFilter(s)) return false
+    if (!sessionMatchesRecommendFilter(s)) return false
     return true
   }),
 )
@@ -257,17 +281,19 @@ const crewInSelectedBands = computed(() => {
   return participants.value.filter(p => p.age != null && ageInBand(p.age!, bandId))
 })
 
-const ageFilterError = computed(() => {
+/**
+ * Browsing an age band nobody in the crew fits is allowed on purpose — the
+ * enrol modal is what enforces the age, so this only sets expectations.
+ */
+const ageFilterNotice = computed(() => {
   const bandId = selectedAgeBand.value
   if (!user.value || !bandId) return null
-  if (crewInSelectedBands.value.length === 0) {
-    const band = PROGRAM_AGE_BANDS.find(b => b.id === bandId)
-    const label = band ? (language.value === 'es' ? band.label.es : band.label.en) : bandId
-    return language.value === 'es'
-      ? `Ningún patinador de tu familia está en: ${label}. Agrega uno en Familia o quita el filtro.`
-      : `None of your family skaters are in: ${label}. Add one under Family or clear the filter.`
-  }
-  return null
+  if (crewInSelectedBands.value.length > 0) return null
+  const band = PROGRAM_AGE_BANDS.find(b => b.id === bandId)
+  const label = band ? (language.value === 'es' ? band.label.es : band.label.en) : bandId
+  return language.value === 'es'
+    ? `Puedes ver las clases de ${label}, pero para inscribirte necesitas un patinador de esa edad en Familia.`
+    : `You can browse ${label} classes, but registering needs a skater that age under Family.`
 })
 
 const audienceLabels = (s: BookableClassSession) => {
@@ -306,7 +332,8 @@ const multiPacksForSession = (s: BookableClassSession): ParentMultiClassPack[] =
 const packPriceMxn = (pack: ParentMultiClassPack) => parentPackPriceMxn(pack)
 
 const packLabel = (pack: ParentClassPack, esLang: boolean) => {
-  if (pack === 1) return esLang ? '1 clase' : '1 class'
+  if (pack === 'group_1') return esLang ? '1 clase grupal' : '1 group class'
+  if (pack === 'individual_1') return esLang ? '1 clase personalizada' : '1 private class'
   if (pack === 4) return esLang ? '4 clases · 1/semana · 4 sem' : '4 classes · 1/week · 4 wk'
   if (pack === 8) return esLang ? '8 clases · 2/semana · 4 sem' : '8 classes · 2/week · 4 wk'
   if (pack === 12) return esLang ? '12 clases · 3/semana · 4 sem' : '12 classes · 3/week · 4 wk'
@@ -314,16 +341,25 @@ const packLabel = (pack: ParentClassPack, esLang: boolean) => {
   return esLang ? '24 clases · 3/semana · 8 sem' : '24 classes · 3/week · 8 wk'
 }
 
+/** The coach picked when the program was created decides the price list. */
+const sessionCoachTier = (s: BookableClassSession) => normalizeCoachTier(s.coach_tier)
+
 const groupDropInPrice = (s: BookableClassSession) =>
-  getClassPriceMxn(coachTierFromSkillLevel(s.skill_level), 'group_session')
+  getClassPriceMxn(sessionCoachTier(s), 'group_session')
+
+const individualDropInPrice = (s: BookableClassSession) =>
+  getClassPriceMxn(sessionCoachTier(s), 'individual_session')
 
 const selectedPackPrice = (s: BookableClassSession, pack: ParentClassPack) => {
-  if (pack === 1) return groupDropInPrice(s)
+  if (pack === 'group_1') return groupDropInPrice(s)
+  if (pack === 'individual_1') return individualDropInPrice(s)
   return packPriceMxn(pack)
 }
 
-const individualDropInPrice = (s: BookableClassSession) =>
-  getClassPriceMxn(coachTierFromSkillLevel(s.skill_level), 'individual_session')
+const singleClassSubtitle = (pack: ParentSingleClass, esLang: boolean) =>
+  pack === 'group_1'
+    ? (esLang ? 'Sesión suelta en grupo' : 'Drop-in with the group')
+    : (esLang ? 'Uno a uno con el coach' : 'One-to-one with the coach')
 
 const packNeedsTwoDays = (pack: ParentClassPack) => pack === 8 || pack === 16
 
@@ -349,9 +385,7 @@ const appliedCoupon = ref<AppliedCoupon | null>(null)
 const couponClassKind = computed(() => classKindForPack(selectedPack.value))
 
 const couponCoachTier = computed(() =>
-  enrollModalSession.value
-    ? coachTierFromSkillLevel(enrollModalSession.value.skill_level)
-    : null,
+  enrollModalSession.value ? sessionCoachTier(enrollModalSession.value) : null,
 )
 
 /** Validate against the first selected skater, since allow-lists are per skater. */
@@ -459,6 +493,17 @@ const anyEnrolled = (s: BookableClassSession) => {
   return set != null && set.size > 0
 }
 
+/** Crew members old enough for this class who have not joined it yet. */
+const joinableParticipants = (s: BookableClassSession) =>
+  participants.value.filter(p => participantEligible(p, s) && !isEnrolled(s, p))
+
+/**
+ * Only close the card once nobody is left to add. Enrolling one sibling used
+ * to lock the whole class, so a second skater could never be signed up.
+ */
+const familyFullyEnrolled = (s: BookableClassSession) =>
+  anyEnrolled(s) && joinableParticipants(s).length === 0
+
 async function loadEnrollments() {
   enrollmentsByEvent.value = new Map()
   if (!user.value) return
@@ -542,13 +587,15 @@ function openEnrollModal(s: BookableClassSession) {
   if (s.status === 'full' || s.status === 'no_coaches') return
   enrollModalSession.value = s
   const packs = multiPacksForSession(s)
-  selectedPack.value = sessionIsSummer(s) ? 1 : (packs[0] || 8)
+  selectedPack.value = sessionIsSummer(s) ? 'group_1' : (packs[0] || 8)
   selectedPackDays.value = []
-  const active = participants.value.find(x => x.key === activeKey.value)
-  modalSelectedKeys.value =
-    active && participantEligible(active, s) && !isEnrolled(s, active)
-      ? [activeKey.value]
-      : []
+  // Start from whoever the recommendation filter is showing, else the Familia
+  // skater. Anyone already in the class is left out so nothing is booked twice.
+  const joinable = joinableParticipants(s)
+  const picked = recommendKeys.value.size
+    ? joinable.filter(p => recommendKeys.value.has(p.key))
+    : joinable.filter(p => p.key === activeKey.value)
+  modalSelectedKeys.value = picked.map(p => p.key)
 }
 
 function closeEnrollModal() {
@@ -619,7 +666,7 @@ async function confirmEnroll() {
           eventId: s.id,
           childAge: p.age,
           crewMemberId: p.crewMemberId,
-          pack: selectedPack.value === 1 ? null : selectedPack.value,
+          pack: isSingleClassPack(selectedPack.value) ? null : selectedPack.value,
           weekdays: packNeedsTwoDays(selectedPack.value)
             ? selectedPackDays.value
             : selectedPack.value === 12 || selectedPack.value === 24
@@ -847,28 +894,39 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-        <p v-if="ageFilterError" class="mt-3 text-sm text-red-700 bg-red-50 border-2 border-red-300 rounded-xl px-3 py-2">
-          {{ ageFilterError }}
+        <p v-if="ageFilterNotice" class="mt-3 text-sm text-gray-700 bg-gray-100 border-2 border-gray-300 rounded-xl px-3 py-2">
+          {{ ageFilterNotice }}
         </p>
       </section>
 
-      <!-- Active family skater (synced with Familia switcher) -->
+      <!-- Local recommendation filter; independent of the Familia switcher. -->
       <section v-if="user && participants.length" class="border-t border-gray-300 pt-4">
-        <p class="text-sm font-mono text-gray-700 mb-2">
-          {{ language === 'es' ? 'Recomendaciones para tu crew:' : 'Recommendations for your crew:' }}
-        </p>
+        <div class="flex items-baseline justify-between gap-3 mb-2">
+          <p class="text-sm font-mono text-gray-700">
+            {{ language === 'es' ? 'Recomendaciones para tu crew:' : 'Recommendations for your crew:' }}
+          </p>
+          <button
+            v-if="recommendKeys.size"
+            type="button"
+            class="text-xs font-bold text-teal-700 underline shrink-0"
+            @click="clearRecommendFilter"
+          >
+            {{ language === 'es' ? 'Ver todas' : 'Show all' }}
+          </button>
+        </div>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="p in participants"
             :key="p.key"
             type="button"
             class="px-4 py-2 rounded-full border-2 text-sm font-black uppercase transition-colors"
+            :aria-pressed="isRecommendFor(p.key)"
             :class="
-              activeKey === p.key
+              isRecommendFor(p.key)
                 ? 'border-black bg-teal-600 text-white ring-2 ring-black ring-offset-1'
                 : 'border-gray-400 bg-white text-gray-900'
             "
-            @click="selectFamilySkater(p.key)"
+            @click="toggleRecommendSkater(p.key)"
           >
             {{ p.firstName }}{{ p.isYou ? ` (${language === 'es' ? 'tú' : 'you'})` : '' }}
             <span v-if="p.age != null" class="font-mono font-normal text-xs opacity-80">
@@ -984,7 +1042,7 @@ onMounted(async () => {
 
           <div class="p-3 border-t-2 border-black">
             <button
-              v-if="anyEnrolled(s)"
+              v-if="familyFullyEnrolled(s)"
               type="button"
               disabled
               class="w-full py-3 rounded-lg bg-teal-600 text-white font-bold text-sm"
@@ -1007,13 +1065,11 @@ onMounted(async () => {
               {{
                 enrollingId === s.id
                   ? '…'
-                  : user
-                    ? language === 'es'
-                      ? 'Inscribirse'
-                      : 'Register'
-                    : language === 'es'
-                      ? 'Iniciar sesión'
-                      : 'Sign in'
+                  : !user
+                    ? (language === 'es' ? 'Iniciar sesión' : 'Sign in')
+                    : anyEnrolled(s)
+                      ? (language === 'es' ? 'Inscribir a otro' : 'Add another skater')
+                      : (language === 'es' ? 'Inscribirse' : 'Register')
               }}
             </button>
           </div>
@@ -1050,7 +1106,7 @@ onMounted(async () => {
                 </li>
                 <li>* {{ formatPrice(groupDropInPrice(s)) }} — {{ language === 'es' ? 'grupal · 1 sesión' : 'group · 1 session' }}</li>
                 <li>* {{ formatPrice(individualDropInPrice(s)) }} — {{ language === 'es' ? 'individual · 1 sesión' : 'individual · 1 session' }}</li>
-                <li>* {{ coachTierLabel(coachTierFromSkillLevel(s.skill_level), language === 'es') }}</li>
+                <li>* {{ coachTierLabel(sessionCoachTier(s), language === 'es') }}</li>
                 <li>* {{ s.skatepark || selectedSkatepark }}</li>
               </ul>
             </div>
@@ -1097,14 +1153,18 @@ onMounted(async () => {
           </h3>
           <div class="grid grid-cols-2 gap-2 mb-4 mt-2">
             <button
+              v-for="single in PARENT_SINGLE_CLASSES"
+              :key="'modal-single-' + single"
               type="button"
               class="rounded-xl border-2 px-3 py-3 text-left transition-colors"
-              :class="selectedPack === 1 ? 'border-black bg-white ring-2 ring-black' : 'border-gray-400 bg-white'"
-              @click="choosePack(1)"
+              :class="selectedPack === single ? 'border-black bg-white ring-2 ring-black' : 'border-gray-400 bg-white'"
+              @click="choosePack(single)"
             >
-              <p class="text-xs font-black uppercase">{{ language === 'es' ? '1 clase' : '1 class' }}</p>
-              <p class="text-[11px] font-mono text-gray-600">{{ language === 'es' ? 'Sesión suelta' : 'Single session' }}</p>
-              <p class="text-sm font-black mt-1">{{ formatPrice(groupDropInPrice(enrollModalSession)) }}</p>
+              <p class="text-xs font-black uppercase">{{ packLabel(single, language === 'es') }}</p>
+              <p class="text-[11px] font-mono text-gray-600">{{ singleClassSubtitle(single, language === 'es') }}</p>
+              <p class="text-sm font-black mt-1">
+                {{ formatPrice(selectedPackPrice(enrollModalSession, single)) }}
+              </p>
             </button>
             <button
               v-for="pack in multiPacksForSession(enrollModalSession)"

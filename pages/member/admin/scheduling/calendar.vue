@@ -45,16 +45,18 @@ import { bookableOccurrences, computeSummerCourseEndDate, generateProgramOccurre
 import { MEXICO_NATIONAL_HOLIDAYS_2026_2027, mexicoHolidayName } from '~/utils/mexicoHolidays'
 import { getProgramSeasonBySlug, isSummerCourseSeason, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
 import {
-  coachTierFromSkillTracks,
-  coachTierLabel,
+  DEFAULT_COACH_TIER,
+  normalizeCoachTier,
   resolveDefaultProgramPriceMxn,
   resolveProgramPackageKind,
+  type CoachPricingTier,
 } from '~/utils/classPricing'
 import {
   classKindLabel,
   coachTierSheetLabel,
   effectivePriceMxn,
   formatMoneyMxn,
+  FINANCE_COACH_TIERS,
 } from '~/utils/finance'
 import { useFinance } from '~/composables/useFinance'
 
@@ -97,6 +99,7 @@ export interface SchoolCalendarRow {
   max_age?: number | null
   skatepark?: string | null
   price_mxn?: number | null
+  coach_tier?: string | null
   audience_category?: string | null
   audience_categories?: string[] | null
   program_series_id?: string | null
@@ -176,6 +179,7 @@ const SERIES_SHARED_FIELDS = [
   'min_age',
   'max_age',
   'price_mxn',
+  'coach_tier',
   'max_capacity_override',
   'season_slug',
 ] as const
@@ -196,6 +200,7 @@ const form = ref({
   max_age: 12,
   skatepark: DEFAULT_SKATEPARK,
   price_mxn: '' as string | number,
+  coach_tier: DEFAULT_COACH_TIER as CoachPricingTier,
   audience_categories: [] as AudienceCategory[],
   practice_time_slot: 'early' as TimeSlot,
   is_recurring: false,
@@ -257,7 +262,7 @@ const programSlotsForGenerate = (): TimeSlot[] => {
   return form.value.recurring_slots.length ? form.value.recurring_slots : ['early']
 }
 
-const formCoachTier = computed(() => coachTierFromSkillTracks(form.value.skill_tracks))
+const formCoachTier = computed(() => normalizeCoachTier(form.value.coach_tier))
 
 // ---------------------------------------------------------------------------
 // Pricing — Finanzas → Precios is the only source of truth
@@ -296,7 +301,6 @@ const programPriceMxn = computed(() => {
   const row = programPriceRow.value
   if (row) return effectivePriceMxn(row)
   return resolveDefaultProgramPriceMxn({
-    skillTracks: form.value.skill_tracks,
     eventType: form.value.event_type as 'class_session' | 'class_individual',
     isRecurring: form.value.is_recurring || isSummerCourseForm.value,
     isSummerCourse: isSummerCourseForm.value,
@@ -1274,14 +1278,15 @@ const defaultForm = (ymd: string, mode: CreateMode, seasonSlug = '') => ({
   skatepark: DEFAULT_SKATEPARK,
   price_mxn: mode === 'program'
     ? resolveDefaultProgramPriceMxn({
-        skillTracks: ['beginner'],
         eventType: 'class_session',
         isRecurring: true,
         isSummerCourse: isSummerCourseSeason(seasonSlug),
         summerWeeks: 1,
         classCount: isSummerCourseSeason(seasonSlug) ? 5 : PROGRAM_TOTAL_CLASSES,
+        coachTier: DEFAULT_COACH_TIER,
       })
     : ('' as string | number),
+  coach_tier: DEFAULT_COACH_TIER as CoachPricingTier,
   audience_categories: [] as AudienceCategory[],
   practice_time_slot: 'early' as TimeSlot,
   is_recurring: mode === 'program',
@@ -1346,6 +1351,7 @@ const openEdit = (ev: SchoolCalendarRow, e?: Event) => {
     max_age: ev.max_age ?? 12,
     skatepark: ev.skatepark || DEFAULT_SKATEPARK,
     price_mxn: ev.price_mxn ?? '',
+    coach_tier: normalizeCoachTier(ev.coach_tier),
     audience_categories: parseAudienceCategories(ev),
     practice_time_slot:
       ev.start_time === '19:00:00' || ev.start_time === '19:00'
@@ -1556,6 +1562,7 @@ const submitEvent = async () => {
         max_age: maxAge,
         skatepark: form.value.location || DEFAULT_SKATEPARK,
         price_mxn: priceNum,
+        coach_tier: formCoachTier.value,
         program_series_id: programSeriesId,
         max_capacity_override: capOverride,
         season_slug: form.value.season_slug.trim() || null,
@@ -1653,6 +1660,7 @@ const submitEvent = async () => {
         : (Number(form.value.max_age) || null)) : null,
       skatepark: isClass ? form.value.location || DEFAULT_SKATEPARK : null,
       price_mxn: isClass ? priceNum : null,
+      coach_tier: isClass ? formCoachTier.value : null,
       max_capacity_override: isClass ? Number(form.value.max_capacity_override) || null : null,
       // Editing one class must not detach it from its program series.
       program_series_id: editingSeriesId.value,
@@ -2041,7 +2049,7 @@ const selectDay = (day: Date) => {
           <div class="min-w-0">
             <h1 class="text-xl font-bold text-white flex items-center gap-2">
               <span aria-hidden="true">📅</span>
-              {{ language === 'es' ? 'Calendario escolar' : 'School calendar' }}
+              {{ language === 'es' ? 'Calendario' : 'Calendar' }}
             </h1>
             <p class="text-xs text-gray-500 truncate">
               {{
@@ -2774,13 +2782,39 @@ const selectDay = (day: Date) => {
                     {{ language === 'es' ? track.label.es : track.label.en }}
                   </button>
                 </div>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-xs font-medium text-gray-400">
+                  {{ language === 'es' ? 'Coach / precios' : 'Coach / prices' }}
+                  <span class="text-red-400">*</span>
+                </p>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button
+                    v-for="tier in FINANCE_COACH_TIERS"
+                    :key="tier.id"
+                    type="button"
+                    class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"
+                    :class="
+                      formCoachTier === tier.id
+                        ? 'border-amber-500 bg-amber-500/15 text-white'
+                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                    "
+                    @click="form.coach_tier = tier.id"
+                  >
+                    <span
+                      class="block w-2 h-2 rounded-full mx-auto mb-1"
+                      :style="{ backgroundColor: tier.color }"
+                      aria-hidden="true"
+                    />
+                    {{ language === 'es' ? tier.es : tier.en }}
+                  </button>
+                </div>
                 <p class="text-[10px] text-amber-300/70">
-                  {{ coachTierLabel(formCoachTier, language === 'es') }}
-                  ·
                   {{
                     language === 'es'
-                      ? 'Intermedio/Avanzado = Coach Pro (especialista)'
-                      : 'Intermediate/Advanced = Pro coach (specialist)'
+                      ? 'Define la lista de precios del programa (Finanzas → Precios).'
+                      : 'Sets which price list the program sells at (Finanzas → Precios).'
                   }}
                 </p>
               </div>

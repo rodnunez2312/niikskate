@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   let q = supabase
     .from('school_calendar_events')
     .select(
-      'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, program_series_id, max_capacity_override, season_slug',
+      'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, coach_tier, program_series_id, max_capacity_override, season_slug',
     )
     .eq('event_type', 'class_session')
     .eq('is_bookable', true)

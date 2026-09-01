@@ -478,8 +478,20 @@ export const PROGRAM_PACK_12_MXN = 1500
 export const PROGRAM_PACK_16_MXN = 2000
 export const PROGRAM_PACK_24_MXN = 3000
 
-export type ParentClassPack = 1 | 4 | 8 | 12 | 16 | 24
 export type ParentMultiClassPack = 4 | 8 | 12 | 16 | 24
+
+/**
+ * A single class can be booked two ways at different rates, so the drop-in
+ * options are named instead of sharing one "1" the way packs share a count.
+ */
+export type ParentSingleClass = 'group_1' | 'individual_1'
+export const PARENT_SINGLE_CLASSES: ParentSingleClass[] = ['group_1', 'individual_1']
+
+export type ParentClassPack = ParentSingleClass | ParentMultiClassPack
+
+export function isSingleClassPack(pack: ParentClassPack): pack is ParentSingleClass {
+  return pack === 'group_1' || pack === 'individual_1'
+}
 
 /** Total classes generated for a program: one per training day, every week. */
 export function programClassCount(
@@ -530,6 +542,8 @@ export interface BookableClassSession {
   max_age: number | null
   skatepark: string | null
   price_mxn: number | null
+  /** Coach price list picked by the admin; null falls back to Coach Niik. */
+  coach_tier?: string | null
   location: string | null
   description: string | null
   coachCount: number

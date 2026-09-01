@@ -277,6 +277,70 @@ export function suggestedFinalMxn(listMxn: number, discountPct: number | null): 
   return Math.ceil((listMxn * (1 - discountPct)) / 100) * 100
 }
 
+/**
+ * Only the two single-session rows are typed by hand. Every other package is a
+ * multiple of one of them, so a coach's whole sheet moves from two numbers.
+ */
+export function isBasePriceKind(kind: ClassPackageKind): boolean {
+  return kind === 'group_session' || kind === 'individual_session'
+}
+
+export function basePriceKindFor(kind: ClassPackageKind): ClassPackageKind {
+  return kind.startsWith('individual') ? 'individual_session' : 'group_session'
+}
+
+/** Precio = price of one session x how many sessions the package includes. */
+export function derivedListMxn(
+  row: Pick<FinancePriceRow, 'class_kind' | 'sessions'>,
+  tierRows: FinancePriceRow[],
+): number | null {
+  if (isBasePriceKind(row.class_kind)) return null
+  const base = tierRows.find(r => r.class_kind === basePriceKindFor(row.class_kind))
+  const sessions = Number(row.sessions) || 0
+  if (!base || sessions <= 0) return null
+  const unit = Number(base.list_mxn) || 0
+  if (unit <= 0) return null
+  return unit * sessions
+}
+
+export interface PriceRecalcChange {
+  id: string
+  label: string
+  fromMxn: number
+  toMxn: number
+  fromFinalMxn: number | null
+  toFinalMxn: number | null
+}
+
+/**
+ * What "Recalcular precios" would write. Nothing is saved until the admin
+ * confirms, so editing a session price leaves the sheet untouched until then.
+ *
+ * Precio final is only rewritten for rows that carry a discount; a row without
+ * one sells at list, and blanking a hand-entered final would lose that edit.
+ */
+export function priceRecalcPlan(tierRows: FinancePriceRow[]): PriceRecalcChange[] {
+  const changes: PriceRecalcChange[] = []
+  for (const row of tierRows) {
+    const nextList = derivedListMxn(row, tierRows) ?? (Number(row.list_mxn) || 0)
+    const nextFinal = row.discount_pct
+      ? suggestedFinalMxn(nextList, row.discount_pct)
+      : (row.final_mxn ?? null)
+    const listMoved = nextList !== Number(row.list_mxn)
+    const finalMoved = (nextFinal ?? null) !== (row.final_mxn ?? null)
+    if (!listMoved && !finalMoved) continue
+    changes.push({
+      id: row.id,
+      label: row.label_es,
+      fromMxn: Number(row.list_mxn) || 0,
+      toMxn: nextList,
+      fromFinalMxn: row.final_mxn ?? null,
+      toFinalMxn: nextFinal ?? null,
+    })
+  }
+  return changes
+}
+
 /** Total Vendido = Precio final x Vendidos. */
 export function totalSoldMxn(row: FinancePriceRow): number {
   return effectivePriceMxn(row) * (row.units_sold || 0)

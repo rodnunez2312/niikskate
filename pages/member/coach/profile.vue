@@ -169,7 +169,7 @@ const menuItems = computed((): MenuRow[] => {
     items.splice(2, 0, {
       kind: 'link',
       icon: '📅',
-      label: language.value === 'es' ? 'Calendario escolar' : 'School calendar',
+      label: language.value === 'es' ? 'Calendario' : 'Calendar',
       path: '/member/admin/scheduling/calendar',
       description:
         language.value === 'es' ? 'Eventos, cierres y competencias' : 'Events, closures, and competitions',

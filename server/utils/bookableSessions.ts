@@ -23,6 +23,7 @@ export type BookableSessionRow = {
   max_age: number | null
   skatepark: string | null
   price_mxn: number | null
+  coach_tier?: string | null
   program_series_id?: string | null
   max_capacity_override?: number | null
   season_slug?: string | null

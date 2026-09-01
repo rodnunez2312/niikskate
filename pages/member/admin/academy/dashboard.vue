@@ -300,7 +300,7 @@ const formatDate = (date: string) => {
               📅
             </div>
             <div class="flex-1">
-              <p class="font-semibold text-white">{{ language === 'es' ? 'Calendario escolar' : 'School calendar' }}</p>
+              <p class="font-semibold text-white">{{ language === 'es' ? 'Calendario' : 'Calendar' }}</p>
               <p class="text-sm text-gray-400">
                 {{ language === 'es' ? 'Eventos, cierres y competencias' : 'Events, closures, and competitions' }}
               </p>

@@ -38,6 +38,8 @@ Run migration: `supabase/migrations/add_birthday_and_class_individual.sql` (birt
 
 Run migration: `supabase/migrations/seed_mexico_holidays_2026_2027.sql` (national holidays 2026–2027; also auto-seeded when opening admin calendar)
 
+Run migration: `supabase/migrations/add_program_coach_tier.sql` (**required for the "Coach / precios" picker** when creating a program) — adds `coach_tier` to `school_calendar_events`. The tier used to be inferred from the skill level, so every Intermedio/Avanzado program silently sold at Coach Pro Street rates ($500 individual instead of $250). Admins now choose Coach Niik / Pro Street / Pro Bowl per program, and existing rows stay NULL, which reads as Coach Niik.
+
 Run migration: `supabase/migrations/add_brand_and_ramp_storage_policies.sql` (**required for brand logo uploads** in Admin → Skateshop → Marcas) — `storage.objects` only had policies for `products/` and `avatars/`, so every write to `brands/` was denied by RLS and the logo silently fell back to a device-local `blob:` URL. Also covers `skateramps/`, which had the same gap for the ramp studio reference photos.
 
 Run migration: `supabase/migrations/add_skateramp_projects.sql` (Skateramps studio + public catalog projects)

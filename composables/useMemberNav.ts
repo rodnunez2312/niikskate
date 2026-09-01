@@ -138,7 +138,7 @@ export function useMemberNav() {
         titleEn: 'Scheduling',
         items: [
           {
-            name: es.value ? 'Calendario escolar' : 'School calendar',
+            name: es.value ? 'Calendario' : 'Calendar',
             path: '/member/admin/scheduling/calendar',
             icon: 'calendar',
             adminOnly: true,

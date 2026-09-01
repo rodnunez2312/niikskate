@@ -29,7 +29,8 @@ export interface FinanceSheetColumn {
   /** Applied to the desktop <th>/<td>; use a Tailwind width class. */
   width?: string
   options?: Array<{ value: string; label: string }>
-  readonly?: boolean
+  /** A predicate locks the cell per row, e.g. prices derived from another row. */
+  readonly?: boolean | ((row: Record<string, any>) => boolean)
   /** Rendered text for `computed` columns, and for the mobile card summary. */
   compute?: (row: Record<string, any>) => string
   /** Keep the phone card short by dropping reference-only columns. */
@@ -79,6 +80,11 @@ const emit = defineEmits<{
 const mobileColumns = computed(() => props.columns.filter(c => !c.hideOnMobile))
 
 const idOf = (row: Record<string, any>) => String(row[props.rowKey] ?? '')
+
+function isStatic(row: Record<string, any>, col: FinanceSheetColumn): boolean {
+  if (col.type === 'computed') return true
+  return typeof col.readonly === 'function' ? col.readonly(row) : !!col.readonly
+}
 
 function displayValue(row: Record<string, any>, col: FinanceSheetColumn): string {
   if (col.compute) return col.compute(row)
@@ -191,7 +197,7 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
               :class="[col.width, toneCell(row, col)]"
             >
               <p
-                v-if="col.type === 'computed' || col.readonly"
+                v-if="isStatic(row, col)"
                 class="px-2 py-1.5 text-xs tabular-nums"
                 :class="[
                   alignClass(col),
@@ -319,7 +325,7 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
             </label>
 
             <p
-              v-if="col.type === 'computed' || col.readonly"
+              v-if="isStatic(row, col)"
               class="text-sm tabular-nums py-1"
               :class="toneText(row, col)
                 ? `${toneText(row, col)} font-bold`

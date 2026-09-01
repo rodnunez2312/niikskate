@@ -258,8 +258,10 @@ export function classKindForBookOption(
   }
 }
 
-/** Season packs are expressed as a class count (4, 8, 12, 16, 24). */
-export function classKindForPack(pack: number | null | undefined): ClassPackageKind | null {
+/** Season packs are a class count (4, 8, 12, 16, 24); single classes are named. */
+export function classKindForPack(pack: string | number | null | undefined): ClassPackageKind | null {
+  if (pack === 'group_1') return 'group_session'
+  if (pack === 'individual_1') return 'individual_session'
   switch (Number(pack)) {
     case 1:
       return 'group_session'

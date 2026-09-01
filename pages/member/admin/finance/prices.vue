@@ -8,12 +8,12 @@ import {
   classKindLabel,
   coachPayMxn,
   downloadCsv,
-  effectivePriceMxn,
   formatMoneyMxn,
+  isBasePriceKind,
   payPerSessionMxn,
   priceListCsv,
   priceListCsvName,
-  suggestedFinalMxn,
+  priceRecalcPlan,
   totalSoldMxn,
   type FinancePriceRow,
 } from '~/utils/finance'
@@ -48,7 +48,16 @@ const columns = computed((): FinanceSheetColumn[] => [
     width: 'w-52',
     placeholder: es.value ? 'Nombre' : 'Name',
   },
-  { key: 'list_mxn', label: es.value ? 'Precio' : 'Price', type: 'money', align: 'right', width: 'w-24' },
+  {
+    key: 'list_mxn',
+    label: es.value ? 'Precio' : 'Price',
+    type: 'money',
+    align: 'right',
+    width: 'w-24',
+    // Only the single-session rows are typed; the rest are session x sessions.
+    readonly: row => !isBasePriceKind((row as FinancePriceRow).class_kind),
+    compute: row => formatMoneyMxn(Number((row as FinancePriceRow).list_mxn) || 0),
+  },
   {
     key: 'final_mxn',
     label: es.value ? 'Precio final' : 'Final price',
@@ -121,6 +130,8 @@ const groups = computed(() =>
     return {
       tier,
       rows,
+      /** How many rows the recalculate button would rewrite right now. */
+      pending: priceRecalcPlan(rows).length,
       totals: {
         label_es: es.value ? 'Total' : 'Total',
         total_sold: formatMoneyMxn(rows.reduce((s, r) => s + totalSoldMxn(r), 0)),
@@ -168,23 +179,40 @@ async function addRow(tier: CoachPricingTier, kind: ClassPackageKind | undefined
   if (!res.ok && res.message) alert(res.message)
 }
 
-/** Reapplies the sheet formula: discount the list price, round up to the nearest 100. */
-async function recalcFinals(tier: CoachPricingTier) {
-  const targets = priceRows.value.filter(
-    r => r.coach_tier === tier && r.discount_pct != null && r.discount_pct > 0,
-  )
-  if (!targets.length) {
-    alert(es.value ? 'Ninguna fila tiene descuento.' : 'No rows have a discount.')
+/**
+ * Rebuilds a coach's sheet from its two session prices: Precio becomes
+ * session x sessions, then Descuento % gives Precio final. Editing a session
+ * price changes nothing until this runs.
+ */
+async function recalcPrices(tier: CoachPricingTier) {
+  const rows = priceRows.value.filter(r => r.coach_tier === tier)
+  const plan = priceRecalcPlan(rows)
+  if (!plan.length) {
+    alert(es.value ? 'Los precios ya están al día.' : 'Prices are already up to date.')
     return
   }
-  const preview = targets
-    .map(r => `${r.label_es}: ${formatMoneyMxn(effectivePriceMxn(r))} → ${formatMoneyMxn(suggestedFinalMxn(Number(r.list_mxn), r.discount_pct))}`)
-    .join('\n')
-  if (!confirm(`${es.value ? 'Recalcular precio final' : 'Recalculate final price'}\n\n${preview}`)) return
 
-  for (const row of targets) {
-    const next = suggestedFinalMxn(Number(row.list_mxn), row.discount_pct)
-    if (next != null && next !== row.final_mxn) await updatePriceRow(row.id, { final_mxn: next })
+  const preview = plan
+    .map((c) => {
+      const list = `${formatMoneyMxn(c.fromMxn)} → ${formatMoneyMxn(c.toMxn)}`
+      const final =
+        c.toFinalMxn !== c.fromFinalMxn
+          ? ` · final ${formatMoneyMxn(c.fromFinalMxn)} → ${formatMoneyMxn(c.toFinalMxn)}`
+          : ''
+      return `${c.label}: ${list}${final}`
+    })
+    .join('\n')
+  if (!confirm(`${es.value ? 'Actualizar precios' : 'Update prices'}\n\n${preview}`)) return
+
+  for (const change of plan) {
+    const patch: Partial<FinancePriceRow> = {}
+    if (change.toMxn !== change.fromMxn) patch.list_mxn = change.toMxn
+    if (change.toFinalMxn !== change.fromFinalMxn) patch.final_mxn = change.toFinalMxn
+    const res = await updatePriceRow(change.id, patch)
+    if (!res.ok && res.message) {
+      alert(res.message)
+      return
+    }
   }
 }
 
@@ -233,8 +261,13 @@ function exportCsv() {
       <template v-else>
         <p class="text-[11px] text-gray-500 leading-snug">
           {{ es
-            ? 'Edita cualquier celda y se guarda al salir del campo. Precio final vacío = se vende al precio de lista. Total vendido, Pago x día, Academia y Pago coach se calculan igual que en el Excel.'
-            : 'Edit any cell; it saves when the field loses focus. An empty final price sells at list price. Total sold, pay per day, academy cut and coach pay are computed exactly as in the Excel.' }}
+            ? 'Solo se escribe el Precio de las filas de 1 sesión (Grupal e Individual) de cada coach. El resto sale de Precio de 1 sesión × Sesiones, y Precio final aplica el Descuento %. Nada cambia hasta pulsar Recalcular precios.'
+            : 'Only the Precio of the 1-session rows (group and individual) is typed per coach. Every other row is 1-session price × sessions, and Precio final applies the discount. Nothing changes until you hit Recalculate prices.' }}
+        </p>
+        <p class="text-[11px] text-gray-500 leading-snug">
+          {{ es
+            ? 'Las demás celdas se guardan al salir del campo. Precio final vacío = se vende al precio de lista. Total vendido, Pago x día, Academia y Pago coach se calculan igual que en el Excel.'
+            : 'Other cells save when the field loses focus. An empty final price sells at list price. Total sold, pay per day, academy cut and coach pay are computed exactly as in the Excel.' }}
         </p>
 
         <section v-for="group in groups" :key="group.tier.id" class="space-y-2">
@@ -251,10 +284,14 @@ function exportCsv() {
               <button
                 type="button"
                 :disabled="saving"
-                class="text-[11px] px-2.5 py-1.5 rounded-lg bg-gray-800 text-gray-300 disabled:opacity-40"
-                @click="recalcFinals(group.tier.id)"
+                class="text-[11px] px-2.5 py-1.5 rounded-lg font-bold disabled:opacity-40 transition-colors"
+                :class="group.pending
+                  ? 'bg-gold-400 text-black hover:bg-gold-300'
+                  : 'bg-gray-800 text-gray-300'"
+                @click="recalcPrices(group.tier.id)"
               >
-                {{ es ? 'Recalcular finales' : 'Recalculate finals' }}
+                {{ es ? 'Recalcular precios' : 'Recalculate prices' }}
+                <span v-if="group.pending">({{ group.pending }})</span>
               </button>
               <select
                 v-if="group.availableKinds.length"

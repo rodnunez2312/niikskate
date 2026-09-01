@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
   const { data: row, error: evErr } = await supabase
     .from('school_calendar_events')
     .select(
-      'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, visible_to_parents, max_capacity_override, program_series_id',
+      'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, coach_tier, visible_to_parents, max_capacity_override, program_series_id',
     )
     .eq('id', eventId)
     .single()
@@ -204,7 +204,7 @@ export default defineEventHandler(async (event) => {
       const { data: seriesRows, error: seriesErr } = await supabase
         .from('school_calendar_events')
         .select(
-          'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, visible_to_parents, max_capacity_override, program_series_id',
+          'id, title, event_type, start_date, end_date, start_time, end_time, location, description, is_bookable, time_slot, audience_category, audience_categories, skill_level, min_age, max_age, skatepark, price_mxn, coach_tier, visible_to_parents, max_capacity_override, program_series_id',
         )
         .eq('program_series_id', row.program_series_id)
         .eq('is_bookable', true)

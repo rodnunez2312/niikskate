@@ -1,5 +1,3 @@
-import type { ProgramSkillTrack } from '~/types'
-
 export const SEASON_TOTAL_CLASSES = 12
 
 /** Curso de verano — flat group rate ($420/day; 5-day pack $1,860). */
@@ -13,14 +11,7 @@ export function summerCoursePriceMxn(days: 5 | 10): number {
   return SUMMER_COURSE_PRICE_MXN[days]
 }
 
-function skillTrackFromLevelId(id: string | null | undefined): ProgramSkillTrack {
-  if (!id) return 'beginner'
-  if (id.startsWith('advanced')) return 'advanced'
-  if (id.startsWith('intermediate')) return 'intermediate'
-  return 'beginner'
-}
-
-/** Coach Principiante teaches fundamentals; Coach Pro is competition/pro experience (Street or Bowl). */
+/** Coach Niik teaches fundamentals; Coach Pro is competition/pro experience (Street or Bowl). */
 export type CoachPricingTier = 'principiante' | 'pro_street' | 'pro_bowl'
 
 export type ClassPackageKind =
@@ -229,21 +220,22 @@ export const COACH_PRICING_TIER_META: Record<
   { label: { es: string; en: string }; description: { es: string; en: string } }
 > = {
   principiante: {
-    label: { es: 'Coach Principiante', en: 'Beginner Coach' },
+    // Same wording as the Finanzas price sheet so both screens name one coach.
+    label: { es: 'Coach Niik', en: 'Coach Niik' },
     description: {
       es: 'Entrenador de fundamentos y técnica básica.',
       en: 'Fundamentals and basic technique coach.',
     },
   },
   pro_street: {
-    label: { es: 'Coach Street', en: 'Coach Street' },
+    label: { es: 'Coach Pro Street', en: 'Coach Pro Street' },
     description: {
       es: 'Especialista con experiencia en competencia y skate pro. Fundamentos hasta nivel competidor.',
       en: 'Specialist with competition and pro experience. Foundations through competitor level.',
     },
   },
   pro_bowl: {
-    label: { es: 'Coach Bowl', en: 'Coach Bowl' },
+    label: { es: 'Coach Pro Bowl', en: 'Coach Pro Bowl' },
     description: {
       es: 'Especialista en bowl con experiencia en competencia y skate pro.',
       en: 'Bowl specialist with competition and pro experience.',
@@ -251,14 +243,20 @@ export const COACH_PRICING_TIER_META: Record<
   },
 }
 
-/** Programs with Intermedio or Avanzado use Pro specialist pricing; Principiante only → fundamentals coach. */
-export function coachTierFromSkillTracks(tracks: ProgramSkillTrack[]): CoachPricingTier {
-  if (tracks.some(t => t === 'intermediate' || t === 'advanced')) return 'pro_street'
-  return 'principiante'
-}
+/**
+ * Programs sell at Coach Niik rates unless an admin picks another coach. The
+ * tier used to be derived from the skill level, which silently charged Pro
+ * Street prices for every Intermedio and Avanzado program.
+ */
+export const DEFAULT_COACH_TIER: CoachPricingTier = 'principiante'
 
-export function coachTierFromSkillLevel(skillLevel: string | null | undefined): CoachPricingTier {
-  return coachTierFromSkillTracks([skillTrackFromLevelId(skillLevel)])
+export const COACH_PRICING_TIERS: CoachPricingTier[] = ['principiante', 'pro_street', 'pro_bowl']
+
+/** Reads a tier off a DB row, falling back to Coach Niik for older programs. */
+export function normalizeCoachTier(value: string | null | undefined): CoachPricingTier {
+  return COACH_PRICING_TIERS.includes(value as CoachPricingTier)
+    ? (value as CoachPricingTier)
+    : DEFAULT_COACH_TIER
 }
 
 export function coachTierLabel(tier: CoachPricingTier, es: boolean): string {
@@ -266,11 +264,15 @@ export function coachTierLabel(tier: CoachPricingTier, es: boolean): string {
   return es ? row.label.es : row.label.en
 }
 
+/**
+ * Pro Bowl only sells sessions and small packs, so a monthly program on that
+ * coach falls back to the Coach Niik row instead of pricing itself at $0.
+ */
 export function getClassPriceRow(
   tier: CoachPricingTier,
   kind: ClassPackageKind,
 ): ClassPriceRow | undefined {
-  return CLASS_PRICING[tier][kind]
+  return CLASS_PRICING[tier][kind] ?? CLASS_PRICING[DEFAULT_COACH_TIER][kind]
 }
 
 export function getClassPriceMxn(
@@ -316,7 +318,6 @@ export function resolveProgramPackageKind(input: {
 }
 
 export function resolveDefaultProgramPriceMxn(input: {
-  skillTracks: ProgramSkillTrack[]
   eventType: 'class_session' | 'class_individual'
   isRecurring: boolean
   isSummerCourse: boolean
@@ -324,7 +325,7 @@ export function resolveDefaultProgramPriceMxn(input: {
   classCount?: number
   coachTier?: CoachPricingTier
 }): number {
-  const tier = input.coachTier ?? coachTierFromSkillTracks(input.skillTracks)
+  const tier = input.coachTier ?? DEFAULT_COACH_TIER
   const kind = resolveProgramPackageKind({
     eventType: input.eventType,
     isRecurring: input.isRecurring,
