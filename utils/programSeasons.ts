@@ -211,14 +211,10 @@ export type SeasonHighlightColor = {
 }
 
 export const SEASON_HIGHLIGHT_PALETTE: SeasonHighlightColor[] = [
-  { fill: 'rgba(20, 184, 166, 0.40)', fillMuted: 'rgba(20, 184, 166, 0.18)', solid: '#14b8a6' },
-  { fill: 'rgba(245, 158, 11, 0.40)', fillMuted: 'rgba(245, 158, 11, 0.18)', solid: '#f59e0b' },
-  { fill: 'rgba(168, 85, 247, 0.40)', fillMuted: 'rgba(168, 85, 247, 0.18)', solid: '#a855f7' },
-  { fill: 'rgba(59, 130, 246, 0.40)', fillMuted: 'rgba(59, 130, 246, 0.18)', solid: '#3b82f6' },
-  { fill: 'rgba(244, 63, 94, 0.40)', fillMuted: 'rgba(244, 63, 94, 0.18)', solid: '#f43f5e' },
-  { fill: 'rgba(34, 197, 94, 0.40)', fillMuted: 'rgba(34, 197, 94, 0.18)', solid: '#22c55e' },
-  { fill: 'rgba(236, 72, 153, 0.40)', fillMuted: 'rgba(236, 72, 153, 0.18)', solid: '#ec4899' },
-  { fill: 'rgba(6, 182, 212, 0.40)', fillMuted: 'rgba(6, 182, 212, 0.18)', solid: '#06b6d4' },
+  // Seasons are structural filters, not semantic categories. Keep them neutral.
+  { fill: 'rgba(100, 116, 139, 0.30)', fillMuted: 'rgba(100, 116, 139, 0.14)', solid: '#64748b' },
+  { fill: 'rgba(107, 114, 128, 0.30)', fillMuted: 'rgba(107, 114, 128, 0.14)', solid: '#6b7280' },
+  { fill: 'rgba(113, 113, 122, 0.30)', fillMuted: 'rgba(113, 113, 122, 0.14)', solid: '#71717a' },
 ]
 
 export function seasonHighlightColor(index: number): SeasonHighlightColor {

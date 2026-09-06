@@ -180,7 +180,7 @@ const individualClassOptions = computed(() => [
     name: language.value === 'es' ? 'Clase Individual' : 'Individual Class',
     description: language.value === 'es' ? 'Entrenamiento uno a uno' : 'One-on-one coaching',
     price: 250,
-    color: 'bg-purple-500',
+    color: 'bg-gray-500',
     capacity: 1,
   },
   {
@@ -196,7 +196,7 @@ const individualClassOptions = computed(() => [
     name: language.value === 'es' ? 'Clase Grupal - Intermedios' : 'Group Class - Intermediate',
     description: language.value === 'es' ? 'Clase sin paquete' : 'Single class',
     price: 350,
-    color: 'bg-yellow-500',
+    color: 'bg-blue-500',
     capacity: 6,
   },
   {
@@ -204,7 +204,7 @@ const individualClassOptions = computed(() => [
     name: language.value === 'es' ? 'Clase Pro Skater - Max Barrera' : 'Pro Skater Class - Max Barrera',
     description: language.value === 'es' ? 'Disponibilidad limitada' : 'Limited availability',
     price: 400,
-    color: 'bg-amber-500',
+    color: 'bg-purple-500',
     capacity: 1,
   },
 ])
@@ -216,7 +216,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Paquete 3 Clases' : '3 Classes Package',
     description: language.value === 'es' ? 'Grupal • descuento aplicado: $945' : 'Group • discounted: $945',
     price: 945,
-    color: 'bg-green-500',
+    color: 'bg-gray-500',
     badge: null,
   },
   {
@@ -224,7 +224,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Paquete 5 Clases' : '5 Classes Package',
     description: language.value === 'es' ? 'Grupal • descuento aplicado: $1,400' : 'Group • discounted: $1,400',
     price: 1400,
-    color: 'bg-yellow-500',
+    color: 'bg-gray-500',
     badge: 'Popular',
   },
   {
@@ -232,7 +232,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Solo Sábados (4 Clases)' : 'Saturdays Only (4 Classes)',
     description: language.value === 'es' ? 'Todas del mes - Válido 1 mes' : 'All month - Valid 1 month',
     price: 420,
-    color: 'bg-purple-500',
+    color: 'bg-gray-500',
     badge: null,
   },
   {
@@ -240,7 +240,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Individual 3 sesiones' : 'Individual 3 sessions',
     description: language.value === 'es' ? 'Descuento aplicado: $1,080' : 'Discounted: $1,080',
     price: 1080,
-    color: 'bg-purple-500',
+    color: 'bg-gray-500',
     badge: null,
   },
   {
@@ -248,7 +248,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Individual 5 sesiones' : 'Individual 5 sessions',
     description: language.value === 'es' ? 'Descuento aplicado: $1,600' : 'Discounted: $1,600',
     price: 1600,
-    color: 'bg-violet-600',
+    color: 'bg-gray-500',
     badge: null,
   },
   {
@@ -256,7 +256,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Pro Max - Grupal 3 sesiones' : 'Pro Max - Group 3 sessions',
     description: language.value === 'es' ? 'Descuento aplicado: $405' : 'Discounted: $405',
     price: 405,
-    color: 'bg-amber-500',
+    color: 'bg-purple-500',
     badge: 'PRO',
   },
   {
@@ -264,7 +264,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Pro Max - Grupal 5 sesiones' : 'Pro Max - Group 5 sessions',
     description: language.value === 'es' ? 'Descuento aplicado: $600' : 'Discounted: $600',
     price: 600,
-    color: 'bg-orange-500',
+    color: 'bg-purple-500',
     badge: 'PRO',
   },
   {
@@ -272,7 +272,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Pro Max - Individual 3 sesiones' : 'Pro Max - Individual 3 sessions',
     description: language.value === 'es' ? 'Descuento aplicado: $675' : 'Discounted: $675',
     price: 675,
-    color: 'bg-purple-600',
+    color: 'bg-purple-500',
     badge: 'PRO',
   },
   {
@@ -280,7 +280,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Pro Max - Individual 5 sesiones' : 'Pro Max - Individual 5 sessions',
     description: language.value === 'es' ? 'Descuento aplicado: $1000' : 'Discounted: $1000',
     price: 1000,
-    color: 'bg-fuchsia-600',
+    color: 'bg-purple-500',
     badge: 'PRO',
   },
   {
@@ -288,7 +288,7 @@ const packageOptions = computed(() => [
     name: language.value === 'es' ? 'Pro Max - Mensual princ' : 'Pro Max - Monthly',
     description: language.value === 'es' ? 'Plan mensual' : 'Monthly plan',
     price: 1000,
-    color: 'bg-amber-600',
+    color: 'bg-purple-500',
     badge: 'PRO',
   },
 ])

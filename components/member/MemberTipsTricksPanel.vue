@@ -64,9 +64,9 @@ const categories: Array<{ value: SkillCategory | 'all'; icon: string }> = [
 
 function difficultyBadge(difficulty: string) {
   switch (difficulty) {
-    case 'beginner': return 'bg-green-500/20 text-green-400'
-    case 'intermediate': return 'bg-yellow-500/20 text-yellow-400'
-    case 'advanced': return 'bg-red-500/20 text-red-400'
+    case 'beginner': return 'bg-green-500/20 text-green-300'
+    case 'intermediate': return 'bg-blue-500/20 text-blue-300'
+    case 'advanced': return 'bg-purple-500/20 text-purple-300'
     default: return 'bg-gray-700 text-gray-400'
   }
 }

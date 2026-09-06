@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { getHeader } from 'h3'
 import type { H3Event } from 'h3'
+import { SPOTS_PER_COACH } from '~/types'
 
-export const SPOTS_PER_COACH = 6
+// Shared with the admin calendar so both sides size a class the same way.
+export { SPOTS_PER_COACH }
 
 export type BookableSessionRow = {
   id: string

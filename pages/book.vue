@@ -365,7 +365,7 @@ const singleClassOptions = computed(() => [
     priceMXN: priceMxnFor('grouped', 150),
     priceUSD: 200,
     icon: '👥',
-    color: 'from-green-400 to-green-600',
+    color: 'from-gray-500 to-gray-600',
   },
   {
     id: 'individual',
@@ -384,7 +384,7 @@ const singleClassOptions = computed(() => [
     priceMXN: priceMxnFor('individual', 250),
     priceUSD: 200,
     icon: '👤',
-    color: 'from-purple-400 to-purple-600',
+    color: 'from-gray-500 to-gray-600',
   },
   {
     id: 'ind_3',
@@ -393,7 +393,7 @@ const singleClassOptions = computed(() => [
     priceMXN: 675,
     priceUSD: 65,
     icon: '3️⃣',
-    color: 'from-purple-400 to-purple-600',
+    color: 'from-gray-500 to-gray-600',
     badge: '10% OFF',
   },
   {
@@ -403,7 +403,7 @@ const singleClassOptions = computed(() => [
     priceMXN: 1000,
     priceUSD: 95,
     icon: '5️⃣',
-    color: 'from-purple-500 to-purple-700',
+    color: 'from-gray-500 to-gray-600',
     badge: '20% OFF',
   },
 ])
@@ -417,7 +417,7 @@ const packageOptions = computed(() => [
     priceMXN: priceMxnFor('monthly', 800),
     priceUSD: 35,
     icon: '🏆',
-    color: 'from-gold-400 to-gold-600',
+    color: 'from-green-400 to-green-600',
     badge: language.value === 'es' ? 'Mejor valor' : 'Best value',
   },
   {
@@ -427,7 +427,7 @@ const packageOptions = computed(() => [
     priceMXN: priceMxnFor('monthly_intermediate', 1000),
     priceUSD: 50,
     icon: '⭐',
-    color: 'from-purple-400 to-blue-600',
+    color: 'from-orange-400 to-orange-600',
     badge: language.value === 'es' ? 'Competitivo' : 'Competitive',
   },
   {
@@ -437,7 +437,7 @@ const packageOptions = computed(() => [
     priceMXN: priceMxnFor('pkg_3', 405),
     priceUSD: 540,
     icon: '3️⃣',
-    color: 'from-green-400 to-green-600',
+    color: 'from-gray-500 to-gray-600',
     badge: packDiscountBadge('pkg_3', 450, 405),
   },
   {
@@ -447,7 +447,7 @@ const packageOptions = computed(() => [
     priceMXN: priceMxnFor('pkg_5', 600),
     priceUSD: 850,
     icon: '5️⃣',
-    color: 'from-yellow-400 to-yellow-600',
+    color: 'from-gray-500 to-gray-600',
     badge: packDiscountBadge('pkg_5', 750, 600),
   },
   {
@@ -457,7 +457,7 @@ const packageOptions = computed(() => [
     priceMXN: priceMxnFor('saturdays', 420),
     priceUSD: 35,
     icon: '🗓️',
-    color: 'from-orange-400 to-orange-600',
+    color: 'from-gray-500 to-gray-600',
   },
 ])
 
@@ -469,7 +469,7 @@ const proClassOptions = computed(() => [
     priceMXN: priceMxnFor('pro_group_single', 350),
     priceUSD: 22,
     icon: '👥',
-    color: 'from-gold-400 to-glass-green',
+    color: 'from-purple-400 to-purple-600',
   },
   {
     id: 'pro_max_single',
@@ -478,7 +478,7 @@ const proClassOptions = computed(() => [
     priceMXN: priceMxnFor('pro_max_single', 400),
     priceUSD: 26,
     icon: '👤',
-    color: 'from-gold-400 to-glass-orange',
+    color: 'from-purple-400 to-purple-600',
   },
   {
     id: 'pro_group_3',
@@ -487,7 +487,7 @@ const proClassOptions = computed(() => [
     priceMXN: priceMxnFor('pro_group_3', 945),
     priceUSD: 58,
     icon: '3️⃣',
-    color: 'from-gold-400 to-glass-orange',
+    color: 'from-purple-400 to-purple-600',
     badge: packDiscountBadge('pro_group_3', 1050, 945),
   },
   {
@@ -497,7 +497,7 @@ const proClassOptions = computed(() => [
     priceMXN: priceMxnFor('pro_group_5', 1400),
     priceUSD: 86,
     icon: '5️⃣',
-    color: 'from-gold-500 to-glass-orange',
+    color: 'from-purple-400 to-purple-600',
     badge: packDiscountBadge('pro_group_5', 1750, 1400),
   },
   {
@@ -507,7 +507,7 @@ const proClassOptions = computed(() => [
     priceMXN: priceMxnFor('pro_ind_3', 1080),
     priceUSD: 67,
     icon: '3️⃣',
-    color: 'from-purple-400 to-gold-500',
+    color: 'from-purple-400 to-purple-600',
     badge: packDiscountBadge('pro_ind_3', 1200, 1080),
   },
   {
@@ -517,7 +517,7 @@ const proClassOptions = computed(() => [
     priceMXN: priceMxnFor('pro_ind_5', 1600),
     priceUSD: 98,
     icon: '5️⃣',
-    color: 'from-purple-500 to-gold-500',
+    color: 'from-purple-400 to-purple-600',
     badge: packDiscountBadge('pro_ind_5', 2000, 1600),
   },
   {
@@ -527,7 +527,7 @@ const proClassOptions = computed(() => [
     priceMXN: priceMxnFor('pro_monthly', 5000),
     priceUSD: 300,
     icon: '🏆',
-    color: 'from-gold-400 to-gold-600',
+    color: 'from-purple-400 to-purple-600',
   },
 ])
 

@@ -257,7 +257,7 @@ const labelClass = 'block text-xs font-semibold uppercase tracking-wide text-gra
             </p>
             <button
               type="button"
-              class="mt-7 px-6 py-3 rounded-xl font-black uppercase text-sm bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-black"
+              class="mt-7 rounded-xl bg-white px-6 py-3 text-sm font-black uppercase text-black hover:bg-gray-200"
               @click="close"
             >
               {{ es ? 'Listo' : 'Done' }}
@@ -461,7 +461,7 @@ const labelClass = 'block text-xs font-semibold uppercase tracking-wide text-gra
               </button>
               <button
                 type="submit"
-                class="px-6 py-3 rounded-xl font-black uppercase text-sm bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-black disabled:opacity-40 disabled:cursor-not-allowed"
+                class="rounded-xl bg-white px-6 py-3 text-sm font-black uppercase text-black hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
                 :disabled="!canSubmit"
               >
                 {{ submitting ? (es ? 'Enviando…' : 'Sending…') : (es ? 'Enviar solicitud' : 'Send request') }}

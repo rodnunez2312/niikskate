@@ -165,10 +165,8 @@ const levelsOpen = ref(false)
         <div class="p-3 border-t-2 border-black">
           <NuxtLink
             to="/classes"
-            class="block w-full py-3 rounded-lg text-center font-black text-sm uppercase text-white tracking-wide
-              bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400
-              hover:from-teal-400 hover:via-cyan-400 hover:to-amber-300
-              shadow-[0_4px_14px_rgba(20,184,166,0.35)]
+            class="block w-full py-3 rounded-lg bg-white text-center font-black text-sm uppercase text-black tracking-wide
+              hover:bg-gray-200 shadow-lg
               hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
           >
             {{ language === 'es' ? 'Ver clases' : 'Browse classes' }}
@@ -187,8 +185,8 @@ const levelsOpen = ref(false)
       </p>
       <NuxtLink
         to="/classes"
-        class="inline-flex items-center justify-center px-6 py-3 rounded-xl font-black uppercase text-sm
-          bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-white
+        class="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-white font-black uppercase text-sm text-black
+          hover:bg-gray-200
           hover:scale-[1.02] transition-transform"
       >
         {{ language === 'es' ? 'Ir a clases' : 'Go to classes' }}

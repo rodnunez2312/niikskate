@@ -10,30 +10,44 @@ const emit = defineEmits<{
 const { staffDashboardItem, staffNavSections, isActive } = useMemberNav()
 const route = useRoute()
 
-const expandedSections = ref<Record<string, boolean>>({})
+const STORAGE_KEY = 'niik-staff-sidebar-collapsed'
 
-function expandAllSections() {
-  const next: Record<string, boolean> = {}
-  for (const section of staffNavSections.value) {
-    next[section.id] = true
+/**
+ * Only the sections you closed are remembered, so anything added later shows up
+ * open rather than hidden behind a chevron nobody knows to click.
+ */
+const collapsed = ref<Set<string>>(new Set())
+
+const isSectionExpanded = (sectionId: string) => !collapsed.value.has(sectionId)
+
+function toggleSection(sectionId: string) {
+  const next = new Set(collapsed.value)
+  if (next.has(sectionId)) next.delete(sectionId)
+  else next.add(sectionId)
+  collapsed.value = next
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]))
+  } catch {
+    /* private mode — the sidebar just forgets between visits */
   }
-  expandedSections.value = next
 }
+
+onMounted(() => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) collapsed.value = new Set(JSON.parse(raw) as string[])
+  } catch {
+    /* ignore malformed state */
+  }
+})
 
 function itemKey(prefix: string, sectionId: string, item: { path: string; name: string }) {
   return prefix + sectionId + '-' + item.path + '-' + item.name
 }
 
-function isSectionExpanded(sectionId: string) {
-  return expandedSections.value[sectionId] ?? true
-}
-
-function toggleSection(sectionId: string) {
-  expandedSections.value = {
-    ...expandedSections.value,
-    [sectionId]: !isSectionExpanded(sectionId),
-  }
-}
+/** Marks a closed section that holds the page you are on. */
+const sectionHasActive = (section: { items: Array<{ path: string }> }) =>
+  section.items.some(item => isActive(item.path))
 
 watch(
   () => route.fullPath,
@@ -41,10 +55,6 @@ watch(
     if (props.mobileOpen) emit('close')
   },
 )
-
-watch(staffNavSections, expandAllSections, { immediate: true })
-
-onMounted(expandAllSections)
 
 function linkClass(active: boolean) {
   return active
@@ -56,44 +66,48 @@ function linkClass(active: boolean) {
 <template>
   <!-- Desktop sidebar -->
   <aside
-    class="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:border-r lg:border-gray-800 lg:bg-gray-950 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto"
+    class="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:border-r lg:border-gray-800 lg:bg-gray-950 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto"
   >
-    <div class="px-5 pt-6 pb-4 border-b border-gray-800">
+    <div class="px-4 pt-5 pb-3 border-b border-gray-800">
       <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-500">NiikSkate</p>
-      <p class="mt-1 text-sm text-gray-400">Staff</p>
     </div>
-    <nav class="flex-1 px-3 py-5 space-y-1">
+    <nav class="flex-1 px-2 py-3">
       <NuxtLink
         :to="staffDashboardItem.path"
-        class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-4"
+        class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors mb-2"
         :class="linkClass(isActive(staffDashboardItem.path))"
       >
-        <MemberNavIcon :name="staffDashboardItem.icon" class-name="w-5 h-5" />
+        <MemberNavIcon :name="staffDashboardItem.icon" class-name="w-4 h-4" />
         <span>{{ staffDashboardItem.name }}</span>
       </NuxtLink>
 
-      <div v-for="section in staffNavSections" :key="section.id" class="pt-1">
+      <div v-for="section in staffNavSections" :key="section.id" class="mt-1.5">
         <button
           type="button"
-          class="flex w-full items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-gray-200 hover:bg-gray-900 transition-colors"
+          class="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.14em] hover:bg-gray-900 transition-colors"
+          :class="
+            !isSectionExpanded(section.id) && sectionHasActive(section)
+              ? 'text-amber-500/80'
+              : 'text-gray-500 hover:text-gray-300'
+          "
           :aria-expanded="isSectionExpanded(section.id)"
           @click="toggleSection(section.id)"
         >
           <span>{{ section.title }}</span>
           <svg
-            class="w-4 h-4 text-gray-500 transition-transform shrink-0"
+            class="w-3 h-3 transition-transform shrink-0"
             :class="isSectionExpanded(section.id) ? 'rotate-90' : ''"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
             aria-hidden="true"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
           </svg>
         </button>
         <ul
           v-show="isSectionExpanded(section.id)"
-          class="mt-0.5 ml-3 pl-3 border-l border-gray-800 space-y-0.5"
+          class="ml-2.5 pl-2 border-l border-gray-800"
         >
           <li
             v-for="item in section.items"
@@ -101,11 +115,11 @@ function linkClass(active: boolean) {
           >
             <NuxtLink
               :to="item.path"
-              class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
+              class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] transition-colors"
               :class="linkClass(isActive(item.path))"
             >
-              <MemberNavIcon :name="item.icon" class-name="w-4 h-4" />
-              <span>{{ item.name }}</span>
+              <MemberNavIcon :name="item.icon" class-name="w-4 h-4 shrink-0" />
+              <span class="truncate">{{ item.name }}</span>
             </NuxtLink>
           </li>
         </ul>
@@ -128,16 +142,13 @@ function linkClass(active: boolean) {
         @click="emit('close')"
       />
       <aside
-        class="absolute left-0 top-0 bottom-0 w-[min(20rem,88vw)] bg-gray-950 border-r border-gray-800 overflow-y-auto shadow-2xl"
+        class="absolute left-0 top-0 bottom-0 w-[min(18rem,84vw)] bg-gray-950 border-r border-gray-800 overflow-y-auto shadow-2xl"
       >
-        <div class="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-800">
-          <div>
-            <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-500">NiikSkate</p>
-            <p class="mt-1 text-sm text-gray-400">Staff</p>
-          </div>
+        <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-800">
+          <p class="text-xs font-black uppercase tracking-[0.2em] text-amber-500">NiikSkate</p>
           <button
             type="button"
-            class="p-2 text-gray-400 hover:text-white"
+            class="p-1.5 text-gray-400 hover:text-white"
             aria-label="Close menu"
             @click="emit('close')"
           >
@@ -146,38 +157,43 @@ function linkClass(active: boolean) {
             </svg>
           </button>
         </div>
-        <nav class="px-3 py-5 space-y-1">
+        <nav class="px-2 py-3">
           <NuxtLink
             :to="staffDashboardItem.path"
-            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-4"
+            class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors mb-2"
             :class="linkClass(isActive(staffDashboardItem.path))"
           >
-            <MemberNavIcon :name="staffDashboardItem.icon" class-name="w-5 h-5" />
+            <MemberNavIcon :name="staffDashboardItem.icon" class-name="w-4 h-4" />
             <span>{{ staffDashboardItem.name }}</span>
           </NuxtLink>
 
-          <div v-for="section in staffNavSections" :key="'m-' + section.id" class="pt-1">
+          <div v-for="section in staffNavSections" :key="'m-' + section.id" class="mt-1.5">
             <button
               type="button"
-              class="flex w-full items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-gray-200 hover:bg-gray-900"
+              class="flex w-full items-center justify-between gap-2 px-2.5 py-2 rounded-md text-[10px] font-bold uppercase tracking-[0.14em] hover:bg-gray-900"
+              :class="
+                !isSectionExpanded(section.id) && sectionHasActive(section)
+                  ? 'text-amber-500/80'
+                  : 'text-gray-500'
+              "
               :aria-expanded="isSectionExpanded(section.id)"
               @click="toggleSection(section.id)"
             >
               <span>{{ section.title }}</span>
               <svg
-                class="w-4 h-4 text-gray-500 transition-transform shrink-0"
+                class="w-3 h-3 transition-transform shrink-0"
                 :class="isSectionExpanded(section.id) ? 'rotate-90' : ''"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
                 aria-hidden="true"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
               </svg>
             </button>
             <ul
               v-show="isSectionExpanded(section.id)"
-              class="mt-0.5 ml-3 pl-3 border-l border-gray-800 space-y-0.5"
+              class="ml-2.5 pl-2 border-l border-gray-800"
             >
               <li
                 v-for="item in section.items"
@@ -185,11 +201,11 @@ function linkClass(active: boolean) {
               >
                 <NuxtLink
                   :to="item.path"
-                  class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+                  class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors"
                   :class="linkClass(isActive(item.path))"
                 >
-                  <MemberNavIcon :name="item.icon" class-name="w-4 h-4" />
-                  <span>{{ item.name }}</span>
+                  <MemberNavIcon :name="item.icon" class-name="w-4 h-4 shrink-0" />
+                  <span class="truncate">{{ item.name }}</span>
                 </NuxtLink>
               </li>
             </ul>

@@ -235,13 +235,13 @@ watch(parentQuotes, () => {
 
         <div class="mt-14">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-            <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 text-center sm:text-left">
+            <h2 class="text-[13px] font-bold uppercase tracking-[0.1em] text-gold-400 text-center sm:text-left">
               {{ es ? 'Temporadas del programa' : 'Program seasons' }}
             </h2>
             <button
               v-if="isAdmin"
               type="button"
-              class="self-center sm:self-auto px-4 py-2.5 rounded-full font-semibold text-sm text-white bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400"
+              class="self-center sm:self-auto px-4 py-2.5 rounded-full font-semibold text-sm text-teal-300 border border-teal-500/60 hover:bg-teal-500/10 transition-colors"
               @click="addSeasonOpen = true"
             >
               + {{ es ? 'Añadir temporada' : 'Add season' }}

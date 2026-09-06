@@ -521,7 +521,7 @@ watch(user, async u => {
             </button>
             <button
               type="button"
-              class="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-semibold text-sm disabled:opacity-50"
+              class="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 transition-colors text-white font-semibold text-sm disabled:opacity-50"
               :disabled="saving"
               @click="publishToShop"
             >

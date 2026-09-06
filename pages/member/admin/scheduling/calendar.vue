@@ -37,6 +37,7 @@ import {
   skillTrackFromLevelId,
   PROGRESSION_AGE,
   PROGRESSION_AUDIENCE_CATEGORIES,
+  SPOTS_PER_COACH,
   isProgressionAudience,
   type ProgramSkillTrack,
   type ProgramWeekCount,
@@ -60,6 +61,7 @@ import {
   FINANCE_COACH_TIERS,
 } from '~/utils/finance'
 import { useFinance } from '~/composables/useFinance'
+import { EVENT_TYPE_COLORS, SKILL_LEVEL_COLORS } from '~/utils/semanticColors'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -130,9 +132,11 @@ const events = ref<SchoolCalendarRow[]>([])
 const viewMonth = ref(new Date())
 const selectedDate = ref<Date>(new Date())
 const filterType = ref<SchoolCalendarEventType | 'all'>('all')
-const calendarView = ref<'week' | 'month'>('week')
+const calendarView = ref<'today' | 'week' | 'month'>('week')
 const addMenuOpen = ref(false)
 const enrollmentCounts = ref<Record<string, number>>({})
+/** Coach names per time slot for the day Hoy is showing. */
+const dayCoachNames = ref<Record<string, string[]>>({})
 
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
@@ -345,6 +349,9 @@ const syncPriceFromFinance = () => {
 }
 
 const isSkillTrackSelected = (track: ProgramSkillTrack) => form.value.skill_tracks.includes(track)
+
+const skillTrackSelectedClass = (track: ProgramSkillTrack) =>
+  SKILL_LEVEL_COLORS[track].selected
 
 const toggleSkillTrack = (track: ProgramSkillTrack) => {
   const cur = [...form.value.skill_tracks]
@@ -794,25 +801,32 @@ const EVENT_META: Record<
   SchoolCalendarEventType,
   { dot: string; label: { en: string; es: string }; emoji: string }
 > = {
-  event: { dot: 'bg-violet-500', label: { en: 'Event', es: 'Evento' }, emoji: '📅' },
-  competition: { dot: 'bg-orange-500', label: { en: 'Competition', es: 'Competencia' }, emoji: '🏆' },
-  holiday: { dot: 'bg-teal-500', label: { en: 'Holiday', es: 'Festivo' }, emoji: '✨' },
+  event: { dot: EVENT_TYPE_COLORS.event.dot, label: { en: 'Event', es: 'Evento' }, emoji: '📅' },
+  competition: { dot: EVENT_TYPE_COLORS.competition.dot, label: { en: 'Competition', es: 'Competencia' }, emoji: '🏆' },
+  holiday: { dot: EVENT_TYPE_COLORS.holiday.dot, label: { en: 'Holiday', es: 'Festivo' }, emoji: '✨' },
   school_closure: { dot: 'bg-red-500', label: { en: 'School closure', es: 'Cierre escolar' }, emoji: '🚫' },
   school_open: { dot: 'bg-emerald-600', label: { en: 'School open', es: 'Abierto' }, emoji: '✅' },
-  practice: { dot: 'bg-sky-500', label: { en: 'Practice', es: 'Práctica' }, emoji: '🏃' },
-  meeting: { dot: 'bg-indigo-500', label: { en: 'Meeting', es: 'Junta' }, emoji: '👥' },
-  camp: { dot: 'bg-amber-500', label: { en: 'Camp', es: 'Campamento' }, emoji: '⛺' },
-  show: { dot: 'bg-pink-500', label: { en: 'Show', es: 'Show' }, emoji: '🎭' },
-  custom: { dot: 'bg-gray-500', label: { en: 'Custom', es: 'Personalizado' }, emoji: '🏷️' },
-  class_session: { dot: 'bg-cyan-500', label: { en: 'Group class', es: 'Clase grupal' }, emoji: '🛹' },
-  birthday: { dot: 'bg-pink-400', label: { en: 'Birthday', es: 'Cumpleaños' }, emoji: '🎂' },
-  class_individual: { dot: 'bg-violet-500', label: { en: 'Individual class', es: 'Clase individual' }, emoji: '👤' },
+  practice: { dot: EVENT_TYPE_COLORS.practice.dot, label: { en: 'Practice', es: 'Práctica' }, emoji: '🏃' },
+  meeting: { dot: EVENT_TYPE_COLORS.event.dot, label: { en: 'Meeting', es: 'Junta' }, emoji: '👥' },
+  camp: { dot: EVENT_TYPE_COLORS.event.dot, label: { en: 'Camp', es: 'Campamento' }, emoji: '⛺' },
+  show: { dot: EVENT_TYPE_COLORS.event.dot, label: { en: 'Show', es: 'Show' }, emoji: '🎭' },
+  custom: { dot: EVENT_TYPE_COLORS.event.dot, label: { en: 'Custom', es: 'Personalizado' }, emoji: '🏷️' },
+  class_session: { dot: SKILL_LEVEL_COLORS.beginner.dot, label: { en: 'Group class', es: 'Clase grupal' }, emoji: '🛹' },
+  birthday: { dot: EVENT_TYPE_COLORS.event.dot, label: { en: 'Birthday', es: 'Cumpleaños' }, emoji: '🎂' },
+  class_individual: { dot: SKILL_LEVEL_COLORS.beginner.dot, label: { en: 'Individual class', es: 'Clase individual' }, emoji: '👤' },
 }
 
 const eventTypeOrder = Object.keys(EVENT_META) as SchoolCalendarEventType[]
 
 const tLabel = (type: SchoolCalendarEventType) =>
   language.value === 'es' ? EVENT_META[type].label.es : EVENT_META[type].label.en
+
+const eventTypeSelectedClass = (type: SchoolCalendarEventType) => {
+  if (type === 'competition') return EVENT_TYPE_COLORS.competition.badge
+  if (type === 'holiday') return EVENT_TYPE_COLORS.holiday.badge
+  if (type === 'practice') return EVENT_TYPE_COLORS.practice.badge
+  return EVENT_TYPE_COLORS.event.badge
+}
 
 const isProgramType = (type: SchoolCalendarEventType) => PROGRAM_ONLY_TYPES.includes(type)
 
@@ -1112,12 +1126,101 @@ const selectedDayHeading = computed(() => {
   return `${language.value === 'es' ? 'HOY' : 'TODAY'} · ${date}`
 })
 
+/** "SÁBADO · 5 SEPTIEMBRE" — the day Hoy is showing, spelled out. */
+const todayHeading = computed(() => {
+  const locale = language.value === 'es' ? es : undefined
+  return format(selectedDate.value, 'EEEE · d MMMM', { locale }).toUpperCase()
+})
+
+const todaySkatepark = computed(() => {
+  const named = selectedDayEvents.value.find(ev => ev.skatepark || ev.location)
+  return named?.skatepark || named?.location || 'Mérida'
+})
+
+/** Only classes get a Hoy card; holidays and meetings stay in the plain list. */
+const todayClasses = computed(() =>
+  selectedDayEvents.value.filter(ev => isProgramType(ev.event_type)),
+)
+
+const todayOtherEvents = computed(() =>
+  selectedDayEvents.value.filter(ev => !isProgramType(ev.event_type)),
+)
+
+function setCalendarView(view: 'today' | 'week' | 'month') {
+  calendarView.value = view
+  // Hoy always means today, even after browsing to another week.
+  if (view === 'today') goToday()
+}
+
+watch(
+  [calendarView, selectedDate],
+  () => {
+    if (calendarView.value === 'today') loadDayCoaches(selectedDate.value)
+  },
+  { immediate: true },
+)
+
 const agendaTime = (ev: SchoolCalendarRow) => {
   if (!ev.start_time) return language.value === 'es' ? 'TODO EL DÍA' : 'ALL DAY'
   const [hours, minutes] = ev.start_time.slice(0, 5).split(':').map(Number)
   const suffix = hours >= 12 ? 'PM' : 'AM'
   const hour = ((hours + 11) % 12) + 1
   return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+/**
+ * Who is coaching each slot on a given day. Mirrors the booking rule in
+ * server/utils/bookableSessions: a roster set for that exact date replaces the
+ * monthly recurring one for that slot rather than adding to it.
+ */
+async function loadDayCoaches(day: Date) {
+  const ymd = format(day, 'yyyy-MM-dd')
+  const dow = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][day.getDay()]
+
+  const nameOf = (row: any) =>
+    (row.profiles?.full_name || row.profiles?.first_name || '').trim()
+
+  const bySlot: Record<string, string[]> = {}
+  const datedSlots = new Set<string>()
+
+  const { data: dated } = await client
+    .from('coach_date_availability')
+    .select('time_slot, profiles:coach_id(full_name, first_name)')
+    .eq('date', ymd)
+    .eq('is_available', true)
+
+  for (const row of (dated as any[]) || []) {
+    datedSlots.add(row.time_slot)
+    const name = nameOf(row)
+    if (name) (bySlot[row.time_slot] ||= []).push(name)
+  }
+
+  const { data: monthly } = await client
+    .from('coach_availability')
+    .select('time_slot, profiles:coach_id(full_name, first_name)')
+    .eq('year', day.getFullYear())
+    .eq('month', day.getMonth() + 1)
+    .eq('day_of_week', dow)
+    .eq('is_available', true)
+
+  for (const row of (monthly as any[]) || []) {
+    if (datedSlots.has(row.time_slot)) continue
+    const name = nameOf(row)
+    if (name) (bySlot[row.time_slot] ||= []).push(name)
+  }
+
+  dayCoachNames.value = bySlot
+}
+
+const coachesForEvent = (ev: SchoolCalendarRow) =>
+  ev.time_slot ? (dayCoachNames.value[ev.time_slot] || []) : []
+
+/** Same sizing rule as booking: an override wins, else six spots per coach. */
+const capacityForEvent = (ev: SchoolCalendarRow) => {
+  if (ev.max_capacity_override != null && ev.max_capacity_override > 0) {
+    return ev.max_capacity_override
+  }
+  return coachesForEvent(ev).length * SPOTS_PER_COACH
 }
 
 const agendaMeta = (ev: SchoolCalendarRow) => {
@@ -1215,11 +1318,7 @@ const eventChipHighlightStyle = (ev: SchoolCalendarRow, day?: Date) => {
   }
 }
 
-const SKILL_CHIP_COLOR: Record<ProgramSkillTrack, { solid: string; muted: string }> = {
-  beginner: { solid: '#059669', muted: 'rgba(5, 150, 105, 0.40)' },
-  intermediate: { solid: '#7c3aed', muted: 'rgba(124, 58, 237, 0.40)' },
-  advanced: { solid: '#d97706', muted: 'rgba(217, 119, 6, 0.40)' },
-}
+const SKILL_CHIP_COLOR = SKILL_LEVEL_COLORS
 
 const SKILL_CHIP_SHORT: Record<ProgramSkillTrack, { es: string; en: string }> = {
   beginner: { es: 'Princ.', en: 'Beg.' },
@@ -2024,6 +2123,74 @@ const programSidebarSeasonLabel = (slug: string) => {
   return language.value === 'es' ? season.name.es : season.name.en
 }
 
+/**
+ * A season is the container; a program is one level/age offering inside it.
+ * The sidebar used to print the season title as each program's own name, so the
+ * two concepts read as duplicates. Rows are now identified by what actually
+ * differs between them and the season is stated once, as a parent.
+ */
+const programIdentityLabel = (program: ProgramSeriesSummary) => {
+  const ev = program.representative
+  const track = PROGRAM_SKILL_TRACKS.find(
+    t => t.id === skillTrackFromLevelId(ev.skill_level),
+  )
+  const level = track ? (language.value === 'es' ? track.label.es : track.label.en) : ''
+  const ages =
+    ev.min_age != null && ev.max_age != null
+      ? `${ev.min_age}–${ev.max_age}`
+      : ev.min_age != null
+        ? `${ev.min_age}+`
+        : ''
+  return [level, ages].filter(Boolean).join(' ') || program.title
+}
+
+/** Format, time and length — what tells two same-level programs apart. */
+const programMetaLabel = (program: ProgramSeriesSummary) => {
+  const es = language.value === 'es'
+  const ev = program.representative
+  const kind = ev.event_type === 'class_individual'
+    ? (es ? 'Individual' : 'Individual')
+    : (es ? 'Grupal' : 'Group')
+  const classes = `${program.classCount} ${
+    es
+      ? (program.classCount === 1 ? 'clase' : 'clases')
+      : (program.classCount === 1 ? 'class' : 'classes')
+  }`
+  return [kind, eventChipTime(ev), classes].filter(Boolean).join(' · ')
+}
+
+const programSeasonGroups = computed(() => {
+  const groups = new Map<string, {
+    slug: string
+    name: string
+    startDate: string
+    endDate: string
+    programs: ProgramSeriesSummary[]
+  }>()
+
+  for (const program of filteredProgramSummaries.value) {
+    const slug = program.seasonSlug || ''
+    if (!groups.has(slug)) {
+      const season = slug ? (seasonBySlug(slug) || getProgramSeasonBySlug(slug)) : null
+      groups.set(slug, {
+        slug,
+        name: season
+          ? (language.value === 'es' ? season.name.es : season.name.en)
+          : (language.value === 'es' ? 'Sin temporada' : 'No season'),
+        startDate: season?.startDate || '',
+        endDate: season?.endDate || '',
+        programs: [],
+      })
+    }
+    groups.get(slug)!.programs.push(program)
+  }
+
+  // Undated groups sink to the bottom rather than jumping to the front.
+  return [...groups.values()].sort((a, b) =>
+    (a.startDate || '9999').localeCompare(b.startDate || '9999'),
+  )
+})
+
 const programStatusBadge = (program: ProgramSeriesSummary) => {
   if (program.isPast) {
     return { kind: 'done' as const, label: language.value === 'es' ? 'Completado' : 'Completed' }
@@ -2098,7 +2265,7 @@ const selectDay = (day: Date) => {
     <header class="border-b border-gray-800 bg-gray-950">
       <div class="px-4 py-5 max-w-7xl mx-auto flex items-center justify-between gap-4">
         <div class="min-w-0">
-          <h1 class="text-2xl font-black text-white">
+          <h1 class="text-2xl font-bold text-white">
             {{ language === 'es' ? 'Calendario' : 'Calendar' }}
           </h1>
           <p class="text-sm text-gray-500 truncate">
@@ -2112,7 +2279,7 @@ const selectDay = (day: Date) => {
         <div class="relative shrink-0">
           <button
             type="button"
-            class="px-4 py-2.5 rounded-xl bg-white text-black font-black text-sm hover:bg-gray-100"
+            class="px-4 py-2.5 rounded-xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-500 transition-colors"
             :aria-expanded="addMenuOpen"
             @click="addMenuOpen = !addMenuOpen"
           >
@@ -2181,7 +2348,7 @@ const selectDay = (day: Date) => {
 
       <div class="flex flex-col gap-8">
         <aside class="order-2">
-          <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
+          <h2 class="text-[13px] font-bold uppercase tracking-[0.1em] text-gold-400 mb-3">
             {{ language === 'es' ? 'Temporadas' : 'Seasons' }}
           </h2>
           <p v-if="seasonSelectError" class="text-[11px] text-amber-300 mb-2">{{ seasonSelectError }}</p>
@@ -2265,7 +2432,7 @@ const selectDay = (day: Date) => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span class="text-white font-black capitalize min-w-[170px] text-center">{{ monthLabel }}</span>
+          <span class="text-white font-semibold capitalize min-w-[170px] text-center">{{ monthLabel }}</span>
           <button
             type="button"
             class="p-2 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white"
@@ -2275,22 +2442,29 @@ const selectDay = (day: Date) => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </button>
-          <button
-            type="button"
-            class="ml-1 px-3 py-2 rounded-lg text-gray-300 text-sm font-bold hover:bg-gray-800"
-            @click="goToday"
-          >
-            {{ language === 'es' ? 'Hoy' : 'Today' }}
-          </button>
         </div>
         <div class="flex items-center gap-2">
-          <select
-            v-model="calendarView"
-            class="rounded-xl bg-gray-900 border border-gray-700 text-white text-sm px-3 py-2"
-          >
-            <option value="week">{{ language === 'es' ? 'Semana' : 'Week' }}</option>
-            <option value="month">{{ language === 'es' ? 'Mes' : 'Month' }}</option>
-          </select>
+          <div class="flex rounded-xl border border-gray-700 bg-gray-900 p-0.5">
+            <button
+              v-for="view in (['today', 'week', 'month'] as const)"
+              :key="view"
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-[0.08em] transition-colors"
+              :class="calendarView === view
+                ? 'bg-teal-600 text-white'
+                : 'text-gray-400 hover:text-gray-200'"
+              :aria-pressed="calendarView === view"
+              @click="setCalendarView(view)"
+            >
+              {{
+                view === 'today'
+                  ? (language === 'es' ? 'Hoy' : 'Today')
+                  : view === 'week'
+                    ? (language === 'es' ? 'Semana' : 'Week')
+                    : (language === 'es' ? 'Mes' : 'Month')
+              }}
+            </button>
+          </div>
           <select
             v-model="filterType"
             class="hidden md:block min-w-[160px] px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm"
@@ -2305,6 +2479,95 @@ const selectDay = (day: Date) => {
       <div v-if="loading" class="flex justify-center py-16">
         <div class="w-10 h-10 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
       </div>
+      <!-- Hoy: the running order for one day, ready to act on. -->
+      <section
+        v-else-if="calendarView === 'today'"
+        class="bg-gray-950 border border-gray-800 rounded-b-2xl"
+      >
+        <div class="px-4 py-3 border-b border-gray-800">
+          <p class="text-[13px] font-bold uppercase tracking-[0.1em] text-white">
+            {{ todayHeading }}
+          </p>
+          <p class="text-[11px] uppercase tracking-wider text-gray-500 mt-0.5">
+            {{ todaySkatepark }}
+          </p>
+        </div>
+
+        <p
+          v-if="!todayClasses.length && !todayOtherEvents.length"
+          class="px-4 py-10 text-center text-sm text-gray-500"
+        >
+          {{ language === 'es' ? 'No hay clases hoy.' : 'No classes today.' }}
+        </p>
+
+        <article
+          v-for="ev in todayClasses"
+          :key="'today-' + ev.id"
+          class="border-b border-gray-800 last:border-b-0 px-4 py-4"
+        >
+          <p class="text-sm font-semibold text-gray-300">{{ agendaTime(ev) }}</p>
+          <div
+            class="h-0.5 rounded-full my-2"
+            :style="{ backgroundColor: SKILL_CHIP_COLOR[skillTrackFromLevelId(ev.skill_level)].solid }"
+            aria-hidden="true"
+          />
+          <p class="text-base font-semibold text-white flex items-center gap-2">
+            <span class="leading-none" aria-hidden="true">{{ eventChipEmoji(ev) }}</span>
+            <span class="truncate">{{ eventChipLabel(ev) }}</span>
+          </p>
+          <p v-if="ev.season_slug" class="text-xs text-gray-400 mt-0.5">
+            {{ programSidebarSeasonLabel(ev.season_slug) }}
+          </p>
+
+          <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            <span class="text-gray-300">
+              <span class="font-semibold">{{ enrollmentCounts[ev.id] || 0 }}</span>
+              <span v-if="capacityForEvent(ev) > 0" class="text-gray-500">
+                / {{ capacityForEvent(ev) }}
+              </span>
+              <span class="text-gray-500"> skaters</span>
+            </span>
+            <span class="text-gray-500">
+              {{ language === 'es' ? 'Coach' : 'Coach' }}:
+              <span class="text-gray-300">
+                {{ coachesForEvent(ev).length ? coachesForEvent(ev).join(', ') : '—' }}
+              </span>
+            </span>
+          </div>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <NuxtLink
+              to="/member/admin/scheduling/attendance"
+              class="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 transition-colors text-white text-xs font-semibold"
+            >
+              {{ language === 'es' ? 'Asistencia' : 'Attendance' }}
+            </NuxtLink>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-900 transition-colors text-xs font-semibold"
+              @click="openEdit(ev, $event)"
+            >
+              {{ language === 'es' ? 'Ver clase' : 'View class' }}
+            </button>
+          </div>
+        </article>
+
+        <button
+          v-for="ev in todayOtherEvents"
+          :key="'today-other-' + ev.id"
+          type="button"
+          class="grid w-full grid-cols-[76px_12px_1fr] gap-3 border-b border-gray-800 px-4 py-3 text-left last:border-b-0 hover:bg-gray-900"
+          @click="openEdit(ev, $event)"
+        >
+          <span class="text-[11px] font-medium text-gray-400 mt-0.5">{{ agendaTime(ev) }}</span>
+          <span class="mt-1 h-2.5 w-2.5 rounded-full" :class="EVENT_META[ev.event_type]?.dot" />
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-semibold text-white">{{ ev.title }}</span>
+            <span class="block text-xs text-gray-500">{{ tLabel(ev.event_type) }}</span>
+          </span>
+        </button>
+      </section>
+
       <template v-else>
       <div
         v-for="month in displayedPeriods"
@@ -2404,7 +2667,7 @@ const selectDay = (day: Date) => {
       </template>
 
       <section class="pt-3">
-        <h2 class="mb-3 text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+        <h2 class="mb-3 text-[13px] font-bold uppercase tracking-[0.1em] text-gray-400">
           {{ selectedDayHeading }}
         </h2>
         <div class="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950">
@@ -2418,7 +2681,7 @@ const selectDay = (day: Date) => {
             class="grid w-full grid-cols-[76px_12px_1fr] gap-3 border-b border-gray-800 px-4 py-3 text-left last:border-b-0 hover:bg-gray-900"
             @click="openEdit(ev, $event)"
           >
-            <span class="text-xs font-black text-gray-300">{{ agendaTime(ev) }}</span>
+            <span class="text-[11px] font-medium text-gray-400 mt-0.5">{{ agendaTime(ev) }}</span>
             <span
               class="mt-1 h-2.5 w-2.5 rounded-full"
               :class="!isProgramType(ev.event_type) ? EVENT_META[ev.event_type]?.dot : ''"
@@ -2427,7 +2690,7 @@ const selectDay = (day: Date) => {
                 : {}"
             />
             <span class="min-w-0">
-              <span class="block truncate text-sm font-black text-white">{{ ev.title }}</span>
+              <span class="block truncate text-sm font-semibold text-white">{{ ev.title }}</span>
               <span v-if="ev.season_slug" class="block truncate text-xs text-gray-400">
                 {{ programSidebarSeasonLabel(ev.season_slug) }}
               </span>
@@ -2439,7 +2702,7 @@ const selectDay = (day: Date) => {
         </div>
 
         <aside class="order-3">
-          <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
+          <h2 class="text-[13px] font-bold uppercase tracking-[0.1em] text-gold-400 mb-3">
             {{ language === 'es' ? 'Programas' : 'Programs' }}
           </h2>
           <p class="text-[11px] text-gray-500 mb-2">
@@ -2476,25 +2739,46 @@ const selectDay = (day: Date) => {
                     : 'No active or upcoming programs.'
               }}
             </p>
-            <div
-              v-for="program in filteredProgramSummaries"
-              :key="program.key"
-              class="relative border-b border-gray-800 last:border-b-0"
-              :class="program.isPast ? 'opacity-45' : ''"
-              :style="program.seasonSlug
-                ? {
-                    backgroundColor: seasonColorFor(program.seasonSlug).fillMuted,
-                    boxShadow: `inset 3px 0 0 ${seasonColorFor(program.seasonSlug).solid}`,
-                  }
-                : {}"
-            >
+            <template v-for="group in programSeasonGroups" :key="'season-' + group.slug">
+              <!-- The season is the container, stated once for the rows below. -->
+              <div
+                class="px-3 py-2.5 border-b border-gray-800 bg-gray-900/70"
+                :style="group.slug
+                  ? { boxShadow: `inset 3px 0 0 ${seasonColorFor(group.slug).solid}` }
+                  : {}"
+              >
+                <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                  {{ language === 'es' ? 'Temporada' : 'Season' }}
+                </p>
+                <p class="text-sm font-semibold text-white leading-snug mt-0.5">
+                  {{ group.name }}
+                </p>
+                <p v-if="group.startDate" class="text-[11px] text-gray-500 mt-0.5">
+                  {{ formatProgramDateRange(group.startDate, group.endDate) }}
+                </p>
+              </div>
+              <p
+                class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-600"
+              >
+                {{ language === 'es' ? 'Programas' : 'Programs' }} · {{ group.programs.length }}
+              </p>
+
+              <div
+                v-for="program in group.programs"
+                :key="program.key"
+                class="relative border-b border-gray-800 last:border-b-0"
+                :class="program.isPast ? 'opacity-45' : ''"
+                :style="program.seasonSlug
+                  ? { backgroundColor: seasonColorFor(program.seasonSlug).fillMuted }
+                  : {}"
+              >
               <button
                 type="button"
                 class="w-full text-left px-3 py-3 pr-[4.5rem] transition-colors hover:bg-gray-900/60"
                 @click="openEditProgram(program)"
               >
                 <p
-                  class="text-sm font-bold leading-snug flex items-center gap-2"
+                  class="text-base font-semibold leading-snug flex items-center gap-2"
                   :class="program.isPast ? 'text-gray-500' : 'text-white'"
                 >
                   <span
@@ -2505,19 +2789,14 @@ const selectDay = (day: Date) => {
                     aria-hidden="true"
                   />
                   <span class="text-base leading-none" aria-hidden="true">{{ eventChipEmoji(program.representative) }}</span>
-                  <span class="line-clamp-2">{{ program.title }}</span>
+                  <span class="line-clamp-2">{{ programIdentityLabel(program) }}</span>
                 </p>
-                <p class="text-[11px] text-gray-500 mt-0.5">
-                  {{ formatProgramDateRange(program.startDate, program.endDate) }}
-                  · {{ program.classCount }}
-                  {{ language === 'es' ? (program.classCount === 1 ? 'clase' : 'clases') : (program.classCount === 1 ? 'class' : 'classes') }}
-                </p>
-                <p v-if="program.seasonSlug && !selectedSeasonSlugs.length" class="text-[10px] text-gray-500 mt-0.5 truncate">
-                  {{ programSidebarSeasonLabel(program.seasonSlug) }}
+                <p class="text-xs text-gray-400 mt-0.5">
+                  {{ programMetaLabel(program) }}
                 </p>
                 <p class="mt-1.5 flex items-center justify-between gap-2">
-                  <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold truncate">
-                    {{ eventChipLabel(program.representative) }}
+                  <span class="text-[11px] text-gray-500 truncate">
+                    {{ formatProgramDateRange(program.startDate, program.endDate) }}
                   </span>
                   <span
                     class="text-[11px] font-semibold shrink-0"
@@ -2556,7 +2835,8 @@ const selectDay = (day: Date) => {
                   </svg>
                 </button>
               </div>
-            </div>
+              </div>
+            </template>
           </div>
         </aside>
       </div>
@@ -2715,7 +2995,7 @@ const selectDay = (day: Date) => {
                   class="rounded-xl border px-2 py-2 text-left transition-all text-[11px] sm:text-xs leading-tight"
                   :class="
                     form.event_type === t
-                      ? 'border-sky-500 bg-sky-500/15 text-white'
+                      ? eventTypeSelectedClass(t)
                       : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                   "
                   @click="form.event_type = t"
@@ -2758,7 +3038,7 @@ const selectDay = (day: Date) => {
                     class="rounded-lg border px-1 py-2 text-center text-[11px] font-semibold transition-all"
                     :class="
                       isAudienceSelected(band.id)
-                        ? 'border-teal-400 bg-teal-500 text-black ring-2 ring-teal-300'
+                        ? 'border-white bg-white text-black ring-2 ring-gray-400'
                         : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                     "
                     @click="toggleAudience(band.id)"
@@ -2781,7 +3061,7 @@ const selectDay = (day: Date) => {
                     class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"
                     :class="
                       isSkillTrackSelected(track.id)
-                        ? 'border-amber-500 bg-amber-500/15 text-white'
+                        ? skillTrackSelectedClass(track.id)
                         : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                     "
                     @click="toggleSkillTrack(track.id)"
@@ -2833,8 +3113,8 @@ const selectDay = (day: Date) => {
               {{ language === 'es' ? 'Todo el día' : 'All day event' }}
             </label>
 
-            <div v-if="isPracticeForm" class="space-y-3 rounded-xl border border-sky-500/30 bg-sky-500/5 p-3">
-              <p class="text-xs font-semibold text-sky-300 uppercase tracking-wide">
+            <div v-if="isPracticeForm" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
+              <p class="text-xs font-semibold text-cyan-300 uppercase tracking-wide">
                 {{ language === 'es' ? 'Horario de práctica' : 'Practice time' }}
               </p>
               <div>
@@ -2847,8 +3127,8 @@ const selectDay = (day: Date) => {
               </div>
             </div>
 
-            <div v-if="isClassSessionForm" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
-              <p class="text-xs font-semibold text-cyan-300 uppercase tracking-wide">
+            <div v-if="isClassSessionForm" class="space-y-3 rounded-xl border border-gray-700 bg-gray-800/40 p-3">
+              <p class="text-xs font-semibold text-gray-300 uppercase tracking-wide">
                 {{ language === 'es' ? 'Sesión reservable' : 'Bookable session' }}
               </p>
 
@@ -3149,7 +3429,7 @@ const selectDay = (day: Date) => {
                   <p class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">
                     {{ language === 'es' ? 'Precio · Finanzas' : 'Price · Finance' }}
                   </p>
-                  <p class="text-lg font-black text-white leading-tight mt-0.5">
+                  <p class="text-lg font-semibold text-white leading-tight mt-0.5">
                     {{ formatMoneyMxn(Number(form.price_mxn) || 0) }}
                   </p>
                   <p class="text-[11px] text-gray-400 truncate">{{ programPriceLabel }}</p>

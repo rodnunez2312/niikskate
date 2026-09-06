@@ -137,6 +137,9 @@ export const PROGRAM_AGE_BANDS: Array<{
 /** Skill track for class scheduling (not the fine-grained library levels). */
 export type ProgramSkillTrack = 'beginner' | 'intermediate' | 'advanced'
 
+/** How many skaters one coach can take in a session. */
+export const SPOTS_PER_COACH = 6
+
 export const PROGRAM_SKILL_TRACKS: Array<{
   id: ProgramSkillTrack
   skillLevelId: SkateSkillLevelId
@@ -574,8 +577,8 @@ export interface CrewMember {
 
 export const CLASS_TYPE_LABELS: Record<ClassType, { name: string; shortName: string; color: string }> = {
   grouped_beginner: { name: 'Grouped - Beginners', shortName: 'Beginner', color: 'bg-green-500' },
-  grouped_intermediate: { name: 'Grouped - Intermediate', shortName: 'Intermediate', color: 'bg-yellow-500' },
-  individual: { name: 'Individual', shortName: 'Individual', color: 'bg-purple-500' },
+  grouped_intermediate: { name: 'Grouped - Intermediate', shortName: 'Intermediate', color: 'bg-blue-500' },
+  individual: { name: 'Individual', shortName: 'Individual', color: 'bg-gray-500' },
 }
 
 // =====================================================
@@ -952,8 +955,8 @@ export interface StudentProgress {
 
 export const SKILL_DIFFICULTY_LABELS: Record<SkillDifficulty, { name: string; color: string; icon: string }> = {
   beginner: { name: 'Beginner', color: 'bg-green-500', icon: '🌱' },
-  intermediate: { name: 'Intermediate', color: 'bg-yellow-500', icon: '⚡' },
-  advanced: { name: 'Advanced', color: 'bg-red-500', icon: '🔥' },
+  intermediate: { name: 'Intermediate', color: 'bg-blue-500', icon: '⚡' },
+  advanced: { name: 'Advanced', color: 'bg-purple-500', icon: '🔥' },
 }
 
 export const SKILL_CATEGORY_LABELS: Record<SkillCategory, { name: string; name_es: string; icon: string }> = {

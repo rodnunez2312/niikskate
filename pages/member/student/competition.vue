@@ -64,8 +64,8 @@ onActivated(loadPage)
       </p>
     </div>
 
-    <section class="rounded-xl border border-gold-400/30 bg-gold-400/5 p-4 space-y-3">
-      <h2 class="text-sm font-bold text-gold-400 uppercase tracking-wide">
+    <section class="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4 space-y-3">
+      <h2 class="text-sm font-bold text-orange-400 uppercase tracking-wide">
         {{ language === 'es' ? 'Tu preparación' : 'Your readiness' }}
       </h2>
       <div class="grid grid-cols-2 gap-3">

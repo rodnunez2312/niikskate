@@ -123,13 +123,13 @@ function selectDay(day: Date) {
           class="relative min-h-14 border-b border-r border-gray-800 p-1 text-left last:border-r-0"
           :class="[
             isSameMonth(day, viewMonth) ? 'text-gray-200' : 'text-gray-700',
-            selectedDate === format(day, 'yyyy-MM-dd') ? 'bg-gray-800 ring-1 ring-inset ring-gold-400' : '',
+            selectedDate === format(day, 'yyyy-MM-dd') ? 'bg-gray-800 ring-1 ring-inset ring-white' : '',
           ]"
           @click="selectDay(day)"
         >
           <span
             class="text-[10px] font-bold"
-            :class="isToday(day) ? 'text-gold-400' : ''"
+            :class="isToday(day) ? 'text-white underline' : ''"
           >
             {{ format(day, 'd') }}
           </span>
@@ -138,7 +138,7 @@ function selectDay(day: Date) {
               v-for="event in eventsOnDay(day)"
               :key="event.id"
               class="h-1.5 w-1.5 rounded-full"
-              :class="isPast(event) ? 'bg-gray-600' : 'bg-gold-400'"
+              :class="isPast(event) ? 'bg-gray-600' : 'bg-orange-500'"
               :title="event.title"
             />
           </span>
@@ -147,7 +147,7 @@ function selectDay(day: Date) {
 
       <div class="flex items-center gap-4 border-t border-gray-800 px-3 py-2 text-[10px] text-gray-500">
         <span class="inline-flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-gold-400" />
+          <span class="h-2 w-2 rounded-full bg-orange-500" />
           {{ language === 'es' ? 'Próximas' : 'Upcoming' }}
         </span>
         <span class="inline-flex items-center gap-1.5">
@@ -171,7 +171,7 @@ function selectDay(day: Date) {
           >
             <span
               class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-              :class="isPast(event) ? 'bg-gray-600' : 'bg-gold-400'"
+              :class="isPast(event) ? 'bg-gray-600' : 'bg-orange-500'"
             />
             <div>
               <p class="text-sm font-bold text-white">{{ event.title }}</p>

@@ -207,7 +207,7 @@ const submit = async () => {
           </button>
           <button
             type="button"
-            class="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 disabled:opacity-50"
+            class="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-teal-600 hover:bg-teal-500 transition-colors disabled:opacity-50"
             :disabled="saving"
             @click="submit"
           >

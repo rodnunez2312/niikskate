@@ -30,6 +30,7 @@ import {
 } from '~/types'
 import { ineligibilityReason, isAgeEligibleForSession, sessionAgeBounds } from '~/utils/ageEligibility'
 import { classKindForPack } from '~/utils/coupons'
+import { SKILL_LEVEL_COLORS } from '~/utils/semanticColors'
 import type { AppliedCoupon } from '~/components/checkout/CouponField.vue'
 import {
   applyMultiStudentDiscount,
@@ -201,6 +202,12 @@ const toggleAgeBand = (id: AudienceCategory) => {
 const toggleSkillTrack = (id: ProgramSkillTrack) => {
   selectedSkillTrack.value = selectedSkillTrack.value === id ? null : id
 }
+
+const skillTrackClass = (id: ProgramSkillTrack) =>
+  SKILL_LEVEL_COLORS[id].selected
+
+const sessionSkillBadgeClass = (skillLevel: string | null) =>
+  SKILL_LEVEL_COLORS[skillTrackFromLevelId(skillLevel)].badge
 
 const selectSeason = (slug: string) => {
   pickedSeasonSlug.value = slug
@@ -888,7 +895,7 @@ onMounted(async () => {
                 class="px-1.5 py-2 rounded-xl border-2 text-center text-[11px] font-bold transition-colors flex items-center justify-center gap-1 min-w-0 whitespace-nowrap"
                 :class="
                   selectedSkillTrack === track.id
-                    ? 'border-black bg-teal-600 text-white'
+                    ? skillTrackClass(track.id)
                     : 'border-gray-400 bg-white text-gray-800'
                 "
                 @click="toggleSkillTrack(track.id)"
@@ -970,7 +977,10 @@ onMounted(async () => {
           class="border-[3px] border-black rounded-xl bg-white flex flex-col overflow-hidden"
         >
           <div class="flex items-start justify-between gap-2 p-3 border-b-2 border-black">
-            <span class="text-[10px] font-bold uppercase bg-gray-100 px-2 py-1 rounded">
+            <span
+              class="rounded border px-2 py-1 text-[10px] font-bold uppercase"
+              :class="sessionSkillBadgeClass(s.skill_level)"
+            >
               {{ skillLabel(s.skill_level) }}
             </span>
             <div class="flex flex-col items-end gap-1 shrink-0">
@@ -1057,11 +1067,8 @@ onMounted(async () => {
             <button
               v-else
               type="button"
-              class="w-full py-3 rounded-lg font-black text-sm uppercase text-white tracking-wide
-                bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400
-                hover:from-teal-400 hover:via-cyan-400 hover:to-amber-300
-                shadow-[0_4px_14px_rgba(20,184,166,0.45)]
-                hover:shadow-[0_6px_20px_rgba(20,184,166,0.55)]
+              class="w-full py-3 rounded-lg bg-white font-black text-sm uppercase text-black tracking-wide
+                hover:bg-gray-200 shadow-lg
                 hover:scale-[1.02] active:scale-[0.98]
                 transition-all duration-200 disabled:opacity-40 disabled:hover:scale-100 disabled:shadow-none"
               :disabled="enrollingId === s.id || s.status === 'full' || s.status === 'no_coaches' || !canRegister"

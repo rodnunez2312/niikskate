@@ -27,7 +27,7 @@ const { formatEventDate, formatEventTime } = useCompetitionEvents()
         <span class="text-2xl shrink-0" aria-hidden="true">🏆</span>
         <div class="min-w-0 flex-1">
           <p class="font-bold text-white">{{ ev.title }}</p>
-          <p class="text-sm text-gold-400 mt-1">{{ formatEventDate(ev) }}</p>
+          <p class="text-sm text-orange-400 mt-1">{{ formatEventDate(ev) }}</p>
           <p v-if="formatEventTime(ev)" class="text-xs text-gray-400 mt-0.5">{{ formatEventTime(ev) }}</p>
           <p v-if="ev.location" class="text-xs text-gray-400 mt-1">📍 {{ ev.location }}</p>
           <p v-if="ev.description" class="text-sm text-gray-400 mt-2 whitespace-pre-line">{{ ev.description }}</p>

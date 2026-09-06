@@ -207,9 +207,9 @@ export function pillarTagClass(id: string | null | undefined): string {
 }
 
 export function levelTagClass(id: string | null | undefined): string {
-  if (id === 'intermediate') return 'bg-yellow-500/20 text-yellow-400'
-  if (id === 'advanced') return 'bg-red-500/20 text-red-400'
-  return 'bg-green-500/20 text-green-400'
+  if (id === 'intermediate') return 'bg-blue-500/20 text-blue-300'
+  if (id === 'advanced') return 'bg-purple-500/20 text-purple-300'
+  return 'bg-green-500/20 text-green-300'
 }
 
 export function formatDuration(seconds: number, es = true): string {

@@ -180,7 +180,7 @@ const requestModalOpen = ref(false)
         </p>
         <button
           type="button"
-          class="inline-flex px-6 py-3 rounded-xl font-black uppercase text-sm bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-black hover:brightness-110 transition"
+          class="inline-flex rounded-xl bg-white px-6 py-3 text-sm font-black uppercase text-black transition hover:bg-gray-200"
           @click="requestModalOpen = true"
         >
           {{ es ? 'Contactar' : 'Contact us' }}

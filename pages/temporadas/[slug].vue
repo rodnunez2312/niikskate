@@ -33,7 +33,7 @@ useHead({
         <NuxtLink
           v-if="isAdmin"
           :to="`/member/admin/scheduling/calendar?temporada=${season.slug}`"
-          class="px-4 py-2 rounded-full font-semibold text-sm text-white bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400"
+          class="px-4 py-2 rounded-full font-semibold text-sm text-white bg-teal-600 hover:bg-teal-500 transition-colors"
         >
           + {{ es ? 'Añadir programa' : 'Add program' }}
         </NuxtLink>

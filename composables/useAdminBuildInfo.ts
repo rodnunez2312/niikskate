@@ -11,13 +11,14 @@ export type AdminBuildInfo = {
 export function useAdminBuildInfo() {
   const { isAdmin, loading: profileLoading } = useSiteProfile()
   const client = useSupabaseClient()
+  const enabled = import.meta.dev
 
   const info = ref<AdminBuildInfo | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
   async function refresh() {
-    if (!isAdmin.value) {
+    if (!enabled || !isAdmin.value) {
       info.value = null
       return
     }
@@ -44,6 +45,7 @@ export function useAdminBuildInfo() {
   watch(
     [isAdmin, profileLoading],
     () => {
+      if (!enabled) return
       if (profileLoading.value) return
       if (isAdmin.value) refresh()
       else info.value = null

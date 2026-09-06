@@ -279,7 +279,7 @@ const cartLabel = computed(() => {
           </p>
           <NuxtLink
             to="/skateramps"
-            class="mt-3 inline-flex px-5 py-2.5 rounded-xl font-black uppercase text-xs bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400 text-black hover:brightness-110 transition"
+            class="mt-3 inline-flex rounded-xl bg-white px-5 py-2.5 text-xs font-black uppercase text-black transition hover:bg-gray-200"
           >
             {{ es ? 'Ver skateramps' : 'See skateramps' }}
           </NuxtLink>

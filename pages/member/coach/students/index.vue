@@ -59,9 +59,9 @@ const formatStartDate = (dateStr: string) => {
 
 const skillBadgeClass = (level: string | null | undefined) => {
   const l = (level || '').toLowerCase()
-  if (l === 'beginner') return 'bg-emerald-500/20 text-emerald-400'
-  if (l === 'intermediate') return 'bg-amber-500/20 text-amber-400'
-  if (l === 'pro' || l === 'advanced') return 'bg-purple-500/20 text-purple-400'
+  if (l === 'beginner') return 'bg-green-500/20 text-green-300'
+  if (l === 'intermediate') return 'bg-blue-500/20 text-blue-300'
+  if (l === 'pro' || l === 'advanced') return 'bg-purple-500/20 text-purple-300'
   return 'bg-gray-700 text-gray-400'
 }
 

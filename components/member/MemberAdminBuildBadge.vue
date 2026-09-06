@@ -4,11 +4,12 @@ const { isAdmin } = useSiteProfile()
 const { info, loading, envLabel, builtAtLocal } = useAdminBuildInfo()
 
 const es = computed(() => language.value === 'es')
+const showDeveloperInfo = import.meta.dev
 </script>
 
 <template>
   <div
-    v-if="isAdmin"
+    v-if="showDeveloperInfo && isAdmin"
     class="rounded-lg border border-gray-800/80 bg-gray-900/60 px-2.5 py-1.5 text-[10px] leading-snug text-gray-500 font-mono"
     :title="info?.shaFull || undefined"
   >

@@ -701,8 +701,8 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div v-if="selectedHoliday" class="px-4 py-2 bg-flame-600/10 border-b border-flame-600/30">
-          <p class="text-xs text-flame-500">
+        <div v-if="selectedHoliday" class="border-b border-yellow-500/30 bg-yellow-500/10 px-4 py-2">
+          <p class="text-xs text-yellow-300">
             🎉 {{ selectedHoliday.title }}
           </p>
         </div>

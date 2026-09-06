@@ -110,8 +110,8 @@ const getStatusLabel = (status: string) => {
 const getClassTypeColor = (classType: string) => {
   const colors: Record<string, string> = {
     grouped_beginner: 'bg-green-500',
-    grouped_intermediate: 'bg-yellow-500',
-    individual: 'bg-purple-500',
+    grouped_intermediate: 'bg-blue-500',
+    individual: 'bg-gray-500',
   }
   return colors[classType] || 'bg-gray-400'
 }

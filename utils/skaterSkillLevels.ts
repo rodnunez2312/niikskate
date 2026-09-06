@@ -1,4 +1,5 @@
 /** Skater skill band for admin kanban (profiles.skill_level). */
+import { SKILL_LEVEL_COLORS } from './semanticColors'
 
 export type SkaterSkillLevelId = 'foundation' | 'beginner' | 'intermediate' | 'advanced'
 
@@ -7,10 +8,10 @@ export const SKATER_KANBAN_SKILL_LEVELS: Array<{
   label: { en: string; es: string }
   color: string
 }> = [
-  { id: 'foundation', label: { en: 'Foundation', es: 'Fundamentos' }, color: '#16a34a' },
-  { id: 'beginner', label: { en: 'Beginner', es: 'Principiante' }, color: '#2563eb' },
-  { id: 'intermediate', label: { en: 'Intermediate', es: 'Intermedio' }, color: '#7c3aed' },
-  { id: 'advanced', label: { en: 'Advanced', es: 'Avanzado' }, color: '#a855f7' },
+  { id: 'foundation', label: { en: 'Foundation', es: 'Fundamentos' }, color: SKILL_LEVEL_COLORS.beginner.solid },
+  { id: 'beginner', label: { en: 'Beginner', es: 'Principiante' }, color: SKILL_LEVEL_COLORS.beginner.solid },
+  { id: 'intermediate', label: { en: 'Intermediate', es: 'Intermedio' }, color: SKILL_LEVEL_COLORS.intermediate.solid },
+  { id: 'advanced', label: { en: 'Advanced', es: 'Avanzado' }, color: SKILL_LEVEL_COLORS.advanced.solid },
 ]
 
 export function normalizeSkaterSkillLevel(

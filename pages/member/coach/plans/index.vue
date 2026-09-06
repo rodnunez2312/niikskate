@@ -1451,14 +1451,14 @@ function goProgramResourceHub() {
             <button
               @click="selectedDifficulty = 'intermediate'"
               class="flex-1 px-3 py-2 rounded-xl text-sm font-semibold"
-              :class="selectedDifficulty === 'intermediate' ? 'bg-yellow-500 text-black' : 'bg-gray-800 text-gray-400'"
+              :class="selectedDifficulty === 'intermediate' ? 'bg-blue-500 text-white' : 'bg-gray-800 text-gray-400'"
             >
               ⚡ {{ language === 'es' ? 'Intermedio' : 'Intermediate' }}
             </button>
             <button
               @click="selectedDifficulty = 'advanced'"
               class="flex-1 px-3 py-2 rounded-xl text-sm font-semibold"
-              :class="selectedDifficulty === 'advanced' ? 'bg-red-500 text-white' : 'bg-gray-800 text-gray-400'"
+              :class="selectedDifficulty === 'advanced' ? 'bg-purple-500 text-white' : 'bg-gray-800 text-gray-400'"
             >
               🔥 {{ language === 'es' ? 'Avanzado' : 'Advanced' }}
             </button>

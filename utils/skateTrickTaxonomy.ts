@@ -158,9 +158,9 @@ export function compareSkillsByManualId(a: TrickManualSortable, b: TrickManualSo
 }
 
 export function difficultyTagClass(difficulty?: string | null): string {
-  if (difficulty === 'intermediate') return 'bg-yellow-500/20 text-yellow-400'
-  if (difficulty === 'advanced') return 'bg-red-500/20 text-red-400'
-  return 'bg-green-500/20 text-green-400'
+  if (difficulty === 'intermediate') return 'bg-blue-500/20 text-blue-300'
+  if (difficulty === 'advanced') return 'bg-purple-500/20 text-purple-300'
+  return 'bg-green-500/20 text-green-300'
 }
 
 export function areaTagClass(area?: string | null): string {
