@@ -44,6 +44,11 @@ export function useMemberNav() {
       icon: 'user',
     },
     {
+      name: es.value ? 'Cuenta' : 'Account',
+      path: '/member/student/account',
+      icon: 'credits',
+    },
+    {
       name: es.value ? 'Progreso' : 'Progress',
       path: '/member/student/progress',
       icon: 'chart',
@@ -54,7 +59,7 @@ export function useMemberNav() {
       icon: 'skate-program',
     },
     {
-      name: es.value ? 'Competir' : 'Compete',
+      name: es.value ? 'Competencias' : 'Competitions',
       path: '/member/student/competition',
       icon: 'flag',
     },
@@ -106,7 +111,7 @@ export function useMemberNav() {
       icon: 'clipboard',
     },
     {
-      name: es.value ? 'Competir' : 'Competitions',
+      name: es.value ? 'Competencias' : 'Competitions',
       path: '/member/admin/competitions',
       icon: 'flag',
     },

@@ -14,6 +14,10 @@ export default defineEventHandler(async (event) => {
     typeof query.crewMemberId === 'string' && query.crewMemberId.trim()
       ? query.crewMemberId.trim()
       : null
+  const skaterProfileId =
+    typeof query.skaterProfileId === 'string' && query.skaterProfileId.trim()
+      ? query.skaterProfileId.trim()
+      : null
   const today = new Date().toISOString().slice(0, 10)
 
   const supabase = getServiceSupabase()
@@ -88,6 +92,11 @@ export default defineEventHandler(async (event) => {
     enrQuery = crewMemberId
       ? enrQuery.eq('crew_member_id', crewMemberId)
       : enrQuery.is('crew_member_id', null)
+
+    // Without this a child's booking would read as the account holder's own.
+    enrQuery = skaterProfileId
+      ? enrQuery.eq('skater_profile_id', skaterProfileId)
+      : enrQuery.is('skater_profile_id', null)
 
     const { data: enr } = await enrQuery
     myEnrollments = (enr || []).map((e: { calendar_event_id: string }) => e.calendar_event_id)

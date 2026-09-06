@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  addDays,
   addMonths,
   eachDayOfInterval,
   endOfMonth,
@@ -129,6 +130,9 @@ const events = ref<SchoolCalendarRow[]>([])
 const viewMonth = ref(new Date())
 const selectedDate = ref<Date>(new Date())
 const filterType = ref<SchoolCalendarEventType | 'all'>('all')
+const calendarView = ref<'week' | 'month'>('week')
+const addMenuOpen = ref(false)
+const enrollmentCounts = ref<Record<string, number>>({})
 
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
@@ -812,9 +816,6 @@ const tLabel = (type: SchoolCalendarEventType) =>
 
 const isProgramType = (type: SchoolCalendarEventType) => PROGRAM_ONLY_TYPES.includes(type)
 
-const legendEventTypes = computed(() => filterEventTypes.value.filter(t => !isProgramType(t)))
-const legendProgramTypes = computed(() => filterEventTypes.value.filter(t => isProgramType(t)))
-
 /** Map Postgres/PostgREST errors to the migration the admin still needs to run. */
 const calendarDbErrorMessage = (msg: string) => {
   const es = language.value === 'es'
@@ -914,9 +915,21 @@ const loadEvents = async () => {
   loading.value = true
   formError.value = ''
   try {
-    const { data, error } = await client.from('school_calendar_events').select('*').order('start_date', { ascending: true })
+    const [{ data, error }, enrollments] = await Promise.all([
+      client.from('school_calendar_events').select('*').order('start_date', { ascending: true }),
+      client
+        .from('class_session_enrollments')
+        .select('calendar_event_id, status')
+        .eq('status', 'confirmed'),
+    ])
     if (error) throw error
     events.value = (data || []) as SchoolCalendarRow[]
+    const counts: Record<string, number> = {}
+    for (const row of enrollments.data || []) {
+      const eventId = (row as { calendar_event_id?: string }).calendar_event_id
+      if (eventId) counts[eventId] = (counts[eventId] || 0) + 1
+    }
+    enrollmentCounts.value = counts
     await ensureMexicoHolidays()
   } catch (e: any) {
     console.error('loadEvents:', e)
@@ -975,8 +988,8 @@ const filteredEvents = computed(() => {
 const monthGrid = (month: Date) => {
   const start = startOfMonth(month)
   const end = endOfMonth(month)
-  const gridStart = startOfWeek(start, { weekStartsOn: 0 })
-  const gridEnd = endOfWeek(end, { weekStartsOn: 0 })
+  const gridStart = startOfWeek(start, { weekStartsOn: 1 })
+  const gridEnd = endOfWeek(end, { weekStartsOn: 1 })
   return { start, end, gridStart, gridEnd, days: eachDayOfInterval({ start: gridStart, end: gridEnd }) }
 }
 
@@ -1061,6 +1074,7 @@ const eventsOnDay = (day: Date) => {
 
 /** Reads as a range while a multi-month season is stacked below. */
 const monthLabel = computed(() => {
+  if (calendarView.value === 'week') return monthLabelFor(selectedDate.value)
   const months = visibleMonths.value
   const first = monthLabelFor(months[0])
   if (months.length < 2) return first
@@ -1073,8 +1087,48 @@ const monthLabel = computed(() => {
 })
 
 const weekdayLabels = computed(() =>
-  language.value === 'es' ? ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  language.value === 'es' ? ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
 )
+
+const weekDays = computed(() => {
+  const start = startOfWeek(selectedDate.value, { weekStartsOn: 1 })
+  const end = endOfWeek(selectedDate.value, { weekStartsOn: 1 })
+  return eachDayOfInterval({ start, end })
+})
+
+const displayedPeriods = computed(() =>
+  calendarView.value === 'week' ? [startOfMonth(selectedDate.value)] : visibleMonths.value,
+)
+
+const displayedDays = (month: Date) =>
+  calendarView.value === 'week' ? weekDays.value : monthGrid(month).days
+
+const selectedDayEvents = computed(() => eventsOnDay(selectedDate.value))
+
+const selectedDayHeading = computed(() => {
+  const locale = language.value === 'es' ? es : undefined
+  const date = format(selectedDate.value, 'EEE d MMM', { locale }).toUpperCase()
+  if (!isToday(selectedDate.value)) return date
+  return `${language.value === 'es' ? 'HOY' : 'TODAY'} · ${date}`
+})
+
+const agendaTime = (ev: SchoolCalendarRow) => {
+  if (!ev.start_time) return language.value === 'es' ? 'TODO EL DÍA' : 'ALL DAY'
+  const [hours, minutes] = ev.start_time.slice(0, 5).split(':').map(Number)
+  const suffix = hours >= 12 ? 'PM' : 'AM'
+  const hour = ((hours + 11) % 12) + 1
+  return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+const agendaMeta = (ev: SchoolCalendarRow) => {
+  const parts: string[] = []
+  if (isProgramType(ev.event_type)) {
+    const count = enrollmentCounts.value[ev.id] || 0
+    parts.push(`${count} ${language.value === 'es' ? 'skaters' : 'skaters'}`)
+  }
+  parts.push(ev.location || ev.skatepark || 'Mérida')
+  return parts.join(' · ')
+}
 
 const parseSelectedSeasonSlugs = (): string[] => {
   const multi = route.query.temporadas
@@ -1104,11 +1158,6 @@ const seasonColorFor = (slug: string) => {
 const isSeasonSelected = (slug: string) => selectedSeasonSlugs.value.includes(slug)
 
 const querySeasonSlug = () => selectedSeasonSlugs.value[0] || ''
-
-const activeQuerySeason = computed(() => {
-  if (selectedSeasons.value.length !== 1) return undefined
-  return selectedSeasons.value[0]
-})
 
 const seasonsCoveringDay = (day: Date) => {
   const ymd = format(day, 'yyyy-MM-dd')
@@ -1774,6 +1823,15 @@ const goToday = () => {
   selectedDate.value = new Date()
 }
 
+const goToPeriod = (direction: -1 | 1) => {
+  if (calendarView.value === 'week') {
+    selectedDate.value = addDays(selectedDate.value, direction * 7)
+    viewMonth.value = startOfMonth(selectedDate.value)
+    return
+  }
+  viewMonth.value = addMonths(viewMonth.value, direction)
+}
+
 const isSelectedDay = (day: Date) => isSameDay(day, selectedDate.value)
 
 const isPastDay = (day: Date) => isBefore(startOfDay(day), startOfDay(new Date()))
@@ -1804,8 +1862,6 @@ const showSeasonArchive = ref(false)
 const archiveIsOpen = computed(
   () => showSeasonArchive.value || archivedSeasons.value.some(s => isSeasonSelected(s.slug)),
 )
-
-const highlightedSeasons = computed(() => selectedSeasons.value)
 
 const isDayInHighlightedSeason = (day: Date) => seasonsCoveringDay(day).length > 0
 
@@ -2033,81 +2089,64 @@ const confirmDeleteProgram = async (program: ProgramSeriesSummary) => {
 
 const selectDay = (day: Date) => {
   selectedDate.value = day
+  viewMonth.value = startOfMonth(day)
 }
 </script>
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-      <div class="px-4 py-4 max-w-7xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex items-center gap-3 min-w-0">
-          <button type="button" class="p-2 -ml-2 text-gold-400 shrink-0" @click="router.push('/member/staff/dashboard')">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div class="min-w-0">
-            <h1 class="text-xl font-bold text-white flex items-center gap-2">
-              <span aria-hidden="true">📅</span>
-              {{ language === 'es' ? 'Calendario' : 'Calendar' }}
-            </h1>
-            <p class="text-xs text-gray-500 truncate">
-              {{
-                language === 'es'
-                  ? 'Eventos y programas de skate.'
-                  : 'School events and skate programs.'
-              }}
-            </p>
-          </div>
+    <header class="border-b border-gray-800 bg-gray-950">
+      <div class="px-4 py-5 max-w-7xl mx-auto flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-black text-white">
+            {{ language === 'es' ? 'Calendario' : 'Calendar' }}
+          </h1>
+          <p class="text-sm text-gray-500 truncate">
+            {{
+              language === 'es'
+                ? 'Eventos, clases y temporadas de Niik Skate'
+                : 'Niik Skate events, classes, and seasons'
+            }}
+          </p>
         </div>
-        <div class="flex flex-wrap gap-2 shrink-0">
+        <div class="relative shrink-0">
           <button
             type="button"
-            class="px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm"
-            @click="openAddEvent"
+            class="px-4 py-2.5 rounded-xl bg-white text-black font-black text-sm hover:bg-gray-100"
+            :aria-expanded="addMenuOpen"
+            @click="addMenuOpen = !addMenuOpen"
           >
-            + {{ language === 'es' ? 'Añadir evento' : 'Add event' }}
+            + {{ language === 'es' ? 'Añadir' : 'Add' }}
           </button>
-          <button
-            type="button"
-            class="px-4 py-2.5 rounded-xl font-semibold text-sm text-white
-              bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-400"
-            @click="openAddProgram"
+          <div
+            v-if="addMenuOpen"
+            class="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-700 bg-gray-900 shadow-2xl"
           >
-            + {{ language === 'es' ? 'Añadir programa' : 'Add program' }}
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2.5 rounded-full font-semibold text-sm text-white border border-cyan-400/60 bg-cyan-500/15 hover:bg-cyan-500/25"
-            @click="addSeasonOpen = true"
-          >
-            + {{ language === 'es' ? 'Añadir temporada' : 'Add season' }}
-          </button>
+            <button
+              type="button"
+              class="block w-full px-4 py-3 text-left text-sm font-semibold text-white hover:bg-gray-800"
+              @click="addMenuOpen = false; openAddProgram()"
+            >
+              {{ language === 'es' ? 'Clase / Programa' : 'Class / Program' }}
+            </button>
+            <button
+              type="button"
+              class="block w-full border-t border-gray-800 px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-800"
+              @click="addMenuOpen = false; openAddEvent()"
+            >
+              {{ language === 'es' ? 'Evento' : 'Event' }}
+            </button>
+            <button
+              type="button"
+              class="block w-full border-t border-gray-800 px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-800"
+              @click="addMenuOpen = false; addSeasonOpen = true"
+            >
+              {{ language === 'es' ? 'Temporada' : 'Season' }}
+            </button>
+          </div>
         </div>
       </div>
     </header>
-
-    <div
-      v-if="activeQuerySeason && profileIsAdmin"
-      class="border-b px-4 py-3"
-      :style="{
-        borderColor: `${seasonColorFor(activeQuerySeason.slug).solid}55`,
-        backgroundColor: seasonColorFor(activeQuerySeason.slug).fillMuted,
-      }"
-    >
-      <p class="max-w-7xl mx-auto text-sm text-white">
-        <span class="font-bold">{{ activeQuerySeason.icon }}
-          {{ language === 'es' ? activeQuerySeason.name.es : activeQuerySeason.name.en }}
-        </span>
-        <span class="text-white/80">
-          · {{
-            language === 'es'
-              ? 'Los programas nuevos se asignarán a esta temporada'
-              : 'New programs will use this season'
-          }}
-        </span>
-      </p>
-    </div>
 
     <div v-if="checkingAccess || profileLoading" class="flex justify-center py-16 px-4">
       <div class="w-10 h-10 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
@@ -2128,7 +2167,7 @@ const selectDay = (day: Date) => {
       {{ language === 'es' ? 'Redirigiendo…' : 'Redirecting…' }}
     </div>
 
-    <div v-else class="px-4 py-6 max-w-[90rem] mx-auto">
+    <div v-else class="px-4 py-6 max-w-7xl mx-auto">
       <div v-if="formError && !modalOpen" class="rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-200 mb-4">
         {{ formError }}
         <p class="text-xs text-red-300/80 mt-2">
@@ -2140,20 +2179,13 @@ const selectDay = (day: Date) => {
         </p>
       </div>
 
-      <div class="lg:flex lg:gap-6 lg:items-start">
-        <aside class="lg:w-72 lg:shrink-0 mb-6 lg:mb-0 lg:sticky lg:top-24">
+      <div class="flex flex-col gap-8">
+        <aside class="order-2">
           <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
-            {{ language === 'es' ? 'Temporadas del programa' : 'Program seasons' }}
+            {{ language === 'es' ? 'Temporadas' : 'Seasons' }}
           </h2>
-          <p class="text-[11px] text-gray-500 mb-2">
-            {{
-              language === 'es'
-                ? 'Toca para seleccionar. Puedes elegir varias. El curso de verano puede coincidir con otra temporada.'
-                : 'Tap to select. You can pick more than one. Summer camp may overlap another season.'
-            }}
-          </p>
           <p v-if="seasonSelectError" class="text-[11px] text-amber-300 mb-2">{{ seasonSelectError }}</p>
-          <div class="rounded-2xl border border-gray-800 bg-gray-950 overflow-y-auto max-h-[70vh]">
+          <div class="rounded-2xl border border-gray-800 bg-gray-950 overflow-hidden">
             <p
               v-if="!currentSeasons.length"
               class="px-3 py-4 text-[11px] text-gray-500 text-center"
@@ -2219,25 +2251,25 @@ const selectDay = (day: Date) => {
           </div>
         </aside>
 
-        <div class="min-w-0 flex-1 space-y-4">
+        <div class="order-1 min-w-0 flex-1 space-y-4">
 
       <!-- Toolbar -->
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-col gap-3 rounded-t-2xl border border-gray-800 bg-gray-950 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="p-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
-            @click="viewMonth = addMonths(viewMonth, -1)"
+            class="p-2 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white"
+            @click="goToPeriod(-1)"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span class="text-white font-semibold capitalize min-w-[140px] text-center">{{ monthLabel }}</span>
+          <span class="text-white font-black capitalize min-w-[170px] text-center">{{ monthLabel }}</span>
           <button
             type="button"
-            class="p-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
-            @click="viewMonth = addMonths(viewMonth, 1)"
+            class="p-2 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white"
+            @click="goToPeriod(1)"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -2245,79 +2277,27 @@ const selectDay = (day: Date) => {
           </button>
           <button
             type="button"
-            class="ml-1 px-3 py-2 rounded-lg border border-gray-600 text-gray-300 text-sm font-medium hover:bg-gray-800"
+            class="ml-1 px-3 py-2 rounded-lg text-gray-300 text-sm font-bold hover:bg-gray-800"
             @click="goToday"
           >
             {{ language === 'es' ? 'Hoy' : 'Today' }}
           </button>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-gray-500 text-sm hidden sm:inline">{{ language === 'es' ? 'Filtrar' : 'Filter' }}</span>
+          <select
+            v-model="calendarView"
+            class="rounded-xl bg-gray-900 border border-gray-700 text-white text-sm px-3 py-2"
+          >
+            <option value="week">{{ language === 'es' ? 'Semana' : 'Week' }}</option>
+            <option value="month">{{ language === 'es' ? 'Mes' : 'Month' }}</option>
+          </select>
           <select
             v-model="filterType"
-            class="flex-1 sm:flex-none min-w-[160px] px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm"
+            class="hidden md:block min-w-[160px] px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm"
           >
             <option value="all">{{ language === 'es' ? 'Todos los eventos' : 'All events' }}</option>
             <option v-for="t in filterEventTypes" :key="t" :value="t">{{ tLabel(t) }}</option>
           </select>
-        </div>
-      </div>
-
-      <!-- Legend: events = dots · programs = icons -->
-      <div class="space-y-2 text-xs text-gray-400">
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold shrink-0">
-            {{ language === 'es' ? 'Eventos' : 'Events' }}
-          </span>
-          <span
-            v-for="t in legendEventTypes"
-            :key="'leg-ev-' + t"
-            class="inline-flex items-center gap-1.5"
-          >
-            <span class="w-2 h-2 rounded-full shrink-0" :class="EVENT_META[t].dot" />
-            {{ tLabel(t) }}
-          </span>
-        </div>
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold shrink-0">
-            {{ language === 'es' ? 'Programas' : 'Programs' }}
-          </span>
-          <span
-            v-for="t in legendProgramTypes"
-            :key="'leg-pr-' + t"
-            class="inline-flex items-center gap-1.5"
-          >
-            <span class="text-sm leading-none shrink-0" aria-hidden="true">{{ EVENT_META[t].emoji }}</span>
-            {{ tLabel(t) }}
-          </span>
-          <span
-            v-for="track in PROGRAM_SKILL_TRACKS"
-            :key="'leg-sk-' + track.id"
-            class="inline-flex items-center gap-1.5"
-          >
-            <span
-              class="w-3 h-3 rounded-sm shrink-0"
-              :style="{ backgroundColor: SKILL_CHIP_COLOR[track.id].solid }"
-            />
-            {{ track.emoji }}
-            {{ language === 'es' ? track.label.es : track.label.en }}
-          </span>
-        </div>
-        <div v-if="highlightedSeasons.length" class="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span
-            v-for="season in highlightedSeasons"
-            :key="'leg-season-' + season.slug"
-            class="inline-flex items-center gap-1.5"
-          >
-            <span
-              class="w-3 h-3 rounded-sm shrink-0"
-              :style="{ backgroundColor: seasonColorFor(season.slug).solid }"
-            />
-            {{ language === 'es' ? season.name.es : season.name.en }}
-            <span class="text-gray-500">
-              · {{ language === 'es' ? season.dates.es : season.dates.en }}
-            </span>
-          </span>
         </div>
       </div>
 
@@ -2327,13 +2307,14 @@ const selectDay = (day: Date) => {
       </div>
       <template v-else>
       <div
-        v-for="month in visibleMonths"
+        v-for="month in displayedPeriods"
         :key="month.toISOString()"
-        class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden"
+        class="bg-gray-950 border border-gray-800 rounded-b-2xl overflow-x-auto"
       >
+        <div class="min-w-[760px]">
         <!-- Only worth naming each grid once a season stacks more than one month -->
         <p
-          v-if="visibleMonths.length > 1"
+          v-if="calendarView === 'month' && visibleMonths.length > 1"
           class="px-3 py-2 border-b border-gray-800 text-sm font-semibold text-white capitalize"
         >
           {{ monthLabelFor(month) }}
@@ -2349,11 +2330,11 @@ const selectDay = (day: Date) => {
         </div>
         <div class="grid grid-cols-7 auto-rows-fr">
           <div
-            v-for="(day, idx) in monthGrid(month).days"
+            v-for="(day, idx) in displayedDays(month)"
             :key="idx"
             role="button"
             tabindex="0"
-            class="min-h-[100px] sm:min-h-[112px] border-b border-r border-gray-800 p-1.5 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
+            class="min-h-[170px] border-b border-r border-gray-800 p-2 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
             :class="{
               'bg-gray-950/50': !isSameMonth(day, month) && !isDayInHighlightedSeason(day),
               'opacity-50': isPastDay(day) && !isDayInHighlightedSeason(day),
@@ -2418,19 +2399,46 @@ const selectDay = (day: Date) => {
             </div>
           </div>
         </div>
+        </div>
       </div>
       </template>
 
-      <p class="text-xs text-gray-600 text-center">
-        {{
-          language === 'es'
-            ? 'Hoy queda seleccionado al abrir. Toca un día para marcarlo. Si hay varios programas el mismo día, desplázate dentro de la celda. Usa el panel Programas a la derecha para ver la serie completa.'
-            : 'Today is selected when you open the calendar. Tap a day to select it. Scroll inside a day cell when several programs share that date. Use the Programs panel on the right for the full series list.'
-        }}
-      </p>
+      <section class="pt-3">
+        <h2 class="mb-3 text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+          {{ selectedDayHeading }}
+        </h2>
+        <div class="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950">
+          <p v-if="!selectedDayEvents.length" class="px-4 py-6 text-sm text-gray-500">
+            {{ language === 'es' ? 'No hay actividades este día.' : 'No activities on this day.' }}
+          </p>
+          <button
+            v-for="ev in selectedDayEvents"
+            :key="ev.id"
+            type="button"
+            class="grid w-full grid-cols-[76px_12px_1fr] gap-3 border-b border-gray-800 px-4 py-3 text-left last:border-b-0 hover:bg-gray-900"
+            @click="openEdit(ev, $event)"
+          >
+            <span class="text-xs font-black text-gray-300">{{ agendaTime(ev) }}</span>
+            <span
+              class="mt-1 h-2.5 w-2.5 rounded-full"
+              :class="!isProgramType(ev.event_type) ? EVENT_META[ev.event_type]?.dot : ''"
+              :style="isProgramType(ev.event_type)
+                ? { backgroundColor: SKILL_CHIP_COLOR[skillTrackFromLevelId(ev.skill_level)].solid }
+                : {}"
+            />
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-black text-white">{{ ev.title }}</span>
+              <span v-if="ev.season_slug" class="block truncate text-xs text-gray-400">
+                {{ programSidebarSeasonLabel(ev.season_slug) }}
+              </span>
+              <span class="block text-xs text-gray-500">{{ agendaMeta(ev) }}</span>
+            </span>
+          </button>
+        </div>
+      </section>
         </div>
 
-        <aside class="lg:w-72 lg:shrink-0 mt-6 lg:mt-0 lg:sticky lg:top-24">
+        <aside class="order-3">
           <h2 class="text-xs font-bold uppercase tracking-[0.22em] text-gold-400 mb-3">
             {{ language === 'es' ? 'Programas' : 'Programs' }}
           </h2>

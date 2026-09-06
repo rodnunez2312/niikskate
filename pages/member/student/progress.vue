@@ -7,11 +7,13 @@ definePageMeta({
 const user = useSupabaseUser()
 const router = useRouter()
 const { language } = useI18n()
-const { participants, refreshCrew, loading: crewLoading } = useCrew()
+// A parent/tutor never skates, so their card is not part of Progreso.
+const { skaterParticipants, refreshCrew, loading: crewLoading } = useCrew()
 
-function studentIdFor(participant: { type: string }) {
+function studentIdFor(participant: { type: string; skaterProfileId: string | null }) {
   if (participant.type === 'self' && user.value?.id) return user.value.id
-  return null
+  // A linked skater has a real profile, so their coach ratings load here too.
+  return participant.skaterProfileId
 }
 
 watch(
@@ -39,11 +41,22 @@ watch(
 
       <template v-else>
         <MemberStudentSkaterProgressPanel
-          v-for="p in participants"
+          v-for="p in skaterParticipants"
           :key="p.key"
           :participant="p"
           :student-id="studentIdFor(p)"
         />
+        <NuxtLink
+          v-if="!skaterParticipants.length"
+          to="/member/student/profile"
+          class="block rounded-2xl border border-gray-800 bg-gray-900 px-4 py-6 text-center text-sm text-gray-400"
+        >
+          {{
+            language === 'es'
+              ? 'Aún no hay patinadores en tu familia. Agrega uno en Familia.'
+              : 'No skaters in your family yet. Add one under Family.'
+          }}
+        </NuxtLink>
       </template>
     </div>
   </div>

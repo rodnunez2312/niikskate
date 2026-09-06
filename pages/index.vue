@@ -307,22 +307,15 @@ watch(parentQuotes, () => {
               <p>
                 {{
                   es
-                    ? 'Cada temporada puede ser de 4 semanas (8 clases $1,000 o 12 clases $1,500) o 8 semanas (16 clases $2,000 o 24 clases $3,000). También hay clase suelta. Entrenamos martes, jueves y sábado en Skatepark La Plancha, Mérida.'
-                    : 'Each season can run 4 weeks (8 classes $1,000 or 12 classes $1,500) or 8 weeks (16 classes $2,000 or 24 classes $3,000). Single classes are also available. We train Tuesday, Thursday, and Saturday at Skatepark La Plancha, Mérida.'
+                    ? 'Las clases grupales reúnen patinadores de edades y niveles compatibles para aprender en un ambiente seguro, dinámico y divertido.'
+                    : 'Group classes bring together skaters of compatible ages and levels to learn in a safe, active, and fun environment.'
                 }}
               </p>
               <p>
                 {{
                   es
-                    ? 'Cuando abren inscripciones, elige la temporada, revisa las clases disponibles (edad y nivel) e inscribe a tu patinador. Los lugares se llenan rápido — conviene registrarse temprano.'
-                    : 'When registration opens, pick a season, review available classes (age and level), and enroll your skater. Spots fill quickly — register early.'
-                }}
-              </p>
-              <p>
-                {{
-                  es
-                    ? 'Descuentos automáticos al inscribir a 2 patinadores (hermanos o varios estudiantes): 10% cada uno; con 3 o más, 15% cada uno.'
-                    : 'Automatic discounts when enrolling 2 skaters (siblings or multiple students): 10% each; with 3 or more, 15% each.'
+                    ? 'El coach guía calentamiento, fundamentos, práctica de habilidades y retos adaptados al grupo. El equipo de seguridad es obligatorio y los cupos son limitados.'
+                    : 'The coach guides the warm-up, fundamentals, skill practice, and challenges adapted to the group. Safety gear is required and group sizes are limited.'
                 }}
               </p>
             </div>

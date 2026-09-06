@@ -23,6 +23,8 @@ export interface CouponContext {
   coachTier?: string | null
   userId: string
   crewMemberId?: string | null
+  /** Skater with their own login, when a guardian books on their behalf. */
+  skaterProfileId?: string | null
 }
 
 export type CouponCheck =
@@ -121,6 +123,22 @@ export async function checkCoupon(
     crewMemberId = crewRow.id
   }
 
+  // Same rule for a skater who has their own login: only trust the id once it
+  // is the caller or a child the caller is the guardian of.
+  let skaterProfileId: string | null = null
+  if (input.skaterProfileId) {
+    const { data: skaterRow, error: skaterErr } = await supabase
+      .from('profiles')
+      .select('id, guardian_user_id')
+      .eq('id', input.skaterProfileId)
+      .maybeSingle()
+    if (skaterErr) return { ok: false, reason: 'server_error' }
+    if (!skaterRow || (skaterRow.id !== input.userId && skaterRow.guardian_user_id !== input.userId)) {
+      return { ok: false, reason: 'not_allowed' }
+    }
+    skaterProfileId = skaterRow.id
+  }
+
   // Restricted coupons: the guardian's profile authorizes their whole crew, or a
   // single child can be listed on its own.
   if (coupon.restricted_to_skaters) {
@@ -133,6 +151,9 @@ export async function checkCoupon(
     const allowed = (allowRows || []).some(
       row =>
         (row.skater_id && row.skater_id === input.userId)
+        // The named skater may be a child booked by their guardian, so the
+        // allow-list has to match the child's profile too, not just the payer.
+        || (row.skater_id && skaterProfileId && row.skater_id === skaterProfileId)
         || (crewMemberId && row.crew_member_id === crewMemberId),
     )
     if (!allowed) return { ok: false, reason: 'not_allowed' }

@@ -102,6 +102,8 @@ export default defineEventHandler(async (event) => {
         first_name: nameParts[0] ?? null,
         last_name: nameParts.length > 1 ? nameParts.slice(1).join(' ') : null,
         role,
+        // Stored so the app can tell a booking parent from a skating member.
+        customer_kind: role === 'customer' ? kind : null,
         phone: (phone || '').trim() || null,
         date_of_birth: dob,
         age,

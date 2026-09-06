@@ -27,6 +27,8 @@ export interface User {
   skill_level?: string | null
   /** Parent/guardian when this profile is a skater with login. */
   guardian_user_id?: string | null
+  /** Customers only: 'guardian' books for the family, 'skater' rides. */
+  customer_kind?: 'guardian' | 'skater' | null
   /** Admin-set weekly preference: { start, end, days[] } — days 0–6 Sun–Sat. */
   skater_schedule?: { start?: string; end?: string; days?: number[]; season_slug?: string } | null
 }

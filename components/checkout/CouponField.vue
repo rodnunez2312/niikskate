@@ -14,6 +14,8 @@ const props = withDefaults(
     classKind?: string | null
     coachTier?: string | null
     crewMemberId?: string | null
+    /** Set when a guardian books a skater who has their own login. */
+    skaterProfileId?: string | null
     disabled?: boolean
     /** The /book wizard is dark; the season modal is light. */
     variant?: 'dark' | 'light'
@@ -43,7 +45,13 @@ const applied = ref<AppliedCoupon | null>(null)
 
 /** Changing the package invalidates a verified discount, so drop it. */
 watch(
-  () => [props.subtotalMxn, props.classKind, props.coachTier, props.crewMemberId],
+  () => [
+    props.subtotalMxn,
+    props.classKind,
+    props.coachTier,
+    props.crewMemberId,
+    props.skaterProfileId,
+  ],
   () => {
     if (!applied.value) return
     applied.value = null
@@ -80,6 +88,7 @@ async function apply() {
         classKind: props.classKind ?? null,
         coachTier: props.coachTier ?? null,
         crewMemberId: props.crewMemberId ?? null,
+        skaterProfileId: props.skaterProfileId ?? null,
         language: language.value,
       },
     })

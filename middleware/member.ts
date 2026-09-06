@@ -7,8 +7,19 @@ export default defineNuxtRouteMiddleware(async to => {
   }
 
   const client = useSupabaseClient()
-  const { data } = await client.from('profiles').select('role').eq('id', user.value.id).single()
+  const { data } = await client
+    .from('profiles')
+    .select('role, guardian_user_id')
+    .eq('id', user.value.id)
+    .single()
   const role = data?.role
+
+  // Assigning a skater to a family moves them onto the family login. Catches
+  // sessions that were already open when the admin made the change.
+  if (data?.guardian_user_id) {
+    await client.auth.signOut()
+    return navigateTo('/auth/login?reason=moved_to_family')
+  }
 
   const studentOnly = to.path.startsWith('/member/student')
   const coachOnly = to.path.startsWith('/member/coach')

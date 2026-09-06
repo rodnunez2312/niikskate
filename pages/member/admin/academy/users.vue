@@ -120,10 +120,16 @@ type AdminSkaterCard = {
 const isNiikSkaterEmail = (email: string) =>
   email.toLowerCase().endsWith(NIIK_SKATE_EMAIL_DOMAIN)
 
-/** Skater login profiles — linked to a family and/or Niik account with DOB. */
-const isSkaterProfile = (u: User) =>
-  Boolean(u.guardian_user_id)
-  || (isNiikSkaterEmail(u.email) && Boolean(u.date_of_birth))
+/**
+ * Skater login profiles. The kind chosen at creation decides it; accounts made
+ * before that was stored fall back to the shape of the row.
+ */
+const isSkaterProfile = (u: User) => {
+  if (u.customer_kind === 'skater') return true
+  if (u.customer_kind === 'guardian') return false
+  return Boolean(u.guardian_user_id)
+    || (isNiikSkaterEmail(u.email) && Boolean(u.date_of_birth))
+}
 
 /** Parent/guardian family account (may use @niikskate.com without DOB). */
 const isFamilyAccount = (u: User) =>
@@ -717,6 +723,13 @@ const submitAddFamily = async () => {
       language.value === 'es' ? 'El nombre del contacto es obligatorio' : 'Contact first name is required'
     return
   }
+  // A family exists to hold skaters: the tutor alone has nobody to book for.
+  if (!newFamilyForm.value.skater_ids.length) {
+    addUserError.value = language.value === 'es'
+      ? 'Elige al menos un patinador. Crea primero los patinadores con el botón Patinador y después la familia.'
+      : 'Pick at least one skater. Create the skaters first with the Patinador button, then the family.'
+    return
+  }
 
   syncFamilyEmailFromNames()
   const emailLocal =
@@ -747,6 +760,8 @@ const submitAddFamily = async () => {
           first_name: first,
           last_name: last || null,
           phone: newFamilyForm.value.phone.trim() || null,
+          // Families created before customer_kind existed are tagged here.
+          customer_kind: 'guardian',
         })
         .eq('id', guardianId)
       if (upErr) throw upErr
@@ -1269,6 +1284,18 @@ const scheduleSummary = (u: User) => {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </button>
+                    <button
+                      type="button"
+                      class="p-1 rounded text-gray-600 hover:bg-red-950/50 hover:text-red-400 disabled:opacity-40"
+                      :disabled="deletingUserId === u.id"
+                      :title="language === 'es' ? `Eliminar ${u.full_name}` : `Delete ${u.full_name}`"
+                      :aria-label="language === 'es' ? `Eliminar ${u.full_name}` : `Delete ${u.full_name}`"
+                      @click.stop="deleteSkater(u)"
+                    >
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1611,14 +1638,21 @@ const scheduleSummary = (u: User) => {
                     </span>
                   </label>
                 </div>
-                <p v-else class="text-xs text-gray-500">
-                  {{ language === 'es' ? 'Aún no hay patinadores registrados.' : 'No skaters registered yet.' }}
+                <p
+                  v-else
+                  class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+                >
+                  {{
+                    language === 'es'
+                      ? 'Aún no hay patinadores registrados. Cierra esta ventana, crea los patinadores con el botón Patinador y vuelve a crear la familia.'
+                      : 'No skaters registered yet. Close this window, create the skaters with the Patinador button, then create the family.'
+                  }}
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
                   {{
                     language === 'es'
-                      ? 'Marca para asignar; desmarca para quitar de la familia.'
-                      : 'Check to assign; uncheck to remove from family.'
+                      ? 'Marca para asignar; desmarca para quitar de la familia. Se requiere al menos uno.'
+                      : 'Check to assign; uncheck to remove from family. At least one is required.'
                   }}
                 </p>
               </div>

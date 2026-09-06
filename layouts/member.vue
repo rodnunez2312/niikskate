@@ -3,7 +3,9 @@ import MemberTopBar from '~/components/member/MemberTopBar.vue'
 import MemberStaffSidebar from '~/components/member/MemberStaffSidebar.vue'
 
 const { navItems, isActive, usesStaffSidebar } = useMemberNav()
+const route = useRoute()
 const staffMenuOpen = ref(false)
+const isCalendarPage = computed(() => route.path === '/member/admin/scheduling/calendar')
 
 function toggleStaffMenu() {
   staffMenuOpen.value = !staffMenuOpen.value
@@ -19,7 +21,19 @@ function toggleStaffMenu() {
     />
 
     <div class="min-w-0 flex-1 flex flex-col min-h-screen">
+      <div
+        v-if="isCalendarPage"
+        class="h-12 shrink-0 border-b border-gray-800 bg-gray-950 px-4 flex items-center"
+      >
+        <NuxtLink
+          to="/member/staff/dashboard"
+          class="text-sm font-bold text-gray-300 hover:text-white"
+        >
+          ← Calendario
+        </NuxtLink>
+      </div>
       <MemberTopBar
+        v-else
         :show-menu-button="usesStaffSidebar"
         :menu-open="staffMenuOpen"
         @toggle-menu="toggleStaffMenu"

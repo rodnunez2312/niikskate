@@ -25,8 +25,16 @@ Most operational queries start from **`profiles`** and join to **`auth.users`** 
 |--------|---------|
 | `crew_members` | Skaters managed by a guardian (`guardian_user_id` → `profiles.id`). Children without their own login. |
 | `class_session_enrollments.crew_member_id` | Which crew skater is enrolled; `NULL` = account holder enrolled for self. |
+| `profiles.guardian_user_id` | The other kind of family skater: has their own login, attached to a parent by an admin. |
+| `class_session_enrollments.skater_profile_id` | Which linked skater is enrolled; `NULL` = a crew member or the account holder. |
 
 Run migration: `supabase/migrations/add_crew_members.sql`
+
+Run migration: `supabase/migrations/add_profile_customer_kind.sql` (**required so a parent stops counting as a skater**) — adds `profiles.customer_kind` (`guardian` / `skater`). The admin create-user form always sent this and it was never stored, so a tutor got their own progress card, trick bag and seat in the class picker. Existing rows are backfilled from `guardian_user_id` in both directions; anything still NULL is treated as a skater, which is how solo adult accounts already behave.
+
+Run migration: `supabase/migrations/add_finance_crew_link.sql` (**required for Mi cuenta**) — adds `crew_member_id` to `finance_student_enrollments` and `finance_payments`. The finance sheet could only point at `profiles.id`, so a child added by their parent under Familia was tracked by name alone and the family had no way to be shown their own classes and payments. Pick the skater in Admin → Finanzas → Alumnos → "+ Alumno" and the family sees the row under Cuenta.
+
+Run migration: `supabase/migrations/add_enrollment_skater_profile.sql` (**required for admin-assigned skaters to show in Crew / Mi Familia**) — a family has two kinds of skater and the parent screens only knew about `crew_members`, so ticking skaters in Admin → Academia → Usuarios → Familia (which writes `profiles.guardian_user_id`) left the parent seeing "1 miembro". Those skaters now appear for the guardian, and this migration adds `skater_profile_id` so booking one records the child rather than the parent. The old `idx_enrollment_self` unique index is rebuilt to require both skater columns to be NULL, otherwise a parent booking two children collides on `(event, user)`.
 
 Run migration: `supabase/migrations/add_monday_slot_and_audience_categories.sql` (monday slot + audience columns)
 
@@ -39,6 +47,8 @@ Run migration: `supabase/migrations/add_birthday_and_class_individual.sql` (birt
 Run migration: `supabase/migrations/seed_mexico_holidays_2026_2027.sql` (national holidays 2026–2027; also auto-seeded when opening admin calendar)
 
 Run migration: `supabase/migrations/add_program_coach_tier.sql` (**required for the "Coach / precios" picker** when creating a program) — adds `coach_tier` to `school_calendar_events`. The tier used to be inferred from the skill level, so every Intermedio/Avanzado program silently sold at Coach Pro Street rates ($500 individual instead of $250). Admins now choose Coach Niik / Pro Street / Pro Bowl per program, and existing rows stay NULL, which reads as Coach Niik.
+
+Run migration: `supabase/migrations/add_student_program_read_policies.sql` (**required for Programa in the skater portal**) — lets each skater read only their own `program_students` assignment and assigned program, plus the active phase structure used to display their roadmap. It does not grant students write access.
 
 Run migration: `supabase/migrations/add_brand_and_ramp_storage_policies.sql` (**required for brand logo uploads** in Admin → Skateshop → Marcas) — `storage.objects` only had policies for `products/` and `avatars/`, so every write to `brands/` was denied by RLS and the logo silently fell back to a device-local `blob:` URL. Also covers `skateramps/`, which had the same gap for the ramp studio reference photos.
 

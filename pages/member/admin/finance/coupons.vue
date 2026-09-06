@@ -55,22 +55,65 @@ onMounted(async () => {
 // Allow-list picker
 // ---------------------------------------------------------------------------
 
-const skaters = ref<Array<{ id: string; full_name: string }>>([])
-const crew = ref<Array<{ id: string; name: string }>>([])
+type RosterProfile = { id: string; full_name: string; guardian_user_id: string | null }
+type RosterCrew = { id: string; name: string; guardian_user_id: string | null }
+type AllowTarget = { skaterId?: string; crewMemberId?: string }
+
+const skaters = ref<RosterProfile[]>([])
+const crew = ref<RosterCrew[]>([])
 const rosterLoaded = ref(false)
 const allowSearch = ref('')
 
 async function loadRoster() {
   if (rosterLoaded.value) return
   const [{ data: profiles }, { data: crewRows }] = await Promise.all([
-    client.from('profiles').select('id, full_name').eq('role', 'customer').order('full_name'),
-    client.from('crew_members').select('id, first_name, last_name').order('first_name'),
+    client
+      .from('profiles')
+      .select('id, full_name, guardian_user_id')
+      .eq('role', 'customer')
+      .order('full_name'),
+    client
+      .from('crew_members')
+      .select('id, first_name, last_name, guardian_user_id')
+      .order('first_name'),
   ])
-  skaters.value = (profiles as Array<{ id: string; full_name: string }>) || []
-  crew.value = ((crewRows as Array<{ id: string; first_name: string; last_name: string }>) || [])
-    .map(c => ({ id: c.id, name: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() }))
+  skaters.value = (profiles as RosterProfile[]) || []
+  crew.value = ((crewRows as Array<{
+    id: string
+    first_name: string
+    last_name: string
+    guardian_user_id: string | null
+  }>) || []).map(c => ({
+    id: c.id,
+    name: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim(),
+    guardian_user_id: c.guardian_user_id,
+  }))
   rosterLoaded.value = true
 }
+
+/**
+ * A family is a guardian plus everyone who books under them: their own account
+ * (they are the payer), their skaters with a login, and their crew children.
+ * Adding the family in one go beats hunting for four names in the roster.
+ */
+const families = computed(() => {
+  const rows: Array<{ id: string; name: string; targets: AllowTarget[] }> = []
+  for (const g of skaters.value) {
+    const linked = skaters.value.filter(s => s.guardian_user_id === g.id)
+    const kids = crew.value.filter(c => c.guardian_user_id === g.id)
+    if (!linked.length && !kids.length) continue
+    rows.push({
+      id: g.id,
+      name: g.full_name || '—',
+      targets: [
+        { skaterId: g.id },
+        ...linked.map(s => ({ skaterId: s.id })),
+        ...kids.map(k => ({ crewMemberId: k.id })),
+      ],
+    })
+  }
+  return rows
+})
 
 async function toggleExpand(coupon: CouponRow) {
   if (expandedId.value === coupon.id) {
@@ -105,6 +148,29 @@ async function addCandidate(candidate: { id: string; kind: 'profile' | 'crew' })
     candidate.kind === 'crew' ? { crewMemberId: candidate.id } : { skaterId: candidate.id },
   )
   if (!res.ok && res.message) alert(res.message)
+  allowSearch.value = ''
+}
+
+const isListed = (target: AllowTarget) =>
+  listedIds.value.has(target.crewMemberId || target.skaterId || '')
+
+const familyCandidates = computed(() => {
+  const q = allowSearch.value.trim().toLowerCase()
+  const rows = families.value.filter(f => f.targets.some(t => !isListed(t)))
+  if (!q) return rows.slice(0, 4)
+  return rows.filter(f => f.name.toLowerCase().includes(q)).slice(0, 10)
+})
+
+async function addFamily(family: { id: string; targets: AllowTarget[] }) {
+  if (!expandedId.value) return
+  for (const target of family.targets) {
+    if (isListed(target)) continue
+    const res = await addToAllowList(expandedId.value, target)
+    if (!res.ok && res.message) {
+      alert(res.message)
+      return
+    }
+  }
   allowSearch.value = ''
 }
 
@@ -458,9 +524,24 @@ async function submitCoupon() {
             <input
               v-model="allowSearch"
               type="text"
-              :placeholder="es ? 'Buscar alumno para agregar…' : 'Search a skater to add…'"
+              :placeholder="es ? 'Buscar familia o alumno para agregar…' : 'Search a family or skater to add…'"
               class="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-white text-sm placeholder-gray-500"
             />
+            <div v-if="familyCandidates.length" class="flex flex-wrap gap-1.5 mt-2">
+              <button
+                v-for="family in familyCandidates"
+                :key="'family-' + family.id"
+                type="button"
+                :disabled="saving"
+                class="text-[11px] px-2 py-1 rounded-lg bg-gold-500/10 border border-gold-500/40 text-gold-200 hover:border-gold-400 disabled:opacity-40"
+                @click="addFamily(family)"
+              >
+                + 👨‍👩‍👧 {{ family.name }}
+                <span class="text-gold-400/70">
+                  ({{ family.targets.length }} {{ es ? 'personas' : 'people' }})
+                </span>
+              </button>
+            </div>
             <div v-if="allowCandidates.length" class="flex flex-wrap gap-1.5 mt-2">
               <button
                 v-for="candidate in allowCandidates"
@@ -473,8 +554,18 @@ async function submitCoupon() {
                 + {{ candidate.kind === 'crew' ? '🧒' : '👤' }} {{ candidate.name }}
               </button>
             </div>
-            <p v-else-if="allowSearch" class="text-[11px] text-gray-600 mt-2">
+            <p
+              v-else-if="allowSearch && !familyCandidates.length"
+              class="text-[11px] text-gray-600 mt-2"
+            >
               {{ es ? 'Sin resultados.' : 'No matches.' }}
+            </p>
+            <p class="text-[11px] text-gray-600 mt-2">
+              {{
+                es
+                  ? 'Agregar una familia inscribe al tutor y a todos sus patinadores de una vez.'
+                  : 'Adding a family lists the guardian and every one of their skaters at once.'
+              }}
             </p>
           </div>
 

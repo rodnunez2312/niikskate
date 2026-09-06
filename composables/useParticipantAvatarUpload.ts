@@ -3,6 +3,8 @@ import type { Ref } from 'vue'
 type AvatarTarget =
   | { kind: 'self' }
   | { kind: 'crew'; crewMemberId: string }
+  /** Someone else's account, e.g. a linked skater: shown but not editable here. */
+  | { kind: 'readonly' }
 
 async function compressToJpegBlob(file: File, maxDim = 512, quality = 0.85): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -132,7 +134,7 @@ export function useParticipantAvatarUpload(
           .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
           .eq('id', user.value.id)
         if (dbErr) throw dbErr
-      } else {
+      } else if (t.kind === 'crew') {
         const { error: dbErr } = await client
           .from('crew_members')
           .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
@@ -176,7 +178,7 @@ export function useParticipantAvatarUpload(
           .update({ avatar_url: null, updated_at: new Date().toISOString() })
           .eq('id', user.value.id)
         if (error) throw error
-      } else {
+      } else if (t.kind === 'crew') {
         const { error } = await client
           .from('crew_members')
           .update({ avatar_url: null, updated_at: new Date().toISOString() })

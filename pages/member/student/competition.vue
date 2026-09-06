@@ -6,17 +6,22 @@ import type { CompetitionEvent } from '~/composables/useCompetitionEvents'
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language } = useI18n()
-const { fetchCompetitions } = useCompetitionEvents()
+const { fetchCompetitions, splitUpcomingPast } = useCompetitionEvents()
 
 const loading = ref(true)
 const events = ref<CompetitionEvent[]>([])
+const upcoming = ref<CompetitionEvent[]>([])
+const past = ref<CompetitionEvent[]>([])
 const readiness = ref({ progressPct: 0, learned: 0, total: 0, lastEvalRating: null as number | null })
 
 async function loadPage() {
   loading.value = true
   try {
-    const { events: rows } = await fetchCompetitions()
+    const { events: rows } = await fetchCompetitions({ includePast: true })
     events.value = rows
+    const split = splitUpcomingPast(rows)
+    upcoming.value = split.upcoming
+    past.value = split.past
 
     if (user.value) {
       const uid = user.value.id
@@ -52,10 +57,10 @@ onActivated(loadPage)
   <div class="px-4 py-6 max-w-lg mx-auto space-y-6 pb-8">
     <div>
       <h1 class="text-xl font-bold text-white">
-        {{ language === 'es' ? 'Ruta de competencia' : 'Competition path' }}
+        {{ language === 'es' ? 'Competencias' : 'Competitions' }}
       </h1>
       <p class="text-sm text-gray-400 mt-1">
-        {{ language === 'es' ? 'Próximas competencias y tu preparación.' : 'Upcoming contests and your readiness.' }}
+        {{ language === 'es' ? 'Calendario de competencias y tu preparación.' : 'Competition calendar and your readiness.' }}
       </p>
     </div>
 
@@ -88,12 +93,30 @@ onActivated(loadPage)
 
     <section class="space-y-3">
       <h2 class="text-sm font-bold text-white">
+        {{ language === 'es' ? 'Calendario' : 'Calendar' }}
+      </h2>
+      <MemberCompetitionCalendar :events="events" :loading="loading" />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-sm font-bold text-white">
         {{ language === 'es' ? 'Próximas competencias' : 'Upcoming competitions' }}
       </h2>
       <MemberCompetitionEventsList
-        :events="events"
+        :events="upcoming"
         :loading="loading"
         :empty-message="language === 'es' ? 'Aún no hay competencias publicadas. Pregunta a tu coach.' : 'No published competitions yet. Ask your coach.'"
+      />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-sm font-bold text-gray-400">
+        {{ language === 'es' ? 'Competencias pasadas' : 'Past competitions' }}
+      </h2>
+      <MemberCompetitionEventsList
+        :events="past"
+        :loading="loading"
+        :empty-message="language === 'es' ? 'Aún no hay competencias pasadas.' : 'No past competitions yet.'"
       />
     </section>
   </div>

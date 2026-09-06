@@ -17,56 +17,73 @@ const { language } = useI18n()
 const es = computed(() => language.value === 'es')
 
 const name = computed(() => (es.value ? props.season.name.es : props.season.name.en))
-const dates = computed(() => (es.value ? props.season.dates.es : props.season.dates.en))
+
+const MONTHS = {
+  es: ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'],
+  en: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+}
+
+const compactDates = computed(() => {
+  const formatDate = (ymd: string) => {
+    const [, month, day] = ymd.split('-').map(Number)
+    const months = es.value ? MONTHS.es : MONTHS.en
+    return `${months[month - 1]} ${day}`
+  }
+  return `${formatDate(props.season.startDate)} — ${formatDate(props.season.endDate)}`
+})
+
+const statusBadge = computed(() => {
+  if (props.past) return ''
+  if (props.status.kind === 'soon') return es.value ? 'PRÓXIMA' : 'UPCOMING'
+  if (props.status.kind === 'enroll') return es.value ? 'ACTIVA' : 'ACTIVE'
+  return ''
+})
 </script>
 
 <template>
   <div
-    class="relative border-b border-gray-800 last:border-b-0"
+    class="group relative border-b border-gray-800 last:border-b-0"
     :class="past ? 'opacity-45' : ''"
     :style="selected
-      ? { backgroundColor: color.fillMuted, boxShadow: `inset 0 0 0 1px ${color.solid}` }
+      ? { backgroundColor: color.fillMuted, boxShadow: `inset 3px 0 0 ${color.solid}` }
       : {}"
   >
     <button
       type="button"
-      class="w-full text-left px-3 py-3 pr-10 transition-colors"
+      class="w-full text-left px-3 py-3 pr-16 transition-colors"
       :class="selected ? '' : 'hover:bg-gray-900'"
       @click="$emit('toggle')"
     >
-      <p
-        class="text-sm font-bold leading-snug flex items-center gap-2"
-        :class="past ? 'text-gray-500' : 'text-white'"
-      >
+      <div class="flex items-center gap-2 min-w-0">
         <span
           class="inline-block w-2.5 h-2.5 rounded-full shrink-0"
           :style="{ backgroundColor: color.solid }"
           aria-hidden="true"
         />
-        <span class="mr-0.5" aria-hidden="true">{{ season.icon }}</span>
-        {{ name }}
-      </p>
-      <p class="text-[11px] text-gray-500 mt-0.5">{{ dates }}</p>
-      <p class="mt-1.5 flex items-center justify-between gap-2">
-        <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Mérida</span>
-        <span
-          v-if="status.kind === 'enroll'"
-          class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-teal-700 text-white text-[10px] font-bold"
+        <p
+          class="min-w-0 flex-1 text-sm font-bold leading-snug truncate"
+          :class="past ? 'text-gray-500' : 'text-white'"
         >
-          {{ status.label }}
+          {{ name }}
+        </p>
+        <span class="text-[10px] font-bold text-gray-400 whitespace-nowrap">
+          {{ compactDates }}
         </span>
+      </div>
+      <div class="mt-1 pl-[18px] flex items-center justify-between gap-2">
+        <span class="text-[10px] text-gray-500 font-semibold">Mérida</span>
         <span
-          v-else
-          class="text-[11px] font-semibold"
-          :class="status.kind === 'done' ? 'text-gray-500' : 'text-gray-400'"
+          v-if="statusBadge"
+          class="inline-flex items-center rounded-full border border-gray-700 px-2 py-0.5 text-[9px] font-black tracking-wide text-gray-300"
         >
-          {{ status.label }}
+          {{ statusBadge }}
         </span>
-      </p>
+      </div>
+      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xl">›</span>
     </button>
     <button
       type="button"
-      class="absolute top-2 right-2 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40"
+      class="absolute top-1 right-1 p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40 opacity-0 group-hover:opacity-100 focus:opacity-100"
       :disabled="removing"
       :title="es ? 'Quitar temporada' : 'Remove season'"
       :aria-label="es ? 'Quitar temporada' : 'Remove season'"

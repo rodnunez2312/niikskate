@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
     coachTier: typeof body?.coachTier === 'string' ? body.coachTier : null,
     userId,
     crewMemberId: typeof body?.crewMemberId === 'string' ? body.crewMemberId : null,
+    skaterProfileId: typeof body?.skaterProfileId === 'string' ? body.skaterProfileId : null,
   })
 
   if (!result.ok) {

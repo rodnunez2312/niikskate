@@ -40,6 +40,11 @@ export default defineEventHandler(async (event) => {
     typeof body?.crewMemberId === 'string' && body.crewMemberId.trim()
       ? body.crewMemberId.trim()
       : null
+  /** A skater with their own login, booked by their guardian. */
+  const skaterProfileId =
+    typeof body?.skaterProfileId === 'string' && body.skaterProfileId.trim()
+      ? body.skaterProfileId.trim()
+      : null
   const packRaw = body?.pack
   const packNum = Number(packRaw)
   const pack =
@@ -56,6 +61,9 @@ export default defineEventHandler(async (event) => {
 
   if (!eventId) {
     throw createError({ statusCode: 400, message: 'eventId is required' })
+  }
+  if (crewMemberId && skaterProfileId) {
+    throw createError({ statusCode: 400, message: 'Pick one skater per enrollment' })
   }
 
   const couponCode = typeof body?.couponCode === 'string' ? body.couponCode.trim() : ''
@@ -99,6 +107,20 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 403, message: 'Not your crew member' })
     }
     skaterAge = computeAgeFromDob(crewRow.date_of_birth, crewRow.age)
+  } else if (skaterProfileId) {
+    const { data: skaterRow, error: skaterErr } = await supabase
+      .from('profiles')
+      .select('id, guardian_user_id, date_of_birth, age')
+      .eq('id', skaterProfileId)
+      .single()
+    if (skaterErr || !skaterRow) {
+      throw createError({ statusCode: 404, message: 'Skater not found' })
+    }
+    // Either the skater is booking for themselves or their guardian is.
+    if (skaterRow.id !== userId && skaterRow.guardian_user_id !== userId) {
+      throw createError({ statusCode: 403, message: 'Not your skater' })
+    }
+    skaterAge = computeAgeFromDob(skaterRow.date_of_birth, skaterRow.age)
   } else {
     const { data: profileRow } = await supabase
       .from('profiles')
@@ -138,6 +160,7 @@ export default defineEventHandler(async (event) => {
           coachTier: typeof body?.couponCoachTier === 'string' ? body.couponCoachTier : null,
           userId,
           crewMemberId,
+          skaterProfileId,
         },
         { context: 'season_enroll', calendarEventId: row.id },
       )
@@ -162,6 +185,9 @@ export default defineEventHandler(async (event) => {
     existingQuery = crewMemberId
       ? existingQuery.eq('crew_member_id', crewMemberId)
       : existingQuery.is('crew_member_id', null)
+    existingQuery = skaterProfileId
+      ? existingQuery.eq('skater_profile_id', skaterProfileId)
+      : existingQuery.is('skater_profile_id', null)
     const { data: existing } = await existingQuery.maybeSingle()
     if (existing?.status === 'confirmed') return 'already' as const
 
@@ -174,6 +200,7 @@ export default defineEventHandler(async (event) => {
       calendar_event_id: sessionRow.id,
       user_id: userId,
       crew_member_id: crewMemberId,
+      skater_profile_id: skaterProfileId,
       child_age: skaterAge,
       status: 'confirmed',
     }

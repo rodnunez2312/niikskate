@@ -37,7 +37,7 @@ const resolveEmailFromIdentifier = async (value: string) => {
 const ensureProfileApproved = async (userId: string) => {
   const { data, error: profileError } = await client
     .from('profiles')
-    .select('role, is_active')
+    .select('role, is_active, guardian_user_id')
     .eq('id', userId)
     .single()
 
@@ -55,6 +55,23 @@ const ensureProfileApproved = async (userId: string) => {
       : 'Your access is pending admin approval.')
   }
 
+  // A skater assigned to a family is managed from the family account, so their
+  // personal @niikskate.com login stops working until an admin unassigns them.
+  if (data.guardian_user_id) {
+    // Naming the family email is a nicety; a failed lookup must not swallow
+    // the real reason they cannot get in.
+    const { data: guardian } = await client
+      .from('profiles')
+      .select('email')
+      .eq('id', data.guardian_user_id)
+      .maybeSingle()
+    const guardianEmail = guardian?.email
+    await client.auth.signOut()
+    throw new Error(language.value === 'es'
+      ? `Esta cuenta ahora pertenece a una familia. Inicia sesión con el correo de la familia${guardianEmail ? `: ${guardianEmail}` : ''}.`
+      : `This account now belongs to a family. Sign in with the family email${guardianEmail ? `: ${guardianEmail}` : ''}.`)
+  }
+
   return data.role
 }
 
@@ -64,6 +81,11 @@ onMounted(() => {
     error.value = language.value === 'es'
       ? 'Tu acceso está pendiente de aprobación por un administrador.'
       : 'Your access is pending admin approval.'
+  }
+  if (reason === 'moved_to_family') {
+    error.value = language.value === 'es'
+      ? 'Esta cuenta ahora pertenece a una familia. Inicia sesión con el correo de la familia.'
+      : 'This account now belongs to a family. Sign in with the family email.'
   }
 })
 

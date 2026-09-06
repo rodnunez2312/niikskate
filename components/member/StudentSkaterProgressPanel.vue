@@ -22,11 +22,14 @@ watch(
   },
 )
 
-const avatarTarget = computed(() =>
-  props.participant.type === 'self'
-    ? ({ kind: 'self' as const })
-    : ({ kind: 'crew' as const, crewMemberId: props.participant.crewMemberId! }),
-)
+const avatarTarget = computed(() => {
+  if (props.participant.type === 'self') return { kind: 'self' as const }
+  // A linked skater keeps their photo on their own account.
+  if (props.participant.type === 'skater') return { kind: 'readonly' as const }
+  return { kind: 'crew' as const, crewMemberId: props.participant.crewMemberId! }
+})
+
+const canEditAvatar = computed(() => props.participant.type !== 'skater')
 
 const {
   uploadingAvatar,
@@ -225,7 +228,7 @@ watch(() => props.studentId, loadData, { immediate: true })
           <button
             type="button"
             class="relative w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-2xl ring-2 ring-gold-400/30 transition-transform active:scale-[0.97] disabled:opacity-70"
-            :disabled="uploadingAvatar"
+            :disabled="uploadingAvatar || !canEditAvatar"
             :aria-label="language === 'es' ? 'Cambiar foto' : 'Change photo'"
             @click="openAvatarPicker"
           >
@@ -248,14 +251,14 @@ watch(() => props.studentId, loadData, { immediate: true })
               </svg>
             </div>
             <span
-              v-else
+              v-else-if="canEditAvatar"
               class="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 text-[10px] flex items-center justify-center"
             >
               📷
             </span>
           </button>
           <button
-            v-if="avatarUrl"
+            v-if="avatarUrl && canEditAvatar"
             type="button"
             class="text-[9px] text-red-400/90 hover:text-red-300 mt-1 underline"
             :disabled="uploadingAvatar"

@@ -16,11 +16,24 @@ type FocusRow = {
   skill?: Skill
 }
 
+type ProgramPhase = {
+  id: string
+  name: string
+  description: string | null
+  color: string | null
+  sortOrder: number
+  learned: number
+  total: number
+  progressPct: number
+}
+
 const loading = ref(true)
 const profile = ref<any>(null)
 const programName = ref<string | null>(null)
+const programDescription = ref<string | null>(null)
 const skillGroupName = ref<string | null>(null)
 const programPct = ref(0)
+const programPhases = ref<ProgramPhase[]>([])
 const skillFocus = ref<FocusRow[]>([])
 const updatingFocusId = ref<string | null>(null)
 const focusError = ref<string | null>(null)
@@ -33,34 +46,67 @@ onMounted(async () => {
     const { data: prof } = await client.from('profiles').select('*').eq('id', uid).single()
     profile.value = prof
 
-    if (prof?.skill_group_id) {
-      const { data: grp } = await client
+    const [{ data: groups }, { data: progress }] = await Promise.all([
+      client
         .from('skill_groups')
-        .select('name')
-        .eq('id', prof.skill_group_id)
-        .maybeSingle()
-      skillGroupName.value = grp?.name ?? null
+        .select('id, name, description, color, sort_order')
+        .eq('is_active', true)
+        .order('sort_order'),
+      client.from('student_progress').select('skill_id').eq('student_id', uid),
+    ])
 
-      const { data: areas } = await client.from('skill_areas').select('id').eq('group_id', prof.skill_group_id)
-      const areaIds = (areas || []).map(a => a.id)
-      if (areaIds.length) {
-        const { data: areaSkills } = await client.from('area_skills').select('skill_id').in('area_id', areaIds)
-        const programSkillIds = [...new Set((areaSkills || []).map(r => r.skill_id).filter(Boolean))]
-        const { data: progress } = await client.from('student_progress').select('skill_id').eq('student_id', uid)
-        if (programSkillIds.length && progress) {
-          const learned = new Set(progress.map(p => p.skill_id))
-          const count = programSkillIds.filter(id => learned.has(id)).length
-          programPct.value = Math.round((count / programSkillIds.length) * 100)
-        }
+    const groupRows = groups || []
+    const groupIds = groupRows.map(group => group.id)
+    const { data: areas } = groupIds.length
+      ? await client.from('skill_areas').select('id, group_id').in('group_id', groupIds)
+      : { data: [] }
+    const areaRows = areas || []
+    const areaIds = areaRows.map(area => area.id)
+    const { data: areaSkills } = areaIds.length
+      ? await client.from('area_skills').select('area_id, skill_id').in('area_id', areaIds)
+      : { data: [] }
+
+    const groupByArea = new Map(areaRows.map(area => [area.id, area.group_id]))
+    const skillIdsByGroup = new Map<string, Set<string>>()
+    for (const row of areaSkills || []) {
+      const groupId = groupByArea.get(row.area_id)
+      if (!groupId || !row.skill_id) continue
+      if (!skillIdsByGroup.has(groupId)) skillIdsByGroup.set(groupId, new Set())
+      skillIdsByGroup.get(groupId)!.add(row.skill_id)
+    }
+    const learnedIds = new Set((progress || []).map(row => row.skill_id))
+    programPhases.value = groupRows.map(group => {
+      const skillIds = [...(skillIdsByGroup.get(group.id) || new Set<string>())]
+      const learned = skillIds.filter(id => learnedIds.has(id)).length
+      return {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        color: group.color,
+        sortOrder: group.sort_order || 0,
+        learned,
+        total: skillIds.length,
+        progressPct: skillIds.length ? Math.round((learned / skillIds.length) * 100) : 0,
       }
-    }
+    })
 
-    const { data: ps } = await client.from('program_students').select('program_id').eq('student_id', uid).limit(1)
-    const pid = ps?.[0]?.program_id
-    if (pid) {
-      const { data: pr } = await client.from('programs').select('name').eq('id', pid).maybeSingle()
-      programName.value = pr?.name ?? null
-    }
+    const currentPhase = programPhases.value.find(phase => phase.id === prof?.skill_group_id)
+    skillGroupName.value = currentPhase?.name ?? null
+    programPct.value = currentPhase?.progressPct ?? 0
+
+    const { data: assignment } = await client
+      .from('program_students')
+      .select('program_id, program:programs(name, description)')
+      .eq('student_id', uid)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const assignedProgram = assignment?.program as unknown as {
+      name?: string
+      description?: string | null
+    } | null
+    programName.value = assignedProgram?.name ?? null
+    programDescription.value = assignedProgram?.description ?? null
 
     const { data: focus } = await client
       .from('student_skill_focus')
@@ -77,6 +123,29 @@ onMounted(async () => {
 function skillLabel(skill?: Skill) {
   if (!skill) return '—'
   return language.value === 'es' ? skill.name_es || skill.name : skill.name
+}
+
+const currentPhaseIndex = computed(() =>
+  programPhases.value.findIndex(phase => phase.id === profile.value?.skill_group_id),
+)
+
+function phaseStatus(phase: ProgramPhase, index: number) {
+  if (phase.id === profile.value?.skill_group_id) {
+    return {
+      label: language.value === 'es' ? 'Fase actual' : 'Current phase',
+      classes: 'border-gold-400/50 bg-gold-400/10 text-gold-300',
+    }
+  }
+  if (phase.progressPct === 100 || (currentPhaseIndex.value >= 0 && index < currentPhaseIndex.value)) {
+    return {
+      label: language.value === 'es' ? 'Completada' : 'Completed',
+      classes: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+    }
+  }
+  return {
+    label: language.value === 'es' ? 'Siguiente' : 'Upcoming',
+    classes: 'border-gray-700 bg-gray-800 text-gray-500',
+  }
 }
 
 /**
@@ -134,18 +203,23 @@ async function setFocusStatus(row: FocusRow, status: SkaterTrickBagStatus) {
     </div>
 
     <template v-else>
-      <div class="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
-        <div class="flex justify-between gap-2">
-          <span class="text-sm text-gray-400">{{ language === 'es' ? 'Programa' : 'Program' }}</span>
-          <span class="text-sm font-semibold text-white">{{ programName || (language === 'es' ? 'Sin asignar' : 'Not assigned') }}</span>
+      <div class="rounded-xl border border-gold-400/30 bg-gold-400/5 p-4 space-y-3">
+        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gold-400">
+          {{ language === 'es' ? 'Tu programa' : 'Your program' }}
+        </p>
+        <div>
+          <p class="text-lg font-black text-white">
+            {{ programName || (language === 'es' ? 'Sin programa asignado' : 'No program assigned') }}
+          </p>
+          <p v-if="programDescription" class="mt-1 text-xs text-gray-400">{{ programDescription }}</p>
         </div>
-        <div class="flex justify-between gap-2">
-          <span class="text-sm text-gray-400">{{ language === 'es' ? 'Nivel / grupo' : 'Level / group' }}</span>
-          <span class="text-sm font-semibold text-white">{{ skillGroupName || (language === 'es' ? 'Sin asignar' : 'Not assigned') }}</span>
-        </div>
-        <div v-if="skillGroupName" class="pt-2">
+        <div v-if="skillGroupName" class="rounded-lg bg-gray-900/80 p-3">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-xs text-gray-400">{{ language === 'es' ? 'Fase actual' : 'Current phase' }}</span>
+            <span class="text-xs font-bold text-white">{{ skillGroupName }}</span>
+          </div>
           <div class="flex justify-between text-xs text-gray-400 mb-1">
-            <span>{{ language === 'es' ? 'Progreso del nivel' : 'Level progress' }}</span>
+            <span>{{ language === 'es' ? 'Progreso de la fase' : 'Phase progress' }}</span>
             <span>{{ programPct }}%</span>
           </div>
           <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -153,6 +227,72 @@ async function setFocusStatus(row: FocusRow, status: SkaterTrickBagStatus) {
           </div>
         </div>
       </div>
+
+      <section class="space-y-3">
+        <div>
+          <h2 class="text-sm font-bold uppercase tracking-wide text-gold-400">
+            {{ language === 'es' ? 'Fases del programa' : 'Program phases' }}
+          </h2>
+          <p class="mt-1 text-xs text-gray-500">
+            {{
+              language === 'es'
+                ? 'Tu recorrido desde fundamentos hasta nivel avanzado.'
+                : 'Your path from foundations through advanced skating.'
+            }}
+          </p>
+        </div>
+
+        <div v-if="programPhases.length" class="relative space-y-2">
+          <div class="absolute bottom-7 left-[19px] top-7 w-px bg-gray-800" aria-hidden="true" />
+          <article
+            v-for="(phase, index) in programPhases"
+            :key="phase.id"
+            class="relative rounded-xl border p-3 pl-12"
+            :class="phase.id === profile?.skill_group_id
+              ? 'border-gold-400/50 bg-gold-400/5'
+              : 'border-gray-800 bg-gray-900'"
+          >
+            <span
+              class="absolute left-3 top-4 z-10 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-black"
+              :style="{ backgroundColor: phase.color || '#6b7280' }"
+              aria-hidden="true"
+            />
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-sm font-bold text-white">{{ phase.name }}</p>
+                <p v-if="phase.description" class="mt-0.5 text-xs text-gray-500">{{ phase.description }}</p>
+              </div>
+              <span
+                class="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
+                :class="phaseStatus(phase, index).classes"
+              >
+                {{ phaseStatus(phase, index).label }}
+              </span>
+            </div>
+            <div class="mt-3 flex items-center gap-2">
+              <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-800">
+                <div
+                  class="h-full rounded-full"
+                  :style="{
+                    width: `${phase.progressPct}%`,
+                    backgroundColor: phase.color || '#6b7280',
+                  }"
+                />
+              </div>
+              <span class="w-9 text-right text-[10px] font-bold text-gray-500">
+                {{ phase.progressPct }}%
+              </span>
+            </div>
+            <p class="mt-1 text-[10px] text-gray-600">
+              {{ phase.learned }}/{{ phase.total }}
+              {{ language === 'es' ? 'habilidades' : 'skills' }}
+            </p>
+          </article>
+        </div>
+        <p v-else class="rounded-xl border border-gray-800 bg-gray-900 p-4 text-sm text-gray-500">
+          {{ language === 'es' ? 'Las fases del programa aún no están disponibles.' : 'Program phases are not available yet.' }}
+        </p>
+      </section>
 
       <MemberSkaterChallengesCard :student-id="user?.id ?? null" can-complete />
 

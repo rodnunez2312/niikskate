@@ -11,7 +11,9 @@ const {
   crewCount,
   loading,
   guardianProfile,
+  isGuardianAccount,
   crewMembers,
+  linkedSkaters,
   addCrewMember,
   updateCrewMember,
   deleteCrewMember,
@@ -38,7 +40,11 @@ const emptyForm = () => ({
 const form = ref(emptyForm())
 
 const isEditingSelf = computed(() => editingKey.value === 'self')
-const skaterCount = computed(() => crewMembers.value.length)
+const skaterCount = computed(() => crewMembers.value.length + linkedSkaters.value.length)
+
+/** Skaters with their own login are maintained by NiikSkate, not by the parent. */
+const skillLevelFor = (p: { skaterProfileId: string | null }) =>
+  linkedSkaters.value.find(s => s.id === p.skaterProfileId)?.skill_level ?? null
 
 function openAdd() {
   editingKey.value = null
@@ -50,7 +56,7 @@ function openAdd() {
 
 function openEdit(key: string) {
   const p = participants.value.find(x => x.key === key)
-  if (!p) return
+  if (!p || p.type === 'skater') return
   editingKey.value = key
   if (key === 'self' && guardianProfile.value) {
     form.value = {
@@ -207,9 +213,22 @@ onMounted(async () => {
               </h2>
               <p v-if="!p.isYou" class="text-[10px] font-black uppercase text-teal-700 mt-0.5">
                 {{ language === 'es' ? 'Patinador' : 'Skater' }}
+                <span v-if="p.type === 'skater'" class="text-gray-500">
+                  · {{ language === 'es' ? 'cuenta propia' : 'own account' }}
+                </span>
               </p>
-              <p v-if="p.isYou" class="text-xs font-bold uppercase text-gray-600 mt-1">
+              <p v-if="p.isYou && isGuardianAccount" class="text-xs text-gray-500 mt-1">
+                {{
+                  language === 'es'
+                    ? 'Administra la familia e inscribe las clases. No toma clases.'
+                    : 'Manages the family and books classes. Does not take classes.'
+                }}
+              </p>
+              <p v-else-if="p.isYou" class="text-xs font-bold uppercase text-gray-600 mt-1">
                 {{ skillLabel(guardianProfile?.skill_level) }}
+              </p>
+              <p v-else-if="p.type === 'skater'" class="text-xs font-bold uppercase text-gray-600 mt-1">
+                {{ skillLabel(skillLevelFor(p)) }}
               </p>
               <p v-if="p.age != null" class="text-xs text-gray-500 mt-1">
                 {{ language === 'es' ? 'Edad' : 'Age' }}: {{ p.age }}
@@ -226,14 +245,25 @@ onMounted(async () => {
           </div>
 
           <div class="grid grid-cols-2 gap-px bg-teal-600/20">
+            <!-- Nothing is booked for the tutor, so there is nothing to select. -->
+            <span v-if="p.isYou && isGuardianAccount" class="bg-white" />
             <button
+              v-else
               type="button"
               class="bg-white py-3 text-[10px] font-black uppercase hover:bg-gray-50"
               @click="setActive(p.key)"
             >
               {{ activeKey === p.key ? '● ' : '' }}{{ language === 'es' ? 'Seleccionar' : 'Select' }}
             </button>
+            <!-- A linked skater owns their account, so only NiikSkate edits it. -->
+            <p
+              v-if="p.type === 'skater'"
+              class="bg-white py-3 text-[10px] font-black uppercase text-gray-400 text-center"
+            >
+              {{ language === 'es' ? 'Gestionado por NiikSkate' : 'Managed by NiikSkate' }}
+            </p>
             <button
+              v-else
               type="button"
               class="bg-white py-3 text-[10px] font-black uppercase hover:bg-gray-50"
               @click="openEdit(p.key)"
@@ -241,7 +271,7 @@ onMounted(async () => {
               {{ language === 'es' ? 'Editar' : 'Edit' }}
             </button>
             <button
-              v-if="!p.isYou"
+              v-if="p.type === 'crew'"
               type="button"
               class="col-span-2 bg-white py-3 text-[10px] font-black uppercase text-red-700 hover:bg-red-50"
               @click="removeMember(p.crewMemberId!)"

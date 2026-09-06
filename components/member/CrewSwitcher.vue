@@ -15,8 +15,9 @@ const props = withDefaults(
 const emit = defineEmits<{ add: [] }>()
 
 const { language } = useI18n()
+// The switcher picks who a class is for, so a guardian is never in the strip.
 const {
-  participants,
+  skaterParticipants: participants,
   activeKey,
   setActive,
   loading,

@@ -14,10 +14,28 @@ export type CrewMemberRow = {
   updated_at: string
 }
 
+/**
+ * A skater with their own login whose profile an admin linked to this guardian
+ * (profiles.guardian_user_id). Unlike a crew member they own their account, so
+ * the family screen shows them but does not let the parent edit or delete them.
+ */
+export type LinkedSkaterRow = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  full_name: string | null
+  date_of_birth: string | null
+  age: number | null
+  avatar_url: string | null
+  skill_level: string | null
+}
+
 export type CrewParticipant = {
   key: string
-  type: 'self' | 'crew'
+  type: 'self' | 'crew' | 'skater'
   crewMemberId: string | null
+  /** Set only for 'skater': the profiles.id to book the class against. */
+  skaterProfileId: string | null
   firstName: string
   displayName: string
   dateOfBirth: string | null
@@ -44,6 +62,8 @@ export type GuardianProfileRow = {
   skill_level: string | null
   email: string | null
   phone: string | null
+  /** 'guardian' = books for the family and never skates. */
+  customer_kind: string | null
 }
 
 const STORAGE_KEY = 'niik-active-crew'
@@ -59,6 +79,7 @@ export function useCrew() {
 
   const loading = useState('crew-loading', () => false)
   const crewMembers = useState<CrewMemberRow[]>('crew-members', () => [])
+  const linkedSkaters = useState<LinkedSkaterRow[]>('crew-linked-skaters', () => [])
   const guardianProfile = useState<GuardianProfileRow | null>('crew-guardian-profile', () => null)
   const activeKey = useState<string>('crew-active-key', () => 'self')
   const bootstrapped = useState('crew-bootstrapped', () => false)
@@ -72,12 +93,31 @@ export function useCrew() {
         key: 'self',
         type: 'self',
         crewMemberId: null,
+        skaterProfileId: null,
         firstName: first,
         displayName: g.full_name?.trim() || first,
         dateOfBirth: g.date_of_birth,
         age: computeAgeFromDob(g.date_of_birth, g.age),
         avatarUrl: g.avatar_url,
         isYou: true,
+      })
+    }
+    for (const s of linkedSkaters.value) {
+      const first =
+        s.first_name?.trim()
+        || s.full_name?.trim()?.split(/\s+/)[0]
+        || 'Skater'
+      list.push({
+        key: s.id,
+        type: 'skater',
+        crewMemberId: null,
+        skaterProfileId: s.id,
+        firstName: first,
+        displayName: s.full_name?.trim() || buildFullName(first, s.last_name),
+        dateOfBirth: s.date_of_birth,
+        age: computeAgeFromDob(s.date_of_birth, s.age),
+        avatarUrl: s.avatar_url,
+        isYou: false,
       })
     }
     for (const m of crewMembers.value) {
@@ -89,6 +129,7 @@ export function useCrew() {
         key: m.id,
         type: 'crew',
         crewMemberId: m.id,
+        skaterProfileId: null,
         firstName: first,
         displayName: m.full_name?.trim() || buildFullName(first, m.last_name),
         dateOfBirth: m.date_of_birth,
@@ -100,8 +141,25 @@ export function useCrew() {
     return list
   })
 
+  /** A parent/tutor account manages the family but never rides. */
+  const isGuardianAccount = computed(
+    () => guardianProfile.value?.customer_kind === 'guardian',
+  )
+
+  /**
+   * Everyone the account can actually book a class or track progress for. The
+   * guardian drops out of this list; they stay in `participants` because the
+   * Familia screen still has to show who the tutor is.
+   */
+  const skaterParticipants = computed(() =>
+    isGuardianAccount.value
+      ? participants.value.filter(p => p.type !== 'self')
+      : participants.value,
+  )
+
   const activeParticipant = computed(() => {
-    return participants.value.find(p => p.key === activeKey.value) ?? participants.value[0] ?? null
+    const pool = skaterParticipants.value
+    return pool.find(p => p.key === activeKey.value) ?? pool[0] ?? null
   })
 
   const activeAge = computed(() => activeParticipant.value?.age ?? null)
@@ -122,7 +180,11 @@ export function useCrew() {
     if (!import.meta.client) return
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved && (saved === 'self' || crewMembers.value.some(m => m.id === saved))) {
+      const known =
+        saved === 'self'
+        || crewMembers.value.some(m => m.id === saved)
+        || linkedSkaters.value.some(s => s.id === saved)
+      if (saved && known) {
         activeKey.value = saved
       }
     } catch {
@@ -131,7 +193,7 @@ export function useCrew() {
   }
 
   function setActive(key: string) {
-    if (participants.value.some(p => p.key === key)) {
+    if (skaterParticipants.value.some(p => p.key === key)) {
       persistActiveKey(key)
     }
   }
@@ -145,7 +207,7 @@ export function useCrew() {
     const { data } = await client
       .from('profiles')
       .select(
-        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone',
+        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind',
       )
       .eq('id', uid)
       .single()
@@ -172,13 +234,36 @@ export function useCrew() {
     crewMembers.value = (data || []) as CrewMemberRow[]
   }
 
+  /** Skaters an admin attached to this guardian on the Familia screen. */
+  async function loadLinkedSkaters() {
+    const uid = user.value?.id
+    if (!uid) {
+      linkedSkaters.value = []
+      return
+    }
+    const { data, error } = await client
+      .from('profiles')
+      .select('id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level')
+      .eq('guardian_user_id', uid)
+      // A profile pointing at itself would otherwise show up twice as "self".
+      .neq('id', uid)
+      .order('first_name', { ascending: true })
+    if (error) {
+      console.error('loadLinkedSkaters:', error)
+      linkedSkaters.value = []
+      return
+    }
+    linkedSkaters.value = (data || []) as LinkedSkaterRow[]
+  }
+
   async function refreshCrew() {
     loading.value = true
     try {
-      await Promise.all([loadGuardianProfile(), loadCrewMembers()])
+      await Promise.all([loadGuardianProfile(), loadCrewMembers(), loadLinkedSkaters()])
       restoreActiveKey()
-      if (!participants.value.some(p => p.key === activeKey.value)) {
-        persistActiveKey('self')
+      // 'self' is not a valid choice on a guardian account, so land on a skater.
+      if (!skaterParticipants.value.some(p => p.key === activeKey.value)) {
+        persistActiveKey(skaterParticipants.value[0]?.key ?? 'self')
       }
     } finally {
       loading.value = false
@@ -275,7 +360,7 @@ export function useCrew() {
       .update(payload)
       .eq('id', uid)
       .select(
-        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone',
+        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind',
       )
       .single()
     if (error) throw new Error(error.message)
@@ -302,8 +387,11 @@ export function useCrew() {
   return {
     loading,
     crewMembers,
+    linkedSkaters,
     guardianProfile,
     participants,
+    skaterParticipants,
+    isGuardianAccount,
     activeKey,
     activeParticipant,
     activeAge,

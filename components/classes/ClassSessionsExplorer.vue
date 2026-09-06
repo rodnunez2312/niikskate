@@ -6,7 +6,6 @@ import {
   coachTierLabel,
   getClassPriceMxn,
   normalizeCoachTier,
-  programPriceHint,
 } from '~/utils/classPricing'
 import {
   DEFAULT_SKATEPARK,
@@ -61,7 +60,8 @@ const router = useRouter()
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language, formatPrice } = useI18n()
-const { participants, refreshCrew, activeKey } = useCrew()
+// Booking is for skaters only; a guardian account books on their behalf.
+const { skaterParticipants: participants, refreshCrew, activeKey } = useCrew()
 
 const loading = ref(true)
 const enrollingId = ref<string | null>(null)
@@ -389,6 +389,12 @@ const couponCoachTier = computed(() =>
 )
 
 /** Validate against the first selected skater, since allow-lists are per skater. */
+const couponSkaterProfileId = computed(() => {
+  const key = modalSelectedKeys.value[0]
+  if (!key) return null
+  return participants.value.find(p => p.key === key)?.skaterProfileId ?? null
+})
+
 const couponCrewMemberId = computed(() => {
   const key = modalSelectedKeys.value[0]
   if (!key) return null
@@ -509,12 +515,17 @@ async function loadEnrollments() {
   if (!user.value) return
   const { data } = await client
     .from('class_session_enrollments')
-    .select('calendar_event_id, crew_member_id')
+    .select('calendar_event_id, crew_member_id, skater_profile_id')
     .eq('user_id', user.value.id)
     .eq('status', 'confirmed')
   const map = new Map<string, Set<string>>()
   for (const row of data || []) {
-    const key = row.crew_member_id ? String(row.crew_member_id) : 'self'
+    // Mirrors CrewParticipant.key: a crew id, a skater profile id, or 'self'.
+    const key = row.crew_member_id
+      ? String(row.crew_member_id)
+      : row.skater_profile_id
+        ? String(row.skater_profile_id)
+        : 'self'
     if (!map.has(row.calendar_event_id)) map.set(row.calendar_event_id, new Set())
     map.get(row.calendar_event_id)!.add(key)
   }
@@ -666,6 +677,7 @@ async function confirmEnroll() {
           eventId: s.id,
           childAge: p.age,
           crewMemberId: p.crewMemberId,
+          skaterProfileId: p.skaterProfileId,
           pack: isSingleClassPack(selectedPack.value) ? null : selectedPack.value,
           weekdays: packNeedsTwoDays(selectedPack.value)
             ? selectedPackDays.value
@@ -751,29 +763,22 @@ onMounted(async () => {
           <p>
             {{
               language === 'es'
-                ? programPriceHint('principiante', true)
-                : programPriceHint('principiante', false)
+                ? 'Las clases grupales reúnen patinadores de edades y niveles compatibles para aprender en un ambiente seguro, dinámico y divertido.'
+                : 'Group classes bring together skaters of compatible ages and levels to learn in a safe, active, and fun environment.'
             }}
           </p>
           <p>
             {{
               language === 'es'
-                ? programPriceHint('pro_street', true)
-                : programPriceHint('pro_street', false)
+                ? 'El coach guía calentamiento, fundamentos, práctica de habilidades y retos adaptados al grupo. El equipo de seguridad es obligatorio.'
+                : 'The coach guides the warm-up, fundamentals, skill practice, and challenges adapted to the group. Safety gear is required.'
             }}
           </p>
           <p>
             {{
               language === 'es'
-                ? 'Elige la clase que corresponda a la edad y nivel de tu patinador e inscríbelo. Los lugares se llenan rápido — conviene registrarse temprano.'
-                : 'Pick the class that fits your skater’s age and level and complete registration. Spots fill quickly — register early.'
-            }}
-          </p>
-          <p>
-            {{
-              language === 'es'
-                ? 'Descuentos automáticos al inscribir a 2 patinadores (hermanos o varios estudiantes): 10% cada uno; con 3 o más, 15% cada uno.'
-                : 'Automatic discounts when enrolling 2 skaters (siblings or multiple students): 10% each; with 3 or more, 15% each.'
+                ? 'Elige la clase que corresponda a la edad y nivel de tu patinador. Los cupos son limitados para que cada alumno reciba atención del coach.'
+                : 'Choose the class that matches your skater’s age and level. Group sizes are limited so every student receives coach attention.'
             }}
           </p>
         </div>
@@ -1281,6 +1286,7 @@ onMounted(async () => {
                 :class-kind="couponClassKind"
                 :coach-tier="couponCoachTier"
                 :crew-member-id="couponCrewMemberId"
+                :skater-profile-id="couponSkaterProfileId"
                 @applied="onCouponApplied"
               />
             </div>

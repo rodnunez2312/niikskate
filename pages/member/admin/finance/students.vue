@@ -46,19 +46,30 @@ const {
   deleteEnrollment,
 } = useFinance()
 
-const skaters = ref<Array<{ id: string; full_name: string }>>([])
+/** Accounts and crew children together, so any family skater can be linked. */
+const people = ref<Array<{ key: string; name: string; kind: 'profile' | 'crew' }>>([])
 const search = ref('')
 const filter = ref<'all' | 'out' | 'overdue' | 'active'>('all')
 const showInactive = ref(false)
 
 onMounted(async () => {
   await Promise.all([loadEnrollments({ force: true }), loadPriceRows()])
-  const { data } = await client
-    .from('profiles')
-    .select('id, full_name')
-    .eq('role', 'customer')
-    .order('full_name')
-  skaters.value = (data as Array<{ id: string; full_name: string }>) || []
+  const [{ data: profileRows }, { data: crewRows }] = await Promise.all([
+    client.from('profiles').select('id, full_name').eq('role', 'customer').order('full_name'),
+    client.from('crew_members').select('id, first_name, last_name').order('first_name'),
+  ])
+  people.value = [
+    ...((profileRows as Array<{ id: string; full_name: string }>) || []).map(p => ({
+      key: `profile:${p.id}`,
+      name: p.full_name || '—',
+      kind: 'profile' as const,
+    })),
+    ...((crewRows as Array<{ id: string; first_name: string; last_name: string }>) || []).map(c => ({
+      key: `crew:${c.id}`,
+      name: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || '—',
+      kind: 'crew' as const,
+    })),
+  ]
 })
 
 watch(showInactive, v => loadEnrollments({ force: true, includeInactive: v }))
@@ -173,7 +184,8 @@ const showForm = ref(false)
 const formError = ref('')
 
 const blankForm = () => ({
-  skater_id: '',
+  /** "profile:<id>" or "crew:<id>" — a family has both kinds of skater. */
+  person_key: '',
   student_name: '',
   price_list_id: '',
   plan_label: '',
@@ -205,9 +217,9 @@ function applyPriceRow(id: string) {
   form.value.amount_paid_mxn = price * (Number(form.value.packages_paid) || 1)
 }
 
-function onSkaterPicked(id: string) {
-  const skater = skaters.value.find(s => s.id === id)
-  if (skater) form.value.student_name = skater.full_name
+function onSkaterPicked(key: string) {
+  const person = people.value.find(p => p.key === key)
+  if (person) form.value.student_name = person.name
 }
 
 function toggleFormDay(day: number) {
@@ -225,8 +237,10 @@ async function submitEnrollment() {
   }
 
   const priceRow = priceRows.value.find(r => r.id === form.value.price_list_id)
+  const [personKind, personId] = form.value.person_key.split(':')
   const res = await addEnrollment({
-    skater_id: form.value.skater_id || null,
+    skater_id: personKind === 'profile' ? personId : null,
+    crew_member_id: personKind === 'crew' ? personId : null,
     student_name: form.value.student_name.trim(),
     price_list_id: priceRow?.id ?? null,
     coach_tier: priceRow?.coach_tier ?? null,
@@ -416,13 +430,22 @@ const attendanceRatePct = computed(() => Math.round(stats.value.attendanceRate *
                 {{ es ? 'Patinador registrado' : 'Registered skater' }}
               </label>
               <select
-                v-model="form.skater_id"
+                v-model="form.person_key"
                 class="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm"
-                @change="onSkaterPicked(form.skater_id)"
+                @change="onSkaterPicked(form.person_key)"
               >
                 <option value="">{{ es ? '— Capturar nombre manualmente —' : '— Type a name instead —' }}</option>
-                <option v-for="s in skaters" :key="s.id" :value="s.id">{{ s.full_name }}</option>
+                <option v-for="p in people" :key="p.key" :value="p.key">
+                  {{ p.kind === 'crew' ? '🧒' : '👤' }} {{ p.name }}
+                </option>
               </select>
+              <p class="text-[11px] text-gray-500 mt-1">
+                {{
+                  es
+                    ? 'Al ligarlo, la familia ve estas clases y pagos en su cuenta.'
+                    : 'Linking it lets the family see these classes and payments in their account.'
+                }}
+              </p>
             </div>
 
             <div>

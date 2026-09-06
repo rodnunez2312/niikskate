@@ -138,6 +138,8 @@ export interface FinancePaymentRow {
   status: 'paid' | 'pending' | 'refunded'
   payer_name: string | null
   skater_id: string | null
+  /** Set instead of skater_id when the payment is for a skater with no login. */
+  crew_member_id: string | null
   coach_id: string | null
   price_list_id: string | null
   coach_tier: CoachPricingTier | null
@@ -173,6 +175,8 @@ export interface FinanceExpenseRow {
 export interface FinanceEnrollmentRow {
   id: string
   skater_id: string | null
+  /** Set instead of skater_id when the skater has no login of their own. */
+  crew_member_id: string | null
   student_name: string
   price_list_id: string | null
   coach_tier: CoachPricingTier | null
@@ -445,28 +449,38 @@ export function remainingSessions(row: FinanceEnrollmentRow): number {
 }
 
 /** Out of classes reads red, one or two left reads amber — same cue as the sheet. */
-export function remainingTone(row: FinanceEnrollmentRow): FinanceTone {
-  const left = remainingSessions(row)
+export function remainingToneFor(left: number): FinanceTone {
   if (left <= 0) return 'bad'
   if (left <= 2) return 'warn'
   return 'good'
 }
 
-export function daysSincePayment(row: FinanceEnrollmentRow): number | null {
-  if (!row.last_payment_on) return null
-  const then = new Date(`${row.last_payment_on.slice(0, 10)}T00:00:00`)
+export function remainingTone(row: FinanceEnrollmentRow): FinanceTone {
+  return remainingToneFor(remainingSessions(row))
+}
+
+export function daysSinceDate(ymd: string | null | undefined): number | null {
+  if (!ymd) return null
+  const then = new Date(`${ymd.slice(0, 10)}T00:00:00`)
   if (Number.isNaN(then.getTime())) return null
   const now = new Date()
   return Math.floor((now.getTime() - then.getTime()) / 86_400_000)
 }
 
+export function daysSincePayment(row: FinanceEnrollmentRow): number | null {
+  return daysSinceDate(row.last_payment_on)
+}
+
 /** A month without a payment is the point where the sheet turns the cell red. */
-export function paymentTone(row: FinanceEnrollmentRow): FinanceTone {
-  const age = daysSincePayment(row)
+export function paymentToneForDays(age: number | null): FinanceTone {
   if (age == null) return 'bad'
   if (age <= 20) return 'good'
   if (age <= 33) return 'warn'
   return 'bad'
+}
+
+export function paymentTone(row: FinanceEnrollmentRow): FinanceTone {
+  return paymentToneForDays(daysSincePayment(row))
 }
 
 /** "L·M" style summary of the committed days. */
