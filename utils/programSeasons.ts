@@ -150,13 +150,37 @@ export function isSummerCourseSeason(slug: string | null | undefined): boolean {
   return Boolean(slug?.startsWith('curso-verano'))
 }
 
+export function isPastSeason(
+  season: Pick<ProgramSeason, 'endDate'>,
+  today = new Date().toISOString().slice(0, 10),
+): boolean {
+  return season.endDate < today
+}
+
+/**
+ * The calendar decides whether a season is open, not the stored flag.
+ *
+ * `status` is written once when the season is created and then goes stale: it
+ * still said "enrolling" for seasons that ended weeks ago, while the season
+ * actually running said "soon". It now only survives as an explicit override,
+ * and only in the direction that cannot lie — an admin may open a future season
+ * early or close a live one, but nothing can keep a finished season open.
+ */
+export function resolveSeasonStatus(
+  season: Pick<ProgramSeason, 'status' | 'startDate' | 'endDate'>,
+  today = new Date().toISOString().slice(0, 10),
+): ProgramSeasonStatus {
+  if (isPastSeason(season, today)) return 'closed'
+  if (season.status === 'closed') return 'closed'
+  if (season.startDate <= today) return 'enrolling'
+  return season.status === 'enrolling' ? 'enrolling' : 'soon'
+}
+
 export function isOpenProgramSeason(
   season: ProgramSeason,
   today = new Date().toISOString().slice(0, 10),
 ): boolean {
-  if (season.status === 'closed') return false
-  if (season.endDate < today) return false
-  return season.status === 'enrolling'
+  return resolveSeasonStatus(season, today) === 'enrolling'
 }
 
 export function pickDefaultProgramSeason(

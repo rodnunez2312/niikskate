@@ -45,7 +45,8 @@ import {
 import { DEFAULT_PROGRAM_WEEKDAYS, PRACTICE_TIME_SLOTS, RECURRING_WEEKDAY_OPTIONS, SUMMER_COURSE_WEEKDAY_OPTIONS, slotsForWeekday, slotsForWeekdays } from '~/utils/classSchedule'
 import { bookableOccurrences, computeSummerCourseEndDate, generateProgramOccurrences, nearestProgramStartDate, parseYmd, syncProgramDateRange, computeProgramEndDate } from '~/utils/recurringProgram'
 import { MEXICO_NATIONAL_HOLIDAYS_2026_2027, mexicoHolidayName } from '~/utils/mexicoHolidays'
-import { getProgramSeasonBySlug, isSummerCourseSeason, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
+import { getProgramSeasonBySlug, isSummerCourseSeason, resolveSeasonStatus, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
+import type { ProgramSeason } from '~/utils/programSeasons'
 import {
   DEFAULT_COACH_TIER,
   normalizeCoachTier,
@@ -1968,13 +1969,12 @@ const seasonMerida = (season: { startDate: string; endDate: string; status: stri
   if (seasonIsPast(season.startDate, season.endDate)) {
     return { kind: 'done' as const, label: language.value === 'es' ? 'Completada' : 'Completed' }
   }
-  if (season.status === 'enrolling') {
+  // Same derivation the public season list uses, so the two cannot disagree.
+  const status = resolveSeasonStatus(season as ProgramSeason)
+  if (status === 'enrolling') {
     return { kind: 'enroll' as const, label: language.value === 'es' ? 'Inscribirse' : 'Register' }
   }
-  return {
-    kind: 'soon' as const,
-    label: seasonStatusLabel(season.status as 'enrolling' | 'soon' | 'closed', language.value === 'es'),
-  }
+  return { kind: 'soon' as const, label: seasonStatusLabel(status, language.value === 'es') }
 }
 
 const toggleSeason = (slug: string) => {

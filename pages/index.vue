@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'public' })
 
-import { seasonStatusLabel } from '~/utils/programSeasons'
+import { isPastSeason, resolveSeasonStatus, seasonStatusLabel } from '~/utils/programSeasons'
 
 const { language } = useI18n()
 const es = computed(() => language.value === 'es')
@@ -13,17 +13,25 @@ const addSeasonOpen = ref(false)
 const removingSeasonSlug = ref('')
 const seasonRemoveError = ref('')
 
-const seasons = computed(() =>
-  seasonCatalog.value.map(s => ({
-    slug: s.slug,
-    icon: s.icon,
-    name: es.value ? s.name.es : s.name.en,
-    dates: es.value ? s.dates.es : s.dates.en,
-    status: seasonStatusLabel(s.status, es.value),
-    statusKey: s.status,
-    href: `/temporadas/${s.slug}`,
-  })),
-)
+const seasons = computed(() => {
+  const today = new Date().toISOString().slice(0, 10)
+  return seasonCatalog.value
+    // A finished season has nothing left to sell. Admins still reach it through
+    // the archive in Calendario.
+    .filter(s => !isPastSeason(s, today))
+    .map((s) => {
+      const status = resolveSeasonStatus(s, today)
+      return {
+        slug: s.slug,
+        icon: s.icon,
+        name: es.value ? s.name.es : s.name.en,
+        dates: es.value ? s.dates.es : s.dates.en,
+        status: seasonStatusLabel(status, es.value),
+        statusKey: status,
+        href: `/temporadas/${s.slug}`,
+      }
+    })
+})
 
 const onSeasonCreated = async (season: { slug: string }) => {
   addSeasonOpen.value = false
