@@ -6,14 +6,22 @@ const props = withDefaults(
     modelValue: string
     allowEmpty?: boolean
     size?: 'sm' | 'md'
+    /** Restrict the chips, e.g. to the types a library actually contains. */
+    options?: readonly string[]
   }>(),
   {
     allowEmpty: false,
     size: 'md',
+    options: undefined,
   },
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+// Keep canonical order even when the caller passes a filtered set.
+const types = computed(() =>
+  props.options ? SKATE_TRICK_TYPES.filter(t => props.options!.includes(t)) : SKATE_TRICK_TYPES,
+)
 
 function pick(opt: string) {
   if (props.allowEmpty && props.modelValue === opt) {
@@ -27,7 +35,7 @@ function pick(opt: string) {
 <template>
   <div class="flex flex-wrap gap-2">
     <button
-      v-for="opt in SKATE_TRICK_TYPES"
+      v-for="opt in types"
       :key="opt"
       type="button"
       class="rounded-full border font-semibold transition-colors"

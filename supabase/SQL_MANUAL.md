@@ -72,6 +72,23 @@ Run migration: `supabase/migrations/add_skater_self_trick_completion.sql` (**req
 
 Run migration: `supabase/migrations/split_strength_from_trick_manual.sql` (**required before the next "Sync from Excel"**) — strength moved to its own Excel sheet, so every trick's `#` shifted down by 24 (320 → 296 rows). `skills_library` upserts on `manual_id`, so syncing without re-keying first would rewrite rows in place and re-point skaters' trick bags at the wrong tricks. The script refuses to run unless the library is in the exact pre-split shape.
 
+Run migration: `supabase/migrations/rekey_trick_library_296_to_259.sql` (**required before the next "Sincronizar Excel"**) — duplicates were deleted from `Skate_Manual`, renumbering Excel column A (296 → 259 rows). Only 2 tricks kept their `#`. Matches tricks by identity (name + area + structure) rather than position: 256 move to their new `#` keeping their UUID and skater progress, 5 duplicate rows fold into the surviving copy, 35 dropped tricks are deactivated rather than deleted so no FK is orphaned, and 3 new tricks are left for the sync to insert. Guards on the tricks themselves, so it no-ops if already applied and refuses to run against an unexpected library.
+
+### Editing the trick manual
+
+`Sincronizar Excel` reads `public/data/niik-trick-library.json`, **not** the `.xlsx`. After editing the workbook:
+
+1. `npm run niik:parse` — regenerates the JSON from `data/Niik_source/NiikSkate_Ticks_Manual.xlsx`.
+2. If any row was deleted, inserted or reordered, every `#` below the edit shifted. Generate and run a re-key migration first, or skaters' progress will silently point at the wrong tricks:
+   ```bash
+   git show HEAD:public/data/niik-trick-library.json > old.json
+   npm run niik:parse
+   node scripts/rekey-trick-library.mjs old.json supabase/migrations/rekey_<date>.sql
+   ```
+3. Then press `Sincronizar Excel`.
+
+Editing cells in place (comments, URLs, Type) without touching row order needs no migration — step 1 then sync.
+
 ```sql
 -- List a parent's crew
 SELECT id, first_name, last_name, date_of_birth, age

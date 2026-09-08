@@ -283,8 +283,27 @@ const setSkaterTrait = async (field: string, value: string | null) => {
 }
 
 // Achievements: trick slots = skills learned (challenge counts defined after unblockedTricks)
-const trickSlotsEarned = computed(() => studentProgress.value.length)
-const trickSlotsTotal = computed(() => Math.max(skills.value.length, 1))
+
+/** The library's Excel "Type" column: Exercise, Drill or Trick. */
+const isDrillSkill = (skill: { trick_type?: string | null }) =>
+  (skill.trick_type || '').trim().toLowerCase() === 'drill'
+
+/**
+ * Drills are repetitions a skater performs, not tricks they land, so counting
+ * them together made "Trucos aprendidos" measure two different things at once.
+ */
+const trickLibrary = computed(() => skills.value.filter(s => !isDrillSkill(s)))
+const drillLibrary = computed(() => skills.value.filter(isDrillSkill))
+
+const trickSlotsEarned = computed(
+  () => trickLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
+)
+const trickSlotsTotal = computed(() => Math.max(trickLibrary.value.length, 1))
+
+const drillsPerformed = computed(
+  () => drillLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
+)
+const drillsTotal = computed(() => Math.max(drillLibrary.value.length, 1))
 
 const loadStudent = async () => {
   if (!studentId.value) return
@@ -1331,6 +1350,22 @@ watch(studentId, () => loadStudent(), { immediate: false })
               </div>
             </div>
             <span class="text-sm font-bold text-white shrink-0">{{ trickSlotsEarned }}/{{ trickSlotsTotal }}</span>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8" stroke-width="2" />
+                <circle cx="12" cy="12" r="3" stroke-width="2" />
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Drills realizados' : 'Drills performed' }}</p>
+              <div class="h-2 bg-gray-800 rounded-full overflow-hidden mt-1">
+                <div class="h-full bg-teal-500/80 rounded-full transition-all" :style="{ width: `${Math.min(100, (drillsPerformed / drillsTotal) * 100)}%` }"></div>
+              </div>
+            </div>
+            <span class="text-sm font-bold text-white shrink-0">{{ drillsPerformed }}/{{ drillsTotal }}</span>
           </div>
         </div>
 

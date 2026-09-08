@@ -62,9 +62,26 @@ const getCategoryDots = (categoryKey: string) => {
   return Math.round((learnedInCategory.length / categorySkills.length) * 10)
 }
 
+/** The library's Excel "Type" column: Exercise, Drill or Trick. */
+const isDrillSkill = (skill: { trick_type?: string | null }) =>
+  (skill.trick_type || '').trim().toLowerCase() === 'drill'
+
+/** Drills are repetitions performed, not tricks landed, so they count apart. */
+const trickLibrary = computed(() => skills.value.filter(s => !isDrillSkill(s)))
+const drillLibrary = computed(() => skills.value.filter(isDrillSkill))
+
+const learnedSkillIds = computed(() => new Set(progress.value.map(p => p.skill_id)))
+
+const tricksLearned = computed(
+  () => trickLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
+)
+const drillsPerformed = computed(
+  () => drillLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
+)
+
 const stats = computed(() => {
-  const total = skills.value.length
-  const learned = progress.value.length
+  const total = trickLibrary.value.length
+  const learned = tricksLearned.value
   const percentage = total > 0 ? Math.round((learned / total) * 100) : 0
   return { total, learned, percentage }
 })
@@ -106,8 +123,14 @@ const milestones = computed(() => [
   {
     icon: '🛹',
     title: language.value === 'es' ? 'Trucos aprendidos' : 'Tricks learned',
-    value: `${progress.value.length} / ${skills.value.length}`,
-    done: progress.value.length > 0,
+    value: `${tricksLearned.value} / ${trickLibrary.value.length}`,
+    done: tricksLearned.value > 0,
+  },
+  {
+    icon: '🎯',
+    title: language.value === 'es' ? 'Drills realizados' : 'Drills performed',
+    value: `${drillsPerformed.value} / ${drillLibrary.value.length}`,
+    done: drillsPerformed.value > 0,
   },
   {
     icon: '📋',

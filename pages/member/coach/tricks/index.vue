@@ -148,11 +148,9 @@ onMounted(async () => {
   }
   userRole.value = profile?.role ?? null
   await Promise.all([loadExcelTrickLibrary(), fetchSkills()])
-  // Auto-sync once on load so DB matches NiikSkate_Ticks_Manual.xlsx (deactivates legacy tricks)
-  if (userRole.value === 'admin' || userRole.value === 'coach') {
-    await syncNiikLibrary({ force: true })
-    await fetchSkills()
-  }
+  // Syncing is deliberately manual. Editing the Excel renumbers column A, and the
+  // upsert keys on manual_id, so an unattended sync can silently re-point skaters'
+  // progress at the wrong tricks. Press "Sincronizar Excel" once the # are re-keyed.
   if (pickMode.value) {
     try {
       const raw = sessionStorage.getItem(PLAN_PICK_KEY)
@@ -176,6 +174,16 @@ async function fetchSkills() {
     loading.value = false
   }
 }
+
+/** Only offer types the library actually uses — the manual has no Exercise rows. */
+const filterTypeOptions = computed(() => {
+  const set = new Set<string>()
+  for (const sk of skills.value) {
+    const t = (sk.trick_type || '').trim()
+    if (t) set.add(t)
+  }
+  return [...set]
+})
 
 const filterAreaOptions = computed(() => {
   const set = new Set<string>()
@@ -560,7 +568,7 @@ function closeDetail() {
             <option v-for="opt in filterAreaOptions" :key="opt" :value="opt">{{ opt }}</option>
           </select>
           <div class="min-w-0 px-1 py-1 rounded-lg bg-gray-800/80 border border-gray-700 flex items-center">
-            <MemberTrickTypePicker v-model="filterType" allow-empty size="sm" />
+            <MemberTrickTypePicker v-model="filterType" allow-empty size="sm" :options="filterTypeOptions" />
           </div>
           <select v-model="filterProgram" class="min-w-0 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm">
             <option value="">Program</option>
