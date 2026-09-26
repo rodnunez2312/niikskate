@@ -236,23 +236,6 @@ const formatDate = (date: string) => {
             </svg>
           </NuxtLink>
 
-          <!-- Attendance -->
-          <NuxtLink 
-            to="/member/admin/scheduling/attendance"
-            class="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all"
-          >
-            <div class="w-12 h-12 rounded-xl bg-glass-blue/20 flex items-center justify-center text-2xl">
-              📋
-            </div>
-            <div class="flex-1">
-              <p class="font-semibold text-white">{{ language === 'es' ? 'Asistencia' : 'Attendance' }}</p>
-              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Marcar asistencia de clases' : 'Mark class attendance' }}</p>
-            </div>
-            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </NuxtLink>
-
           <!-- Finance -->
           <NuxtLink 
             to="/member/admin/finance"

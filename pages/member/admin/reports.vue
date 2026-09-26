@@ -77,7 +77,7 @@ const cards = computed(() => [
   {
     label: language.value === 'es' ? 'Reservas del mes' : 'Reservations this month',
     value: stats.value.classesThisMonth,
-    to: '/member/admin/scheduling/attendance',
+    to: '/member/admin/scheduling/calendar',
   },
   {
     label: language.value === 'es' ? 'Ingresos del mes' : 'Income this month',

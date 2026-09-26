@@ -188,7 +188,7 @@ const quickActions = computed(() => {
     {
       id: 'session',
       label: es.value ? 'Iniciar sesión' : 'Start session',
-      href: isAdmin.value ? '/member/admin/scheduling/attendance' : '/member/coach/plans',
+      href: isAdmin.value ? '/member/admin/scheduling/calendar' : '/member/coach/plans',
       icon: 'play',
     },
     {

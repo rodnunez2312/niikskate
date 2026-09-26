@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { format, isToday, isTuesday, isThursday, isSaturday, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, isAfter } from 'date-fns'
-import { es } from 'date-fns/locale'
 import {
   SKATE_TRICK_AREAS,
   SKATE_TRICK_STRUCTURES,
@@ -45,9 +43,6 @@ const evaluationCount = ref(0)
 const loading = ref(true)
 const skills = ref<any[]>([])
 const studentProgress = ref<any[]>([])
-const studentReservations = ref<any[]>([])
-const studentAttendance = ref<any[]>([])
-const calendarMonth = ref(new Date())
 
 const skillFocusRows = ref<any[]>([])
 const assignFilterStructure = ref('')
@@ -330,15 +325,11 @@ const loadStudent = async () => {
       countRes,
       skillsRes,
       progressRes,
-      reservationsRes,
-      attendanceRes,
     ] = await Promise.allSettled([
       client.from('student_evaluations').select('*').eq('student_id', id).order('evaluation_date', { ascending: false }).limit(1),
       client.from('student_evaluations').select('*', { count: 'exact', head: true }).eq('student_id', id),
       client.from('skills_library').select('*').eq('is_active', true).order('sort_order'),
       client.from('student_progress').select('*, skill:skills_library(*)').eq('student_id', id),
-      client.from('class_reservations').select('*').eq('user_id', id).eq('status', 'active').order('reservation_date'),
-      client.from('attendance').select('*').eq('student_id', id).order('class_date'),
     ])
 
     if (evalRes.status === 'fulfilled' && evalRes.value?.data?.[0]) lastEvaluation.value = evalRes.value.data[0]
@@ -347,8 +338,6 @@ const loadStudent = async () => {
     else evaluationCount.value = 0
     skills.value = skillsRes.status === 'fulfilled' ? (skillsRes.value?.data ?? []) : []
     studentProgress.value = progressRes.status === 'fulfilled' ? (progressRes.value?.data ?? []) : []
-    studentReservations.value = reservationsRes.status === 'fulfilled' ? (reservationsRes.value?.data ?? []) : []
-    studentAttendance.value = attendanceRes.status === 'fulfilled' ? (attendanceRes.value?.data ?? []) : []
     const { data: psRows } = await client.from('program_students').select('program_id').eq('student_id', id).limit(1)
     const pid = psRows?.[0]?.program_id as string | undefined
     if (pid) {
@@ -879,64 +868,6 @@ const skaterScheduleDisplay = computed(() => {
     days: dayStr || (language.value === 'es' ? 'Sin días' : 'No days'),
   }
 })
-
-const calendarDays = computed(() => {
-  const start = startOfMonth(calendarMonth.value)
-  const end = endOfMonth(calendarMonth.value)
-  const days = eachDayOfInterval({ start, end })
-  const startPadding = getDay(start)
-  const padded: (Date | null)[] = []
-  for (let i = 0; i < startPadding; i++) padded.push(null)
-  return [...padded, ...days]
-})
-
-const calendarMonthLabel = computed(() => {
-  const locale = language.value === 'es' ? es : undefined
-  return format(calendarMonth.value, 'MMMM yyyy', { locale })
-})
-
-const dayLabels = computed(() =>
-  language.value === 'es' ? ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-)
-
-const hasReservation = (date: Date) =>
-  studentReservations.value.some(r => r.reservation_date === format(date, 'yyyy-MM-dd'))
-
-const getAttendanceForDate = (date: Date) =>
-  studentAttendance.value.find(a => a.class_date === format(date, 'yyyy-MM-dd'))
-
-const getDayStatus = (date: Date): 'attended' | 'missed' | 'upcoming' | 'reserved' | null => {
-  const today = new Date()
-  const dateStr = format(date, 'yyyy-MM-dd')
-  const attendance = getAttendanceForDate(date)
-  if (attendance) return attendance.attended ? 'attended' : 'missed'
-  if (hasReservation(date)) {
-    if (isBefore(date, today) && !isToday(date)) return 'missed'
-    return isToday(date) ? 'reserved' : 'upcoming'
-  }
-  return null
-}
-
-const prevMonth = () => {
-  const d = new Date(calendarMonth.value)
-  d.setMonth(d.getMonth() - 1)
-  calendarMonth.value = d
-}
-
-const nextMonth = () => {
-  const d = new Date(calendarMonth.value)
-  d.setMonth(d.getMonth() + 1)
-  calendarMonth.value = d
-}
-
-const calendarStats = computed(() => ({
-  attended: studentAttendance.value.filter(a => a.attended).length,
-  missed: studentAttendance.value.filter(a => !a.attended).length,
-  upcoming: studentReservations.value.filter(r => {
-    const date = new Date(r.reservation_date)
-    return isAfter(date, new Date()) || isToday(date)
-  }).length
-}))
 
 const userRole = ref<string | null>(null)
 onMounted(async () => {
@@ -1881,69 +1812,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
             </div>
           </div>
         </div>
-
-      <!-- Attendance calendar -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 class="font-bold text-white mb-3 flex items-center gap-2">
-          <span>📅</span>
-          {{ language === 'es' ? 'Calendario de Asistencia' : 'Attendance Calendar' }}
-        </h3>
-        <div class="grid grid-cols-3 gap-2 mb-4">
-          <div class="bg-glass-green/20 rounded-lg p-2 text-center">
-            <p class="text-xl font-bold text-glass-green">{{ calendarStats.attended }}</p>
-            <p class="text-xs text-gray-400">{{ language === 'es' ? 'Asistió' : 'Attended' }}</p>
-          </div>
-          <div class="bg-flame-600/20 rounded-lg p-2 text-center">
-            <p class="text-xl font-bold text-flame-600">{{ calendarStats.missed }}</p>
-            <p class="text-xs text-gray-400">{{ language === 'es' ? 'Faltó' : 'Missed' }}</p>
-          </div>
-          <div class="bg-glass-blue/20 rounded-lg p-2 text-center">
-            <p class="text-xl font-bold text-glass-blue">{{ calendarStats.upcoming }}</p>
-            <p class="text-xs text-gray-400">{{ language === 'es' ? 'Próximas' : 'Upcoming' }}</p>
-          </div>
-        </div>
-        <div class="flex items-center justify-between mb-3">
-          <button @click="prevMonth" class="p-2 bg-gray-800 rounded-lg hover:bg-gray-700">
-            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-          </button>
-          <h4 class="font-semibold text-white capitalize">{{ calendarMonthLabel }}</h4>
-          <button @click="nextMonth" class="p-2 bg-gray-800 rounded-lg hover:bg-gray-700">
-            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-          </button>
-        </div>
-        <div class="grid grid-cols-7 gap-1 mb-1">
-          <div v-for="day in dayLabels" :key="day" class="text-center text-[10px] text-gray-500 font-medium py-1">{{ day }}</div>
-        </div>
-        <div class="grid grid-cols-7 gap-1">
-          <div
-            v-for="(day, index) in calendarDays"
-            :key="index"
-            class="aspect-square flex items-center justify-center rounded-lg text-xs relative"
-            :class="{
-              'bg-glass-green text-white font-bold': day && getDayStatus(day) === 'attended',
-              'bg-flame-600 text-white font-bold': day && getDayStatus(day) === 'missed',
-              'bg-glass-blue text-white font-bold': day && getDayStatus(day) === 'upcoming',
-              'bg-gold-400 text-black font-bold ring-2 ring-gold-400/50': day && getDayStatus(day) === 'reserved',
-              'bg-gray-800 text-gray-400': day && !getDayStatus(day),
-              'ring-2 ring-white/30': day && isToday(day),
-            }"
-          >
-            <span v-if="day">{{ format(day, 'd') }}</span>
-            <span
-              v-if="day && getDayStatus(day)"
-              class="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px]"
-            >
-              {{ getDayStatus(day) === 'attended' ? '✓' : getDayStatus(day) === 'missed' ? '✗' : getDayStatus(day) === 'upcoming' ? '○' : '●' }}
-            </span>
-          </div>
-        </div>
-        <div class="flex items-center justify-center gap-4 mt-3 text-[10px]">
-          <div class="flex items-center gap-1"><span class="w-3 h-3 bg-glass-green rounded" /><span class="text-gray-400">{{ language === 'es' ? 'Asistió' : 'Attended' }}</span></div>
-          <div class="flex items-center gap-1"><span class="w-3 h-3 bg-flame-600 rounded" /><span class="text-gray-400">{{ language === 'es' ? 'Faltó' : 'Missed' }}</span></div>
-          <div class="flex items-center gap-1"><span class="w-3 h-3 bg-glass-blue rounded" /><span class="text-gray-400">{{ language === 'es' ? 'Próxima' : 'Upcoming' }}</span></div>
-          <div class="flex items-center gap-1"><span class="w-3 h-3 bg-gold-400 rounded" /><span class="text-gray-400">{{ language === 'es' ? 'Hoy' : 'Today' }}</span></div>
-        </div>
-      </div>
 
     </div>
     </div>

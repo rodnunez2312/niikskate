@@ -74,6 +74,10 @@ Run migration: `supabase/migrations/split_strength_from_trick_manual.sql` (**req
 
 Run migration: `supabase/migrations/rekey_trick_library_296_to_259.sql` (**required before the next "Sincronizar Excel"**) — duplicates were deleted from `Skate_Manual`, renumbering Excel column A (296 → 259 rows). Only 2 tricks kept their `#`. Matches tricks by identity (name + area + structure) rather than position: 256 move to their new `#` keeping their UUID and skater progress, 5 duplicate rows fold into the surviving copy, 35 dropped tricks are deactivated rather than deleted so no FK is orphaned, and 3 new tricks are left for the sync to insert. Guards on the tricks themselves, so it no-ops if already applied and refuses to run against an unexpected library.
 
+Run migration: `supabase/migrations/add_coach_profile_fields.sql` (**required for the redesigned Coaches page**) — adds `title`, `experience`, `certifications` and `is_head_coach` to `profiles`, plus `is_primary` on `program_coaches` with a partial unique index so a coach has at most one primary program.
+
+Run migration: `supabase/migrations/add_coach_activity_tracking.sql` (**required for Actividad de coaches**) — creates `class_session_coaches` (which coach actually ran a calendar session, the source of "clases dadas") and `evaluation_videos` (progress clips a coach attaches to a skater's evaluation, the source of "videos subidos"). Until this runs, the activity page shows zeros and the calendar's coach chips fail to save with a visible warning.
+
 ### Editing the trick manual
 
 `Sincronizar Excel` reads `public/data/niik-trick-library.json`, **not** the `.xlsx`. After editing the workbook:

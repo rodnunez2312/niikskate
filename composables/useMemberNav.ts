@@ -154,9 +154,9 @@ export function useMemberNav() {
             icon: 'users',
           },
           {
-            name: es.value ? 'Asistencia' : 'Attendance',
-            path: '/member/admin/scheduling/attendance',
-            icon: 'clipboard',
+            name: es.value ? 'Actividad de coaches' : 'Coach activity',
+            path: '/member/admin/scheduling/coach-activity',
+            icon: 'chart',
             adminOnly: true,
           },
         ],

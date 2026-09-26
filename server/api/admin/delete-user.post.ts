@@ -1,5 +1,5 @@
 /**
- * Admin-only: permanently delete a skater (customer) account.
+ * Admin-only: permanently delete a skater (customer) or coach account.
  */
 import { requireAdmin } from '~/server/utils/requireAdmin'
 
@@ -30,10 +30,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'Admin accounts cannot be deleted here' })
   }
 
-  if (target.role !== 'customer') {
+  if (target.role !== 'customer' && target.role !== 'coach') {
     throw createError({
       statusCode: 403,
-      message: 'Only skater (customer) accounts can be deleted from this screen',
+      message: 'Only skater and coach accounts can be deleted',
     })
   }
 

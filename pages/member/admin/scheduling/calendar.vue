@@ -906,7 +906,7 @@ const bootstrapPage = async () => {
       await router.push('/member/staff/dashboard')
       return
     }
-    await loadEvents()
+    await Promise.all([loadEvents(), loadCoachRoster()])
   } catch (e: unknown) {
     accessError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -1216,6 +1216,83 @@ async function loadDayCoaches(day: Date) {
 const coachesForEvent = (ev: SchoolCalendarRow) =>
   ev.time_slot ? (dayCoachNames.value[ev.time_slot] || []) : []
 
+// ---------------------------------------------------------------------------
+// Coach assignment — who actually taught the class
+// ---------------------------------------------------------------------------
+
+/**
+ * Availability says who *could* take a slot. Assignment records who did, which
+ * is what "clases dadas" on the coach activity page counts.
+ */
+type CoachOption = { id: string; name: string }
+
+const coachRoster = ref<CoachOption[]>([])
+const assignedCoachIds = ref<string[]>([])
+/** Set when the table is missing so the section can point at the migration. */
+const coachAssignError = ref('')
+
+const loadCoachRoster = async () => {
+  const { data } = await client
+    .from('profiles')
+    .select('id, full_name, first_name, last_name, email')
+    .eq('role', 'coach')
+    .order('full_name')
+  coachRoster.value = ((data as any[]) || []).map(p => ({
+    id: p.id,
+    name:
+      (p.full_name || `${p.first_name || ''} ${p.last_name || ''}`).trim()
+      || p.email
+      || 'Coach',
+  }))
+}
+
+const loadAssignedCoaches = async (eventId: string | null) => {
+  assignedCoachIds.value = []
+  coachAssignError.value = ''
+  if (!eventId) return
+  const { data, error } = await client
+    .from('class_session_coaches')
+    .select('coach_id')
+    .eq('calendar_event_id', eventId)
+  if (error) {
+    coachAssignError.value = error.message
+    return
+  }
+  assignedCoachIds.value = ((data as any[]) || []).map(r => r.coach_id)
+}
+
+const toggleAssignedCoach = (coachId: string) => {
+  const i = assignedCoachIds.value.indexOf(coachId)
+  if (i >= 0) assignedCoachIds.value.splice(i, 1)
+  else assignedCoachIds.value.push(coachId)
+}
+
+/**
+ * Replaces the assignment for the given events. Errors are swallowed into a
+ * banner instead of thrown so a missing migration can't block saving a class.
+ */
+const syncCoachAssignments = async (eventIds: string[]) => {
+  if (!eventIds.length) return
+  const { error: delErr } = await client
+    .from('class_session_coaches')
+    .delete()
+    .in('calendar_event_id', eventIds)
+  if (delErr) {
+    coachAssignError.value = delErr.message
+    return
+  }
+  if (!assignedCoachIds.value.length) return
+  const rows = eventIds.flatMap(eventId =>
+    assignedCoachIds.value.map(coachId => ({
+      calendar_event_id: eventId,
+      coach_id: coachId,
+      assigned_by: user.value?.id ?? null,
+    })),
+  )
+  const { error } = await client.from('class_session_coaches').insert(rows)
+  if (error) coachAssignError.value = error.message
+}
+
 /** Same sizing rule as booking: an override wins, else six spots per coach. */
 const capacityForEvent = (ev: SchoolCalendarRow) => {
   if (ev.max_capacity_override != null && ev.max_capacity_override > 0) {
@@ -1461,6 +1538,8 @@ const openCreateForDay = (day: Date, mode: CreateMode = 'event') => {
   }
   programTitleManual.value = false
   lastAutoProgramTitle.value = ''
+  assignedCoachIds.value = []
+  coachAssignError.value = ''
   modalOpen.value = true
   formError.value = ''
   if (mode === 'program') {
@@ -1527,6 +1606,7 @@ const openEdit = (ev: SchoolCalendarRow, e?: Event) => {
   }
   editScope.value = ev.program_series_id ? 'series' : 'single'
   void loadEditSeriesCount(ev.program_series_id ?? null)
+  void loadAssignedCoaches(ev.id)
   modalOpen.value = true
   formError.value = ''
   captureFormSnapshot()
@@ -1776,6 +1856,13 @@ const submitEvent = async () => {
         }
       }
       if (bulkErr) throw bulkErr
+      if (assignedCoachIds.value.length) {
+        const { data: created } = await client
+          .from('school_calendar_events')
+          .select('id')
+          .eq('program_series_id', seriesId)
+        await syncCoachAssignments(((created as any[]) || []).map(r => r.id))
+      }
       await loadEvents()
       closeModal()
       saving.value = false
@@ -1844,9 +1931,10 @@ const submitEvent = async () => {
       return client
         .from('school_calendar_events')
         .insert({ ...payload, created_by: user.value!.id })
+        .select('id')
     }
 
-    let { error } = await savePayload(withAudienceArray)
+    let { data: saved, error } = await savePayload(withAudienceArray)
     // Column missing → retry without array; check violations need age-band migration (don't strip).
     if (
       error
@@ -1854,10 +1942,31 @@ const submitEvent = async () => {
         || /column .*audience_categories.* does not exist/i.test(error.message || ''))
     ) {
       const { audience_categories: _drop, ...legacyPayload } = withAudienceArray
-      ;({ error } = await savePayload(legacyPayload))
+      ;({ data: saved, error } = await savePayload(legacyPayload))
     }
 
     if (error) throw error
+
+    if (isClass) {
+      // A series edit spreads the roster across every class in the program; a
+      // single edit or a one-off class only touches its own row.
+      let targets: string[] = []
+      if (editingId.value) {
+        if (editScope.value === 'series' && editingSeriesId.value) {
+          const { data: siblings } = await client
+            .from('school_calendar_events')
+            .select('id')
+            .eq('program_series_id', editingSeriesId.value)
+          targets = ((siblings as any[]) || []).map(r => r.id)
+        } else {
+          targets = [editingId.value]
+        }
+      } else {
+        targets = ((saved as any[]) || []).map(r => r.id)
+      }
+      await syncCoachAssignments(targets)
+    }
+
     await loadEvents()
     closeModal()
   } catch (e: any) {
@@ -2536,12 +2645,6 @@ const selectDay = (day: Date) => {
           </div>
 
           <div class="mt-3 flex flex-wrap gap-2">
-            <NuxtLink
-              to="/member/admin/scheduling/attendance"
-              class="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 transition-colors text-white text-xs font-semibold"
-            >
-              {{ language === 'es' ? 'Asistencia' : 'Attendance' }}
-            </NuxtLink>
             <button
               type="button"
               class="px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-900 transition-colors text-xs font-semibold"
@@ -3104,6 +3207,45 @@ const selectDay = (day: Date) => {
                       ? 'Define la lista de precios del programa (Finanzas → Precios).'
                       : 'Sets which price list the program sells at (Finanzas → Precios).'
                   }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-xs font-medium text-gray-400">
+                  {{ language === 'es' ? 'Coaches asignados' : 'Assigned coaches' }}
+                </p>
+                <p v-if="coachRoster.length === 0" class="text-[11px] text-gray-500">
+                  {{ language === 'es' ? 'No hay coaches registrados todavía.' : 'No coaches registered yet.' }}
+                </p>
+                <div v-else class="flex flex-wrap gap-1.5">
+                  <button
+                    v-for="c in coachRoster"
+                    :key="c.id"
+                    type="button"
+                    class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
+                    :class="
+                      assignedCoachIds.includes(c.id)
+                        ? 'border-teal-500 bg-teal-500/15 text-teal-200'
+                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                    "
+                    @click="toggleAssignedCoach(c.id)"
+                  >
+                    {{ c.name }}
+                  </button>
+                </div>
+                <p class="text-[10px] text-gray-500">
+                  {{
+                    language === 'es'
+                      ? 'Cuenta como clase dada en Actividad de coaches.'
+                      : 'Counts as a class given on the coach activity page.'
+                  }}
+                  <span v-if="editingId && editScope === 'series'">
+                    {{ language === 'es' ? 'Se aplica a toda la serie.' : 'Applies to the whole series.' }}
+                  </span>
+                </p>
+                <p v-if="coachAssignError" class="text-[10px] text-amber-300">
+                  {{ language === 'es' ? 'No se guardaron los coaches:' : 'Coaches were not saved:' }}
+                  {{ coachAssignError }}
                 </p>
               </div>
             </div>
