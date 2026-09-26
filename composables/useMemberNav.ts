@@ -187,11 +187,6 @@ export function useMemberNav() {
             icon: 'flag',
           },
           {
-            name: es.value ? 'Planeación de clases' : 'Class planning',
-            path: '/member/coach/plans',
-            icon: 'coaching',
-          },
-          {
             name: es.value ? 'Certificaciones' : 'Certifications',
             path: '/member/coach/certifications',
             icon: 'star',
@@ -308,10 +303,6 @@ export function useMemberNav() {
     if (path === '/member/student/classes' && (route.path === '/classes' || route.path.startsWith('/member/student/classes'))) return true
     if (path === '/member/student/profile' && route.path.startsWith('/member/student/profile')) return true
     if (path === '/member/student/progress' && route.path.startsWith('/member/student/progress')) return true
-    // Class planning hub — tips/sessions/tricks tabs live here
-    if (path === '/member/coach/plans') {
-      return route.path === '/member/coach/plans' || route.path === '/member/coach/plans/'
-    }
     if (path === '/member/coach/students' && route.path.startsWith('/member/coach/students')) return true
     if (path === '/member/coach/evaluations' && route.path.startsWith('/member/coach/evaluations')) return true
     // Finanzas owns its own tab bar, so any sub-route keeps the sidebar item active.

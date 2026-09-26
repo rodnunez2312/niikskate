@@ -78,6 +78,8 @@ Run migration: `supabase/migrations/add_coach_profile_fields.sql` (**required fo
 
 Run migration: `supabase/migrations/add_coach_activity_tracking.sql` (**required for Actividad de coaches**) — creates `class_session_coaches` (which coach actually ran a calendar session, the source of "clases dadas") and `evaluation_videos` (progress clips a coach attaches to a skater's evaluation, the source of "videos subidos"). Until this runs, the activity page shows zeros and the calendar's coach chips fail to save with a visible warning.
 
+Run migration: `supabase/migrations/add_session_locations.sql` (**so new parks added on Iniciar sesión are shared**) — creates `session_locations`. Until it runs, a location you add is kept in this browser only.
+
 ### Editing the trick manual
 
 `Sincronizar Excel` reads `public/data/niik-trick-library.json`, **not** the `.xlsx`. After editing the workbook:

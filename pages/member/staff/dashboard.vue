@@ -188,19 +188,19 @@ const quickActions = computed(() => {
     {
       id: 'session',
       label: es.value ? 'Iniciar sesión' : 'Start session',
-      href: isAdmin.value ? '/member/admin/scheduling/calendar' : '/member/coach/plans',
+      href: '/member/coach/plans',
       icon: 'play',
     },
     {
       id: 'enroll',
       label: es.value ? 'Inscribir patinador' : 'Enroll athlete',
-      href: isAdmin.value ? '/member/admin/academy/registrations' : '/member/coach/students',
+      href: isAdmin.value ? '/member/admin/academy/users' : '/member/coach/students',
       icon: 'user-plus',
     },
     {
       id: 'family',
       label: es.value ? 'Invitar familia' : 'Invite family',
-      href: '/member/admin/academy/registrations',
+      href: '/member/admin/academy/users',
       adminOnly: true,
     },
     {
