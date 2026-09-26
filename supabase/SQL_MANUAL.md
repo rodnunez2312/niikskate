@@ -50,6 +50,8 @@ Run migration: `supabase/migrations/add_program_coach_tier.sql` (**required for 
 
 Run migration: `supabase/migrations/add_student_program_read_policies.sql` (**required for Programa in the skater portal**) — lets each skater read only their own `program_students` assignment and assigned program, plus the active phase structure used to display their roadmap. It does not grant students write access.
 
+Run migration: `supabase/migrations/add_guardian_program_read.sql` (**required so a tutor sees a child's program**) — the skater policies above only match `auth.uid()`, so a parent opening Programa got an empty assignment even when the child was on a phase. This adds SELECT for `program_students`, `programs`, and `student_progress` when that student's `profiles.guardian_user_id` is the signed-in tutor.
+
 Run migration: `supabase/migrations/add_brand_and_ramp_storage_policies.sql` (**required for brand logo uploads** in Admin → Skateshop → Marcas) — `storage.objects` only had policies for `products/` and `avatars/`, so every write to `brands/` was denied by RLS and the logo silently fell back to a device-local `blob:` URL. Also covers `skateramps/`, which had the same gap for the ramp studio reference photos.
 
 Run migration: `supabase/migrations/add_skateramp_projects.sql` (Skateramps studio + public catalog projects)

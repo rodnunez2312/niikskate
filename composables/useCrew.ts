@@ -28,6 +28,7 @@ export type LinkedSkaterRow = {
   age: number | null
   avatar_url: string | null
   skill_level: string | null
+  skillGroupName: string | null
 }
 
 export type CrewParticipant = {
@@ -42,6 +43,8 @@ export type CrewParticipant = {
   age: number | null
   avatarUrl: string | null
   isYou: boolean
+  /** Program phase name, e.g. "Level 4: Progression". Crew kids without a profile have none. */
+  skillGroupName: string | null
 }
 
 export type CrewMemberInput = {
@@ -64,6 +67,13 @@ export type GuardianProfileRow = {
   phone: string | null
   /** 'guardian' = books for the family and never skates. */
   customer_kind: string | null
+  skillGroupName: string | null
+}
+
+function skillGroupNameOf(row: { skill_group?: { name?: string | null } | { name?: string | null }[] | null }) {
+  const group = row.skill_group
+  if (Array.isArray(group)) return group[0]?.name ?? null
+  return group?.name ?? null
 }
 
 const STORAGE_KEY = 'niik-active-crew'
@@ -100,6 +110,7 @@ export function useCrew() {
         age: computeAgeFromDob(g.date_of_birth, g.age),
         avatarUrl: g.avatar_url,
         isYou: true,
+        skillGroupName: g.skillGroupName,
       })
     }
     for (const s of linkedSkaters.value) {
@@ -118,6 +129,7 @@ export function useCrew() {
         age: computeAgeFromDob(s.date_of_birth, s.age),
         avatarUrl: s.avatar_url,
         isYou: false,
+        skillGroupName: s.skillGroupName,
       })
     }
     for (const m of crewMembers.value) {
@@ -136,6 +148,7 @@ export function useCrew() {
         age: computeAgeFromDob(m.date_of_birth, m.age),
         avatarUrl: m.avatar_url,
         isYou: false,
+        skillGroupName: null,
       })
     }
     return list
@@ -207,11 +220,13 @@ export function useCrew() {
     const { data } = await client
       .from('profiles')
       .select(
-        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind',
+        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind, skill_group:skill_groups(name)',
       )
       .eq('id', uid)
       .single()
-    guardianProfile.value = data ?? null
+    guardianProfile.value = data
+      ? { ...data, skillGroupName: skillGroupNameOf(data as { skill_group?: { name?: string | null } | null }) }
+      : null
   }
 
   async function loadCrewMembers() {
@@ -243,7 +258,7 @@ export function useCrew() {
     }
     const { data, error } = await client
       .from('profiles')
-      .select('id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level')
+      .select('id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, skill_group:skill_groups(name)')
       .eq('guardian_user_id', uid)
       // A profile pointing at itself would otherwise show up twice as "self".
       .neq('id', uid)
@@ -253,7 +268,10 @@ export function useCrew() {
       linkedSkaters.value = []
       return
     }
-    linkedSkaters.value = (data || []) as LinkedSkaterRow[]
+    linkedSkaters.value = ((data || []) as Array<Omit<LinkedSkaterRow, 'skillGroupName'> & { skill_group?: { name?: string | null } | null }>).map(row => ({
+      ...row,
+      skillGroupName: skillGroupNameOf(row),
+    }))
   }
 
   async function refreshCrew() {
@@ -360,11 +378,14 @@ export function useCrew() {
       .update(payload)
       .eq('id', uid)
       .select(
-        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind',
+        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind, skill_group:skill_groups(name)',
       )
       .single()
     if (error) throw new Error(error.message)
-    guardianProfile.value = data
+    guardianProfile.value = {
+      ...data,
+      skillGroupName: skillGroupNameOf(data as { skill_group?: { name?: string | null } | null }),
+    }
     return data
   }
 

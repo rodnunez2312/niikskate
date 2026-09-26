@@ -145,8 +145,11 @@ const pageSubtitle = computed(() => {
 })
 
 const canRegister = computed(() => {
+  // The stored status is set once at creation and goes stale. A season whose
+  // dates have started is open, even if it was saved as "soon".
+  if (activeSeason.value) return isOpenProgramSeason(activeSeason.value)
   if (props.seasonSlug) return props.registrationOpen
-  return activeSeason.value ? activeSeason.value.status === 'enrolling' : true
+  return true
 })
 
 /** Official training days: Tuesday, Thursday, Saturday — or Mon–Fri for summer. */

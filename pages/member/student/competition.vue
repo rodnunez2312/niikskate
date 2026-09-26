@@ -3,10 +3,23 @@ definePageMeta({ middleware: ['auth', 'member'], layout: 'member' })
 
 import type { CompetitionEvent } from '~/composables/useCompetitionEvents'
 
+import { isCompetitionPhase } from '~/utils/skillGroupLevels'
+
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language } = useI18n()
 const { fetchCompetitions, splitUpcomingPast } = useCompetitionEvents()
+const { activeParticipant, guardianProfile, loading: crewLoading } = useCrew()
+
+const competitionsOpen = computed(() => {
+  const phase = activeParticipant.value?.skillGroupName || guardianProfile.value?.skillGroupName
+  return !crewLoading.value && isCompetitionPhase(phase)
+})
+
+watch([competitionsOpen, crewLoading], () => {
+  if (crewLoading.value || competitionsOpen.value) return
+  navigateTo('/member/student/classes', { replace: true })
+}, { immediate: true })
 
 const loading = ref(true)
 const events = ref<CompetitionEvent[]>([])
@@ -49,12 +62,16 @@ async function loadPage() {
   }
 }
 
-onMounted(loadPage)
-onActivated(loadPage)
+onMounted(() => {
+  if (competitionsOpen.value) loadPage()
+})
+watch(competitionsOpen, open => {
+  if (open) loadPage()
+})
 </script>
 
 <template>
-  <div class="px-4 py-6 max-w-lg mx-auto space-y-6 pb-8">
+  <div v-if="competitionsOpen" class="px-4 py-6 max-w-lg mx-auto space-y-6 pb-8">
     <div>
       <h1 class="text-xl font-bold text-white">
         {{ language === 'es' ? 'Competencias' : 'Competitions' }}

@@ -31,6 +31,14 @@ export function assignableSkillGroups<T extends SkillGroupRow>(groups: T[]): T[]
   return groups.filter(g => g.is_active !== false && !isPlanningSkillGroupName(g.name))
 }
 
+/** Competitions are only for program phases 4 and 5. Beginner phases stay out. */
+export function isCompetitionPhase(groupName?: string | null): boolean {
+  const match = (groupName || '').match(/(?:level|nivel)\s*(\d+)/i)
+  if (!match) return false
+  const phase = Number(match[1])
+  return phase === 4 || phase === 5
+}
+
 export function effectiveSkaterLevelId(
   skillGroupId: string | null | undefined,
   groups: SkillGroupRow[],

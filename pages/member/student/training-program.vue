@@ -7,6 +7,15 @@ import { trickBagStatusLabel, type SkaterTrickBagStatus } from '~/utils/skateTri
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language } = useI18n()
+const { activeParticipant, loading: crewLoading } = useCrew()
+
+/** The chip on the header, not the tutor login. Crew kids without a profile have no id. */
+const subjectId = computed(() => {
+  const person = activeParticipant.value
+  if (person?.skaterProfileId) return person.skaterProfileId
+  if (person?.type === 'self') return user.value?.id ?? null
+  return null
+})
 
 type FocusRow = {
   id: string
@@ -38,12 +47,10 @@ const skillFocus = ref<FocusRow[]>([])
 const updatingFocusId = ref<string | null>(null)
 const focusError = ref<string | null>(null)
 
-onMounted(async () => {
-  if (!user.value) return
+async function loadProgram(uid: string) {
   loading.value = true
   try {
-    const uid = user.value.id
-    const { data: prof } = await client.from('profiles').select('*').eq('id', uid).single()
+    const { data: prof } = await client.from('profiles').select('*').eq('id', uid).maybeSingle()
     profile.value = prof
 
     const [{ data: groups }, { data: progress }] = await Promise.all([
@@ -105,8 +112,9 @@ onMounted(async () => {
       name?: string
       description?: string | null
     } | null
-    programName.value = assignedProgram?.name ?? null
-    programDescription.value = assignedProgram?.description ?? null
+    // The phase on the skater's profile is the assignment coaches set on the board.
+    programName.value = assignedProgram?.name ?? currentPhase?.name ?? null
+    programDescription.value = assignedProgram?.description ?? currentPhase?.description ?? null
 
     const { data: focus } = await client
       .from('student_skill_focus')
@@ -118,7 +126,22 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+watch([subjectId, crewLoading], ([uid, crewBusy]) => {
+  if (crewBusy) return
+  if (!uid) {
+    profile.value = null
+    programName.value = null
+    programDescription.value = null
+    skillGroupName.value = null
+    programPct.value = 0
+    skillFocus.value = []
+    loading.value = false
+    return
+  }
+  loadProgram(uid)
+}, { immediate: true })
 
 function skillLabel(skill?: Skill) {
   if (!skill) return '—'
@@ -206,6 +229,7 @@ async function setFocusStatus(row: FocusRow, status: SkaterTrickBagStatus) {
       <div class="rounded-xl border border-gold-400/30 bg-gold-400/5 p-4 space-y-3">
         <p class="text-[10px] font-black uppercase tracking-[0.18em] text-gold-400">
           {{ language === 'es' ? 'Tu programa' : 'Your program' }}
+          <span v-if="activeParticipant && !activeParticipant.isYou"> · {{ activeParticipant.firstName }}</span>
         </p>
         <div>
           <p class="text-lg font-black text-white">

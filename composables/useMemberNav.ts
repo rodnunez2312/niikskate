@@ -1,3 +1,5 @@
+import { isCompetitionPhase } from '~/utils/skillGroupLevels'
+
 export type MemberNavItem = {
   name: string
   path: string
@@ -29,6 +31,13 @@ export function useMemberNav() {
   const user = useSupabaseUser()
   const { language } = useI18n()
   const { isAdmin, isCoach, isStudent, isStaff } = useSiteProfile()
+  const { activeParticipant, guardianProfile, loading: crewLoading } = useCrew()
+
+  /** Beginner phases (1–3) and skaters with no phase do not get competitions. */
+  const competitionsOpen = computed(() => {
+    const phase = activeParticipant.value?.skillGroupName || guardianProfile.value?.skillGroupName
+    return !crewLoading.value && isCompetitionPhase(phase)
+  })
 
   const es = computed(() => language.value === 'es')
 
@@ -58,11 +67,13 @@ export function useMemberNav() {
       path: '/member/student/training-program',
       icon: 'skate-program',
     },
-    {
-      name: es.value ? 'Competencias' : 'Competitions',
-      path: '/member/student/competition',
-      icon: 'flag',
-    },
+    ...(competitionsOpen.value
+      ? [{
+          name: es.value ? 'Competencias' : 'Competitions',
+          path: '/member/student/competition',
+          icon: 'flag',
+        }]
+      : []),
   ])
 
   /** Flat tabs kept for students (and any layout still using navItems). */

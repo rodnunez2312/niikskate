@@ -9,6 +9,14 @@ const identifier = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
+/** While the form is signing in, the session watcher must not start a second redirect. */
+const signingIn = ref(false)
+
+function isAbortError(e: unknown) {
+  const name = e && typeof e === 'object' && 'name' in e ? String((e as { name?: string }).name) : ''
+  const raw = e instanceof Error ? e.message : String(e ?? '')
+  return name === 'AbortError' || /abort/i.test(raw)
+}
 
 const normalizePhone = (value: string) => value.replace(/\D/g, '')
 
@@ -90,24 +98,25 @@ onMounted(() => {
 })
 
 // Redirect if already logged in → dashboard (coach/admin home), or custom ?redirect=
+const goAfterLogin = async (userId: string) => {
+  await ensureProfileApproved(userId)
+  const explicitRedirect = route.query.redirect as string
+  await router.push(explicitRedirect || '/member')
+}
+
 watch(user, async (newUser) => {
-  if (newUser) {
-    try {
-      const role = await ensureProfileApproved(newUser.id)
-      const explicitRedirect = route.query.redirect as string
-      if (explicitRedirect) {
-        router.push(explicitRedirect)
-        return
-      }
-      router.push('/member')
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : (language.value === 'es' ? 'Error al iniciar sesión' : 'Sign-in error')
-    }
+  if (!newUser || signingIn.value) return
+  try {
+    await goAfterLogin(newUser.id)
+  } catch (e) {
+    if (isAbortError(e)) return
+    error.value = e instanceof Error ? e.message : (language.value === 'es' ? 'Error al iniciar sesión' : 'Sign-in error')
   }
 }, { immediate: true })
 
 const handleLogin = async () => {
   loading.value = true
+  signingIn.value = true
   error.value = null
 
   try {
@@ -119,21 +128,28 @@ const handleLogin = async () => {
 
     if (authError) throw authError
 
-    const signedInId = signInData.user?.id
+    const signedInId = signInData.user?.id || user.value?.id
     if (!signedInId) {
       throw new Error(language.value === 'es'
         ? 'No se pudo obtener la sesión. Vuelve a intentar.'
         : 'Could not load session. Try again.')
     }
 
-    const role = await ensureProfileApproved(signedInId)
-    const explicitRedirect = route.query.redirect as string
-    if (explicitRedirect) {
-      router.push(explicitRedirect)
+    await goAfterLogin(signedInId)
+  } catch (e) {
+    // Navigation can cancel the in-flight sign-in even though the session saved.
+    if (isAbortError(e)) {
+      if (user.value) {
+        try {
+          await goAfterLogin(user.value.id)
+        } catch (retryError) {
+          if (!isAbortError(retryError)) {
+            error.value = retryError instanceof Error ? retryError.message : String(retryError)
+          }
+        }
+      }
       return
     }
-    router.push('/member')
-  } catch (e) {
     const raw = e instanceof Error ? e.message : String(e)
     const isNetwork =
       raw === 'Failed to fetch' ||
@@ -148,6 +164,7 @@ const handleLogin = async () => {
       error.value = raw || (language.value === 'es' ? 'Error al iniciar sesión' : 'Failed to sign in')
     }
   } finally {
+    signingIn.value = false
     loading.value = false
   }
 }
