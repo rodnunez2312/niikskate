@@ -32,7 +32,8 @@ const getCategoryDots = (categoryKey: string) => {
 
 const stats = computed(() => {
   const total = skills.value.length
-  const learned = progress.value.length
+  const trickIds = new Set(skills.value.map(skill => skill.id))
+  const learned = progress.value.filter(row => trickIds.has(row.skill_id)).length
   const percentage = total > 0 ? Math.round((learned / total) * 100) : 0
   return { total, learned, percentage }
 })
@@ -50,7 +51,12 @@ onMounted(async () => {
   try {
     const [{ data: profileData }, { data: skillsData }, { data: progressData }] = await Promise.all([
       client.from('profiles').select('full_name, email, avatar_url').eq('id', user.value.id).single(),
-      client.from('skills_library').select('*').eq('is_active', true).order('sort_order'),
+      client
+        .from('skills_library')
+        .select('*')
+        .eq('is_active', true)
+        .eq('trick_type', 'Trick')
+        .order('sort_order'),
       client.from('student_progress').select('*').eq('student_id', user.value.id),
     ])
     profile.value = profileData

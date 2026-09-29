@@ -108,7 +108,10 @@ onMounted(load)
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <header class="px-4 pt-safe pb-2 max-w-lg mx-auto">
+    <header
+      class="px-4 pt-safe pb-2 mx-auto"
+      :class="skaters.length > 1 ? 'max-w-lg lg:max-w-6xl' : 'max-w-lg lg:max-w-4xl'"
+    >
       <h1 class="text-2xl font-bold text-white pt-4">
         {{ es ? 'Mi cuenta' : 'My account' }}
       </h1>
@@ -121,7 +124,10 @@ onMounted(load)
       </p>
     </header>
 
-    <div class="px-4 max-w-lg mx-auto space-y-6 mt-3">
+    <div
+      class="px-4 mx-auto space-y-6 mt-3"
+      :class="skaters.length > 1 ? 'max-w-lg lg:max-w-6xl' : 'max-w-lg lg:max-w-4xl'"
+    >
       <div v-if="loading" class="space-y-4">
         <div v-for="i in 2" :key="i" class="h-56 bg-gray-900 rounded-2xl animate-pulse" />
       </div>
@@ -141,10 +147,14 @@ onMounted(load)
           }}
         </NuxtLink>
 
+        <div
+          class="grid grid-cols-1 gap-6"
+          :class="skaters.length > 1 ? 'lg:grid-cols-2' : ''"
+        >
         <section
           v-for="s in skaters"
           :key="s.key"
-          class="rounded-2xl border border-gray-800 bg-gray-900 overflow-hidden"
+          class="rounded-2xl border border-gray-800 bg-gray-900 overflow-hidden min-w-0"
         >
           <div class="px-4 py-3 border-b border-gray-800 flex items-baseline justify-between gap-2">
             <h2 class="font-black uppercase text-white truncate">{{ s.name }}</h2>
@@ -283,6 +293,7 @@ onMounted(load)
             </div>
           </template>
         </section>
+        </div>
 
         <section v-if="coupons.length" class="space-y-3">
           <h2 class="text-sm font-black uppercase text-gold-400">

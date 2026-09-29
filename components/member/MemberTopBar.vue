@@ -8,14 +8,17 @@ const emit = defineEmits<{
   'toggle-menu': []
 }>()
 
+const route = useRoute()
 const { language } = useI18n()
 const { fullName, isAdmin, isCoach, isStudent } = useSiteProfile()
+const { isGuardianAccount } = useCrew()
 const client = useSupabaseClient()
 const router = useRouter()
 
 const roleLabel = computed(() => {
   if (isAdmin.value) return language.value === 'es' ? 'Administrador' : 'Administrator'
   if (isCoach.value) return language.value === 'es' ? 'Coach' : 'Coach'
+  if (isGuardianAccount.value) return language.value === 'es' ? 'Cuenta familiar' : 'Family account'
   return language.value === 'es' ? 'Estudiante' : 'Student'
 })
 
@@ -33,9 +36,6 @@ async function signOut() {
 function goAddCrew() {
   router.push('/member/student/profile?add=1')
 }
-
-// Shared crew state — loads once for all member pages
-useCrew()
 </script>
 
 <template>
@@ -81,7 +81,11 @@ useCrew()
 
       <MemberAdminBuildBadge v-if="isAdmin" />
 
-      <MemberCrewSwitcher v-if="isStudent" compact @add="goAddCrew" />
+      <MemberCrewSwitcher
+        v-if="isStudent && !route.path.startsWith('/member/student/training-program')"
+        compact
+        @add="goAddCrew"
+      />
     </div>
   </header>
 </template>

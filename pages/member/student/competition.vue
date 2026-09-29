@@ -39,7 +39,11 @@ async function loadPage() {
     if (user.value) {
       const uid = user.value.id
       const [skillsRes, progressRes, evalRes] = await Promise.all([
-        client.from('skills_library').select('id').eq('is_active', true),
+        client
+          .from('skills_library')
+          .select('id')
+          .eq('is_active', true)
+          .eq('trick_type', 'Trick'),
         client.from('student_progress').select('skill_id').eq('student_id', uid),
         client
           .from('student_evaluations')
@@ -49,7 +53,8 @@ async function loadPage() {
           .limit(1),
       ])
       const total = skillsRes.data?.length || 0
-      const learned = progressRes.data?.length || 0
+      const trickIds = new Set((skillsRes.data || []).map(row => row.id))
+      const learned = (progressRes.data || []).filter(row => trickIds.has(row.skill_id)).length
       readiness.value = {
         total,
         learned,

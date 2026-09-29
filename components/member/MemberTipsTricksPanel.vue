@@ -21,6 +21,7 @@ async function fetchSkills() {
       .from('skills_library')
       .select('*')
       .eq('is_active', true)
+      .eq('trick_type', 'Trick')
       .order('sort_order')
     if (error) throw error
     skills.value = data || []

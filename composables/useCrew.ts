@@ -29,6 +29,7 @@ export type LinkedSkaterRow = {
   avatar_url: string | null
   skill_level: string | null
   skillGroupName: string | null
+  created_at?: string | null
 }
 
 export type CrewParticipant = {
@@ -45,6 +46,8 @@ export type CrewParticipant = {
   isYou: boolean
   /** Program phase name, e.g. "Level 4: Progression". Crew kids without a profile have none. */
   skillGroupName: string | null
+  /** When this person was registered at the academy. */
+  joinedAt: string | null
 }
 
 export type CrewMemberInput = {
@@ -68,13 +71,11 @@ export type GuardianProfileRow = {
   /** 'guardian' = books for the family and never skates. */
   customer_kind: string | null
   skillGroupName: string | null
+  created_at?: string | null
 }
 
-function skillGroupNameOf(row: { skill_group?: { name?: string | null } | { name?: string | null }[] | null }) {
-  const group = row.skill_group
-  if (Array.isArray(group)) return group[0]?.name ?? null
-  return group?.name ?? null
-}
+const PROFILE_FIELDS =
+  'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind, skill_group_id, created_at'
 
 const STORAGE_KEY = 'niik-active-crew'
 
@@ -111,6 +112,7 @@ export function useCrew() {
         avatarUrl: g.avatar_url,
         isYou: true,
         skillGroupName: g.skillGroupName,
+        joinedAt: g.created_at ?? null,
       })
     }
     for (const s of linkedSkaters.value) {
@@ -130,6 +132,7 @@ export function useCrew() {
         avatarUrl: s.avatar_url,
         isYou: false,
         skillGroupName: s.skillGroupName,
+        joinedAt: s.created_at ?? null,
       })
     }
     for (const m of crewMembers.value) {
@@ -149,14 +152,21 @@ export function useCrew() {
         avatarUrl: m.avatar_url,
         isYou: false,
         skillGroupName: null,
+        joinedAt: m.created_at ?? null,
       })
     }
     return list
   })
 
-  /** A parent/tutor account manages the family but never rides. */
+  /**
+   * A parent account manages the family and never rides. Accounts created
+   * before customer_kind existed still count once skaters are assigned to them.
+   */
   const isGuardianAccount = computed(
-    () => guardianProfile.value?.customer_kind === 'guardian',
+    () =>
+      guardianProfile.value?.customer_kind === 'guardian'
+      || linkedSkaters.value.length > 0
+      || crewMembers.value.length > 0,
   )
 
   /**
@@ -211,22 +221,38 @@ export function useCrew() {
     }
   }
 
+  async function skillGroupNames(ids: Array<string | null | undefined>) {
+    const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))]
+    if (!unique.length) return new Map<string, string>()
+    const { data, error } = await client.from('skill_groups').select('id, name').in('id', unique)
+    if (error) {
+      console.error('skillGroupNames:', error)
+      return new Map<string, string>()
+    }
+    return new Map((data || []).map(row => [row.id as string, row.name as string]))
+  }
+
   async function loadGuardianProfile() {
     const uid = user.value?.id
     if (!uid) {
       guardianProfile.value = null
       return
     }
-    const { data } = await client
+    const { data, error } = await client
       .from('profiles')
-      .select(
-        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind, skill_group:skill_groups(name)',
-      )
+      .select(PROFILE_FIELDS)
       .eq('id', uid)
       .single()
-    guardianProfile.value = data
-      ? { ...data, skillGroupName: skillGroupNameOf(data as { skill_group?: { name?: string | null } | null }) }
-      : null
+    if (error || !data) {
+      if (error) console.error('loadGuardianProfile:', error)
+      guardianProfile.value = null
+      return
+    }
+    const names = await skillGroupNames([data.skill_group_id])
+    guardianProfile.value = {
+      ...data,
+      skillGroupName: data.skill_group_id ? names.get(data.skill_group_id) ?? null : null,
+    }
   }
 
   async function loadCrewMembers() {
@@ -258,7 +284,7 @@ export function useCrew() {
     }
     const { data, error } = await client
       .from('profiles')
-      .select('id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, skill_group:skill_groups(name)')
+      .select('id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, skill_group_id, created_at')
       .eq('guardian_user_id', uid)
       // A profile pointing at itself would otherwise show up twice as "self".
       .neq('id', uid)
@@ -268,9 +294,11 @@ export function useCrew() {
       linkedSkaters.value = []
       return
     }
-    linkedSkaters.value = ((data || []) as Array<Omit<LinkedSkaterRow, 'skillGroupName'> & { skill_group?: { name?: string | null } | null }>).map(row => ({
+    const rows = data || []
+    const names = await skillGroupNames(rows.map(row => row.skill_group_id))
+    linkedSkaters.value = rows.map(row => ({
       ...row,
-      skillGroupName: skillGroupNameOf(row),
+      skillGroupName: row.skill_group_id ? names.get(row.skill_group_id) ?? null : null,
     }))
   }
 
@@ -377,14 +405,13 @@ export function useCrew() {
       .from('profiles')
       .update(payload)
       .eq('id', uid)
-      .select(
-        'id, first_name, last_name, full_name, date_of_birth, age, avatar_url, skill_level, email, phone, customer_kind, skill_group:skill_groups(name)',
-      )
+      .select(PROFILE_FIELDS)
       .single()
     if (error) throw new Error(error.message)
+    const names = await skillGroupNames([data.skill_group_id])
     guardianProfile.value = {
       ...data,
-      skillGroupName: skillGroupNameOf(data as { skill_group?: { name?: string | null } | null }),
+      skillGroupName: data.skill_group_id ? names.get(data.skill_group_id) ?? null : null,
     }
     return data
   }

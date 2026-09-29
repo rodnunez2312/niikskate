@@ -128,6 +128,16 @@ async function removeMember(id: string) {
   }
 }
 
+function formatJoined(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10)
+  return date.toLocaleDateString(language.value === 'es' ? 'es-MX' : 'en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 const skillLabel = (level: string | null | undefined) => {
   if (!level) {
     return language.value === 'es' ? 'Nivel: sin evaluar' : 'Skill level: not yet assessed'
@@ -218,11 +228,7 @@ onMounted(async () => {
                 </span>
               </p>
               <p v-if="p.isYou && isGuardianAccount" class="text-xs text-gray-500 mt-1">
-                {{
-                  language === 'es'
-                    ? 'Administra la familia e inscribe las clases. No toma clases.'
-                    : 'Manages the family and books classes. Does not take classes.'
-                }}
+                {{ language === 'es' ? 'Cuenta admin' : 'Admin account' }}
               </p>
               <p v-else-if="p.isYou" class="text-xs font-bold uppercase text-gray-600 mt-1">
                 {{ skillLabel(guardianProfile?.skill_level) }}
@@ -232,7 +238,6 @@ onMounted(async () => {
               </p>
               <p v-if="p.age != null" class="text-xs text-gray-500 mt-1">
                 {{ language === 'es' ? 'Edad' : 'Age' }}: {{ p.age }}
-                <span v-if="p.dateOfBirth"> · {{ p.dateOfBirth }}</span>
               </p>
               <p v-else-if="!p.isYou" class="text-xs text-amber-700 mt-1 font-medium">
                 {{
@@ -240,6 +245,9 @@ onMounted(async () => {
                     ? 'Agrega edad o fecha de nacimiento para inscribir clases'
                     : 'Add age or date of birth to enroll in classes'
                 }}
+              </p>
+              <p v-if="!p.isYou && p.joinedAt" class="text-xs text-gray-500 mt-1">
+                {{ language === 'es' ? 'Inicio en Niik' : 'Started at Niik' }}: {{ formatJoined(p.joinedAt) }}
               </p>
             </div>
           </div>

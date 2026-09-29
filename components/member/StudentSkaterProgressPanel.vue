@@ -3,6 +3,7 @@ import type { Skill, StudentProgress, SkillCategory } from '~/types'
 import { SKILL_CATEGORY_LABELS } from '~/types'
 import type { CrewParticipant } from '~/composables/useCrew'
 import { skaterRatingBubbleClass } from '~/utils/skaterRatingDots'
+import { isSkaterTrick } from '~/utils/skateTrickTaxonomy'
 
 const props = defineProps<{
   participant: CrewParticipant
@@ -62,23 +63,13 @@ const getCategoryDots = (categoryKey: string) => {
   return Math.round((learnedInCategory.length / categorySkills.length) * 10)
 }
 
-/** The library's Excel "Type" column: Exercise, Drill or Trick. */
-const isDrillSkill = (skill: { trick_type?: string | null }) =>
-  (skill.trick_type || '').trim().toLowerCase() === 'drill'
-
-/** Drills are repetitions performed, not tricks landed, so they count apart. */
-const trickLibrary = computed(() => skills.value.filter(s => !isDrillSkill(s)))
-const drillLibrary = computed(() => skills.value.filter(isDrillSkill))
+const trickLibrary = computed(() => skills.value.filter(isSkaterTrick))
 
 const learnedSkillIds = computed(() => new Set(progress.value.map(p => p.skill_id)))
 
 const tricksLearned = computed(
   () => trickLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
 )
-const drillsPerformed = computed(
-  () => drillLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
-)
-
 const stats = computed(() => {
   const total = trickLibrary.value.length
   const learned = tricksLearned.value
@@ -127,12 +118,6 @@ const milestones = computed(() => [
     done: tricksLearned.value > 0,
   },
   {
-    icon: '🎯',
-    title: language.value === 'es' ? 'Drills realizados' : 'Drills performed',
-    value: `${drillsPerformed.value} / ${drillLibrary.value.length}`,
-    done: drillsPerformed.value > 0,
-  },
-  {
     icon: '📋',
     title: language.value === 'es' ? 'Evaluaciones' : 'Evaluations',
     value: String(evaluationCount.value),
@@ -148,7 +133,7 @@ const milestones = computed(() => [
     icon: '🏆',
     title: language.value === 'es' ? 'Progreso general' : 'Overall progress',
     value: skills.value.length ? `${stats.value.percentage}%` : '0%',
-    done: progress.value.length >= 5,
+    done: tricksLearned.value >= 5,
   },
 ])
 
@@ -159,7 +144,11 @@ function skillName(skill: Skill) {
 async function loadData() {
   loading.value = true
   try {
-    const skillsRes = await client.from('skills_library').select('*').eq('is_active', true)
+    const skillsRes = await client
+      .from('skills_library')
+      .select('*')
+      .eq('is_active', true)
+      .eq('trick_type', 'Trick')
     skills.value = skillsRes.data || []
 
     if (!props.studentId) {

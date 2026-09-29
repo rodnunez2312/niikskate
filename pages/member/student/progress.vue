@@ -28,24 +28,35 @@ watch(
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <header class="px-4 pt-safe pb-2 max-w-lg mx-auto">
+    <header
+      class="px-4 pt-safe pb-2 mx-auto"
+      :class="skaterParticipants.length > 1 ? 'max-w-lg lg:max-w-6xl' : 'max-w-lg lg:max-w-4xl'"
+    >
       <h1 class="text-2xl font-bold text-white pt-4">
         {{ language === 'es' ? 'Progreso' : 'Progress' }}
       </h1>
     </header>
 
-    <div class="px-4 max-w-lg mx-auto space-y-10 mt-2">
-      <div v-if="crewLoading" class="space-y-4">
+    <div
+      class="px-4 mx-auto mt-2"
+      :class="skaterParticipants.length > 1 ? 'max-w-lg lg:max-w-6xl' : 'max-w-lg lg:max-w-4xl'"
+    >
+      <div v-if="crewLoading" class="space-y-4 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
         <div v-for="i in 2" :key="i" class="h-48 bg-gray-900 rounded-2xl animate-pulse" />
       </div>
 
       <template v-else>
-        <MemberStudentSkaterProgressPanel
-          v-for="p in skaterParticipants"
-          :key="p.key"
-          :participant="p"
-          :student-id="studentIdFor(p)"
-        />
+        <div
+          class="grid grid-cols-1 gap-10"
+          :class="skaterParticipants.length > 1 ? 'lg:grid-cols-2 lg:gap-6' : ''"
+        >
+          <MemberStudentSkaterProgressPanel
+            v-for="p in skaterParticipants"
+            :key="p.key"
+            :participant="p"
+            :student-id="studentIdFor(p)"
+          />
+        </div>
         <NuxtLink
           v-if="!skaterParticipants.length"
           to="/member/student/profile"

@@ -42,6 +42,16 @@ export type SkaterTrickBagStatus = 'assigned' | 'pending' | 'done'
 
 export const SKATER_TRICK_BAG_STATUSES: SkateTrickBagStatus[] = ['assigned', 'pending', 'done']
 
+/** Only Excel rows explicitly marked Type = Trick belong in skater-facing UI. */
+export function isSkaterTrick(skill: { trick_type?: string | null } | null | undefined): boolean {
+  return (skill?.trick_type || '').trim().toLowerCase() === 'trick'
+}
+
+/** Drills remain coach-only references for class and session planning. */
+export function isCoachDrill(skill: { trick_type?: string | null } | null | undefined): boolean {
+  return (skill?.trick_type || '').trim().toLowerCase() === 'drill'
+}
+
 export function trickBagStatusLabel(status: SkaterTrickBagStatus, es: boolean): string {
   if (status === 'assigned') return es ? 'Asignado' : 'Assigned'
   if (status === 'pending') return es ? 'En progreso' : 'In progress'
