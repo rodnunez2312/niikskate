@@ -72,6 +72,8 @@ const user = useSupabaseUser()
 const assignedSkillGroup = ref<{ id: string; name: string; description: string | null } | null>(null)
 const assignedProgramName = ref<string | null>(null)
 const programSkillIds = ref<string[]>([])
+const programTrickIds = ref<string[]>([])
+const programDrillIds = ref<string[]>([])
 const individualProgramPct = ref(0)
 const groupAveragePct = ref(0)
 
@@ -216,6 +218,23 @@ const skaterInitial = computed(() =>
 )
 
 const learnedSkillIds = computed(() => new Set(studentProgress.value.map(p => p.skill_id)))
+
+const completedProgramTricks = computed(
+  () => programTrickIds.value.filter(id => learnedSkillIds.value.has(id)).length,
+)
+const completedProgramDrills = computed(
+  () => programDrillIds.value.filter(id => learnedSkillIds.value.has(id)).length,
+)
+const programTrickPct = computed(() =>
+  programTrickIds.value.length
+    ? Math.round((completedProgramTricks.value / programTrickIds.value.length) * 100)
+    : 0,
+)
+const programDrillPct = computed(() =>
+  programDrillIds.value.length
+    ? Math.round((completedProgramDrills.value / programDrillIds.value.length) * 100)
+    : 0,
+)
 
 const programMilestoneProgress = computed(() =>
   computeSkaterProgramMilestones(skills.value, learnedSkillIds.value),
@@ -824,6 +843,8 @@ const goToEvaluations = () => navigateTo(`/member/coach/evaluations?student=${st
 const loadProgramProgressForGroup = async () => {
   assignedSkillGroup.value = null
   programSkillIds.value = []
+  programTrickIds.value = []
+  programDrillIds.value = []
   individualProgramPct.value = 0
   groupAveragePct.value = 0
   const gid = student.value?.skill_group_id as string | undefined
@@ -836,11 +857,23 @@ const loadProgramProgressForGroup = async () => {
 
   const { data: areas } = await client.from('skill_areas').select('id').eq('group_id', gid)
   const areaIds = (areas || []).map((a: { id: string }) => a.id)
-  if (!areaIds.length) return
-
-  const { data: areaSkills } = await client.from('area_skills').select('skill_id').in('area_id', areaIds)
-  const ids = [...new Set((areaSkills || []).map((r: { skill_id: string }) => r.skill_id).filter(Boolean))]
+  const { data: areaSkills } = areaIds.length
+    ? await client.from('area_skills').select('skill_id').in('area_id', areaIds)
+    : { data: [] }
+  const mappedIds = (areaSkills || []).map((r: { skill_id: string }) => r.skill_id).filter(Boolean)
+  const structureIds = skills.value
+    .filter(skill => skillStructure(skill) === grp?.name)
+    .map(skill => skill.id)
+  const candidateIds = [...new Set([...mappedIds, ...structureIds])]
+  const programSkills = skills.value.filter(
+    skill =>
+      candidateIds.includes(skill.id)
+      && (isSkaterTrick(skill) || isCoachDrill(skill)),
+  )
+  const ids = programSkills.map(skill => skill.id)
   programSkillIds.value = ids
+  programTrickIds.value = programSkills.filter(isSkaterTrick).map(skill => skill.id)
+  programDrillIds.value = programSkills.filter(isCoachDrill).map(skill => skill.id)
   if (!ids.length) return
 
   const learned = studentProgress.value.filter(p => ids.includes(p.skill_id)).length
@@ -1068,20 +1101,36 @@ watch(studentId, () => loadStudent(), { immediate: false })
                   ·
                   {{
                     language === 'es'
-                      ? `${programSkillIds.length} skills`
-                      : `${programSkillIds.length} skills`
+                      ? `${programSkillIds.length} skills · ${programTrickIds.length} trucos · ${programDrillIds.length} drills`
+                      : `${programSkillIds.length} skills · ${programTrickIds.length} tricks · ${programDrillIds.length} drills`
                   }}
                 </p>
                 <div class="space-y-3">
                   <div class="space-y-1">
                     <div class="flex justify-between items-baseline gap-2">
-                      <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Completados' : 'Completed' }}</span>
-                      <span class="text-sm font-bold text-sky-400">{{ individualProgramPct }}%</span>
+                      <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Trucos completados' : 'Completed tricks' }}</span>
+                      <span class="text-sm font-bold text-gray-200">
+                        {{ completedProgramTricks }}/{{ programTrickIds.length }} · {{ programTrickPct }}%
+                      </span>
                     </div>
                     <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                       <div
-                        class="h-full bg-sky-500 rounded-full transition-all"
-                        :style="{ width: `${individualProgramPct}%` }"
+                        class="h-full rounded-full bg-gray-200 transition-all"
+                        :style="{ width: `${programTrickPct}%` }"
+                      />
+                    </div>
+                  </div>
+                  <div class="space-y-1">
+                    <div class="flex justify-between items-baseline gap-2">
+                      <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Drills realizados' : 'Completed drills' }}</span>
+                      <span class="text-sm font-bold text-cyan-300">
+                        {{ completedProgramDrills }}/{{ programDrillIds.length }} · {{ programDrillPct }}%
+                      </span>
+                    </div>
+                    <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        class="h-full rounded-full bg-cyan-500 transition-all"
+                        :style="{ width: `${programDrillPct}%` }"
                       />
                     </div>
                   </div>
@@ -1103,8 +1152,8 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 <p class="text-[9px] text-gray-600 mt-3 leading-snug">
                   {{
                     language === 'es'
-                      ? 'Skills del programa marcados completados.'
-                      : 'Assigned program skills marked completed.'
+                      ? 'Los drills son referencia del coach; no cuentan como trucos del patinador.'
+                      : 'Drills are coach references and do not count as skater tricks.'
                   }}
                 </p>
               </template>
