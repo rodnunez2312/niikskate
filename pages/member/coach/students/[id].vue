@@ -11,6 +11,7 @@ import {
   nextTrickBagStatus,
   difficultyTagClass,
   areaTagClass,
+  isCoachDrill,
   isSkaterTrick,
   trickManualLabel,
   type SkaterTrickBagStatus,
@@ -573,6 +574,23 @@ const unblockedTricks = computed(() =>
       skill: p.skill || skills.value.find(s => s.id === p.skill_id),
     }))
     .filter(p => isSkaterTrick(p.skill))
+    .sort((a, b) => compareSkillsByManualId(a.skill, b.skill)),
+)
+
+/** Historical drill work stays visible to staff, but never enters the skater's Trick Bag. */
+const activeCoachDrills = computed(() =>
+  [...skillFocusRows.value]
+    .filter(f => isCoachDrill(f.skill) && (f.status === 'assigned' || f.status === 'pending'))
+    .sort((a, b) => compareSkillsByManualId(a.skill || {}, b.skill || {})),
+)
+
+const completedCoachDrills = computed(() =>
+  [...studentProgress.value]
+    .map(p => ({
+      ...p,
+      skill: p.skill || skills.value.find(s => s.id === p.skill_id),
+    }))
+    .filter(p => isCoachDrill(p.skill))
     .sort((a, b) => compareSkillsByManualId(a.skill, b.skill)),
 )
 
@@ -1793,6 +1811,91 @@ watch(studentId, () => loadStudent(), { immediate: false })
             <p v-if="focusError" class="text-sm text-flame-500">{{ focusError }}</p>
           </div>
         </div>
+
+        <!-- Coach-only drill history: never appears in the skater Trick Bag. -->
+        <section class="rounded-xl border border-gray-800 bg-gray-900 p-4 lg:p-6">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="flex items-center gap-2 text-lg font-bold text-white">
+                <span aria-hidden="true">🎯</span>
+                {{ language === 'es' ? 'Drills del coach' : 'Coach drills' }}
+              </h3>
+              <p class="mt-1 text-xs text-gray-500">
+                {{
+                  language === 'es'
+                    ? 'Referencia exclusiva para planear sesiones. Estos drills no aparecen como trucos ni cuentan en el progreso del patinador.'
+                    : 'Coach-only session-planning reference. These drills do not appear as tricks or count toward skater progress.'
+                }}
+              </p>
+            </div>
+            <NuxtLink
+              to="/member/coach/plans"
+              class="rounded-lg border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-300 hover:border-gray-500 hover:text-white"
+            >
+              {{ language === 'es' ? 'Planear sesión' : 'Plan session' }}
+            </NuxtLink>
+          </div>
+
+          <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div class="overflow-hidden rounded-lg border border-gray-800">
+              <div class="flex items-center justify-between bg-gray-800/70 px-3 py-2">
+                <h4 class="text-xs font-bold uppercase tracking-wide text-gray-300">
+                  {{ language === 'es' ? 'Asignados / en práctica' : 'Assigned / practicing' }}
+                </h4>
+                <span class="text-xs font-bold text-white">{{ activeCoachDrills.length }}</span>
+              </div>
+              <ul v-if="activeCoachDrills.length" class="divide-y divide-gray-800">
+                <li
+                  v-for="row in activeCoachDrills"
+                  :key="row.id"
+                  class="flex items-center gap-3 px-3 py-2.5"
+                >
+                  <span class="w-10 shrink-0 font-mono text-[10px] text-gray-600">
+                    {{ trickManualLabel(row.skill) || '—' }}
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-sm text-gray-200">
+                    {{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}
+                  </span>
+                  <span class="shrink-0 text-[10px] uppercase text-gray-500">
+                    {{ row.status === 'pending' ? (language === 'es' ? 'Práctica' : 'Practicing') : (language === 'es' ? 'Asignado' : 'Assigned') }}
+                  </span>
+                </li>
+              </ul>
+              <p v-else class="px-3 py-5 text-center text-xs text-gray-600">
+                {{ language === 'es' ? 'Sin drills activos.' : 'No active drills.' }}
+              </p>
+            </div>
+
+            <div class="overflow-hidden rounded-lg border border-gray-800">
+              <div class="flex items-center justify-between bg-gray-800/70 px-3 py-2">
+                <h4 class="text-xs font-bold uppercase tracking-wide text-gray-300">
+                  {{ language === 'es' ? 'Realizados' : 'Completed' }}
+                </h4>
+                <span class="text-xs font-bold text-white">{{ completedCoachDrills.length }}</span>
+              </div>
+              <ul v-if="completedCoachDrills.length" class="divide-y divide-gray-800">
+                <li
+                  v-for="row in completedCoachDrills"
+                  :key="row.skill_id"
+                  class="flex items-center gap-3 px-3 py-2.5"
+                >
+                  <span class="w-10 shrink-0 font-mono text-[10px] text-gray-600">
+                    {{ trickManualLabel(row.skill) || '—' }}
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-sm text-gray-200">
+                    {{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}
+                  </span>
+                  <span class="shrink-0 text-[10px] uppercase text-gray-500">
+                    {{ row.skill?.area || '—' }}
+                  </span>
+                </li>
+              </ul>
+              <p v-else class="px-3 py-5 text-center text-xs text-gray-600">
+                {{ language === 'es' ? 'Sin drills realizados.' : 'No completed drills.' }}
+              </p>
+            </div>
+          </div>
+        </section>
 
         <!-- Preferred schedule (set by admin) -->
         <div v-if="skaterScheduleDisplay" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
