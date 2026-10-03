@@ -4,6 +4,7 @@
  */
 
 import type {
+  FinanceAttendanceMark,
   FinanceEnrollmentRow,
   FinanceExpenseRow,
   FinancePaymentRow,
@@ -12,11 +13,11 @@ import type {
 } from '~/utils/finance'
 
 const MIGRATION_HINT =
-  'run supabase/migrations/add_finance_module.sql in the Supabase SQL Editor, then reload'
+  'run the pending finance migrations from supabase/migrations in the Supabase SQL Editor, then reload'
 
 function friendlyError(message: string): string {
   if (
-    /finance_(price_list|payments|expenses|settings|student_enrollments)|does not exist|schema cache/i
+    /finance_(price_list|payments|expenses|settings|student_enrollments|enrollment_session_marks)|does not exist|schema cache/i
       .test(message)
   ) {
     return `${message} — ${MIGRATION_HINT}`
@@ -52,7 +53,7 @@ export function monthKeyRange(key: string): MonthRange {
   return monthRange(y, (m || 1) - 1)
 }
 
-type MutationResult = { ok: boolean; message?: string }
+type MutationResult = { ok: boolean; message?: string; id?: string }
 
 export function useFinance() {
   const client = useSupabaseClient()
@@ -62,6 +63,7 @@ export function useFinance() {
   const payments = useState<FinancePaymentRow[]>('finance-payments', () => [])
   const expenses = useState<FinanceExpenseRow[]>('finance-expenses', () => [])
   const enrollments = useState<FinanceEnrollmentRow[]>('finance-enrollments', () => [])
+  const attendanceMarks = useState<FinanceAttendanceMark[]>('finance-attendance-marks', () => [])
   const settings = useState<FinanceSettingsRow | null>('finance-settings', () => null)
 
   const loading = ref(false)
@@ -360,10 +362,11 @@ export function useFinance() {
         .select('*')
         .single()
       if (e) throw new Error(e.message)
-      enrollments.value = [...enrollments.value, data as unknown as FinanceEnrollmentRow].sort(
+      const created = data as unknown as FinanceEnrollmentRow
+      enrollments.value = [...enrollments.value, created].sort(
         (a, b) => a.student_name.localeCompare(b.student_name),
       )
-      return { ok: true }
+      return { ok: true, id: created.id }
     } catch (e) {
       return fail(e, 'addEnrollment failed')
     } finally {
@@ -413,6 +416,66 @@ export function useFinance() {
     }
   }
 
+  const loadAttendanceMarks = async (enrollmentIds?: string[]) => {
+    if (enrollmentIds && !enrollmentIds.length) {
+      attendanceMarks.value = []
+      return attendanceMarks.value
+    }
+    try {
+      let query = client
+        .from('finance_enrollment_session_marks')
+        .select('*')
+        .order('session_date', { ascending: false })
+      if (enrollmentIds) query = query.in('enrollment_id', enrollmentIds)
+      const { data, error: e } = await query.limit(2000)
+      if (e) throw new Error(e.message)
+      attendanceMarks.value = (data || []) as unknown as FinanceAttendanceMark[]
+    } catch (e) {
+      fail(e, 'loadAttendanceMarks failed')
+    }
+    return attendanceMarks.value
+  }
+
+  const saveAttendanceMark = async (
+    row: Pick<FinanceAttendanceMark, 'enrollment_id' | 'session_date' | 'status'>,
+  ): Promise<MutationResult> => {
+    saving.value = true
+    error.value = null
+    try {
+      const { error: e } = await client.from('finance_enrollment_session_marks').upsert({
+        ...row,
+        created_by: user.value?.id ?? null,
+      }, { onConflict: 'enrollment_id,session_date' })
+      if (e) throw new Error(e.message)
+      await Promise.all([
+        loadAttendanceMarks(enrollments.value.map(r => r.id)),
+        loadEnrollments({ force: true, includeInactive: true }),
+      ])
+      return { ok: true }
+    } catch (e) {
+      return fail(e, 'saveAttendanceMark failed')
+    } finally {
+      saving.value = false
+    }
+  }
+
+  const deleteAttendanceMark = async (id: string): Promise<MutationResult> => {
+    saving.value = true
+    try {
+      const { error: e } = await client.from('finance_enrollment_session_marks').delete().eq('id', id)
+      if (e) throw new Error(e.message)
+      await Promise.all([
+        loadAttendanceMarks(enrollments.value.map(r => r.id)),
+        loadEnrollments({ force: true, includeInactive: true }),
+      ])
+      return { ok: true }
+    } catch (e) {
+      return fail(e, 'deleteAttendanceMark failed')
+    } finally {
+      saving.value = false
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Break-even settings
   // -------------------------------------------------------------------------
@@ -456,6 +519,7 @@ export function useFinance() {
     payments,
     expenses,
     enrollments,
+    attendanceMarks,
     settings,
     loading,
     saving,
@@ -476,6 +540,9 @@ export function useFinance() {
     addEnrollment,
     updateEnrollment,
     deleteEnrollment,
+    loadAttendanceMarks,
+    saveAttendanceMark,
+    deleteAttendanceMark,
     loadSettings,
     saveSettings,
   }

@@ -42,6 +42,7 @@ const studentId = computed(() => route.params.id as string)
 const student = ref<any | null>(null)
 const lastEvaluation = ref<any | null>(null)
 const evaluationCount = ref(0)
+const evidenceVideoCount = ref(0)
 const loading = ref(true)
 const skills = ref<any[]>([])
 const studentProgress = ref<any[]>([])
@@ -235,6 +236,16 @@ const programDrillPct = computed(() =>
     ? Math.round((completedProgramDrills.value / programDrillIds.value.length) * 100)
     : 0,
 )
+const libraryTrickPct = computed(() =>
+  trickLibrary.value.length
+    ? Math.round((trickSlotsEarned.value / trickLibrary.value.length) * 100)
+    : 0,
+)
+const libraryDrillPct = computed(() =>
+  drillLibrary.value.length
+    ? Math.round((drillsCompleted.value / drillLibrary.value.length) * 100)
+    : 0,
+)
 
 const programMilestoneProgress = computed(() =>
   computeSkaterProgramMilestones(skills.value, learnedSkillIds.value),
@@ -323,11 +334,31 @@ const setSkaterTrait = async (field: string, value: string | null) => {
  * them together made "Trucos aprendidos" measure two different things at once.
  */
 const trickLibrary = computed(() => skills.value.filter(isSkaterTrick))
+const drillLibrary = computed(() => skills.value.filter(isCoachDrill))
 
 const trickSlotsEarned = computed(
   () => trickLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
 )
 const trickSlotsTotal = computed(() => Math.max(trickLibrary.value.length, 1))
+const drillsCompleted = computed(
+  () => drillLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
+)
+const drillsTotal = computed(() => drillLibrary.value.length)
+
+type ProfileModule = 'challenges' | 'tricks' | 'drills'
+const profileModule = ref<ProfileModule>('tricks')
+const challengeCounts = ref({ completed: 0, total: 0 })
+const challengeCard = ref<{ openForm: () => void } | null>(null)
+const bagIsDrills = computed(() => profileModule.value === 'drills')
+
+const onChallengeCounts = (payload: { completed: number; total: number }) => {
+  challengeCounts.value = payload
+}
+
+const openChallengeForm = () => {
+  profileModule.value = 'challenges'
+  challengeCard.value?.openForm()
+}
 
 const loadStudent = async () => {
   if (!studentId.value) return
@@ -382,9 +413,14 @@ const loadStudent = async () => {
       .from('student_skill_focus')
       .select('*, skill:skills_library(*)')
       .eq('student_id', id)
-      .in('status', ['assigned', 'pending', 'done'])
+      .in('status', ['assigned', 'pending', 'review', 'done', 'requested'])
       .order('created_at', { ascending: false })
     skillFocusRows.value = focusData || []
+    const { count: videoCount } = await client
+      .from('trick_evidence_videos')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', id)
+    evidenceVideoCount.value = videoCount || 0
   } catch (e) {
     console.error('Error loading student dashboard:', e)
   } finally {
@@ -576,13 +612,42 @@ const updateSkillFocusStatus = async (focusId: string, status: SkaterTrickBagSta
 
 const focusBlockedSkillIds = computed(() =>
   skillFocusRows.value
-    .filter(f => f.status === 'assigned' || f.status === 'pending' || f.status === 'done')
+    .filter(f => f.status === 'assigned' || f.status === 'pending' || f.status === 'review' || f.status === 'done' || f.status === 'requested')
     .map(f => f.skill_id),
 )
 
+const skaterRequests = computed(() =>
+  skillFocusRows.value.filter(f =>
+    f.status === 'requested'
+    && (bagIsDrills.value ? isCoachDrill(f.skill) : isSkaterTrick(f.skill)),
+  ),
+)
+
+const approveSkaterRequest = async (focusId: string) => {
+  if (updatingFocusId.value) return
+  updatingFocusId.value = focusId
+  focusError.value = null
+  try {
+    const { error } = await client
+      .from('student_skill_focus')
+      .update({ status: 'assigned', completed_at: null })
+      .eq('id', focusId)
+    if (error) throw error
+    const row = skillFocusRows.value.find(f => f.id === focusId)
+    if (row) row.status = 'assigned'
+  } catch (e: any) {
+    focusError.value = e?.message || (language.value === 'es' ? 'No se pudo confirmar' : 'Could not confirm')
+  } finally {
+    updatingFocusId.value = null
+  }
+}
+
 const activeTrickBag = computed(() =>
   [...skillFocusRows.value]
-    .filter(f => isSkaterTrick(f.skill) && (f.status === 'assigned' || f.status === 'pending'))
+    .filter(f =>
+      (bagIsDrills.value ? isCoachDrill(f.skill) : isSkaterTrick(f.skill))
+      && (f.status === 'assigned' || f.status === 'pending' || f.status === 'review'),
+    )
     .sort((a, b) => compareSkillsByManualId(a.skill || {}, b.skill || {})),
 )
 
@@ -592,29 +657,15 @@ const unblockedTricks = computed(() =>
       ...p,
       skill: p.skill || skills.value.find(s => s.id === p.skill_id),
     }))
-    .filter(p => isSkaterTrick(p.skill))
-    .sort((a, b) => compareSkillsByManualId(a.skill, b.skill)),
-)
-
-/** Historical drill work stays visible to staff, but never enters the skater's Trick Bag. */
-const activeCoachDrills = computed(() =>
-  [...skillFocusRows.value]
-    .filter(f => isCoachDrill(f.skill) && (f.status === 'assigned' || f.status === 'pending'))
-    .sort((a, b) => compareSkillsByManualId(a.skill || {}, b.skill || {})),
-)
-
-const completedCoachDrills = computed(() =>
-  [...studentProgress.value]
-    .map(p => ({
-      ...p,
-      skill: p.skill || skills.value.find(s => s.id === p.skill_id),
-    }))
-    .filter(p => isCoachDrill(p.skill))
+    .filter(p => (bagIsDrills.value ? isCoachDrill(p.skill) : isSkaterTrick(p.skill)))
     .sort((a, b) => compareSkillsByManualId(a.skill, b.skill)),
 )
 
 const assignablePool = computed(() =>
-  skills.value.filter(sk => isSkaterTrick(sk) && !focusBlockedSkillIds.value.includes(sk.id)),
+  skills.value.filter(sk =>
+    (bagIsDrills.value ? isCoachDrill(sk) : isSkaterTrick(sk))
+    && !focusBlockedSkillIds.value.includes(sk.id),
+  ),
 )
 
 function matchesAssignFilters(sk: any): boolean {
@@ -829,9 +880,16 @@ watch(activeTrickBag, rows => {
   selectedFocusIds.value = selectedFocusIds.value.filter(id => available.has(id))
 })
 
+watch(profileModule, () => {
+  selectedAssignIds.value = []
+  selectedFocusIds.value = []
+  assignSearch.value = ''
+})
+
 const trickBagStatusClass = (status: string) => {
   if (status === 'assigned') return 'bg-sky-500/25 text-sky-300 border-sky-400/50 hover:bg-sky-500/35'
   if (status === 'pending') return 'bg-amber-500/25 text-amber-300 border-amber-400/50 hover:bg-amber-500/35'
+  if (status === 'review') return 'bg-gold-400/20 text-gold-300 border-gold-400/50 hover:bg-gold-400/30'
   if (status === 'done') return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
   return 'bg-gray-700 text-gray-300 border-gray-600'
 }
@@ -870,10 +928,14 @@ const loadProgramProgressForGroup = async () => {
       candidateIds.includes(skill.id)
       && (isSkaterTrick(skill) || isCoachDrill(skill)),
   )
-  const ids = programSkills.map(skill => skill.id)
-  programSkillIds.value = ids
+  programSkillIds.value = programSkills.map(skill => skill.id)
   programTrickIds.value = programSkills.filter(isSkaterTrick).map(skill => skill.id)
   programDrillIds.value = programSkills.filter(isCoachDrill).map(skill => skill.id)
+
+  // The bars follow every trick and drill the coach marks done, same as the
+  // modules below. The kanban level list alone stayed at 0 because it held
+  // only that level's drills.
+  const ids = skills.value.filter(skill => isSkaterTrick(skill) || isCoachDrill(skill)).map(skill => skill.id)
   if (!ids.length) return
 
   const learned = studentProgress.value.filter(p => ids.includes(p.skill_id)).length
@@ -1004,6 +1066,9 @@ watch(studentId, () => loadStudent(), { immediate: false })
             <p v-else class="text-sm text-white/60 mt-0.5 italic">
               {{ language === 'es' ? 'Sin edad' : 'No age' }}
             </p>
+            <p class="text-sm text-white/90 mt-1">
+              {{ language === 'es' ? 'Videos subidos' : 'Videos uploaded' }}: {{ evidenceVideoCount }}
+            </p>
             <p class="text-sm mt-2 flex items-center gap-1.5 flex-wrap">
               <span class="text-white/75 shrink-0">
                 {{ language === 'es' ? 'Programa asignado:' : 'Assigned program:' }}
@@ -1101,8 +1166,8 @@ watch(studentId, () => loadStudent(), { immediate: false })
                   ·
                   {{
                     language === 'es'
-                      ? `${programSkillIds.length} skills · ${programTrickIds.length} trucos · ${programDrillIds.length} drills`
-                      : `${programSkillIds.length} skills · ${programTrickIds.length} tricks · ${programDrillIds.length} drills`
+                      ? `${trickSlotsEarned} trucos · ${drillsCompleted} drills`
+                      : `${trickSlotsEarned} tricks · ${drillsCompleted} drills`
                   }}
                 </p>
                 <div class="space-y-3">
@@ -1110,13 +1175,13 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     <div class="flex justify-between items-baseline gap-2">
                       <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Trucos completados' : 'Completed tricks' }}</span>
                       <span class="text-sm font-bold text-gray-200">
-                        {{ completedProgramTricks }}/{{ programTrickIds.length }} · {{ programTrickPct }}%
+                        {{ trickSlotsEarned }}/{{ trickSlotsTotal }} · {{ libraryTrickPct }}%
                       </span>
                     </div>
                     <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         class="h-full rounded-full bg-gray-200 transition-all"
-                        :style="{ width: `${programTrickPct}%` }"
+                        :style="{ width: `${libraryTrickPct}%` }"
                       />
                     </div>
                   </div>
@@ -1124,13 +1189,13 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     <div class="flex justify-between items-baseline gap-2">
                       <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Drills realizados' : 'Completed drills' }}</span>
                       <span class="text-sm font-bold text-cyan-300">
-                        {{ completedProgramDrills }}/{{ programDrillIds.length }} · {{ programDrillPct }}%
+                        {{ drillsCompleted }}/{{ drillsTotal }} · {{ libraryDrillPct }}%
                       </span>
                     </div>
                     <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                       <div
                         class="h-full rounded-full bg-cyan-500 transition-all"
-                        :style="{ width: `${programDrillPct}%` }"
+                        :style="{ width: `${libraryDrillPct}%` }"
                       />
                     </div>
                   </div>
@@ -1152,8 +1217,8 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 <p class="text-[9px] text-gray-600 mt-3 leading-snug">
                   {{
                     language === 'es'
-                      ? 'Los drills son referencia del coach; no cuentan como trucos del patinador.'
-                      : 'Drills are coach references and do not count as skater tricks.'
+                      ? 'Cuenta cada truco y drill marcado como completado.'
+                      : 'Counts every trick and drill marked completed.'
                   }}
                 </p>
               </template>
@@ -1350,33 +1415,96 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </p>
         </div>
 
-        <!-- Coach-set challenges: goals outside the trick bag -->
-        <MemberSkaterChallengesCard :student-id="studentId" :can-manage="canEditSkaterProfile" />
-
-        <!-- Progress & achievements (icon + label + bar + count) -->
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+        <div class="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left transition-colors"
+            :class="profileModule === 'tricks' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800 hover:border-gray-600'"
+            @click="profileModule = 'tricks'"
+          >
+            <p class="text-[11px] sm:text-sm text-gray-400 leading-tight">
+              {{ language === 'es' ? 'Trucos aprendidos' : 'Tricks learned' }}
+            </p>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
+              <div
+                class="h-full rounded-full bg-amber-500/80"
+                :style="{ width: `${Math.min(100, (trickSlotsEarned / trickSlotsTotal) * 100)}%` }"
+              />
             </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-gray-400">{{ language === 'es' ? 'Trucos aprendidos' : 'Trick slots earned' }}</p>
-              <div class="h-2 bg-gray-800 rounded-full overflow-hidden mt-1">
-                <div class="h-full bg-amber-500/80 rounded-full transition-all" :style="{ width: `${Math.min(100, (trickSlotsEarned / trickSlotsTotal) * 100)}%` }"></div>
-              </div>
-            </div>
-            <span class="text-sm font-bold text-white shrink-0">{{ trickSlotsEarned }}/{{ trickSlotsTotal }}</span>
-          </div>
+            <p class="mt-1 text-right text-sm font-bold text-white">{{ trickSlotsEarned }}/{{ trickSlotsTotal }}</p>
+          </button>
 
+          <button
+            type="button"
+            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left transition-colors"
+            :class="profileModule === 'drills' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800 hover:border-gray-600'"
+            @click="profileModule = 'drills'"
+          >
+            <p class="text-[11px] sm:text-sm text-gray-400 leading-tight">
+              {{ language === 'es' ? 'Drills completados' : 'Drills completed' }}
+            </p>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
+              <div
+                class="h-full rounded-full bg-amber-500/80"
+                :style="{ width: `${drillsTotal ? Math.min(100, (drillsCompleted / drillsTotal) * 100) : 0}%` }"
+              />
+            </div>
+            <p class="mt-1 text-right text-sm font-bold text-white">{{ drillsCompleted }}/{{ drillsTotal }}</p>
+          </button>
+
+          <button
+            type="button"
+            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left transition-colors"
+            :class="profileModule === 'challenges' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800 hover:border-gray-600'"
+            @click="profileModule = 'challenges'"
+          >
+            <div class="flex items-start justify-between gap-1">
+              <p class="text-[11px] sm:text-sm text-gray-400 leading-tight">
+                {{ language === 'es' ? 'Desafíos completados' : 'Challenges completed' }}
+              </p>
+              <span
+                v-if="canEditSkaterProfile"
+                class="shrink-0 rounded-lg bg-amber-500 px-2 py-1 text-[10px] font-bold text-black hover:bg-amber-400"
+                @click.stop="openChallengeForm"
+              >
+                {{ language === 'es' ? '+ Desafío' : '+ Challenge' }}
+              </span>
+            </div>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
+              <div
+                class="h-full rounded-full bg-amber-500/80"
+                :style="{ width: `${challengeCounts.total ? Math.round((challengeCounts.completed / challengeCounts.total) * 100) : 0}%` }"
+              />
+            </div>
+            <p class="mt-1 text-right text-sm font-bold text-white">
+              {{ challengeCounts.completed }}/{{ challengeCounts.total }}
+            </p>
+          </button>
         </div>
 
-        <!-- Trick bag (assigned / pending / done) -->
-        <div class="bg-gray-900 border border-amber-500/30 rounded-xl p-4 lg:p-6 space-y-5 w-full min-w-0">
+        <MemberSkaterChallengesCard
+          v-show="profileModule === 'challenges'"
+          ref="challengeCard"
+          :student-id="studentId"
+          :can-manage="canEditSkaterProfile"
+          table-only
+          @counts="onChallengeCounts"
+        />
+
+        <!-- Trick bag or drill bag, same layout -->
+        <div
+          v-show="profileModule !== 'challenges'"
+          class="bg-gray-900 border border-amber-500/30 rounded-xl p-4 lg:p-6 space-y-5 w-full min-w-0"
+        >
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div class="flex items-center gap-2">
-              <span class="text-lg" aria-hidden="true">🎒</span>
+              <span class="text-lg" aria-hidden="true">{{ bagIsDrills ? '🎯' : '🎒' }}</span>
               <h3 class="font-bold text-white text-lg">
-                {{ language === 'es' ? 'Bolsa de trucos' : 'Trick bag' }}
+                {{
+                  bagIsDrills
+                    ? (language === 'es' ? 'Bolsa de drills' : 'Drill bag')
+                    : (language === 'es' ? 'Bolsa de trucos' : 'Trick bag')
+                }}
               </h3>
             </div>
             <button
@@ -1389,13 +1517,58 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </div>
           <p class="hidden lg:block text-xs text-gray-500">
             {{
-              language === 'es'
-                ? 'Arriba: trucos completados. Abajo: asignados y en progreso. Marca varias casillas para asignarlos o completarlos de golpe, o usa + para uno solo; clic en el estado para avanzar (Asignado → En progreso → Completado).'
-                : 'Top: completed tricks. Below: assigned and in progress. Tick several boxes to assign or complete them in one go, or use + for a single trick; click status to advance (Assigned → In progress → Completed).'
+              bagIsDrills
+                ? (language === 'es'
+                  ? 'Arriba: drills realizados. Abajo: asignados y en progreso. Marca varias casillas para asignarlos o completarlos de golpe, o usa + para uno solo; clic en el estado para avanzar (Asignado → En progreso → Completado).'
+                  : 'Top: completed drills. Below: assigned and in progress. Tick several boxes to assign or complete them in one go, or use + for a single drill; click status to advance (Assigned → In progress → Completed).')
+                : (language === 'es'
+                  ? 'Arriba: trucos completados. Abajo: asignados y en progreso. Marca varias casillas para asignarlos o completarlos de golpe, o usa + para uno solo; clic en el estado para avanzar (Asignado → En progreso → Completado).'
+                  : 'Top: completed tricks. Below: assigned and in progress. Tick several boxes to assign or complete them in one go, or use + for a single trick; click status to advance (Assigned → In progress → Completed).')
             }}
           </p>
 
+          <div v-if="skaterRequests.length" class="rounded-xl border border-violet-400/40 bg-violet-500/10 p-3 space-y-2">
+            <p class="text-xs font-bold uppercase tracking-wide text-violet-200">
+              {{ language === 'es' ? 'Pedidos del patinador' : 'Skater requests' }}
+            </p>
+            <p class="text-[11px] text-gray-400">
+              {{
+                language === 'es'
+                  ? 'El patinador lo pidió. Permítelo solo si va con su nivel.'
+                  : 'The skater asked for this. Allow it only if it fits their level.'
+              }}
+            </p>
+            <div
+              v-for="f in skaterRequests"
+              :key="f.id"
+              class="flex items-center justify-between gap-2 rounded-lg bg-gray-900/70 px-3 py-2"
+            >
+              <div class="min-w-0">
+                <p class="text-sm text-white truncate">{{ language === 'es' ? f.skill?.name_es || f.skill?.name : f.skill?.name }}</p>
+                <p class="text-[10px] text-gray-500 truncate">{{ [f.skill?.area, f.skill?.structure].filter(Boolean).join(' · ') }}</p>
+              </div>
+              <div class="flex shrink-0 gap-1.5">
+                <button
+                  type="button"
+                  class="rounded-lg bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-black disabled:opacity-50"
+                  :disabled="updatingFocusId === f.id"
+                  @click="approveSkaterRequest(f.id)"
+                >
+                  {{ language === 'es' ? 'Permitir' : 'Allow' }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-gray-600 px-2.5 py-1 text-[11px] font-bold text-gray-300"
+                  @click="dismissSkillFocus(f.id)"
+                >
+                  {{ language === 'es' ? 'No' : 'No' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <MemberSkaterTrickBagMobile
+            :kind="bagIsDrills ? 'drill' : 'trick'"
             :skater-name="skaterDisplayName"
             :active-tricks="activeTrickBag"
             :completed-tricks="unblockedTricks"
@@ -1427,7 +1600,11 @@ watch(studentId, () => loadStudent(), { immediate: false })
           <!-- Unlocked tricks / challenges -->
           <div class="hidden lg:block space-y-2 min-w-0">
             <h4 class="text-sm font-semibold text-emerald-400">
-              {{ language === 'es' ? 'Trucos desbloqueados' : 'Unlocked tricks' }}
+              {{
+                bagIsDrills
+                  ? (language === 'es' ? 'Drills realizados' : 'Completed drills')
+                  : (language === 'es' ? 'Trucos desbloqueados' : 'Unlocked tricks')
+              }}
               <span class="text-gray-500 font-normal">({{ unblockedTricks.length }})</span>
             </h4>
             <div class="overflow-x-auto rounded-lg border border-gray-800">
@@ -1436,10 +1613,9 @@ watch(studentId, () => loadStudent(), { immediate: false })
                   <tr>
                     <th class="px-3 py-2 font-medium w-12">#</th>
                     <th class="px-3 py-2 font-medium w-28">{{ language === 'es' ? 'Estado' : 'Status' }}</th>
-                    <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
+                    <th class="px-3 py-2 font-medium">{{ bagIsDrills ? 'Drill' : (language === 'es' ? 'Truco' : 'Skill') }}</th>
                     <th class="px-3 py-2 font-medium">Program</th>
                     <th class="px-3 py-2 font-medium">Area</th>
-                    <th class="px-3 py-2 font-medium">Type</th>
                   </tr>
                 </thead>
                 <tbody v-if="unblockedTricks.length" class="divide-y divide-gray-800">
@@ -1484,13 +1660,16 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     </td>
                     <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
                     <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill?.area || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill?.trick_type || '—' }}</td>
                   </tr>
                 </tbody>
                 <tbody v-else>
                   <tr>
-                    <td colspan="6" class="px-3 py-6 text-center text-gray-500 text-sm">
-                      {{ language === 'es' ? 'Aún no hay trucos desbloqueados.' : 'No unlocked tricks yet.' }}
+                    <td colspan="5" class="px-3 py-6 text-center text-gray-500 text-sm">
+                      {{
+                        bagIsDrills
+                          ? (language === 'es' ? 'Aún no hay drills realizados.' : 'No completed drills yet.')
+                          : (language === 'es' ? 'Aún no hay trucos desbloqueados.' : 'No unlocked tricks yet.')
+                      }}
                     </td>
                   </tr>
                 </tbody>
@@ -1568,10 +1747,9 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     >
                       {{ language === 'es' ? 'Estado' : 'Status' }}
                     </th>
-                    <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
+                    <th class="px-3 py-2 font-medium">{{ bagIsDrills ? 'Drill' : (language === 'es' ? 'Truco' : 'Skill') }}</th>
                     <th class="px-3 py-2 font-medium">Program</th>
                     <th class="px-3 py-2 font-medium">Area</th>
-                    <th class="px-3 py-2 font-medium">Type</th>
                     <th class="px-3 py-2 font-medium w-36">ETA</th>
                     <th class="px-3 py-2 font-medium w-24 text-right">{{ language === 'es' ? 'Notas' : 'Comments' }}</th>
                   </tr>
@@ -1613,6 +1791,11 @@ watch(studentId, () => loadStudent(), { immediate: false })
                           aria-hidden="true"
                         />
                         <span
+                          v-else-if="f.status === 'review'"
+                          class="w-2 h-2 rounded-full bg-gold-400 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span
                           v-else-if="f.status === 'done'"
                           class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"
                           aria-hidden="true"
@@ -1629,7 +1812,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     </td>
                     <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(f.skill) || '—' }}</td>
                     <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ f.skill?.area || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ f.skill?.trick_type || '—' }}</td>
                     <td class="px-3 py-2">
                       <input
                         type="date"
@@ -1663,8 +1845,12 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 </tbody>
                 <tbody v-else>
                   <tr>
-                    <td colspan="9" class="px-3 py-6 text-center text-gray-500 text-sm">
-                      {{ language === 'es' ? 'No hay trucos asignados ni en progreso.' : 'No assigned or in-progress tricks.' }}
+                    <td colspan="8" class="px-3 py-6 text-center text-gray-500 text-sm">
+                      {{
+                        bagIsDrills
+                          ? (language === 'es' ? 'No hay drills asignados ni en progreso.' : 'No assigned or in-progress drills.')
+                          : (language === 'es' ? 'No hay trucos asignados ni en progreso.' : 'No assigned or in-progress tricks.')
+                      }}
                     </td>
                   </tr>
                 </tbody>
@@ -1673,56 +1859,39 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </div>
 
           <!-- Assign trick table -->
-          <div class="hidden lg:block space-y-3 min-w-0 border-t border-gray-800 pt-4">
-            <div>
-              <h4 class="text-sm font-semibold text-amber-400">
-                {{ language === 'es' ? 'Asignar truco' : 'Assign trick' }}
-              </h4>
-              <p class="text-xs text-gray-500 mt-1">
-                {{
-                  language === 'es'
-                    ? 'Filtra o busca, marca las casillas y asigna o completa todos de una vez. Pulsa + para asignar uno solo.'
-                    : 'Filter or search, tick the boxes, then assign or complete them all at once. Press + for a single trick.'
-                }}
-              </p>
-            </div>
-            <input
-              v-model="assignSearch"
-              type="search"
-              class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
-              :placeholder="language === 'es' ? 'Buscar truco por nombre o #…' : 'Search trick by name or #…'"
-            />
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div class="min-w-0">
-                <label class="block text-xs text-gray-500 mb-1">Program</label>
-                <select
-                  v-model="assignFilterStructure"
-                  class="w-full min-w-0 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
-                >
-                  <option value="">{{ language === 'es' ? 'Todas' : 'All' }}</option>
-                  <option v-for="opt in assignStructureOptions" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
-              </div>
-              <div class="min-w-0">
-                <label class="block text-xs text-gray-500 mb-1">Area</label>
-                <select
-                  v-model="assignFilterArea"
-                  class="w-full min-w-0 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
-                >
-                  <option value="">{{ language === 'es' ? 'Todas' : 'All' }}</option>
-                  <option v-for="opt in assignAreaOptions" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
-              </div>
-              <div class="min-w-0">
-                <label class="block text-xs text-gray-500 mb-1">Type</label>
-                <select
-                  v-model="assignFilterType"
-                  class="w-full min-w-0 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
-                >
-                  <option value="">{{ language === 'es' ? 'Todos' : 'All' }}</option>
-                  <option v-for="opt in assignTypeOptions" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
-              </div>
+          <div class="hidden lg:block space-y-2 min-w-0 border-t border-gray-800 pt-3">
+            <h4 class="text-xs font-semibold text-amber-400">
+              {{
+                bagIsDrills
+                  ? (language === 'es' ? 'Asignar drill' : 'Assign drill')
+                  : (language === 'es' ? 'Asignar truco' : 'Assign trick')
+              }}
+            </h4>
+            <div class="flex items-center gap-2">
+              <input
+                v-model="assignSearch"
+                type="search"
+                class="min-w-0 flex-1 h-8 px-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
+                :placeholder="
+                  bagIsDrills
+                    ? (language === 'es' ? 'Buscar drill…' : 'Search drill…')
+                    : (language === 'es' ? 'Buscar truco…' : 'Search trick…')
+                "
+              />
+              <select
+                v-model="assignFilterStructure"
+                class="h-8 w-40 shrink-0 px-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
+              >
+                <option value="">{{ language === 'es' ? 'Programa' : 'Program' }}</option>
+                <option v-for="opt in assignStructureOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+              <select
+                v-model="assignFilterArea"
+                class="h-8 w-36 shrink-0 px-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
+              >
+                <option value="">{{ language === 'es' ? 'Área' : 'Area' }}</option>
+                <option v-for="opt in assignAreaOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
             </div>
 
             <div
@@ -1800,10 +1969,9 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     >
                       {{ language === 'es' ? 'Estado' : 'Status' }}
                     </th>
-                    <th class="px-3 py-2 font-medium">{{ language === 'es' ? 'Truco' : 'Skill' }}</th>
+                    <th class="px-3 py-2 font-medium">{{ bagIsDrills ? 'Drill' : (language === 'es' ? 'Truco' : 'Skill') }}</th>
                     <th class="px-3 py-2 font-medium">Program</th>
                     <th class="px-3 py-2 font-medium">Area</th>
-                    <th class="px-3 py-2 font-medium">Type</th>
                   </tr>
                 </thead>
                 <tbody v-if="assignTrickTableRows.length" class="divide-y divide-gray-800">
@@ -1841,16 +2009,19 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     </td>
                     <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
                     <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.area || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.trick_type || '—' }}</td>
                   </tr>
                 </tbody>
                 <tbody v-else>
                   <tr>
-                    <td colspan="7" class="px-3 py-8 text-center text-gray-500 text-sm">
+                    <td colspan="6" class="px-3 py-8 text-center text-gray-500 text-sm">
                       {{
                         assignablePool.length === 0
-                          ? (language === 'es' ? 'No hay trucos disponibles para asignar.' : 'No tricks available to assign.')
-                          : (language === 'es' ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.')
+                          ? (bagIsDrills
+                            ? (language === 'es' ? 'No hay drills disponibles para asignar.' : 'No drills available to assign.')
+                            : (language === 'es' ? 'No hay trucos disponibles para asignar.' : 'No tricks available to assign.'))
+                          : (bagIsDrills
+                            ? (language === 'es' ? 'Sin drills con estos filtros.' : 'No drills match these filters.')
+                            : (language === 'es' ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.'))
                       }}
                     </td>
                   </tr>
@@ -1860,91 +2031,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
             <p v-if="focusError" class="text-sm text-flame-500">{{ focusError }}</p>
           </div>
         </div>
-
-        <!-- Coach-only drill history: never appears in the skater Trick Bag. -->
-        <section class="rounded-xl border border-gray-800 bg-gray-900 p-4 lg:p-6">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 class="flex items-center gap-2 text-lg font-bold text-white">
-                <span aria-hidden="true">🎯</span>
-                {{ language === 'es' ? 'Drills del coach' : 'Coach drills' }}
-              </h3>
-              <p class="mt-1 text-xs text-gray-500">
-                {{
-                  language === 'es'
-                    ? 'Referencia exclusiva para planear sesiones. Estos drills no aparecen como trucos ni cuentan en el progreso del patinador.'
-                    : 'Coach-only session-planning reference. These drills do not appear as tricks or count toward skater progress.'
-                }}
-              </p>
-            </div>
-            <NuxtLink
-              to="/member/coach/plans"
-              class="rounded-lg border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-300 hover:border-gray-500 hover:text-white"
-            >
-              {{ language === 'es' ? 'Planear sesión' : 'Plan session' }}
-            </NuxtLink>
-          </div>
-
-          <div class="mt-4 grid gap-4 lg:grid-cols-2">
-            <div class="overflow-hidden rounded-lg border border-gray-800">
-              <div class="flex items-center justify-between bg-gray-800/70 px-3 py-2">
-                <h4 class="text-xs font-bold uppercase tracking-wide text-gray-300">
-                  {{ language === 'es' ? 'Asignados / en práctica' : 'Assigned / practicing' }}
-                </h4>
-                <span class="text-xs font-bold text-white">{{ activeCoachDrills.length }}</span>
-              </div>
-              <ul v-if="activeCoachDrills.length" class="divide-y divide-gray-800">
-                <li
-                  v-for="row in activeCoachDrills"
-                  :key="row.id"
-                  class="flex items-center gap-3 px-3 py-2.5"
-                >
-                  <span class="w-10 shrink-0 font-mono text-[10px] text-gray-600">
-                    {{ trickManualLabel(row.skill) || '—' }}
-                  </span>
-                  <span class="min-w-0 flex-1 truncate text-sm text-gray-200">
-                    {{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}
-                  </span>
-                  <span class="shrink-0 text-[10px] uppercase text-gray-500">
-                    {{ row.status === 'pending' ? (language === 'es' ? 'Práctica' : 'Practicing') : (language === 'es' ? 'Asignado' : 'Assigned') }}
-                  </span>
-                </li>
-              </ul>
-              <p v-else class="px-3 py-5 text-center text-xs text-gray-600">
-                {{ language === 'es' ? 'Sin drills activos.' : 'No active drills.' }}
-              </p>
-            </div>
-
-            <div class="overflow-hidden rounded-lg border border-gray-800">
-              <div class="flex items-center justify-between bg-gray-800/70 px-3 py-2">
-                <h4 class="text-xs font-bold uppercase tracking-wide text-gray-300">
-                  {{ language === 'es' ? 'Realizados' : 'Completed' }}
-                </h4>
-                <span class="text-xs font-bold text-white">{{ completedCoachDrills.length }}</span>
-              </div>
-              <ul v-if="completedCoachDrills.length" class="divide-y divide-gray-800">
-                <li
-                  v-for="row in completedCoachDrills"
-                  :key="row.skill_id"
-                  class="flex items-center gap-3 px-3 py-2.5"
-                >
-                  <span class="w-10 shrink-0 font-mono text-[10px] text-gray-600">
-                    {{ trickManualLabel(row.skill) || '—' }}
-                  </span>
-                  <span class="min-w-0 flex-1 truncate text-sm text-gray-200">
-                    {{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}
-                  </span>
-                  <span class="shrink-0 text-[10px] uppercase text-gray-500">
-                    {{ row.skill?.area || '—' }}
-                  </span>
-                </li>
-              </ul>
-              <p v-else class="px-3 py-5 text-center text-xs text-gray-600">
-                {{ language === 'es' ? 'Sin drills realizados.' : 'No completed drills.' }}
-              </p>
-            </div>
-          </div>
-        </section>
 
         <!-- Preferred schedule (set by admin) -->
         <div v-if="skaterScheduleDisplay" class="bg-gray-900 border border-gray-800 rounded-xl p-4">

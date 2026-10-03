@@ -6,7 +6,7 @@ import { checkCoupon, getServiceClient, requireUser } from '~/server/utils/coupo
 import { couponLabel } from '~/utils/coupons'
 
 export default defineEventHandler(async (event) => {
-  const userId = await requireUser(event)
+  const authUserId = await requireUser(event)
   const body = await readBody(event)
 
   const code = typeof body?.code === 'string' ? body.code : ''
@@ -19,6 +19,19 @@ export default defineEventHandler(async (event) => {
   }
 
   const supabase = getServiceClient()
+  let userId = authUserId
+  const targetUserId = typeof body?.targetUserId === 'string' ? body.targetUserId : null
+  if (targetUserId && targetUserId !== authUserId) {
+    const { data: actor } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authUserId)
+      .maybeSingle()
+    if (actor?.role !== 'admin') {
+      throw createError({ statusCode: 403, message: 'Only admins can validate for another account' })
+    }
+    userId = targetUserId
+  }
   const result = await checkCoupon(supabase, {
     code,
     subtotalMxn,

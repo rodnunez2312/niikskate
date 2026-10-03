@@ -14,9 +14,15 @@ const props = withDefaults(
     canManage?: boolean
     /** The skater themselves: mark a challenge as accomplished */
     canComplete?: boolean
+    /** Coach profile: table only. The summary bar lives on the parent. */
+    tableOnly?: boolean
   }>(),
-  { canManage: false, canComplete: false },
+  { canManage: false, canComplete: false, tableOnly: false },
 )
+
+const emit = defineEmits<{
+  counts: [payload: { completed: number; total: number }]
+}>()
 
 const client = useSupabaseClient()
 const user = useSupabaseUser()
@@ -157,11 +163,17 @@ const dueLabel = (challenge: SkaterChallenge) => {
 }
 
 watch(() => props.studentId, loadChallenges, { immediate: true })
+
+watch([completedCount, totalCount], () => {
+  emit('counts', { completed: completedCount.value, total: totalCount.value })
+}, { immediate: true })
+
+defineExpose({ openForm })
 </script>
 
 <template>
   <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-4">
-    <div class="flex items-center gap-3">
+    <div v-if="!tableOnly" class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400 shrink-0">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
@@ -187,7 +199,7 @@ watch(() => props.studentId, loadChallenges, { immediate: true })
       </button>
     </div>
 
-    <p class="text-[11px] text-gray-500 leading-snug">
+    <p v-if="!tableOnly" class="text-[11px] text-gray-500 leading-snug">
       {{
         es
           ? 'Retos que pone el coach fuera de la bolsa de trucos: no cuentan como trucos aprendidos.'
@@ -250,6 +262,62 @@ watch(() => props.studentId, loadChallenges, { immediate: true })
 
     <div v-if="loading" class="flex justify-center py-6">
       <div class="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+    </div>
+
+    <div v-else-if="tableOnly" class="overflow-x-auto rounded-lg border border-gray-800">
+      <table class="w-full min-w-[520px] text-sm text-left">
+        <thead class="bg-gray-800/80 text-gray-400 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="px-3 py-2 font-medium">{{ es ? 'Desafío' : 'Challenge' }}</th>
+            <th class="px-3 py-2 font-medium">{{ es ? 'Estado' : 'Status' }}</th>
+            <th class="px-3 py-2 font-medium">{{ es ? 'Fecha' : 'Date' }}</th>
+            <th v-if="canManage" class="px-3 py-2 font-medium w-16" />
+          </tr>
+        </thead>
+        <tbody v-if="sorted.length" class="divide-y divide-gray-800">
+          <tr v-for="challenge in sorted" :key="challenge.id" class="hover:bg-gray-800/40">
+            <td class="px-3 py-2">
+              <p class="font-medium text-white">{{ challenge.title }}</p>
+              <p v-if="challenge.description" class="text-xs text-gray-500 mt-0.5">{{ challenge.description }}</p>
+            </td>
+            <td class="px-3 py-2 whitespace-nowrap">
+              <button
+                type="button"
+                class="text-xs font-semibold uppercase tracking-wide disabled:opacity-40"
+                :class="challenge.status === 'completed' ? 'text-emerald-400' : 'text-amber-400'"
+                :disabled="!canToggle(challenge) || busyId === challenge.id"
+                @click="setChallengeStatus(challenge, challenge.status !== 'completed')"
+              >
+                {{ challengeStatusLabel(challenge.status, es) }}
+              </button>
+            </td>
+            <td class="px-3 py-2 text-gray-400 whitespace-nowrap">
+              {{ dueLabel(challenge) || '—' }}
+            </td>
+            <td v-if="canManage" class="px-3 py-2">
+              <button
+                type="button"
+                class="text-gray-600 hover:text-red-400"
+                :disabled="busyId === challenge.id"
+                @click="deleteChallenge(challenge)"
+              >
+                {{ es ? 'Quitar' : 'Remove' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+        <tbody v-else>
+          <tr>
+            <td :colspan="canManage ? 4 : 3" class="px-3 py-6 text-center text-gray-500 text-sm">
+              {{
+                canManage
+                  ? (es ? 'Sin desafíos todavía. Crea uno con “+ Desafío”.' : 'No challenges yet. Create one with “+ Challenge”.')
+                  : (es ? 'Tu coach aún no te ha puesto un desafío.' : 'Your coach has not set a challenge yet.')
+              }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <ul v-else-if="sorted.length" class="space-y-2">

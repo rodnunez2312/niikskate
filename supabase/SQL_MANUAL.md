@@ -52,6 +52,10 @@ Run migration: `supabase/migrations/add_student_program_read_policies.sql` (**re
 
 Run migration: `supabase/migrations/add_guardian_program_read.sql` (**required so a tutor sees a child's program**) — the skater policies above only match `auth.uid()`, so a parent opening Programa got an empty assignment even when the child was on a phase. This adds SELECT for `program_students`, `programs`, and `student_progress` when that student's `profiles.guardian_user_id` is the signed-in tutor.
 
+Run migration: `supabase/migrations/add_trick_review_videos.sql` (**required for trick review and evidence videos**) — adds the `review` status so a skater can send a trick to the coach without marking it completed, lets a parent update that status, and stores evidence clips in `trick_evidence_videos` so they count on the skater profile.
+
+Run migration: `supabase/migrations/add_family_skater_avatar_upload.sql` (**required so a family can set a skater photo**) — storage only allowed `avatars/{the signed-in user}`, so a parent uploading a child's picture was rejected with "new row violates row-level security policy". This allows that folder for a linked skater and for `avatars/crew/{id}`, and lets the parent write `profiles.avatar_url` on those children.
+
 Run migration: `supabase/migrations/add_brand_and_ramp_storage_policies.sql` (**required for brand logo uploads** in Admin → Skateshop → Marcas) — `storage.objects` only had policies for `products/` and `avatars/`, so every write to `brands/` was denied by RLS and the logo silently fell back to a device-local `blob:` URL. Also covers `skateramps/`, which had the same gap for the ramp studio reference photos.
 
 Run migration: `supabase/migrations/add_skateramp_projects.sql` (Skateramps studio + public catalog projects)

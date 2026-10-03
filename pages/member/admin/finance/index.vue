@@ -7,16 +7,18 @@
  */
 import {
   FINANCE_COACH_TIERS,
+  aggregateStudents,
   academyPerUnitMxn,
   coachTierSheetLabel,
   computeBreakEven,
+  daysSinceDate,
   effectivePriceMxn,
   expenseCategoryLabel,
   formatMoneyMxn,
   formatPct,
   monthlyFixedCostMxn,
+  paymentToneForDays,
   sortPriceRows,
-  summarizeEnrollments,
   summarizeExpenses,
   summarizePayments,
   totalsByCategory,
@@ -100,7 +102,15 @@ const gapToTarget = computed(() =>
   Math.max(0, breakEven.value.minimumViableIncome - income.value.academyNet),
 )
 
-const students = computed(() => summarizeEnrollments(enrollments.value))
+const students = computed(() => {
+  const rows = aggregateStudents(enrollments.value)
+  return {
+    count: rows.length,
+    remaining: rows.reduce((n, row) => n + row.remaining, 0),
+    outOfClasses: rows.filter(row => row.remaining <= 0).length,
+    overdue: rows.filter(row => paymentToneForDays(daysSinceDate(row.lastPaymentOn)) === 'bad').length,
+  }
+})
 
 const expenseBreakdown = computed(() =>
   totalsByCategory(
@@ -479,7 +489,7 @@ async function persistSettings() {
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">
-                {{ es ? 'Inscripciones' : 'Enrollments' }}
+                {{ es ? 'Alumnos' : 'Students' }}
               </p>
               <p class="text-lg font-bold text-white tabular-nums">{{ students.count }}</p>
             </div>

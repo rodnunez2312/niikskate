@@ -200,6 +200,34 @@ export interface FinanceEnrollmentRow {
   created_at?: string
 }
 
+export type FinanceAttendanceStatus = 'attended' | 'absent'
+
+export interface FinanceAttendanceMark {
+  id: string
+  enrollment_id: string
+  session_date: string
+  status: FinanceAttendanceStatus
+  calendar_event_id: string | null
+  notes: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface FinanceStudentSummary {
+  key: string
+  studentName: string
+  skaterId: string | null
+  crewMemberId: string | null
+  enrollments: FinanceEnrollmentRow[]
+  sessionsPaid: number
+  attended: number
+  absences: number
+  remaining: number
+  amountPaidMxn: number
+  lastPaymentOn: string | null
+  futureBookedClasses: number
+}
+
 export interface FinanceSettingsRow {
   id: boolean
   owner_draw_mxn: number
@@ -522,28 +550,54 @@ export function summarizeEnrollments(rows: FinanceEnrollmentRow[]) {
   }
 }
 
-export function enrollmentsCsv(rows: FinanceEnrollmentRow[], es: boolean): string {
+const normalizedStudentName = (name: string) => name.trim().toLocaleLowerCase().replace(/\s+/g, ' ')
+
+export function enrollmentStudentKey(row: FinanceEnrollmentRow): string {
+  if (row.skater_id) return `profile:${row.skater_id}`
+  if (row.crew_member_id) return `crew:${row.crew_member_id}`
+  return `name:${normalizedStudentName(row.student_name)}`
+}
+
+export function aggregateStudents(
+  rows: FinanceEnrollmentRow[],
+  futureBookings: Record<string, number> = {},
+): FinanceStudentSummary[] {
+  const groups = new Map<string, FinanceEnrollmentRow[]>()
+  for (const row of rows) {
+    const key = enrollmentStudentKey(row)
+    groups.set(key, [...(groups.get(key) ?? []), row])
+  }
+  return [...groups.entries()].map(([key, enrollments]) => {
+    const sorted = [...enrollments].sort((a, b) =>
+      (b.last_payment_on ?? b.created_at ?? '').localeCompare(a.last_payment_on ?? a.created_at ?? ''),
+    )
+    const latest = sorted[0]
+    return {
+      key,
+      studentName: latest.student_name,
+      skaterId: latest.skater_id,
+      crewMemberId: latest.crew_member_id,
+      enrollments: sorted,
+      sessionsPaid: enrollments.reduce((n, r) => n + Number(r.sessions_paid || 0), 0),
+      attended: enrollments.reduce((n, r) => n + Number(r.attended || 0), 0),
+      absences: enrollments.reduce((n, r) => n + Number(r.absences || 0), 0),
+      remaining: enrollments.reduce((n, r) => n + Math.max(0, remainingSessions(r)), 0),
+      amountPaidMxn: enrollments.reduce((n, r) => n + Number(r.amount_paid_mxn || 0), 0),
+      lastPaymentOn: sorted.map(r => r.last_payment_on).find(Boolean) ?? null,
+      futureBookedClasses: futureBookings[key] ?? 0,
+    }
+  }).sort((a, b) => a.studentName.localeCompare(b.studentName))
+}
+
+export function studentSummariesCsv(rows: FinanceStudentSummary[]): string {
   return buildCsv(
     [
-      'Alumno', 'Tipo de clase', 'Precio', 'Ultimo pago', 'Vendidos', 'Total Vendido',
-      'Sesiones', ...ATTEND_WEEKDAYS.map(d => (es ? d.es : d.en)),
-      'Asistencia', 'Faltas', 'Quedan', 'Coach tier', 'Activo', 'Notas',
+      'Alumno', 'Clases pagadas', 'Clases restantes', 'Clases activas',
+      'Asistencias', 'Faltas', 'Total pagado', 'Ultimo pago',
     ],
     rows.map(r => [
-      r.student_name,
-      r.plan_label ?? classKindLabel(r.class_kind, es),
-      Number(r.price_mxn || 0),
-      r.last_payment_on ?? '',
-      r.packages_paid,
-      Number(r.amount_paid_mxn || 0),
-      r.sessions_paid,
-      ...ATTEND_WEEKDAYS.map(d => (r.attend_weekdays?.includes(d.value) ? 'X' : '')),
-      r.attended,
-      r.absences,
-      remainingSessions(r),
-      coachTierSheetLabel(r.coach_tier, es),
-      r.is_active ? 'si' : 'no',
-      r.notes ?? '',
+      r.studentName, r.sessionsPaid, r.remaining, r.futureBookedClasses,
+      r.attended, r.absences, r.amountPaidMxn, r.lastPaymentOn ?? '',
     ]),
   )
 }

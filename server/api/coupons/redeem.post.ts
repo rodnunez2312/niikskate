@@ -9,7 +9,7 @@ import { getServiceClient, redeemCoupon, requireUser } from '~/server/utils/coup
 import { couponLabel } from '~/utils/coupons'
 
 export default defineEventHandler(async (event) => {
-  const userId = await requireUser(event)
+  const authUserId = await requireUser(event)
   const body = await readBody(event)
 
   const code = typeof body?.code === 'string' ? body.code : ''
@@ -22,6 +22,19 @@ export default defineEventHandler(async (event) => {
   }
 
   const supabase = getServiceClient()
+  let userId = authUserId
+  const targetUserId = typeof body?.targetUserId === 'string' ? body.targetUserId : null
+  if (targetUserId && targetUserId !== authUserId) {
+    const { data: actor } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authUserId)
+      .maybeSingle()
+    if (actor?.role !== 'admin') {
+      throw createError({ statusCode: 403, message: 'Only admins can redeem for another account' })
+    }
+    userId = targetUserId
+  }
 
   // A credit id must belong to the caller, otherwise a redemption could be
   // attached to someone else's purchase.
@@ -49,7 +62,9 @@ export default defineEventHandler(async (event) => {
       skaterProfileId: typeof body?.skaterProfileId === 'string' ? body.skaterProfileId : null,
     },
     {
-      context: body?.context === 'season_enroll' ? 'season_enroll' : 'book',
+      context: body?.context === 'admin_enrollment'
+        ? 'admin_enrollment'
+        : body?.context === 'season_enroll' ? 'season_enroll' : 'book',
       userCreditId,
       calendarEventId: typeof body?.calendarEventId === 'string' ? body.calendarEventId : null,
     },

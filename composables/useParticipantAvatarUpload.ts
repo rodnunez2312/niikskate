@@ -3,8 +3,8 @@ import type { Ref } from 'vue'
 type AvatarTarget =
   | { kind: 'self' }
   | { kind: 'crew'; crewMemberId: string }
-  /** Someone else's account, e.g. a linked skater: shown but not editable here. */
-  | { kind: 'readonly' }
+  /** A skater profile linked to this family account. */
+  | { kind: 'skater'; skaterProfileId: string }
 
 async function compressToJpegBlob(file: File, maxDim = 512, quality = 0.85): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -64,6 +64,7 @@ export function useParticipantAvatarUpload(
   function storageFolder(): string | null {
     const t = target.value
     if (t.kind === 'self' && user.value?.id) return `avatars/${user.value.id}`
+    if (t.kind === 'skater') return `avatars/${t.skaterProfileId}`
     if (t.kind === 'crew') return `avatars/crew/${t.crewMemberId}`
     return null
   }
@@ -128,11 +129,12 @@ export function useParticipantAvatarUpload(
       const publicUrl = `${pub.publicUrl}?t=${Date.now()}`
 
       const t = target.value
-      if (t.kind === 'self') {
+      if (t.kind === 'self' || t.kind === 'skater') {
+        const profileId = t.kind === 'self' ? user.value.id : t.skaterProfileId
         const { error: dbErr } = await client
           .from('profiles')
           .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
-          .eq('id', user.value.id)
+          .eq('id', profileId)
         if (dbErr) throw dbErr
       } else if (t.kind === 'crew') {
         const { error: dbErr } = await client
@@ -172,11 +174,12 @@ export function useParticipantAvatarUpload(
     try {
       await clearAvatarFolder(folder)
       const t = target.value
-      if (t.kind === 'self') {
+      if (t.kind === 'self' || t.kind === 'skater') {
+        const profileId = t.kind === 'self' ? user.value.id : t.skaterProfileId
         const { error } = await client
           .from('profiles')
           .update({ avatar_url: null, updated_at: new Date().toISOString() })
-          .eq('id', user.value.id)
+          .eq('id', profileId)
         if (error) throw error
       } else if (t.kind === 'crew') {
         const { error } = await client

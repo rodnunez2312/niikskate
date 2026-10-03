@@ -38,7 +38,8 @@ type AssignRow = {
   }
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  kind?: 'trick' | 'drill'
   skaterName: string
   activeTricks: FocusRow[]
   completedTricks: ProgressRow[]
@@ -54,7 +55,7 @@ const props = defineProps<{
   revertingSkillId: string | null
   selectedSkillIds: string[]
   bulkBusy: boolean
-}>()
+}>(), { kind: 'trick' })
 
 const emit = defineEmits<{
   'update:filterStructure': [value: string]
@@ -72,6 +73,24 @@ const emit = defineEmits<{
 
 const { language } = useI18n()
 const es = computed(() => language.value === 'es')
+
+const noun = computed(() => {
+  const drill = props.kind === 'drill'
+  return {
+    doneEmpty: drill
+      ? (es.value ? 'Aún no hay drills completados.' : 'No completed drills yet.')
+      : (es.value ? 'Aún no hay trucos completados.' : 'No completed tricks yet.'),
+    search: drill
+      ? (es.value ? 'Buscar drill…' : 'Search drill…')
+      : (es.value ? 'Buscar truco…' : 'Search trick…'),
+    empty: drill
+      ? (es.value ? 'Sin drills con estos filtros.' : 'No drills match these filters.')
+      : (es.value ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.'),
+    select: drill
+      ? (es.value ? 'Seleccionar drill' : 'Select drill')
+      : (es.value ? 'Seleccionar truco' : 'Select trick'),
+  }
+})
 
 type ParkTab = 'active' | 'done' | 'assign'
 const tab = ref<ParkTab>('active')
@@ -227,7 +246,7 @@ const statusBtnClass = (current: string, target: SkaterTrickBagStatus) => {
 
     <div v-else-if="tab === 'done'" class="space-y-3">
       <p v-if="!completedTricks.length" class="text-center text-sm text-gray-500 py-8">
-        {{ es ? 'Aún no hay trucos completados.' : 'No completed tricks yet.' }}
+        {{ noun.doneEmpty }}
       </p>
       <article
         v-for="row in completedTricks"
@@ -250,36 +269,28 @@ const statusBtnClass = (current: string, target: SkaterTrickBagStatus) => {
     </div>
 
     <div v-else class="space-y-3">
-      <input
-        v-model="assignSearch"
-        type="search"
-        class="w-full min-h-[48px] px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-base"
-        :placeholder="es ? 'Buscar truco…' : 'Search trick…'"
-      />
-      <div class="grid grid-cols-1 gap-2">
+      <div class="flex items-center gap-1.5">
+        <input
+          v-model="assignSearch"
+          type="search"
+          class="min-w-0 flex-1 h-9 px-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-xs"
+          :placeholder="noun.search"
+        />
         <select
           :value="filterStructure"
-          class="min-h-[44px] px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+          class="h-9 w-[30%] shrink-0 px-1 rounded-lg bg-gray-800 border border-gray-600 text-white text-[11px]"
           @change="emit('update:filterStructure', ($event.target as HTMLSelectElement).value)"
         >
-          <option value="">{{ es ? 'Programa: Todas' : 'Program: All' }}</option>
+          <option value="">{{ es ? 'Programa' : 'Program' }}</option>
           <option v-for="opt in structureOptions" :key="opt" :value="opt">{{ opt }}</option>
         </select>
         <select
           :value="filterArea"
-          class="min-h-[44px] px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+          class="h-9 w-[26%] shrink-0 px-1 rounded-lg bg-gray-800 border border-gray-600 text-white text-[11px]"
           @change="emit('update:filterArea', ($event.target as HTMLSelectElement).value)"
         >
-          <option value="">{{ es ? 'Área: Todas' : 'Area: All' }}</option>
+          <option value="">{{ es ? 'Área' : 'Area' }}</option>
           <option v-for="opt in areaOptions" :key="opt" :value="opt">{{ opt }}</option>
-        </select>
-        <select
-          :value="filterType"
-          class="min-h-[44px] px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
-          @change="emit('update:filterType', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">{{ es ? 'Tipo: Todos' : 'Type: All' }}</option>
-          <option v-for="opt in typeOptions" :key="opt" :value="opt">{{ opt }}</option>
         </select>
       </div>
       <button
@@ -295,7 +306,7 @@ const statusBtnClass = (current: string, target: SkaterTrickBagStatus) => {
         }}
       </button>
       <p v-if="!filteredAssignRows.length" class="text-center text-sm text-gray-500 py-8">
-        {{ es ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.' }}
+        {{ noun.empty }}
       </p>
       <article
         v-for="row in filteredAssignRows"
@@ -311,7 +322,7 @@ const statusBtnClass = (current: string, target: SkaterTrickBagStatus) => {
           type="checkbox"
           class="w-6 h-6 shrink-0 accent-sky-500"
           :checked="selectedSet.has(row.skill.id)"
-          :aria-label="es ? 'Seleccionar truco' : 'Select trick'"
+          :aria-label="noun.select"
           @change="emit('toggle-select', row.skill.id)"
         />
         <div class="min-w-0 flex-1">

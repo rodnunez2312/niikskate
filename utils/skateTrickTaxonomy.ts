@@ -38,9 +38,9 @@ export type SkateTrickStructure = (typeof SKATE_TRICK_STRUCTURES)[number]
 export type SkateTrickType = (typeof SKATE_TRICK_TYPES)[number]
 export type SkateTrickProgram = (typeof SKATE_TRICK_PROGRAMS)[number]
 
-export type SkaterTrickBagStatus = 'assigned' | 'pending' | 'done'
+export type SkaterTrickBagStatus = 'assigned' | 'pending' | 'review' | 'done' | 'requested'
 
-export const SKATER_TRICK_BAG_STATUSES: SkateTrickBagStatus[] = ['assigned', 'pending', 'done']
+export const SKATER_TRICK_BAG_STATUSES: SkateTrickBagStatus[] = ['assigned', 'pending', 'review', 'done', 'requested']
 
 /** Only Excel rows explicitly marked Type = Trick belong in skater-facing UI. */
 export function isSkaterTrick(skill: { trick_type?: string | null } | null | undefined): boolean {
@@ -55,14 +55,16 @@ export function isCoachDrill(skill: { trick_type?: string | null } | null | unde
 export function trickBagStatusLabel(status: SkaterTrickBagStatus, es: boolean): string {
   if (status === 'assigned') return es ? 'Asignado' : 'Assigned'
   if (status === 'pending') return es ? 'En progreso' : 'In progress'
+  if (status === 'review') return es ? 'En revisión' : 'In review'
+  if (status === 'requested') return es ? 'Por confirmar' : 'Awaiting coach'
   return es ? 'Completado' : 'Completed'
 }
 
 /** Hover hint for the Estado column header. */
 export function trickBagStatusFlowHint(es: boolean): string {
   return es
-    ? 'Pulsa + para asignar. Luego clic en el estado: Asignado → En progreso → Completado.'
-    : 'Press + to assign. Then click status: Assigned → In progress → Completed.'
+    ? 'Pulsa + para asignar. Luego: Asignado → En progreso → En revisión → Completado. Completado lo confirma el coach.'
+    : 'Press + to assign. Then: Assigned → In progress → In review → Completed. The coach confirms Completed.'
 }
 
 /** Tooltip for the next action on a status control. */
@@ -77,14 +79,18 @@ export function trickBagStatusNextHint(
     return es ? 'Clic: pasar a En progreso' : 'Click: move to In progress'
   }
   if (status === 'pending') {
-    return es ? 'Clic: marcar Completado' : 'Click: mark Completed'
+    return es ? 'Clic: enviar a revisión del coach' : 'Click: send to the coach for review'
+  }
+  if (status === 'review') {
+    return es ? 'Clic: confirmar que lo viste y marcarlo completado' : 'Click: confirm you saw it and mark it completed'
   }
   return es ? 'Completado' : 'Completed'
 }
 
 export function nextTrickBagStatus(status: SkaterTrickBagStatus): SkaterTrickBagStatus | null {
   if (status === 'assigned') return 'pending'
-  if (status === 'pending') return 'done'
+  if (status === 'pending') return 'review'
+  if (status === 'review') return 'done'
   return null
 }
 

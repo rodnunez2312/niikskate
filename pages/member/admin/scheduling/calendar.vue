@@ -35,8 +35,6 @@ import {
   programClassCount,
   skillLevelIdFromTrack,
   skillTrackFromLevelId,
-  PROGRESSION_AGE,
-  PROGRESSION_AUDIENCE_CATEGORIES,
   SPOTS_PER_COACH,
   isProgressionAudience,
   type ProgramSkillTrack,
@@ -62,6 +60,7 @@ import {
   FINANCE_COACH_TIERS,
 } from '~/utils/finance'
 import { useFinance } from '~/composables/useFinance'
+import { fetchCoachDirectoryProfiles } from '~/composables/coachDirectory'
 import { EVENT_TYPE_COLORS, SKILL_LEVEL_COLORS } from '~/utils/semanticColors'
 
 definePageMeta({
@@ -364,17 +363,10 @@ const toggleSkillTrack = (track: ProgramSkillTrack) => {
     form.value.skill_tracks = [...cur, track]
   }
   form.value.skill_level = skillLevelIdFromTrack(form.value.skill_tracks[0]!)
-  applyProgressionAgesIfNeeded()
 }
 
-/** Intermediate (Progresión) covers ages 7–17: kids + teens bands. */
-const applyProgressionAgesIfNeeded = () => {
-  if (!isProgramForm.value) return
-  if (!form.value.skill_tracks.includes('intermediate')) return
-  const cats = new Set(form.value.audience_categories)
-  for (const id of PROGRESSION_AUDIENCE_CATEGORIES) cats.add(id)
-  form.value.audience_categories = [...cats]
-}
+/** Ages come only from the chips the admin actually selected. */
+const selectedAudienceAges = () => mergedAudienceAgeRange(form.value.audience_categories)
 
 const applySummerCoursePreset = () => {
   form.value.is_recurring = true
@@ -840,6 +832,7 @@ const calendarDbErrorMessage = (msg: string) => {
     || m.includes('tots_5_7')
     || m.includes('kids_7_12')
     || m.includes('teens_13_17')
+    || m.includes('adults_18_plus')
     || (m.includes('check constraint') && m.includes('audience'))
   ) {
     return es
@@ -1230,20 +1223,32 @@ const coachRoster = ref<CoachOption[]>([])
 const assignedCoachIds = ref<string[]>([])
 /** Set when the table is missing so the section can point at the migration. */
 const coachAssignError = ref('')
+const coachRosterError = ref('')
 
 const loadCoachRoster = async () => {
-  const { data } = await client
-    .from('profiles')
-    .select('id, full_name, first_name, last_name, email')
-    .eq('role', 'coach')
-    .order('full_name')
-  coachRoster.value = ((data as any[]) || []).map(p => ({
-    id: p.id,
-    name:
-      (p.full_name || `${p.first_name || ''} ${p.last_name || ''}`).trim()
-      || p.email
-      || 'Coach',
-  }))
+  coachRosterError.value = ''
+  try {
+    const rows = await fetchCoachDirectoryProfiles<{
+      id: string
+      full_name: string | null
+      first_name: string | null
+      last_name: string | null
+      email: string | null
+    }>(client, {
+      select: 'id, full_name, first_name, last_name, email',
+      activeOnly: true,
+    })
+    coachRoster.value = rows.map(p => ({
+      id: p.id,
+      name:
+        (p.full_name || `${p.first_name || ''} ${p.last_name || ''}`).trim()
+        || p.email
+        || 'Coach',
+    }))
+  } catch (error) {
+    coachRoster.value = []
+    coachRosterError.value = error instanceof Error ? error.message : String(error)
+  }
 }
 
 const loadAssignedCoaches = async (eventId: string | null) => {
@@ -1594,16 +1599,6 @@ const openEdit = (ev: SchoolCalendarRow, e?: Event) => {
     max_capacity_override: ev.max_capacity_override ?? (ev.event_type === 'class_individual' ? 1 : 6),
     season_slug: ev.season_slug ?? '',
   }
-  applyProgressionAgesIfNeeded()
-  if (
-    form.value.skill_tracks.includes('intermediate')
-    && !form.value.audience_categories.includes('adults_18_plus')
-  ) {
-    if (!form.value.audience_categories.includes('tots_5_7')) {
-      form.value.min_age = PROGRESSION_AGE.minAge
-    }
-    form.value.max_age = Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
-  }
   editScope.value = ev.program_series_id ? 'series' : 'single'
   void loadEditSeriesCount(ev.program_series_id ?? null)
   void loadAssignedCoaches(ev.id)
@@ -1756,13 +1751,7 @@ const submitEvent = async () => {
     ) => {
       const slotTimes = TIME_SLOT_LABELS[slot] ?? TIME_SLOT_LABELS.summer
       const capOverride = Number(form.value.max_capacity_override) || null
-      const progression = form.value.skill_tracks.includes('intermediate')
-      const minAge = progression && !form.value.audience_categories.includes('tots_5_7')
-        ? PROGRESSION_AGE.minAge
-        : (Number(form.value.min_age) || null)
-      const maxAge = progression && !form.value.audience_categories.includes('adults_18_plus')
-        ? Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
-        : (Number(form.value.max_age) || null)
+      const ages = selectedAudienceAges()
       const holidayNote = isHoliday
         ? language.value === 'es'
           ? `Festivo nacional (${mexicoHolidayName(dateStr, true)}) — clase no reservable.`
@@ -1787,8 +1776,8 @@ const submitEvent = async () => {
           ? form.value.audience_categories
           : null,
         skill_level: skillLevelIdFromTrack(form.value.skill_tracks[0]!),
-        min_age: minAge,
-        max_age: maxAge,
+        min_age: ages.minAge,
+        max_age: ages.maxAge,
         skatepark: form.value.location || DEFAULT_SKATEPARK,
         price_mxn: priceNum,
         coach_tier: formCoachTier.value,
@@ -1888,12 +1877,8 @@ const submitEvent = async () => {
       time_slot: isClass ? form.value.time_slot : null,
       audience_category: form.value.audience_categories[0] ?? null,
       skill_level: isClass ? form.value.skill_level : null,
-      min_age: isClass ? (form.value.skill_tracks.includes('intermediate') && !form.value.audience_categories.includes('tots_5_7')
-        ? PROGRESSION_AGE.minAge
-        : (Number(form.value.min_age) || null)) : null,
-      max_age: isClass ? (form.value.skill_tracks.includes('intermediate') && !form.value.audience_categories.includes('adults_18_plus')
-        ? Math.max(Number(form.value.max_age) || 0, PROGRESSION_AGE.maxAge)
-        : (Number(form.value.max_age) || null)) : null,
+      min_age: isClass ? selectedAudienceAges().minAge : null,
+      max_age: isClass ? selectedAudienceAges().maxAge : null,
       skatepark: isClass ? form.value.location || DEFAULT_SKATEPARK : null,
       price_mxn: isClass ? priceNum : null,
       coach_tier: isClass ? formCoachTier.value : null,
@@ -3216,6 +3201,10 @@ const selectDay = (day: Date) => {
                 </p>
                 <p v-if="coachRoster.length === 0" class="text-[11px] text-gray-500">
                   {{ language === 'es' ? 'No hay coaches registrados todavía.' : 'No coaches registered yet.' }}
+                </p>
+                <p v-if="coachRosterError" class="text-[10px] text-red-300">
+                  {{ language === 'es' ? 'No se pudo cargar la lista:' : 'Could not load roster:' }}
+                  {{ coachRosterError }}
                 </p>
                 <div v-else class="flex flex-wrap gap-1.5">
                   <button
