@@ -79,8 +79,6 @@ function goAddCrew() {
         </button>
       </div>
 
-      <MemberAdminBuildBadge v-if="isAdmin" />
-
       <MemberCrewSwitcher
         v-if="isStudent && !route.path.startsWith('/member/student/training-program')"
         compact

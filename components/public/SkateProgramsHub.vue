@@ -27,6 +27,12 @@ const skillTrackColumns = computed(() =>
 )
 
 const levelsOpen = ref(false)
+
+function classesLink(offering: (typeof offerings)[number]) {
+  const query: Record<string, string> = { nivel: offering.skillTrack }
+  if (offering.audiences.length) query.edad = offering.audiences.join(',')
+  return { path: '/classes', query }
+}
 </script>
 
 <template>
@@ -164,7 +170,7 @@ const levelsOpen = ref(false)
 
         <div class="p-3 border-t-2 border-black">
           <NuxtLink
-            to="/classes"
+            :to="classesLink(p)"
             class="block w-full py-3 rounded-lg bg-white text-center font-black text-sm uppercase text-black tracking-wide
               hover:bg-gray-200 shadow-lg
               hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"

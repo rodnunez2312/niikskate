@@ -43,7 +43,7 @@ import {
 import { DEFAULT_PROGRAM_WEEKDAYS, PRACTICE_TIME_SLOTS, RECURRING_WEEKDAY_OPTIONS, SUMMER_COURSE_WEEKDAY_OPTIONS, slotsForWeekday, slotsForWeekdays } from '~/utils/classSchedule'
 import { bookableOccurrences, computeSummerCourseEndDate, generateProgramOccurrences, nearestProgramStartDate, parseYmd, syncProgramDateRange, computeProgramEndDate } from '~/utils/recurringProgram'
 import { MEXICO_NATIONAL_HOLIDAYS_2026_2027, mexicoHolidayName } from '~/utils/mexicoHolidays'
-import { getProgramSeasonBySlug, isSummerCourseSeason, resolveSeasonStatus, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
+import { getProgramSeasonBySlug, isSummerCourseSeason, pickDefaultProgramSeason, resolveSeasonStatus, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
 import type { ProgramSeason } from '~/utils/programSeasons'
 import {
   DEFAULT_COACH_TIER,
@@ -477,24 +477,14 @@ const buildProgramTitle = (): string => {
       .map(id => PROGRAM_AGE_TITLE[id as keyof typeof PROGRAM_AGE_TITLE])
       .filter(Boolean)
       .map(a => (es ? a.es : a.en))
-  let base =
-    ages.length === 0
-      ? `${typePart} ${skillPart}`
-      : ages.length === 1
-        ? es
-          ? `${typePart} ${skillPart} para ${ages[0]}`
-          : `${typePart} ${skillPart} for ${ages[0]}`
-        : es
-          ? `${typePart} ${skillPart} para ${ages.slice(0, -1).join(', ')} y ${ages[ages.length - 1]}`
-          : `${typePart} ${skillPart} for ${ages.join(', ')}`
-
-  const slug = form.value.season_slug?.trim()
-  if (!slug) return base
-  const season = getProgramSeasonBySlug(slug)
-  if (!season) return base
-  const seasonLabel = es ? season.name.es : season.name.en
-  const prefix = es ? `Temporada ${seasonLabel}` : `${seasonLabel} Season`
-  return `${prefix}: ${base}`
+  if (ages.length === 0) return `${typePart} ${skillPart}`
+  const ageList = ages.length === 1
+    ? ages[0]
+    : es
+      ? `${ages.slice(0, -1).join(', ')} y ${ages[ages.length - 1]}`
+      : ages.join(', ')
+  const agePart = es ? `Grupo de edad: ${ageList}` : `Age group: ${ageList}`
+  return `${typePart} ${skillPart} · ${agePart}`
 }
 
 const applyProgramTitle = (force = false) => {
@@ -512,7 +502,6 @@ watch(
       form.value.event_type,
       form.value.skill_tracks.join(','),
       form.value.audience_categories.join(','),
-      form.value.season_slug,
       language.value,
     ] as const,
   () => {
@@ -1064,6 +1053,10 @@ const eventsOnDay = (day: Date) => {
   }
 
   return list.sort((a, b) => {
+    const at = a.start_time || '99:99'
+    const bt = b.start_time || '99:99'
+    if (at !== bt) return at.localeCompare(bt)
+
     const aProg = isProgramType(a.event_type) ? 0 : 1
     const bProg = isProgramType(b.event_type) ? 0 : 1
     if (aProg !== bProg) return aProg - bProg
@@ -1072,12 +1065,39 @@ const eventsOnDay = (day: Date) => {
     const bSkill = skillOrder[skillTrackFromLevelId(b.skill_level)] ?? 9
     if (aSkill !== bSkill) return aSkill - bSkill
 
-    const at = a.start_time || ''
-    const bt = b.start_time || ''
-    if (at !== bt) return at.localeCompare(bt)
-
     return a.title.localeCompare(b.title)
   })
+}
+
+const eventStartKey = (ev: SchoolCalendarRow) => ev.start_time?.slice(0, 5) || ''
+
+const eventTimeGroups = (day: Date) => {
+  const groups: { key: string; label: string; events: SchoolCalendarRow[] }[] = []
+  for (const ev of eventsOnDay(day)) {
+    const key = eventStartKey(ev)
+    const last = groups[groups.length - 1]
+    if (last && last.key === key) last.events.push(ev)
+    else groups.push({ key, label: agendaTime(ev), events: [ev] })
+  }
+  return groups
+}
+
+const eventAgeEmojis = (ev: SchoolCalendarRow) => {
+  if (!isProgramType(ev.event_type)) return [] as string[]
+  const cats = parseAudienceCategories(ev)
+  const fromCats = PROGRAM_AGE_BANDS.filter(band => cats.includes(band.id))
+  if (fromCats.length) return fromCats.map(band => band.emoji)
+  const min = ev.min_age
+  const max = ev.max_age ?? 99
+  if (min == null) return []
+  return PROGRAM_AGE_BANDS
+    .filter(band => {
+      const bandMax = band.maxAge ?? 99
+      const classInside = min >= band.minAge && max <= bandMax
+      const bandInside = band.minAge >= min && bandMax <= max
+      return classInside || bandInside
+    })
+    .map(band => band.emoji)
 }
 
 /** Reads as a range while a multi-month season is stacked below. */
@@ -1447,8 +1467,7 @@ const eventChipLabel = (ev: SchoolCalendarRow) => {
       : ev.min_age != null
         ? `${ev.min_age}+`
         : ''
-  const time = eventChipTime(ev)
-  return [kind, skill, ages, time ? `· ${time}` : ''].filter(Boolean).join(' ')
+  return [kind, skill, ages].filter(Boolean).join(' ')
 }
 
 const eventChipEmoji = (ev: SchoolCalendarRow) => {
@@ -1536,7 +1555,10 @@ const openCreateForDay = (day: Date, mode: CreateMode = 'event') => {
   editingId.value = null
   createMode.value = mode
   const ymd = format(day, 'yyyy-MM-dd')
-  const seasonFromQuery = mode === 'program' ? seasonSlugForProgramDay(day) : ''
+  const activeSeason = mode === 'program' ? pickDefaultProgramSeason(programSeasons.value) : undefined
+  const seasonFromQuery = mode === 'program'
+    ? (activeSeason?.slug || seasonSlugForProgramDay(day))
+    : ''
   form.value = defaultForm(ymd, mode, seasonFromQuery)
   if (mode === 'event' && filterType.value !== 'all' && EVENT_ONLY_TYPES.includes(filterType.value as SchoolCalendarEventType)) {
     form.value.event_type = filterType.value as SchoolCalendarEventType
@@ -2043,6 +2065,15 @@ const seasonIsCurrent = (startDate: string, endDate: string) => {
 const currentSeasons = computed(() =>
   programSeasons.value.filter(s => !seasonIsPast(s.startDate, s.endDate)),
 )
+
+/** Add-class dropdown skips closed seasons. A class already on one still shows that season. */
+const seasonChoicesForForm = computed(() => {
+  const open = programSeasons.value.filter(s => resolveSeasonStatus(s) !== 'closed')
+  const selected = form.value.season_slug
+  if (!selected || open.some(s => s.slug === selected)) return open
+  const current = programSeasons.value.find(s => s.slug === selected)
+  return current ? [current, ...open] : open
+})
 
 const archivedSeasons = computed(() =>
   programSeasons.value
@@ -2599,14 +2630,16 @@ const selectDay = (day: Date) => {
           :key="'today-' + ev.id"
           class="border-b border-gray-800 last:border-b-0 px-4 py-4"
         >
-          <p class="text-sm font-semibold text-gray-300">{{ agendaTime(ev) }}</p>
+          <p class="inline-flex rounded-md border border-white/25 bg-black/30 px-2 py-0.5 text-sm font-semibold text-gold-300">
+            {{ agendaTime(ev) }}
+          </p>
           <div
             class="h-0.5 rounded-full my-2"
             :style="{ backgroundColor: SKILL_CHIP_COLOR[skillTrackFromLevelId(ev.skill_level)].solid }"
             aria-hidden="true"
           />
           <p class="text-base font-semibold text-white flex items-center gap-2">
-            <span class="leading-none" aria-hidden="true">{{ eventChipEmoji(ev) }}</span>
+            <span class="leading-none" aria-hidden="true">{{ eventAgeEmojis(ev).join('') || eventChipEmoji(ev) }}</span>
             <span class="truncate">{{ eventChipLabel(ev) }}</span>
           </p>
           <p v-if="ev.season_slug" class="text-xs text-gray-400 mt-0.5">
@@ -2713,40 +2746,55 @@ const selectDay = (day: Date) => {
               {{ format(day, 'd') }}
             </div>
             <div
-              class="flex flex-col gap-0.5 max-h-[4.75rem] sm:max-h-[5.75rem] overflow-y-auto overscroll-contain"
+              class="flex flex-col gap-1 max-h-[7.5rem] overflow-y-auto overscroll-contain"
             >
-              <button
-                v-for="ev in eventsOnDay(day)"
-                :key="ev.id"
-                type="button"
-                class="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate border transition-colors shrink-0"
-                :class="isProgramChipTinted(ev)
-                  ? 'text-white font-semibold border-transparent'
-                  : isPastDay(day)
-                    ? 'bg-gray-900/80 text-gray-500 border-gray-800'
-                    : 'bg-gray-800/90 text-gray-200 border-gray-700 hover:border-gold-500/50'"
-                :style="eventChipHighlightStyle(ev, day)"
-                :title="isBlockedProgram(ev) ? `${ev.title} — ${blockedProgramTitle(ev)}` : ev.title"
-                @click.stop="openEdit(ev, $event)"
+              <div
+                v-for="group in eventTimeGroups(day)"
+                :key="group.key || 'all-day'"
+                class="rounded-md border border-white/25 bg-black/20 px-0.5 py-0.5"
               >
-                <span
-                  v-if="isBlockedProgram(ev)"
-                  class="inline-block mr-0.5 align-middle text-[11px] leading-none"
-                  :aria-label="blockedProgramTitle(ev)"
-                >🚫</span>
-                <span
-                  v-else-if="isProgramType(ev.event_type)"
-                  class="inline-block mr-0.5 align-middle text-[11px] leading-none"
-                  :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
-                  aria-hidden="true"
-                >{{ eventChipEmoji(ev) }}</span>
-                <span
-                  v-else
-                  class="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle"
-                  :class="isPastDay(day) ? 'bg-gray-600' : (EVENT_META[ev.event_type]?.dot || 'bg-gray-500')"
-                />
-                <span :class="isBlockedProgram(ev) ? 'line-through opacity-80' : ''">{{ eventChipLabel(ev) }}</span>
-              </button>
+                <p class="px-0.5 text-[9px] font-black leading-none tracking-wide text-gold-300">
+                  {{ group.label }}
+                </p>
+                <button
+                  v-for="ev in group.events"
+                  :key="ev.id"
+                  type="button"
+                  class="mt-0.5 w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate border transition-colors shrink-0"
+                  :class="isProgramChipTinted(ev)
+                    ? 'text-white font-semibold border-transparent'
+                    : isPastDay(day)
+                      ? 'bg-gray-900/80 text-gray-500 border-gray-800'
+                      : 'bg-gray-800/90 text-gray-200 border-gray-700 hover:border-gold-500/50'"
+                  :style="eventChipHighlightStyle(ev, day)"
+                  :title="isBlockedProgram(ev) ? `${ev.title} — ${blockedProgramTitle(ev)}` : ev.title"
+                  @click.stop="openEdit(ev, $event)"
+                >
+                  <span
+                    v-if="isBlockedProgram(ev)"
+                    class="inline-block mr-0.5 align-middle text-[11px] leading-none"
+                    :aria-label="blockedProgramTitle(ev)"
+                  >🚫</span>
+                  <span
+                    v-else-if="eventAgeEmojis(ev).length"
+                    class="inline-block mr-0.5 align-middle text-[11px] leading-none"
+                    :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
+                    aria-hidden="true"
+                  >{{ eventAgeEmojis(ev).join('') }}</span>
+                  <span
+                    v-else-if="isProgramType(ev.event_type)"
+                    class="inline-block mr-0.5 align-middle text-[11px] leading-none"
+                    :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
+                    aria-hidden="true"
+                  >{{ eventChipEmoji(ev) }}</span>
+                  <span
+                    v-else
+                    class="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle"
+                    :class="isPastDay(day) ? 'bg-gray-600' : (EVENT_META[ev.event_type]?.dot || 'bg-gray-500')"
+                  />
+                  <span :class="isBlockedProgram(ev) ? 'line-through opacity-80' : ''">{{ eventChipLabel(ev) }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2766,10 +2814,10 @@ const selectDay = (day: Date) => {
             v-for="ev in selectedDayEvents"
             :key="ev.id"
             type="button"
-            class="grid w-full grid-cols-[76px_12px_1fr] gap-3 border-b border-gray-800 px-4 py-3 text-left last:border-b-0 hover:bg-gray-900"
+            class="grid w-full grid-cols-[92px_12px_1fr] gap-3 border-b border-gray-800 px-4 py-3 text-left last:border-b-0 hover:bg-gray-900"
             @click="openEdit(ev, $event)"
           >
-            <span class="text-[11px] font-medium text-gray-400 mt-0.5">{{ agendaTime(ev) }}</span>
+            <span class="mt-0.5 inline-flex rounded-md border border-white/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-300">{{ agendaTime(ev) }}</span>
             <span
               class="mt-1 h-2.5 w-2.5 rounded-full"
               :class="!isProgramType(ev.event_type) ? EVENT_META[ev.event_type]?.dot : ''"
@@ -2778,7 +2826,9 @@ const selectDay = (day: Date) => {
                 : {}"
             />
             <span class="min-w-0">
-              <span class="block truncate text-sm font-semibold text-white">{{ ev.title }}</span>
+              <span class="block truncate text-sm font-semibold text-white">
+                <span v-if="eventAgeEmojis(ev).length" class="mr-1" aria-hidden="true">{{ eventAgeEmojis(ev).join('') }}</span>{{ ev.title }}
+              </span>
               <span v-if="ev.season_slug" class="block truncate text-xs text-gray-400">
                 {{ programSidebarSeasonLabel(ev.season_slug) }}
               </span>
@@ -3035,8 +3085,8 @@ const selectDay = (day: Date) => {
                 :placeholder="
                   isProgramForm
                     ? language === 'es'
-                      ? 'Ej. Grupal Principiante para Skater Tots (5-7)'
-                      : 'e.g. Group Beginner for Skater Tots (5-7)'
+                      ? 'Ej. Grupal Principiante · Grupo de edad: 5-7'
+                      : 'e.g. Group Beginner · Age group: 5-7'
                     : language === 'es'
                       ? 'Nombre del evento'
                       : 'Enter event title'
@@ -3107,7 +3157,7 @@ const selectDay = (day: Date) => {
                   <option value="">
                     {{ language === 'es' ? '— Elige temporada —' : '— Select season —' }}
                   </option>
-                  <option v-for="s in programSeasons" :key="s.slug" :value="s.slug">
+                  <option v-for="s in seasonChoicesForForm" :key="s.slug" :value="s.slug">
                     {{ language === 'es' ? s.name.es : s.name.en }}
                     · {{ language === 'es' ? s.dates.es : s.dates.en }}
                   </option>

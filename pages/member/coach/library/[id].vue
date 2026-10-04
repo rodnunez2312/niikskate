@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  SKATE_TRICK_AREAS,
   SKATE_TRICK_STRUCTURES,
   areaTagClass,
   difficultyFromStructure,
@@ -15,11 +16,19 @@ definePageMeta({
 
 interface AreaSkill {
   id: string
-  area_id: string
+  area_id: string | null
+  subgroup_id: string | null
   skill_id: string
   variant: string | null
   sort_order: number
   skill: { id: string; name: string; name_es: string | null; category: string; difficulty?: string } | null
+}
+
+interface ProgramSubgroup {
+  id: string
+  name: string
+  area_id: string | null
+  skills: AreaSkill[]
 }
 
 interface AreaWithSkills {
@@ -28,6 +37,7 @@ interface AreaWithSkills {
   subgroups_count: number
   skills_count: number
   skills: AreaSkill[]
+  subgroups: ProgramSubgroup[]
 }
 
 const route = useRoute()
@@ -48,7 +58,13 @@ const group = ref<{
   skills_count: number
 } | null>(null)
 const areas = ref<AreaWithSkills[]>([])
-const subgroups = ref<Array<{ id: string; name: string }>>([])
+const subgroups = ref<ProgramSubgroup[]>([])
+const subgroupModalOpen = ref(false)
+const subgroupModalAreaId = ref<string | null>(null)
+const subgroupEditingId = ref<string | null>(null)
+const subgroupName = ref('')
+const subgroupSaving = ref(false)
+const subgroupError = ref('')
 const expandedAreaIds = ref<Set<string>>(new Set())
 
 const librarySkills = ref<Array<{
@@ -62,12 +78,14 @@ const librarySkills = ref<Array<{
   difficulty?: string | null
 }>>([])
 const addSkillAreaId = ref<string | null>(null)
+const addSkillSubgroupId = ref<string | null>(null)
 const addSkillModalOpen = ref(false)
 const addSkillSearch = ref('')
 const addSkillStructureFilter = ref('')
 const addSkillAreaFilter = ref('')
 const addSkillVariant = ref('')
 const addSkillSaving = ref(false)
+const selectedSkillIds = ref<Set<string>>(new Set())
 
 const programLevels = ref<Array<{ id: string; name: string; sort_order: number }>>([])
 
@@ -144,41 +162,91 @@ async function fetchGroup() {
       return
     }
     const { data: areasData } = await client.from('skill_areas').select('id, name').eq('group_id', id).order('sort_order')
-    const { data: subgroupsData } = await client.from('skill_subgroups').select('id, name').eq('group_id', id).order('sort_order')
+    const sgFull = await client
+      .from('skill_subgroups')
+      .select('id, name, area_id, sort_order')
+      .eq('group_id', id)
+      .order('sort_order')
+    const subgroupsData = sgFull.error
+      ? ((await client.from('skill_subgroups').select('id, name, sort_order').eq('group_id', id).order('sort_order')).data || [])
+          .map(row => ({ ...row, area_id: null as string | null }))
+      : (sgFull.data || [])
     const areaIds = (areasData || []).map((a: { id: string }) => a.id)
-    let areaSkillsList: Array<{ id: string; area_id: string; skill_id: string; variant: string | null; sort_order: number; skill: any }> = []
+    const skillWithPlace = 'id, area_id, skill_id, variant, sort_order, subgroup_id, skill:skills_library(id, name, name_es, category, difficulty)'
+    const skillPlain = 'id, area_id, skill_id, variant, sort_order, skill:skills_library(id, name, name_es, category, difficulty)'
+    let areaSkillsList: Array<{
+      id: string
+      area_id: string | null
+      subgroup_id: string | null
+      skill_id: string
+      variant: string | null
+      sort_order: number
+      skill: any
+    }> = []
     if (areaIds.length > 0) {
-      const { data: areaSkillsData } = await client
-        .from('area_skills')
-        .select('id, area_id, skill_id, variant, sort_order, skill:skills_library(id, name, name_es, category, difficulty)')
-        .in('area_id', areaIds)
-        .order('sort_order')
-      areaSkillsList = areaSkillsData || []
+      const placed = await client.from('area_skills').select(skillWithPlace).in('area_id', areaIds).order('sort_order')
+      if (placed.error) {
+        const plain = await client.from('area_skills').select(skillPlain).in('area_id', areaIds).order('sort_order')
+        areaSkillsList = (plain.data || []).map(row => ({ ...row, subgroup_id: null }))
+      } else {
+        areaSkillsList = placed.data || []
+      }
     }
-    const byArea = new Map<string, AreaSkill[]>()
-    for (const a of areasData || []) {
-      byArea.set(a.id, [])
+    const directIds = subgroupsData.filter(s => !s.area_id).map(s => s.id)
+    if (directIds.length && !sgFull.error) {
+      const extra = await client.from('area_skills').select(skillWithPlace).in('subgroup_id', directIds).order('sort_order')
+      if (!extra.error && extra.data) {
+        const seen = new Set(areaSkillsList.map(row => row.id))
+        for (const row of extra.data) {
+          if (!seen.has(row.id)) areaSkillsList.push(row)
+        }
+      }
     }
+    const toSkill = (row: (typeof areaSkillsList)[number]): AreaSkill => ({
+      id: row.id,
+      area_id: row.area_id,
+      subgroup_id: row.subgroup_id ?? null,
+      skill_id: row.skill_id,
+      variant: row.variant ?? null,
+      sort_order: row.sort_order ?? 0,
+      skill: row.skill ?? null,
+    })
+    const bySubgroup = new Map<string, AreaSkill[]>()
+    const directByArea = new Map<string, AreaSkill[]>()
+    for (const a of areasData || []) directByArea.set(a.id, [])
     for (const row of areaSkillsList) {
-      const list = byArea.get(row.area_id) || []
-      list.push({
-        id: row.id,
-        area_id: row.area_id,
-        skill_id: row.skill_id,
-        variant: row.variant ?? null,
-        sort_order: row.sort_order ?? 0,
-        skill: row.skill ?? null,
-      })
-      byArea.set(row.area_id, list)
+      const skill = toSkill(row)
+      if (skill.subgroup_id) {
+        const list = bySubgroup.get(skill.subgroup_id) || []
+        list.push(skill)
+        bySubgroup.set(skill.subgroup_id, list)
+      } else if (skill.area_id) {
+        const list = directByArea.get(skill.area_id) || []
+        list.push(skill)
+        directByArea.set(skill.area_id, list)
+      }
     }
-    areas.value = (areasData || []).map((a: any) => ({
-      id: a.id,
-      name: a.name,
-      subgroups_count: 0,
-      skills_count: (byArea.get(a.id) || []).length,
-      skills: (byArea.get(a.id) || []).sort((x: AreaSkill, y: AreaSkill) => x.sort_order - y.sort_order),
+    const sortSkills = (list: AreaSkill[]) => list.sort((x, y) => x.sort_order - y.sort_order)
+    const builtSubgroups: ProgramSubgroup[] = subgroupsData.map(s => ({
+      id: s.id,
+      name: s.name,
+      area_id: s.area_id ?? null,
+      skills: sortSkills(bySubgroup.get(s.id) || []),
     }))
-    subgroups.value = subgroupsData || []
+    subgroups.value = builtSubgroups
+    areas.value = (areasData || []).map((a: { id: string; name: string }) => {
+      const nested = builtSubgroups.filter(s => s.area_id === a.id)
+      const direct = sortSkills(directByArea.get(a.id) || [])
+      const nestedCount = nested.reduce((n, s) => n + s.skills.length, 0)
+      return {
+        id: a.id,
+        name: a.name,
+        subgroups_count: nested.length,
+        skills_count: direct.length + nestedCount,
+        skills: direct,
+        subgroups: nested,
+      }
+    })
     const { data: skaterData } = await client
       .from('profiles')
       .select('id, full_name, email, skill_level')
@@ -186,7 +254,9 @@ async function fetchGroup() {
       .eq('skill_group_id', id)
       .order('full_name')
     programSkaters.value = (skaterData || []) as ProgramSkater[]
-    const totalSkills = areas.value.reduce((n, ar) => n + ar.skills_count, 0)
+    const areaSkills = areas.value.reduce((n, ar) => n + ar.skills_count, 0)
+    const directSkills = builtSubgroups.filter(s => !s.area_id).reduce((n, s) => n + s.skills.length, 0)
+    const totalSkills = areaSkills + directSkills
     group.value = {
       ...g,
       areas_count: areas.value.length,
@@ -212,12 +282,38 @@ function goBack() {
   router.push('/member/coach/library')
 }
 
-function openAddSkillModal(areaId: string) {
+/** Program names match the library structure, e.g. "Level 2: Balance & Control". */
+function structureForProgram(name: string | null | undefined): string {
+  const raw = (name || '').trim()
+  if (!raw) return ''
+  const exact = SKATE_TRICK_STRUCTURES.find(s => s === raw)
+  if (exact) return exact
+  const level = raw.match(/level\s*(\d+)/i)
+  if (!level) return ''
+  return SKATE_TRICK_STRUCTURES.find(s => s.startsWith(`Level ${level[1]}:`)) || ''
+}
+
+const directSubgroups = computed(() => subgroups.value.filter(s => !s.area_id))
+
+function destinationSkills(): AreaSkill[] {
+  if (addSkillSubgroupId.value) {
+    const sg = subgroups.value.find(s => s.id === addSkillSubgroupId.value)
+    return sg?.skills || []
+  }
+  const area = areas.value.find(a => a.id === addSkillAreaId.value)
+  return area?.skills || []
+}
+
+function openAddSkillModal(areaId: string | null, subgroupId: string | null = null) {
+  const area = areas.value.find(a => a.id === areaId)
+  const areaName = area?.name || ''
   addSkillAreaId.value = areaId
+  addSkillSubgroupId.value = subgroupId
   addSkillSearch.value = ''
-  addSkillStructureFilter.value = ''
-  addSkillAreaFilter.value = ''
+  addSkillStructureFilter.value = structureForProgram(group.value?.name)
+  addSkillAreaFilter.value = (SKATE_TRICK_AREAS as readonly string[]).includes(areaName) ? areaName : ''
   addSkillVariant.value = ''
+  selectedSkillIds.value = new Set()
   addSkillModalOpen.value = true
   loadLibrarySkills()
 }
@@ -225,10 +321,101 @@ function openAddSkillModal(areaId: string) {
 function closeAddSkillModal() {
   addSkillModalOpen.value = false
   addSkillAreaId.value = null
+  addSkillSubgroupId.value = null
   addSkillSearch.value = ''
   addSkillStructureFilter.value = ''
   addSkillAreaFilter.value = ''
   addSkillVariant.value = ''
+  selectedSkillIds.value = new Set()
+}
+
+function openSubgroupModal(areaId: string | null, existing?: ProgramSubgroup) {
+  subgroupModalAreaId.value = areaId
+  subgroupEditingId.value = existing?.id || null
+  subgroupName.value = existing?.name || ''
+  subgroupError.value = ''
+  subgroupModalOpen.value = true
+}
+
+function closeSubgroupModal() {
+  subgroupModalOpen.value = false
+  subgroupEditingId.value = null
+  subgroupName.value = ''
+  subgroupError.value = ''
+}
+
+function schemaHint(error: { message?: string } | null) {
+  const msg = error?.message || ''
+  if (!/area_id|subgroup_id|schema cache/i.test(msg)) return msg
+  return language.value === 'es'
+    ? 'Falta la tabla de subgrupos. Ejecuta supabase/migrations/add_area_subgroups.sql en el SQL Editor de Supabase.'
+    : 'Subgroup columns are missing. Run supabase/migrations/add_area_subgroups.sql in the Supabase SQL Editor.'
+}
+
+async function saveSubgroup() {
+  const name = subgroupName.value.trim()
+  if (!name || !group.value) return
+  subgroupSaving.value = true
+  subgroupError.value = ''
+  try {
+    if (subgroupEditingId.value) {
+      const { error } = await client.from('skill_subgroups').update({ name }).eq('id', subgroupEditingId.value)
+      if (error) throw error
+    } else {
+      const { error } = await client.from('skill_subgroups').insert({
+        group_id: group.value.id,
+        area_id: subgroupModalAreaId.value,
+        name,
+        sort_order: subgroups.value.length,
+      })
+      if (error) throw error
+      if (subgroupModalAreaId.value) expandedAreaIds.value = new Set([...expandedAreaIds.value, subgroupModalAreaId.value])
+    }
+    await fetchGroup()
+    closeSubgroupModal()
+  } catch (e: any) {
+    subgroupError.value = schemaHint(e) || 'Error'
+  } finally {
+    subgroupSaving.value = false
+  }
+}
+
+async function deleteSubgroup(id: string) {
+  const ok = confirm(language.value === 'es' ? '¿Eliminar este subgrupo y sus skills?' : 'Delete this subgroup and its skills?')
+  if (!ok) return
+  const { error } = await client.from('skill_subgroups').delete().eq('id', id)
+  if (error) {
+    subgroupError.value = schemaHint(error)
+    return
+  }
+  await fetchGroup()
+}
+
+function skillPickKey(skillId: string) {
+  return skillId + '|' + (addSkillVariant.value.trim() || '')
+}
+
+function isSkillAlreadyInArea(skillId: string) {
+  return currentAreaAssignedSkillIds.value.has(skillPickKey(skillId))
+}
+
+function toggleSkillPick(skillId: string) {
+  if (isSkillAlreadyInArea(skillId)) return
+  const next = new Set(selectedSkillIds.value)
+  if (next.has(skillId)) next.delete(skillId)
+  else next.add(skillId)
+  selectedSkillIds.value = next
+}
+
+function toggleVisibleSkillPicks() {
+  const visible = filteredLibrarySkills.value.filter(s => !isSkillAlreadyInArea(s.id))
+  const allPicked = visible.length > 0 && visible.every(s => selectedSkillIds.value.has(s.id))
+  const next = new Set(selectedSkillIds.value)
+  for (const skill of visible) {
+    if (allPicked) next.delete(skill.id)
+    else next.add(skill.id)
+  }
+  selectedSkillIds.value = next
 }
 
 async function loadLibrarySkills() {
@@ -261,31 +448,31 @@ const filteredLibrarySkills = computed(() => {
 })
 
 const currentAreaAssignedSkillIds = computed(() => {
-  if (!addSkillAreaId.value) return new Set<string>()
-  const area = areas.value.find((a) => a.id === addSkillAreaId.value)
-  if (!area) return new Set<string>()
-  return new Set(area.skills.map((as) => as.skill_id + '|' + (as.variant ?? '')))
+  return new Set(destinationSkills().map((as) => as.skill_id + '|' + (as.variant ?? '')))
 })
 
-async function addSkillToArea(skillId: string) {
+async function addSelectedSkills() {
   const areaId = addSkillAreaId.value
-  if (!areaId) return
-  const key = skillId + '|' + (addSkillVariant.value.trim() || '')
-  if (currentAreaAssignedSkillIds.value.has(key)) return
+  const ids = [...selectedSkillIds.value].filter(id => !isSkillAlreadyInArea(id))
+  if ((!areaId && !addSkillSubgroupId.value) || !ids.length) return
   addSkillSaving.value = true
   try {
     const variant = addSkillVariant.value.trim() || null
-    const { error } = await client.from('area_skills').insert({
-      area_id: areaId,
-      skill_id: skillId,
-      variant,
-      sort_order: 0,
-    })
+    const { error } = await client.from('area_skills').insert(
+      ids.map(skill_id => ({
+        area_id: addSkillAreaId.value,
+        subgroup_id: addSkillSubgroupId.value,
+        skill_id,
+        variant,
+        sort_order: 0,
+      })),
+    )
     if (error) throw error
     await fetchGroup()
     closeAddSkillModal()
-  } catch (e) {
+  } catch (e: any) {
     console.error('Add skill to area failed:', e)
+    window.alert(schemaHint(e) || e?.message || 'Error')
   } finally {
     addSkillSaving.value = false
   }
@@ -354,50 +541,58 @@ function skaterInitials(name: string) {
     <template v-else-if="group">
       <div class="px-4 py-6 max-w-2xl mx-auto">
         <!-- Group header -->
-        <div class="flex items-start gap-3 mb-6">
-          <div class="flex flex-col shrink-0">
-            <button
-              type="button"
-              class="p-0.5 rounded transition-colors"
-              :class="prevProgramLevel ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-700 cursor-not-allowed'"
-              :disabled="!prevProgramLevel"
-              :title="prevProgramLevel?.name || (language === 'es' ? 'Primer nivel' : 'First level')"
-              @click="goToAdjacentLevel(-1)"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-            </button>
-            <button
-              type="button"
-              class="p-0.5 rounded transition-colors"
-              :class="nextProgramLevel ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-700 cursor-not-allowed'"
-              :disabled="!nextProgramLevel"
-              :title="nextProgramLevel?.name || (language === 'es' ? 'Último nivel' : 'Last level')"
-              @click="goToAdjacentLevel(1)"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-            </button>
+        <div class="mb-6 space-y-3">
+          <div class="flex items-start gap-2">
+            <div class="flex flex-col shrink-0 pt-1">
+              <button
+                type="button"
+                class="p-0.5 rounded transition-colors"
+                :class="prevProgramLevel ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-700 cursor-not-allowed'"
+                :disabled="!prevProgramLevel"
+                :title="prevProgramLevel?.name || (language === 'es' ? 'Primer nivel' : 'First level')"
+                @click="goToAdjacentLevel(-1)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+              </button>
+              <button
+                type="button"
+                class="p-0.5 rounded transition-colors"
+                :class="nextProgramLevel ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-700 cursor-not-allowed'"
+                :disabled="!nextProgramLevel"
+                :title="nextProgramLevel?.name || (language === 'es' ? 'Último nivel' : 'Last level')"
+                @click="goToAdjacentLevel(1)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start gap-2">
+                <h2 class="text-xl font-bold text-white leading-tight break-words">{{ group.name }}</h2>
+                <span
+                  v-if="group.is_active"
+                  class="mt-1 w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center shrink-0"
+                  title="Active"
+                >
+                  <svg class="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                </span>
+              </div>
+              <p class="text-sm text-gray-400 mt-1 leading-snug">{{ group.description || '—' }}</p>
+            </div>
           </div>
-          <div class="flex-1 min-w-0">
-            <h2 class="text-xl font-bold text-white">{{ group.name }}</h2>
-            <p class="text-sm text-gray-400 mt-0.5">{{ group.description || '—' }}</p>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <span
-              v-if="group.is_active"
-              class="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center"
-              title="Active"
-            >
-              <svg class="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-            </span>
-            <p class="text-xs text-gray-500">
+          <div class="flex items-center justify-between gap-2 pl-6">
+            <p class="text-xs text-gray-500 leading-snug min-w-0">
               <template v-if="!isPlanningSkillGroupName(group.name)">
                 {{ programSkaters.length }} {{ language === 'es' ? 'patinadores' : 'skaters' }},
               </template>
-              {{ group.areas_count }} {{ language === 'es' ? 'áreas' : 'areas' }}, {{ group.subgroups_count }} {{ language === 'es' ? 'subgrupos' : 'subgroups' }}, {{ group.skills_count }} {{ language === 'es' ? 'skills' : 'skills' }}
+              {{ group.areas_count }} {{ language === 'es' ? 'áreas' : 'areas' }},
+              {{ group.subgroups_count }} {{ language === 'es' ? 'subgrupos' : 'subgroups' }},
+              {{ group.skills_count }} {{ language === 'es' ? 'skills' : 'skills' }}
             </p>
-            <button type="button" class="p-2 text-gray-500 hover:text-white" title="Copy">📋</button>
-            <button type="button" class="p-2 text-gray-500 hover:text-amber-400" title="Edit">✏️</button>
-            <button type="button" class="p-2 text-gray-500 hover:text-red-400" title="Delete">🗑️</button>
+            <div class="flex items-center shrink-0">
+              <button type="button" class="p-2 text-gray-500 hover:text-white" title="Copy">📋</button>
+              <button type="button" class="p-2 text-gray-500 hover:text-amber-400" title="Edit">✏️</button>
+              <button type="button" class="p-2 text-gray-500 hover:text-red-400" title="Delete">🗑️</button>
+            </div>
           </div>
         </div>
 
@@ -466,15 +661,9 @@ function skaterInitials(name: string) {
 
         <!-- Areas -->
         <section class="mb-8">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+          <div class="flex flex-col gap-2 mb-3">
             <h3 class="text-base font-bold text-white">{{ language === 'es' ? 'Áreas' : 'Areas' }}</h3>
-            <div class="flex gap-2">
-              <button
-                type="button"
-                class="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 text-sm font-medium hover:bg-gray-700"
-              >
-                {{ language === 'es' ? 'Crear desde ubicaciones' : 'Create from Locations' }}
-              </button>
+            <div class="flex flex-wrap gap-2">
               <button
                 type="button"
                 class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500"
@@ -490,31 +679,48 @@ function skaterInitials(name: string) {
               class="bg-gray-800/80 border border-gray-700 rounded-xl overflow-hidden"
             >
               <div
-                class="flex items-center gap-3 p-4 cursor-pointer"
+                class="p-3 cursor-pointer"
                 @click="toggleAreaExpanded(area.id)"
               >
-                <svg
-                  class="w-5 h-5 text-gray-400 shrink-0 transition-transform"
-                  :class="expandedAreaIds.has(area.id) ? 'rotate-90' : ''"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-                <span class="font-medium text-white flex-1">{{ area.name }}</span>
-                <span class="text-sm text-gray-500">{{ area.subgroups_count }} {{ language === 'es' ? 'subgrupos' : 'subgroups' }}, {{ area.skills_count }} {{ language === 'es' ? 'skills' : 'skills' }}</span>
-                <div class="flex items-center gap-1" @click.stop>
-                  <button
-                    type="button"
-                    class="px-2 py-1 rounded text-xs bg-blue-600 text-white hover:bg-blue-500"
-                    @click="openAddSkillModal(area.id)"
+                <div class="flex items-start gap-2">
+                  <svg
+                    class="w-5 h-5 text-gray-400 shrink-0 mt-0.5 transition-transform"
+                    :class="expandedAreaIds.has(area.id) ? 'rotate-90' : ''"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    + {{ language === 'es' ? 'Skill' : 'Add Skill' }}
-                  </button>
-                  <button type="button" class="px-2 py-1 rounded text-xs bg-gray-700 text-gray-300 hover:bg-gray-600">+ {{ language === 'es' ? 'Subgrupo' : 'Subgroup' }}</button>
-                  <button type="button" class="p-1.5 text-gray-500 hover:text-amber-400" title="Edit">✏️</button>
-                  <button type="button" class="p-1.5 text-gray-500 hover:text-red-400" title="Delete">🗑️</button>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-start justify-between gap-2">
+                      <span class="font-medium text-white leading-tight break-words">{{ area.name }}</span>
+                      <div class="flex items-center shrink-0" @click.stop>
+                        <button type="button" class="p-1.5 text-gray-500 hover:text-amber-400" title="Edit">✏️</button>
+                        <button type="button" class="p-1.5 text-gray-500 hover:text-red-400" title="Delete">🗑️</button>
+                      </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">
+                      {{ area.subgroups_count }} {{ language === 'es' ? 'subgrupos' : 'subgroups' }},
+                      {{ area.skills_count }} {{ language === 'es' ? 'skills' : 'skills' }}
+                    </p>
+                    <div class="flex flex-wrap gap-1.5 mt-2" @click.stop>
+                      <button
+                        type="button"
+                        class="px-2 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500"
+                        @click="openAddSkillModal(area.id)"
+                      >
+                        + {{ language === 'es' ? 'Skill' : 'Skill' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="px-2 py-1 rounded text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        @click="openSubgroupModal(area.id)"
+                      >
+                        + {{ language === 'es' ? 'Subgrupo' : 'Subgroup' }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div v-if="expandedAreaIds.has(area.id)" class="border-t border-gray-700 px-4 pb-4 pt-3">
@@ -548,6 +754,40 @@ function skaterInitials(name: string) {
                   <span v-if="!area.skills.length" class="text-gray-500 italic text-sm">
                     {{ language === 'es' ? 'Ningún skill aún. Usa + Skill para añadir.' : 'No skills yet. Use + Add Skill to add.' }}
                   </span>
+                </div>
+                <div v-if="area.subgroups.length" class="mt-4 space-y-3">
+                  <div
+                    v-for="sg in area.subgroups"
+                    :key="sg.id"
+                    class="rounded-lg border border-gray-600 bg-gray-900/40 p-3"
+                  >
+                    <div class="flex items-center gap-2 mb-2">
+                      <p class="text-sm font-semibold text-white flex-1">{{ sg.name }}</p>
+                      <button
+                        type="button"
+                        class="px-2 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500"
+                        @click="openAddSkillModal(area.id, sg.id)"
+                      >
+                        + {{ language === 'es' ? 'Skill' : 'Skill' }}
+                      </button>
+                      <button type="button" class="p-1 text-gray-400 hover:text-amber-400" @click="openSubgroupModal(area.id, sg)">✏️</button>
+                      <button type="button" class="p-1 text-gray-400 hover:text-red-400" @click="deleteSubgroup(sg.id)">🗑️</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <div
+                        v-for="as in sg.skills"
+                        :key="as.id"
+                        class="inline-flex items-center gap-1 rounded-lg bg-gray-700/80 border border-gray-600 px-2.5 py-1.5 text-sm"
+                      >
+                        <span class="text-white">{{ skillDisplayName(as.skill) }}</span>
+                        <span v-if="as.variant" class="rounded bg-green-500/20 text-green-300 px-1.5 py-0.5 text-xs">{{ as.variant }}</span>
+                        <button type="button" class="ml-1 text-gray-400 hover:text-white" @click="removeSkillFromArea(as.id)">×</button>
+                      </div>
+                      <span v-if="!sg.skills.length" class="text-xs text-gray-500 italic">
+                        {{ language === 'es' ? 'Sin skills en este subgrupo.' : 'No skills in this subgroup yet.' }}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -604,18 +844,45 @@ function skaterInitials(name: string) {
                   />
                 </div>
               </div>
-              <div class="flex-1 overflow-y-auto px-4 pb-4">
+              <div class="flex-1 overflow-y-auto px-4 pb-2">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                  <p class="text-xs text-gray-400">
+                    {{ selectedSkillIds.size }}
+                    {{ language === 'es' ? 'seleccionados' : 'selected' }}
+                  </p>
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-blue-300 hover:text-white"
+                    @click="toggleVisibleSkillPicks"
+                  >
+                    {{ language === 'es' ? 'Seleccionar visibles' : 'Select visible' }}
+                  </button>
+                </div>
                 <div class="space-y-1">
                   <button
                     v-for="skill in filteredLibrarySkills"
                     :key="skill.id"
                     type="button"
                     class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left transition-colors"
-                    :class="currentAreaAssignedSkillIds.has(skill.id + '|' + (addSkillVariant.trim() || '')) ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700 text-white'"
-                    :disabled="currentAreaAssignedSkillIds.has(skill.id + '|' + (addSkillVariant.trim() || ''))"
-                    @click="addSkillToArea(skill.id)"
+                    :class="
+                      isSkillAlreadyInArea(skill.id)
+                        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                        : selectedSkillIds.has(skill.id)
+                          ? 'bg-blue-900/50 text-white ring-2 ring-blue-400'
+                          : 'bg-gray-800 hover:bg-gray-700 text-white'
+                    "
+                    :disabled="isSkillAlreadyInArea(skill.id)"
+                    @click="toggleSkillPick(skill.id)"
                   >
-                    <span class="min-w-0 truncate">{{ skillDisplayName(skill) }}</span>
+                    <span class="flex min-w-0 items-center gap-2">
+                      <span
+                        class="w-4 h-4 shrink-0 rounded border flex items-center justify-center text-[10px]"
+                        :class="selectedSkillIds.has(skill.id) ? 'border-blue-300 bg-blue-500 text-white' : 'border-gray-500'"
+                      >
+                        {{ selectedSkillIds.has(skill.id) ? '✓' : '' }}
+                      </span>
+                      <span class="min-w-0 truncate">{{ skillDisplayName(skill) }}</span>
+                    </span>
                     <span class="flex shrink-0 flex-wrap items-center justify-end gap-1">
                       <span
                         v-if="skill.area"
@@ -638,6 +905,22 @@ function skaterInitials(name: string) {
                   {{ language === 'es' ? 'No se encontraron skills.' : 'No skills found.' }}
                 </p>
               </div>
+              <div class="p-4 border-t border-gray-700">
+                <button
+                  type="button"
+                  class="w-full py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 disabled:opacity-40"
+                  :disabled="!selectedSkillIds.size || addSkillSaving"
+                  @click="addSelectedSkills"
+                >
+                  {{
+                    addSkillSaving
+                      ? '…'
+                      : language === 'es'
+                        ? `Añadir ${selectedSkillIds.size || ''}`.trim()
+                        : `Add ${selectedSkillIds.size || ''}`.trim()
+                  }}
+                </button>
+              </div>
             </div>
           </div>
         </Teleport>
@@ -649,25 +932,89 @@ function skaterInitials(name: string) {
             <button
               type="button"
               class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 w-fit"
+              @click="openSubgroupModal(null)"
             >
               + {{ language === 'es' ? 'Añadir subgrupo' : 'Add Subgroup' }}
             </button>
           </div>
-          <div v-if="!subgroups.length" class="py-6 px-4 bg-gray-800/50 border border-gray-700 rounded-xl text-center">
+          <div v-if="!directSubgroups.length" class="py-6 px-4 bg-gray-800/50 border border-gray-700 rounded-xl text-center">
             <p class="text-gray-500 italic">{{ language === 'es' ? 'Aún no hay subgrupos directos' : 'No direct subgroups yet' }}</p>
           </div>
           <div v-else class="space-y-2">
             <div
-              v-for="sg in subgroups"
+              v-for="sg in directSubgroups"
               :key="sg.id"
-              class="flex items-center gap-3 p-4 bg-gray-800/80 border border-gray-700 rounded-xl"
+              class="p-4 bg-gray-800/80 border border-gray-700 rounded-xl"
             >
-              <span class="font-medium text-white flex-1">{{ sg.name }}</span>
-              <button type="button" class="p-1.5 text-gray-500 hover:text-amber-400">✏️</button>
-              <button type="button" class="p-1.5 text-gray-500 hover:text-red-400">🗑️</button>
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-white flex-1">{{ sg.name }}</span>
+                <button
+                  type="button"
+                  class="px-2 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500"
+                  @click="openAddSkillModal(null, sg.id)"
+                >
+                  + {{ language === 'es' ? 'Skill' : 'Skill' }}
+                </button>
+                <button type="button" class="p-1.5 text-gray-500 hover:text-amber-400" @click="openSubgroupModal(null, sg)">✏️</button>
+                <button type="button" class="p-1.5 text-gray-500 hover:text-red-400" @click="deleteSubgroup(sg.id)">🗑️</button>
+              </div>
+              <div class="flex flex-wrap gap-2 mt-3">
+                <div
+                  v-for="as in sg.skills"
+                  :key="as.id"
+                  class="inline-flex items-center gap-1 rounded-lg bg-gray-700/80 border border-gray-600 px-2.5 py-1.5 text-sm"
+                >
+                  <span class="text-white">{{ skillDisplayName(as.skill) }}</span>
+                  <span v-if="as.variant" class="rounded bg-green-500/20 text-green-300 px-1.5 py-0.5 text-xs">{{ as.variant }}</span>
+                  <button type="button" class="ml-1 text-gray-400 hover:text-white" @click="removeSkillFromArea(as.id)">×</button>
+                </div>
+                <span v-if="!sg.skills.length" class="text-xs text-gray-500 italic">
+                  {{ language === 'es' ? 'Sin skills en este subgrupo.' : 'No skills in this subgroup yet.' }}
+                </span>
+              </div>
             </div>
           </div>
         </section>
+
+        <Teleport to="body">
+          <div
+            v-if="subgroupModalOpen"
+            class="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/60 p-4"
+            @click.self="closeSubgroupModal"
+          >
+            <form
+              class="w-full max-w-md bg-gray-900 border border-gray-700 rounded-xl p-5"
+              @submit.prevent="saveSubgroup"
+              @click.stop
+            >
+              <h3 class="text-lg font-semibold text-white mb-3">
+                {{
+                  subgroupEditingId
+                    ? (language === 'es' ? 'Editar subgrupo' : 'Edit subgroup')
+                    : (language === 'es' ? 'Nuevo subgrupo' : 'New subgroup')
+                }}
+              </h3>
+              <label class="block text-xs text-gray-400 mb-1">
+                {{ language === 'es' ? 'Nombre' : 'Name' }}
+              </label>
+              <input
+                v-model="subgroupName"
+                required
+                class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+                :placeholder="language === 'es' ? 'Ej. Nose stalls' : 'e.g. Nose stalls'"
+              />
+              <p v-if="subgroupError" class="mt-2 text-sm text-red-400">{{ subgroupError }}</p>
+              <div class="flex gap-2 mt-4">
+                <button type="button" class="flex-1 py-2 rounded-lg border border-gray-600 text-gray-200" @click="closeSubgroupModal">
+                  {{ language === 'es' ? 'Cancelar' : 'Cancel' }}
+                </button>
+                <button type="submit" class="flex-1 py-2 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-40" :disabled="subgroupSaving || !subgroupName.trim()">
+                  {{ language === 'es' ? 'Guardar' : 'Save' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Teleport>
       </div>
     </template>
   </div>

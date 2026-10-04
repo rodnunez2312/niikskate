@@ -265,8 +265,12 @@ export function classKindForPack(pack: string | number | null | undefined): Clas
   switch (Number(pack)) {
     case 1:
       return 'group_session'
+    case 3:
+      return 'group_pack_3'
     case 4:
       return 'monthly_4'
+    case 5:
+      return 'group_pack_5'
     case 8:
       return 'monthly_8'
     case 12:

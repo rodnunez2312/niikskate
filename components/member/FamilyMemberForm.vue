@@ -20,11 +20,41 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:modelValue': [value: typeof props.modelValue]
-  submit: []
+  submit: [newPassword: string]
   cancel: []
 }>()
 
 const { language } = useI18n()
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordError = ref('')
+
+function onSubmit() {
+  passwordError.value = ''
+  if (!props.isParent) {
+    emit('submit', '')
+    return
+  }
+  const next = newPassword.value.trim()
+  const confirm = confirmPassword.value.trim()
+  if (!next && !confirm) {
+    emit('submit', '')
+    return
+  }
+  if (next.length < 6) {
+    passwordError.value =
+      language.value === 'es'
+        ? 'La contraseña debe tener al menos 6 caracteres.'
+        : 'Password must be at least 6 characters.'
+    return
+  }
+  if (next !== confirm) {
+    passwordError.value =
+      language.value === 'es' ? 'Las contraseñas no coinciden.' : 'Passwords do not match.'
+    return
+  }
+  emit('submit', next)
+}
 
 const local = computed({
   get: () => props.modelValue,
@@ -45,7 +75,7 @@ function patch(field: keyof typeof props.modelValue, value: string) {
 </script>
 
 <template>
-  <form class="space-y-3" @submit.prevent="emit('submit')">
+  <form class="space-y-3" @submit.prevent="onSubmit">
     <label class="block text-xs font-bold uppercase">
       {{ language === 'es' ? 'Nombre' : 'First name' }}
       <input
@@ -101,6 +131,39 @@ function patch(field: keyof typeof props.modelValue, value: string) {
             : 'Enter age or date of birth to filter season classes.'
       }}
     </p>
+    <div v-if="isParent" class="space-y-3 border-t-2 border-gray-200 pt-3">
+      <p class="text-xs font-black uppercase">
+        {{ language === 'es' ? 'Cambiar contraseña' : 'Change password' }}
+      </p>
+      <p class="text-xs text-gray-600">
+        {{
+          language === 'es'
+            ? 'Déjalo en blanco si no quieres cambiarla.'
+            : 'Leave blank to keep your current password.'
+        }}
+      </p>
+      <label class="block text-xs font-bold uppercase">
+        {{ language === 'es' ? 'Nueva contraseña' : 'New password' }}
+        <input
+          v-model="newPassword"
+          type="password"
+          autocomplete="new-password"
+          minlength="6"
+          class="mt-1 w-full border-2 border-black rounded-lg px-3 py-2 font-medium normal-case"
+        />
+      </label>
+      <label class="block text-xs font-bold uppercase">
+        {{ language === 'es' ? 'Confirmar contraseña' : 'Confirm password' }}
+        <input
+          v-model="confirmPassword"
+          type="password"
+          autocomplete="new-password"
+          minlength="6"
+          class="mt-1 w-full border-2 border-black rounded-lg px-3 py-2 font-medium normal-case"
+        />
+      </label>
+      <p v-if="passwordError" class="text-sm text-red-600 font-medium">{{ passwordError }}</p>
+    </div>
     <div class="flex gap-2 pt-2">
       <button
         type="button"

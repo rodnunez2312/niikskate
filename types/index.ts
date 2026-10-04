@@ -186,6 +186,8 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
   title: { en: string; es: string }
   purpose: { en: string; es: string }
   skillTrack: ProgramSkillTrack
+  /** Age bands applied on the classes page. Empty means no age filter. */
+  audiences: AudienceCategory[]
   comingSoon?: boolean
 }> = [
   {
@@ -198,6 +200,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
       es: 'Construyendo equilibrio a través del juego',
     },
     skillTrack: 'beginner',
+    audiences: ['tots_5_7'],
   },
   {
     id: 'foundations',
@@ -209,6 +212,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
       es: 'Aprende los fundamentos del skate',
     },
     skillTrack: 'beginner',
+    audiences: ['kids_7_12'],
   },
   {
     id: 'teen_foundations',
@@ -220,6 +224,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
       es: 'Desarrolla confianza y habilidades base',
     },
     skillTrack: 'beginner',
+    audiences: ['teens_13_17'],
   },
   {
     id: 'adult_foundations',
@@ -231,6 +236,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
       es: 'Nunca es tarde para empezar a patinar',
     },
     skillTrack: 'beginner',
+    audiences: ['adults_18_plus'],
   },
   {
     id: 'progression',
@@ -242,6 +248,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
       es: 'Habilidades intermedias y desarrollo de trucos',
     },
     skillTrack: 'intermediate',
+    audiences: ['kids_7_12', 'teens_13_17'],
   },
   {
     id: 'competition_team',
@@ -253,6 +260,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
       es: 'Entrenamiento estructurado para competencias y CONADE',
     },
     skillTrack: 'advanced',
+    audiences: [],
   },
 ]
 
@@ -477,13 +485,18 @@ export const PROGRAM_DAYS_PER_WEEK = 3
 export const PROGRAM_TOTAL_CLASSES = PROGRAM_WEEKS * PROGRAM_DAYS_PER_WEEK
 export const PROGRAM_CLASSES_PER_WEEK_INCLUDED = 2
 export const PROGRAM_INCLUDED_CLASSES = PROGRAM_WEEKS * PROGRAM_CLASSES_PER_WEEK_INCLUDED
+export const PROGRAM_PACK_3_MXN = 450
 export const PROGRAM_PACK_4_MXN = 600
+export const PROGRAM_PACK_5_MXN = 750
 export const PROGRAM_PACK_8_MXN = 1000
 export const PROGRAM_PACK_12_MXN = 1500
 export const PROGRAM_PACK_16_MXN = 2000
 export const PROGRAM_PACK_24_MXN = 3000
 
-export type ParentMultiClassPack = 4 | 8 | 12 | 16 | 24
+export type ParentMultiClassPack = 3 | 4 | 5 | 8 | 12 | 16 | 24
+
+/** Shown on every regular class card: small packs, then the full month. */
+export const CARD_CLASS_PACKS: ParentMultiClassPack[] = [3, 5, 8, 12]
 
 /**
  * A single class can be booked two ways at different rates, so the drop-in
@@ -507,7 +520,9 @@ export function programClassCount(
 }
 
 export function packPriceMxn(pack: ParentMultiClassPack): number {
+  if (pack === 3) return PROGRAM_PACK_3_MXN
   if (pack === 4) return PROGRAM_PACK_4_MXN
+  if (pack === 5) return PROGRAM_PACK_5_MXN
   if (pack === 8) return PROGRAM_PACK_8_MXN
   if (pack === 12) return PROGRAM_PACK_12_MXN
   if (pack === 16) return PROGRAM_PACK_16_MXN

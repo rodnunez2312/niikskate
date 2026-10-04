@@ -15,7 +15,7 @@ import {
   TIME_SLOT_LABELS,
   audienceAgeRange,
   audienceCategoryLabel,
-  multiClassPacksForSeriesLength,
+  CARD_CLASS_PACKS,
   packPriceMxn as parentPackPriceMxn,
   parseAudienceCategories,
   skillTrackFromLevelId,
@@ -79,10 +79,27 @@ const enrollmentsByEvent = ref<Map<string, Set<string>>>(new Map())
 const skateparks = [DEFAULT_SKATEPARK]
 const selectedSkatepark = ref(DEFAULT_SKATEPARK)
 const selectedDays = ref<number[]>([])
-/** Optional browse filter by age band — null = show all */
-const selectedAgeBand = ref<AudienceCategory | null>(null)
+/** Optional browse filter by age band — empty = show all */
+const selectedAgeBands = ref<AudienceCategory[]>([])
 /** Optional browse filter by skill track — null = show all */
 const selectedSkillTrack = ref<ProgramSkillTrack | null>(null)
+
+const ageBandIds = new Set(PROGRAM_AGE_BANDS.map(band => band.id))
+const skillTrackIds = new Set(PROGRAM_SKILL_TRACKS.map(track => track.id))
+
+function applyFiltersFromRoute() {
+  const edad = route.query.edad
+  const raw = typeof edad === 'string' ? edad.split(',').map(part => part.trim()) : []
+  selectedAgeBands.value = raw.filter((id): id is AudienceCategory => ageBandIds.has(id as AudienceCategory))
+  const nivel = route.query.nivel
+  selectedSkillTrack.value =
+    typeof nivel === 'string' && skillTrackIds.has(nivel as ProgramSkillTrack)
+      ? (nivel as ProgramSkillTrack)
+      : null
+}
+
+applyFiltersFromRoute()
+watch(() => [route.query.edad, route.query.nivel], applyFiltersFromRoute)
 /** Crew members to show recommendations for — empty = every class */
 const recommendKeys = ref<Set<string>>(new Set())
 
@@ -199,7 +216,9 @@ const toggleDay = (d: number) => {
 }
 
 const toggleAgeBand = (id: AudienceCategory) => {
-  selectedAgeBand.value = selectedAgeBand.value === id ? null : id
+  selectedAgeBands.value = selectedAgeBands.value.includes(id)
+    ? selectedAgeBands.value.filter(band => band !== id)
+    : [...selectedAgeBands.value, id]
 }
 
 const toggleSkillTrack = (id: ProgramSkillTrack) => {
@@ -252,13 +271,15 @@ const participantEligible = (p: CrewParticipant, s: BookableClassSession) => {
 }
 
 const sessionMatchesAgeBandFilter = (s: BookableClassSession) => {
-  const bandId = selectedAgeBand.value
-  if (!bandId) return true
+  const bands = selectedAgeBands.value
+  if (!bands.length) return true
   const cats = parseAudienceCategories(s)
-  if (cats.includes(bandId)) return true
   const bounds = sessionAgeBounds(s)
-  const band = audienceAgeRange(bandId)
-  return rangesOverlap(bounds.minAge, bounds.maxAge, band.minAge, band.maxAge)
+  return bands.some(bandId => {
+    if (cats.includes(bandId)) return true
+    const band = audienceAgeRange(bandId)
+    return rangesOverlap(bounds.minAge, bounds.maxAge, band.minAge, band.maxAge)
+  })
 }
 
 const sessionMatchesLevelFilter = (s: BookableClassSession) => {
@@ -286,9 +307,9 @@ const filteredSessions = computed(() =>
 )
 
 const crewInSelectedBands = computed(() => {
-  const bandId = selectedAgeBand.value
-  if (!bandId) return participants.value
-  return participants.value.filter(p => p.age != null && ageInBand(p.age!, bandId))
+  const bands = selectedAgeBands.value
+  if (!bands.length) return participants.value
+  return participants.value.filter(p => p.age != null && bands.some(bandId => ageInBand(p.age!, bandId)))
 })
 
 /**
@@ -296,11 +317,15 @@ const crewInSelectedBands = computed(() => {
  * enrol modal is what enforces the age, so this only sets expectations.
  */
 const ageFilterNotice = computed(() => {
-  const bandId = selectedAgeBand.value
-  if (!user.value || !bandId) return null
+  const bands = selectedAgeBands.value
+  if (!user.value || !bands.length) return null
   if (crewInSelectedBands.value.length > 0) return null
-  const band = PROGRAM_AGE_BANDS.find(b => b.id === bandId)
-  const label = band ? (language.value === 'es' ? band.label.es : band.label.en) : bandId
+  const label = bands
+    .map(id => {
+      const band = PROGRAM_AGE_BANDS.find(b => b.id === id)
+      return band ? (language.value === 'es' ? band.label.es : band.label.en) : id
+    })
+    .join(', ')
   return language.value === 'es'
     ? `Puedes ver las clases de ${label}, pero para inscribirte necesitas un patinador de esa edad en Familia.`
     : `You can browse ${label} classes, but registering needs a skater that age under Family.`
@@ -313,6 +338,27 @@ const audienceLabels = (s: BookableClassSession) => {
   return cats.map(id => audienceCategoryLabel(id, lang)).join(' · ')
 }
 
+/** Stored titles used to start with the season name. Age sits on its own line. */
+const displaySessionTitle = (title: string) =>
+  title
+    .replace(/^Temporada\s+[^:]+:\s*/i, '')
+    .replace(/^.+?\sSeason:\s*/i, '')
+    .replace(/\s+[·•]\s+(?:Grupo de edad|Age group):.*$/i, '')
+    .replace(/\s+para\s+[\d+\s,y\-–]+$/i, '')
+    .replace(/\s+for\s+[\d+\s,\-–]+$/i, '')
+    .trim()
+
+const ageGroupLine = (s: BookableClassSession) => {
+  const esLang = language.value === 'es'
+  const ages = audienceLabels(s)
+  if (ages) return esLang ? `Grupo de edad: ${ages}` : `Age group: ${ages}`
+  if (s.min_age != null || s.max_age != null) {
+    const range = `${s.min_age ?? '—'}–${s.max_age ?? '—'}`
+    return esLang ? `Grupo de edad: ${range}` : `Age group: ${range}`
+  }
+  return ''
+}
+
 const skillLabel = (id: string | null) => {
   if (!id) return language.value === 'es' ? 'Todos los niveles' : 'All levels'
   const row = SKATE_SKILL_LEVELS.find(l => l.id === id)
@@ -320,35 +366,43 @@ const skillLabel = (id: string | null) => {
   return language.value === 'es' ? row.title.es : row.title.en
 }
 
-const seriesSizeById = computed(() => {
-  const map = new Map<string, number>()
-  for (const s of sessions.value) {
-    if (!s.program_series_id) continue
-    map.set(s.program_series_id, (map.get(s.program_series_id) || 0) + 1)
-  }
-  return map
-})
-
-const sessionSeriesCount = (s: BookableClassSession) =>
-  s.program_series_id ? (seriesSizeById.value.get(s.program_series_id) || 1) : 1
-
 const sessionIsSummer = (s: BookableClassSession) => isSummerCourseSeason(s.season_slug)
 
 const multiPacksForSession = (s: BookableClassSession): ParentMultiClassPack[] => {
   if (sessionIsSummer(s)) return []
-  return multiClassPacksForSeriesLength(sessionSeriesCount(s))
+  return [...CARD_CLASS_PACKS]
 }
 
-const packPriceMxn = (pack: ParentMultiClassPack) => parentPackPriceMxn(pack)
+const packPriceMxn = (pack: ParentMultiClassPack, s?: BookableClassSession) => {
+  if (!s) return parentPackPriceMxn(pack)
+  const tier = sessionCoachTier(s)
+  if (pack === 3) return getClassPriceMxn(tier, 'group_pack_3')
+  if (pack === 5) return getClassPriceMxn(tier, 'group_pack_5')
+  if (pack === 4) return getClassPriceMxn(tier, 'monthly_4')
+  if (pack === 8) return getClassPriceMxn(tier, 'monthly_8')
+  if (pack === 12) return getClassPriceMxn(tier, 'monthly_12')
+  if (pack === 16) return getClassPriceMxn(tier, 'monthly_16')
+  if (pack === 24) return getClassPriceMxn(tier, 'monthly_24')
+  return parentPackPriceMxn(pack)
+}
 
 const packLabel = (pack: ParentClassPack, esLang: boolean) => {
   if (pack === 'group_1') return esLang ? '1 clase grupal' : '1 group class'
   if (pack === 'individual_1') return esLang ? '1 clase personalizada' : '1 private class'
+  if (pack === 3) return esLang ? '3 clases' : '3 classes'
   if (pack === 4) return esLang ? '4 clases · 1/semana · 4 sem' : '4 classes · 1/week · 4 wk'
+  if (pack === 5) return esLang ? '5 clases' : '5 classes'
   if (pack === 8) return esLang ? '8 clases · 2/semana · 4 sem' : '8 classes · 2/week · 4 wk'
-  if (pack === 12) return esLang ? '12 clases · 3/semana · 4 sem' : '12 classes · 3/week · 4 wk'
+  if (pack === 12) return esLang ? '12 clases · mes completo' : '12 classes · full month'
   if (pack === 16) return esLang ? '16 clases · 2/semana · 8 sem' : '16 classes · 2/week · 8 wk'
   return esLang ? '24 clases · 3/semana · 8 sem' : '24 classes · 3/week · 8 wk'
+}
+
+/** Short second line so the four package chips share one row. */
+const packChipDetail = (pack: ParentMultiClassPack, esLang: boolean) => {
+  if (pack === 8) return esLang ? '2/sem · 4 sem' : '2/wk · 4 wk'
+  if (pack === 12) return esLang ? 'mes completo' : 'full month'
+  return ''
 }
 
 /** The coach picked when the program was created decides the price list. */
@@ -363,7 +417,7 @@ const individualDropInPrice = (s: BookableClassSession) =>
 const selectedPackPrice = (s: BookableClassSession, pack: ParentClassPack) => {
   if (pack === 'group_1') return groupDropInPrice(s)
   if (pack === 'individual_1') return individualDropInPrice(s)
-  return packPriceMxn(pack)
+  return packPriceMxn(pack, s)
 }
 
 const singleClassSubtitle = (pack: ParentSingleClass, esLang: boolean) =>
@@ -449,7 +503,7 @@ const sessionDetailsText = (s: BookableClassSession) => {
       ages ? `Edades: ${ages}.` : null,
       `Nivel: ${skillLabel(s.skill_level)}.`,
       slot ? `Horario: ${slot}.` : null,
-      `Programa ${multiPacksForSession(s).map(p => `${p} clases ${formatPrice(packPriceMxn(p))}`).join(' · ') || 'curso de verano'} · Grupal ${formatPrice(groupDropInPrice(s))} · Individual ${formatPrice(individualDropInPrice(s))}.`,
+      `Programa ${multiPacksForSession(s).map(p => `${p} clases ${formatPrice(packPriceMxn(p, s))}`).join(' · ') || 'curso de verano'} · Grupal ${formatPrice(groupDropInPrice(s))} · Individual ${formatPrice(individualDropInPrice(s))}.`,
       `Máx. ${s.maxCapacity || 6} patinadores por sesión.`,
     ]
     return bits.filter(Boolean).join(' ')
@@ -460,7 +514,7 @@ const sessionDetailsText = (s: BookableClassSession) => {
     ages ? `Ages: ${ages}.` : null,
     `Level: ${skillLabel(s.skill_level)}.`,
     slot ? `Time: ${slot}.` : null,
-    `${multiPacksForSession(s).map(p => `${p}-class pack ${formatPrice(packPriceMxn(p))}`).join(' · ') || 'summer course'} · Group ${formatPrice(groupDropInPrice(s))} · Individual ${formatPrice(individualDropInPrice(s))}.`,
+    `${multiPacksForSession(s).map(p => `${p}-class pack ${formatPrice(packPriceMxn(p, s))}`).join(' · ') || 'summer course'} · Group ${formatPrice(groupDropInPrice(s))} · Individual ${formatPrice(individualDropInPrice(s))}.`,
     `Max ${s.maxCapacity || 6} skaters per session.`,
   ]
   return bits.filter(Boolean).join(' ')
@@ -608,7 +662,7 @@ function openEnrollModal(s: BookableClassSession) {
   if (s.status === 'full' || s.status === 'no_coaches') return
   enrollModalSession.value = s
   const packs = multiPacksForSession(s)
-  selectedPack.value = sessionIsSummer(s) ? 'group_1' : (packs[0] || 8)
+  selectedPack.value = sessionIsSummer(s) ? 'group_1' : (packs.includes(8) ? 8 : (packs[0] || 8))
   selectedPackDays.value = []
   // Start from whoever the recommendation filter is showing, else the Familia
   // skater. Anyone already in the class is left out so nothing is booked twice.
@@ -874,7 +928,7 @@ onMounted(async () => {
                 type="button"
                 class="px-2 py-2 rounded-xl border-2 text-left text-[11px] font-bold transition-colors flex items-center gap-1 shrink min-w-0 whitespace-nowrap"
                 :class="
-                  selectedAgeBand === band.id
+                  selectedAgeBands.includes(band.id)
                     ? 'border-black bg-teal-600 text-white'
                     : 'border-gray-400 bg-white text-gray-800'
                 "
@@ -979,46 +1033,60 @@ onMounted(async () => {
           :key="s.id"
           class="border-[3px] border-black rounded-xl bg-white flex flex-col overflow-hidden"
         >
-          <div class="flex items-start justify-between gap-2 p-3 border-b-2 border-black">
-            <span
-              class="rounded border px-2 py-1 text-[10px] font-bold uppercase"
-              :class="sessionSkillBadgeClass(s.skill_level)"
-            >
-              {{ skillLabel(s.skill_level) }}
-            </span>
-            <div class="flex flex-col items-end gap-1 shrink-0">
+          <div class="p-3 border-b-2 border-black space-y-2">
+            <div class="flex items-start gap-2">
               <span
-                v-for="pack in multiPacksForSession(s)"
-                :key="s.id + '-p' + pack"
-                class="text-[10px] font-bold bg-teal-700 text-white px-2 py-1 rounded text-right leading-tight"
+                class="rounded border px-2 py-1 text-[10px] font-bold uppercase shrink-0"
+                :class="sessionSkillBadgeClass(s.skill_level)"
               >
-                {{ formatPrice(packPriceMxn(pack)) }}
-                <span class="block font-mono font-normal opacity-90 normal-case">
-                  {{ packLabel(pack, language === 'es') }}
-                </span>
+                {{ skillLabel(s.skill_level) }}
               </span>
-              <span class="text-[10px] font-bold bg-black text-white px-2 py-1 rounded text-right leading-tight">
-                {{ formatPrice(groupDropInPrice(s)) }}
-                <span class="block font-mono font-normal opacity-90 normal-case">
-                  {{ language === 'es' ? 'grupal · 1 sesión' : 'group · 1 session' }}
+              <div class="min-w-0 flex-1">
+                <p class="text-[9px] font-black uppercase tracking-wide text-gray-500 mb-1">
+                  {{ language === 'es' ? 'Clases individuales' : 'Individual classes' }}
+                </p>
+                <div class="grid grid-cols-2 gap-1">
+                  <span class="text-[10px] font-bold bg-black text-white px-1.5 py-1 rounded text-center leading-tight">
+                    {{ formatPrice(groupDropInPrice(s)) }}
+                    <span class="block font-mono font-normal opacity-90 normal-case">
+                      {{ language === 'es' ? 'grupal · 1 sesión' : 'group · 1 session' }}
+                    </span>
+                  </span>
+                  <span class="text-[10px] font-bold bg-gray-800 text-white px-1.5 py-1 rounded text-center leading-tight">
+                    {{ formatPrice(individualDropInPrice(s)) }}
+                    <span class="block font-mono font-normal opacity-90 normal-case">
+                      {{ language === 'es' ? 'individual · 1 sesión' : 'individual · 1 session' }}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div v-if="multiPacksForSession(s).length">
+              <p class="text-[9px] font-black uppercase tracking-wide text-teal-800 mb-1">
+                {{ language === 'es' ? 'Paquete de clases' : 'Class package' }}
+              </p>
+              <div class="grid grid-cols-4 gap-1 items-stretch">
+                <span
+                  v-for="pack in multiPacksForSession(s)"
+                  :key="s.id + '-p' + pack"
+                  class="h-full text-[10px] font-bold bg-teal-700 text-white px-1 py-1 rounded text-center leading-tight flex flex-col justify-center"
+                >
+                  {{ formatPrice(packPriceMxn(pack, s)) }}
+                  <span class="block font-mono font-normal opacity-90 normal-case">
+                    {{ pack }} {{ language === 'es' ? 'clases' : 'classes' }}
+                  </span>
+                  <span class="block font-mono font-normal opacity-90 normal-case min-h-[1.1em]">
+                    {{ packChipDetail(pack, language === 'es') }}
+                  </span>
                 </span>
-              </span>
-              <span class="text-[10px] font-bold bg-gray-800 text-white px-2 py-1 rounded text-right leading-tight">
-                {{ formatPrice(individualDropInPrice(s)) }}
-                <span class="block font-mono font-normal opacity-90 normal-case">
-                  {{ language === 'es' ? 'individual · 1 sesión' : 'individual · 1 session' }}
-                </span>
-              </span>
+              </div>
             </div>
           </div>
 
           <div class="p-4 flex-1 flex flex-col">
-            <h2 class="text-xl font-black uppercase leading-tight">{{ s.title }}</h2>
-            <p v-if="audienceLabels(s) || s.min_age != null" class="text-sm font-bold mt-1 text-gray-700 font-mono">
-              <template v-if="audienceLabels(s)">{{ audienceLabels(s) }}</template>
-              <template v-else-if="s.min_age != null || s.max_age != null">
-                {{ language === 'es' ? 'Edades' : 'Ages' }} {{ s.min_age ?? '—' }}–{{ s.max_age ?? '—' }}
-              </template>
+            <h2 class="text-xl font-black uppercase leading-tight">{{ displaySessionTitle(s.title) }}</h2>
+            <p v-if="ageGroupLine(s)" class="text-sm font-bold mt-1 text-gray-700 font-mono">
+              {{ ageGroupLine(s) }}
             </p>
 
             <ul class="mt-3 space-y-2 text-sm font-mono">
@@ -1116,11 +1184,11 @@ onMounted(async () => {
                 {{ sessionDetailsText(s) }}
               </p>
               <ul class="mt-3 space-y-1 text-xs font-mono text-gray-300">
-                <li v-for="pack in multiPacksForSession(s)" :key="'det-' + pack">
-                  * {{ formatPrice(packPriceMxn(pack)) }} — {{ packLabel(pack, language === 'es') }}
-                </li>
                 <li>* {{ formatPrice(groupDropInPrice(s)) }} — {{ language === 'es' ? 'grupal · 1 sesión' : 'group · 1 session' }}</li>
                 <li>* {{ formatPrice(individualDropInPrice(s)) }} — {{ language === 'es' ? 'individual · 1 sesión' : 'individual · 1 session' }}</li>
+                <li v-for="pack in multiPacksForSession(s)" :key="'det-' + pack">
+                  * {{ formatPrice(packPriceMxn(pack, s)) }} — {{ packLabel(pack, language === 'es') }}
+                </li>
                 <li>* {{ coachTierLabel(sessionCoachTier(s), language === 'es') }}</li>
                 <li>* {{ s.skatepark || selectedSkatepark }}</li>
               </ul>
@@ -1163,10 +1231,10 @@ onMounted(async () => {
             × {{ language === 'es' ? 'Cancelar' : 'Cancel' }}
           </button>
 
-          <h3 class="text-sm font-black uppercase text-teal-700 tracking-wide">
-            {{ language === 'es' ? 'Paquete' : 'Package' }}
+          <h3 class="text-sm font-black uppercase text-gray-700 tracking-wide">
+            {{ language === 'es' ? 'Clases individuales' : 'Individual classes' }}
           </h3>
-          <div class="grid grid-cols-2 gap-2 mb-4 mt-2">
+          <div class="grid grid-cols-2 gap-2 mt-2 mb-4">
             <button
               v-for="single in PARENT_SINGLE_CLASSES"
               :key="'modal-single-' + single"
@@ -1181,17 +1249,30 @@ onMounted(async () => {
                 {{ formatPrice(selectedPackPrice(enrollModalSession, single)) }}
               </p>
             </button>
+          </div>
+          <h3
+            v-if="multiPacksForSession(enrollModalSession).length"
+            class="text-sm font-black uppercase text-teal-700 tracking-wide"
+          >
+            {{ language === 'es' ? 'Paquete de clases' : 'Class package' }}
+          </h3>
+          <div
+            v-if="multiPacksForSession(enrollModalSession).length"
+            class="grid grid-cols-4 gap-1 mb-4 mt-2 items-stretch"
+          >
             <button
               v-for="pack in multiPacksForSession(enrollModalSession)"
               :key="'modal-pack-' + pack"
               type="button"
-              class="rounded-xl border-2 px-3 py-3 text-left transition-colors"
+              class="h-full rounded-xl border-2 px-1.5 py-2 text-center transition-colors flex flex-col justify-center"
               :class="selectedPack === pack ? 'border-black bg-white ring-2 ring-black' : 'border-gray-400 bg-white'"
               @click="choosePack(pack)"
             >
-              <p class="text-xs font-black uppercase">{{ pack }} {{ language === 'es' ? 'clases' : 'classes' }}</p>
-              <p class="text-[11px] font-mono text-gray-600">{{ packLabel(pack, language === 'es') }}</p>
-              <p class="text-sm font-black mt-1">{{ formatPrice(packPriceMxn(pack)) }}</p>
+              <p class="text-xs font-black uppercase leading-tight">{{ pack }} {{ language === 'es' ? 'clases' : 'classes' }}</p>
+              <p class="text-[10px] font-mono text-gray-600 min-h-[1.1em] leading-tight">
+                {{ packChipDetail(pack, language === 'es') }}
+              </p>
+              <p class="text-sm font-black mt-1">{{ formatPrice(packPriceMxn(pack, enrollModalSession)) }}</p>
             </button>
           </div>
 

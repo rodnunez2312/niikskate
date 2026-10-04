@@ -256,57 +256,41 @@ watch(parentQuotes, () => {
             </button>
           </div>
           <p v-if="isAdmin && seasonRemoveError" class="text-sm text-red-300 mb-3">{{ seasonRemoveError }}</p>
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[560px] text-left border-collapse">
-              <thead>
-                <tr class="border-b border-white/15 text-xs uppercase tracking-wider text-gray-500">
-                  <th class="py-3 pr-4 font-semibold">{{ es ? 'Temporada' : 'Season' }}</th>
-                  <th class="py-3 pr-4 font-semibold">{{ es ? 'Fechas' : 'Dates' }}</th>
-                  <th class="py-3 font-semibold">Mérida</th>
-                  <th v-if="isAdmin" class="py-3 w-12" />
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="row in seasons"
-                  :key="row.slug"
-                  class="border-b border-white/10 text-sm sm:text-base"
-                >
-                  <td class="py-4 pr-4 font-bold text-white">
-                    <NuxtLink :to="`/temporadas/${row.slug}`" class="hover:text-gold-300 transition-colors">
-                      <span class="mr-1.5" aria-hidden="true">{{ row.icon }}</span>
-                      {{ row.name }}
-                    </NuxtLink>
-                  </td>
-                  <td class="py-4 pr-4 text-gray-300">{{ row.dates }}</td>
-                  <td class="py-4 font-semibold">
-                    <NuxtLink
-                      v-if="row.statusKey === 'enrolling'"
-                      :to="row.href"
-                      class="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-teal-700 text-white text-xs font-bold hover:bg-teal-600"
-                    >
-                      {{ es ? 'Inscribirse' : 'Register' }}
-                    </NuxtLink>
-                    <span v-else class="text-gray-400 text-sm">{{ row.status }}</span>
-                  </td>
-                  <td v-if="isAdmin" class="py-4 pl-2 text-right">
-                    <button
-                      type="button"
-                      class="inline-flex p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40"
-                      :disabled="removingSeasonSlug === row.slug"
-                      :title="es ? 'Quitar temporada' : 'Remove season'"
-                      :aria-label="es ? 'Quitar temporada' : 'Remove season'"
-                      @click="confirmRemoveSeason(row)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <ul class="divide-y divide-white/10">
+            <li
+              v-for="row in seasons"
+              :key="row.slug"
+              class="flex items-center gap-2 py-3"
+            >
+              <div class="min-w-0 flex-1">
+                <NuxtLink :to="`/temporadas/${row.slug}`" class="block font-bold text-white text-sm hover:text-gold-300 transition-colors truncate">
+                  <span class="mr-1" aria-hidden="true">{{ row.icon }}</span>{{ row.name }}
+                </NuxtLink>
+                <p class="text-xs text-gray-400 truncate">{{ row.dates }}</p>
+              </div>
+              <NuxtLink
+                v-if="row.statusKey === 'enrolling'"
+                :to="row.href"
+                class="shrink-0 inline-flex items-center justify-center px-3 py-1.5 rounded-full bg-teal-700 text-white text-xs font-bold hover:bg-teal-600"
+              >
+                {{ es ? 'Inscribirse' : 'Register' }}
+              </NuxtLink>
+              <span v-else class="shrink-0 text-gray-400 text-xs">{{ row.status }}</span>
+              <button
+                v-if="isAdmin"
+                type="button"
+                class="shrink-0 inline-flex p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-950/50 disabled:opacity-40"
+                :disabled="removingSeasonSlug === row.slug"
+                :title="es ? 'Quitar temporada' : 'Remove season'"
+                :aria-label="es ? 'Quitar temporada' : 'Remove season'"
+                @click="confirmRemoveSeason(row)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </li>
+          </ul>
           <details class="mt-8 max-w-2xl mx-auto text-left">
             <summary class="cursor-pointer text-center text-sm font-bold text-gold-400 hover:text-gold-300">
               {{ es ? 'Cómo funciona' : 'How this works' }}
@@ -357,15 +341,22 @@ watch(parentQuotes, () => {
           <p>
             {{
               es
-                ? 'Ansiedad, miedo al fallo y la cultura del “todo o nada” llegan temprano. El skate ya enseña caída y reintento — nosotros lo hacemos intencional.'
-                : 'Anxiety, fear of failure, and all-or-nothing culture show up early. Skate already teaches falling and trying again — we make that intentional.'
+                ? 'El skate enseña algo poderoso: caerse, adaptarse y volver a intentarlo. En NiikSkate, convertimos ese proceso en algo intencional.'
+                : 'Skate teaches something powerful: falling, adapting, and trying again. At NiikSkate, we make that process intentional.'
             }}
           </p>
           <p>
             {{
               es
-                ? 'NiikSkate convierte cada sesión en práctica de resiliencia: exposición, skills mentales, competencia, confianza.'
-                : 'NiikSkate turns every session into resilience practice: exposure, mental skills, competence, confidence.'
+                ? 'Cada sesión desarrolla más que habilidades sobre la tabla: trabajamos resiliencia, manejo de la frustración, confianza y fortaleza mental a través de retos progresivos, herramientas mentales y experiencias reales de superación.'
+                : 'Every session builds more than skills on the board: we work on resilience, handling frustration, confidence, and mental strength through progressive challenges, mental tools, and real experiences of getting back up.'
+            }}
+          </p>
+          <p>
+            {{
+              es
+                ? 'No se trata de no caer. Se trata de aprender a levantarse.'
+                : 'It is not about never falling. It is about learning to get back up.'
             }}
           </p>
         </div>
@@ -436,13 +427,22 @@ watch(parentQuotes, () => {
                 : 'Try the Niik Method at no cost.'
             }}
           </h2>
-          <p class="text-gray-300 text-lg mb-8 max-w-xl">
-            {{
-              es
-                ? 'Sesiones abiertas para conocer coaches, la comunidad y cómo enseñamos a caer — y levantarse.'
-                : 'Open sessions to meet coaches, the community, and how we teach falling — and getting back up.'
-            }}
-          </p>
+          <div class="text-gray-300 text-lg mb-8 max-w-xl space-y-4">
+            <p>
+              {{
+                es
+                  ? 'Vive una sesión abierta, conoce a nuestros coaches, conecta con la comunidad y descubre una forma diferente de aprender skate.'
+                  : 'Join an open session, meet our coaches, connect with the community, and discover a different way to learn skate.'
+              }}
+            </p>
+            <p>
+              {{
+                es
+                  ? 'Aquí no solo enseñamos a patinar. Enseñamos a caer, aprender y volver a intentarlo.'
+                  : 'Here we do not only teach skating. We teach falling, learning, and trying again.'
+              }}
+            </p>
+          </div>
           <NuxtLink
             to="/classes"
             class="inline-flex px-6 py-3 rounded-xl border border-gold-400 text-gold-400 font-bold hover:bg-gold-400 hover:text-black transition-colors"

@@ -23,11 +23,13 @@ const {
 } = useCrew()
 
 const route = useRoute()
+const client = useSupabaseClient()
 
 const showForm = ref(false)
 const editingKey = ref<string | null>(null)
 const saving = ref(false)
 const formError = ref('')
+const saveNotice = ref('')
 const addAnother = ref(false)
 
 const emptyForm = () => ({
@@ -88,13 +90,20 @@ function buildPayload() {
   }
 }
 
-async function saveForm() {
+async function saveForm(newPassword = '') {
   formError.value = ''
+  saveNotice.value = ''
   saving.value = true
   try {
     const payload = buildPayload()
     if (isEditingSelf.value) {
       await updateGuardianProfile(payload)
+      if (newPassword) {
+        const { error } = await client.auth.updateUser({ password: newPassword })
+        if (error) throw error
+        saveNotice.value =
+          language.value === 'es' ? 'Contraseña actualizada.' : 'Password updated.'
+      }
       showForm.value = false
     } else if (editingKey.value) {
       await updateCrewMember(editingKey.value, payload)
@@ -290,6 +299,7 @@ onMounted(async () => {
         </article>
       </div>
 
+      <p v-if="saveNotice" class="mt-4 text-sm text-teal-700 font-medium">{{ saveNotice }}</p>
       <p v-if="formError" class="mt-4 text-sm text-red-600 font-medium">{{ formError }}</p>
     </div>
 

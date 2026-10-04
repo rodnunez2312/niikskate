@@ -48,8 +48,8 @@ export default defineEventHandler(async (event) => {
   const packRaw = body?.pack
   const packNum = Number(packRaw)
   const pack =
-    packNum === 4 || packNum === 8 || packNum === 12 || packNum === 16 || packNum === 24
-      ? (packNum as 4 | 8 | 12 | 16 | 24)
+    packNum === 3 || packNum === 4 || packNum === 5 || packNum === 8 || packNum === 12 || packNum === 16 || packNum === 24
+      ? (packNum as 3 | 4 | 5 | 8 | 12 | 16 | 24)
       : null
   const weekdays = Array.isArray(body?.weekdays)
     ? [...new Set(
@@ -217,7 +217,7 @@ export default defineEventHandler(async (event) => {
     return 'ok' as const
   }
 
-  if (pack === 4 || pack === 8 || pack === 12 || pack === 16 || pack === 24) {
+  if (pack === 3 || pack === 4 || pack === 5 || pack === 8 || pack === 12 || pack === 16 || pack === 24) {
     if ((pack === 8 || pack === 16) && weekdays.length !== 2) {
       throw createError({
         statusCode: 400,
@@ -239,7 +239,12 @@ export default defineEventHandler(async (event) => {
       if (seriesErr) throw createError({ statusCode: 400, message: seriesErr.message })
       if (seriesRows?.length) targets = seriesRows as typeof row[]
     }
-    if (wantedDays.length) {
+    if (pack === 3 || pack === 5) {
+      targets = targets
+        .filter(t => t.start_date >= row.start_date)
+        .sort((a, b) => a.start_date.localeCompare(b.start_date))
+        .slice(0, pack)
+    } else if (wantedDays.length) {
       targets = targets.filter(t => wantedDays.includes(ymdToWeekday(t.start_date)))
     }
     if (!targets.length) {
