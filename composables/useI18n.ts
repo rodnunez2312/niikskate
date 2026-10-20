@@ -159,7 +159,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Auth
     'auth.welcomeBack': 'Welcome Back',
-    'auth.signInTo': 'Sign in to Skateboard Academy',
+    'auth.signInTo': 'Sign in to NiikSkate',
     'auth.email': 'Email',
     'auth.password': 'Password',
     'auth.forgotPassword': 'Forgot password?',
@@ -168,7 +168,7 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.noAccount': 'Don\'t have an account?',
     'auth.signUp': 'Sign up',
     'auth.createAccount': 'Create Account',
-    'auth.joinAcademy': 'Join Skateboard Academy and start shredding!',
+    'auth.joinAcademy': 'Join NiikSkate and start riding.',
     'auth.confirmPassword': 'Confirm Password',
     'auth.creatingAccount': 'Creating account...',
     'auth.hasAccount': 'Already have an account?',
@@ -299,7 +299,7 @@ const translations: Record<Language, Record<string, string>> = {
     'category.safety_equipment': 'Equipo de Seguridad',
     'category.merchandise': 'Mercancía',
     'category.skateboards': 'Patinetas',
-    'category.hardware': 'Accesorios',
+    'category.hardware': 'Hardware',
     'category.ramps': 'Rampas',
     
     // Cart
@@ -360,7 +360,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Auth
     'auth.welcomeBack': 'Bienvenido',
-    'auth.signInTo': 'Inicia sesión en Skateboard Academy',
+    'auth.signInTo': 'Inicia sesión en NiikSkate',
     'auth.email': 'Correo electrónico',
     'auth.password': 'Contraseña',
     'auth.forgotPassword': '¿Olvidaste tu contraseña?',
@@ -369,7 +369,7 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.noAccount': '¿No tienes cuenta?',
     'auth.signUp': 'Regístrate',
     'auth.createAccount': 'Crear Cuenta',
-    'auth.joinAcademy': '¡Únete a Skateboard Academy y empieza a patinar!',
+    'auth.joinAcademy': 'Únete a NiikSkate y empieza a patinar.',
     'auth.confirmPassword': 'Confirmar Contraseña',
     'auth.creatingAccount': 'Creando cuenta...',
     'auth.hasAccount': '¿Ya tienes cuenta?',

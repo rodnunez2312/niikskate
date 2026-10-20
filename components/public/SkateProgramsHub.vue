@@ -36,19 +36,19 @@ function classesLink(offering: (typeof offerings)[number]) {
 </script>
 
 <template>
-  <div class="space-y-12">
+  <div class="space-y-16 sm:space-y-20">
     <section class="text-center max-w-3xl mx-auto">
-      <p class="text-gold-400 text-sm font-bold uppercase tracking-widest mb-3">
+      <p class="t-eyebrow text-sage-700 mb-4">
         {{ language === 'es' ? 'Programas de Skate' : 'Skate Programs' }}
       </p>
-      <h1 class="text-3xl sm:text-4xl font-black text-white mb-4">
+      <h1 class="t-h2 mb-5">
         {{
           language === 'es'
             ? 'Clases para cada edad y nivel'
             : 'Classes for every age and level'
         }}
       </h1>
-      <p class="text-gray-400 text-base sm:text-lg leading-relaxed">
+      <p class="t-lead text-charcoal/75">
         {{
           language === 'es'
             ? 'Elige por edad y habilidad. Cada programa tiene un propósito claro — no solo un rango de edades.'
@@ -57,23 +57,25 @@ function classesLink(offering: (typeof offerings)[number]) {
       </p>
     </section>
 
+    <PublicProgramSeasonsList class="max-w-3xl mx-auto" />
+
     <PublicMemberAppCta />
 
     <!-- How we group classes: age left, skill levels explained on the right -->
     <section class="max-w-6xl mx-auto grid lg:grid-cols-[16rem_minmax(0,1fr)] gap-4 items-start">
-      <div class="rounded-2xl border border-gray-800 bg-gray-900/50 p-5">
-        <h2 class="text-sm font-bold uppercase tracking-wide text-gold-400 mb-3">
+      <div class="rounded-3xl border border-cream-200 bg-cream-50 p-6">
+        <h2 class="t-eyebrow text-sage-700 mb-4">
           {{ language === 'es' ? 'Edad' : 'Age' }}
         </h2>
-        <ul class="space-y-2">
+        <ul class="space-y-3">
           <li
             v-for="band in PROGRAM_AGE_BANDS"
             :key="band.id"
-            class="flex items-center gap-3 text-sm text-gray-200"
+            class="flex items-center gap-3 text-sm"
           >
             <span class="text-xl w-8 text-center" aria-hidden="true">{{ band.emoji }}</span>
             <span>{{ language === 'es' ? band.label.es : band.label.en }}
-              <span class="text-gray-400">
+              <span class="text-charcoal/65">
                 ({{ language === 'es' ? band.nickname.es : band.nickname.en }})
               </span>
             </span>
@@ -81,17 +83,17 @@ function classesLink(offering: (typeof offerings)[number]) {
         </ul>
       </div>
 
-      <div class="rounded-2xl border border-gray-800 bg-gray-900/50 p-5 overflow-hidden">
-        <h2 class="text-sm font-bold uppercase tracking-wide text-gold-400 mb-4">
+      <div class="rounded-3xl border border-cream-200 bg-cream-50 p-6 overflow-hidden">
+        <h2 class="t-eyebrow text-sage-700 mb-4">
           {{ language === 'es' ? 'Nivel' : 'Skill' }}
         </h2>
-        <div class="grid sm:grid-cols-3 gap-0 sm:divide-x sm:divide-gray-800">
+        <div class="grid sm:grid-cols-3 gap-0 sm:divide-x sm:divide-cream-200">
           <div
             v-for="col in skillTrackColumns"
             :key="col.id"
             class="py-3 sm:py-0 sm:px-4 first:sm:pl-0 last:sm:pr-0"
           >
-            <p class="flex items-center gap-2 text-sm font-bold text-white">
+            <p class="flex items-center gap-2 text-sm font-bold">
               <span class="text-xl leading-none" aria-hidden="true">{{ col.emoji }}</span>
               {{ col.label }}
             </p>
@@ -99,13 +101,15 @@ function classesLink(offering: (typeof offerings)[number]) {
         </div>
 
         <div
-          class="mt-4 overflow-hidden border border-black bg-[#fff9f0] text-black"
+          class="mt-5 overflow-hidden border-2 border-charcoal bg-cream"
           :class="levelsOpen ? 'rounded-2xl' : 'rounded-full'"
         >
           <button
             type="button"
-            class="w-full flex items-center justify-between gap-3 px-5 py-2.5 text-left font-mono text-xs sm:text-sm font-bold tracking-tight"
+            class="w-full flex items-center justify-between gap-3 px-5 py-3 text-left text-sm font-bold hover:bg-acid/30 transition-colors"
+            :class="levelsOpen ? 'rounded-t-2xl' : 'rounded-full'"
             :aria-expanded="levelsOpen"
+            aria-controls="skill-levels-detail"
             @click="levelsOpen = !levelsOpen"
           >
             <span>
@@ -121,21 +125,22 @@ function classesLink(offering: (typeof offerings)[number]) {
           </button>
           <div
             v-if="levelsOpen"
-            class="border-t border-black grid sm:grid-cols-3 sm:divide-x sm:divide-black/20"
+            id="skill-levels-detail"
+            class="border-t-2 border-charcoal grid sm:grid-cols-3 sm:divide-x sm:divide-cream-200"
           >
             <div
               v-for="col in skillTrackColumns"
               :key="'detail-' + col.id"
-              class="px-4 py-3 space-y-3 border-b border-black/15 last:border-b-0 sm:border-b-0"
+              class="px-4 py-4 space-y-3 border-b border-cream-200 last:border-b-0 sm:border-b-0"
             >
               <div
                 v-for="level in col.levels"
                 :key="level.id"
               >
-                <p class="font-semibold text-sm text-gray-900">
+                <p class="font-semibold text-sm">
                   {{ language === 'es' ? level.title.es : level.title.en }}
                 </p>
-                <p class="mt-0.5 text-xs leading-relaxed text-gray-600">
+                <p class="mt-0.5 text-xs leading-relaxed text-charcoal/70">
                   {{ language === 'es' ? level.description.es : level.description.en }}
                 </p>
               </div>
@@ -150,30 +155,28 @@ function classesLink(offering: (typeof offerings)[number]) {
       <article
         v-for="p in offerings"
         :key="p.id"
-        class="relative flex flex-col rounded-2xl border-2 border-black bg-[#fff9f0] text-gray-900 shadow-lg overflow-hidden transition-transform hover:-translate-y-0.5"
+        class="card-lift relative flex flex-col rounded-3xl border-2 border-charcoal bg-cream-50 overflow-hidden"
       >
-        <div class="p-5 flex-1 flex flex-col">
-          <span class="text-4xl mb-3" aria-hidden="true">{{ p.emoji }}</span>
-          <p class="text-xs font-mono font-bold uppercase tracking-wide mb-1 text-teal-700">
+        <div class="p-6 flex-1 flex flex-col">
+          <span class="text-4xl mb-4" aria-hidden="true">{{ p.emoji }}</span>
+          <p class="t-eyebrow text-[11px] text-sage-700 mb-1">
             {{ language === 'es' ? p.ageLabel.es : p.ageLabel.en }}
           </p>
-          <h2 class="text-xl font-black uppercase leading-tight mb-2 text-gray-900">
+          <h2 class="font-display text-2xl font-black uppercase leading-tight mb-3">
             {{ language === 'es' ? p.title.es : p.title.en }}
           </h2>
-          <p class="text-sm leading-relaxed flex-1 text-gray-700">
+          <p class="text-sm leading-relaxed flex-1 text-charcoal/75">
             {{ language === 'es' ? p.purpose.es : p.purpose.en }}
           </p>
-          <p class="mt-4 text-[11px] font-mono uppercase tracking-wide text-gray-500">
+          <p class="mt-5 inline-flex self-start px-3 py-1 rounded-full bg-sage-100 text-[11px] font-bold uppercase tracking-wide text-sage-700">
             {{ skillLabel(p.skillTrack) }}
           </p>
         </div>
 
-        <div class="p-3 border-t-2 border-black">
+        <div class="p-4 border-t-2 border-charcoal">
           <NuxtLink
             :to="classesLink(p)"
-            class="block w-full py-3 rounded-lg bg-white text-center font-black text-sm uppercase text-black tracking-wide
-              hover:bg-gray-200 shadow-lg
-              hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+            class="btn-lime w-full uppercase text-sm tracking-wide"
           >
             {{ language === 'es' ? 'Ver clases' : 'Browse classes' }}
           </NuxtLink>
@@ -181,20 +184,15 @@ function classesLink(offering: (typeof offerings)[number]) {
       </article>
     </section>
 
-    <section class="rounded-2xl border border-gray-800 bg-gray-900/40 p-6 max-w-4xl mx-auto text-center">
-      <p class="text-gray-300 text-sm mb-4">
+    <section class="rounded-3xl border border-cream-200 bg-cream-50 p-8 max-w-4xl mx-auto text-center">
+      <p class="text-charcoal/75 mb-5">
         {{
           language === 'es'
             ? '¿Listo para inscribirte? Revisa las clases publicadas, elige día y confirma tu patinador.'
             : 'Ready to join? Browse published classes, pick a day, and confirm your skater.'
         }}
       </p>
-      <NuxtLink
-        to="/classes"
-        class="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-white font-black uppercase text-sm text-black
-          hover:bg-gray-200
-          hover:scale-[1.02] transition-transform"
-      >
+      <NuxtLink to="/classes" class="btn-outline-dark">
         {{ language === 'es' ? 'Ir a clases' : 'Go to classes' }}
       </NuxtLink>
     </section>

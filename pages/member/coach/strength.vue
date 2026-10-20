@@ -231,26 +231,17 @@ async function runSync() {
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <header class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4 pt-safe pb-4">
-      <div class="max-w-[1400px] mx-auto pt-4 space-y-3">
-        <div>
-          <h1 class="text-2xl lg:text-3xl font-bold text-white">
-            💪 {{ es ? 'Entrenamiento de fuerza' : 'Strength training' }}
-          </h1>
-          <p class="text-xs text-gray-500 mt-1">
-            {{ exercises.length }}
-            {{ es ? 'ejercicios · 5 pilares · nivel' : 'exercises · 5 pillars · level' }}
-            {{ levelLabel(generatorLevel, es) }}
-          </p>
-        </div>
-
-        <MemberStrengthQuickSessionBar
-          v-if="exercises.length"
-          :level="generatorLevel"
-          @update:session="onSessionGenerated"
-        />
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="es ? 'Fuerza' : 'Strength'"
+      :subtitle="`${exercises.length} ${es ? 'ejercicios' : 'exercises'} · ${levelLabel(generatorLevel, es)}`"
+    />
+    <div class="px-4 max-w-[1400px] mx-auto pt-4">
+      <MemberStrengthQuickSessionBar
+        v-if="exercises.length"
+        :level="generatorLevel"
+        @update:session="onSessionGenerated"
+      />
+    </div>
 
     <div class="px-4 max-w-[1400px] mx-auto py-4">
       <p v-if="error" class="text-xs text-red-300 bg-red-500/10 rounded-lg p-3 mb-4">{{ error }}</p>

@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 
 export const TRAINING_PILLARS = [
-  { id: 'balance', emoji: '⚖️', es: 'Balance', en: 'Balance', color: '#2563eb' },
+  { id: 'balance', emoji: '⚖️', es: 'Balance', en: 'Balance', color: '#C9EF42' },
   { id: 'coordination', emoji: '🧠', es: 'Coordinación', en: 'Coordination', color: '#7c3aed' },
   { id: 'mobility', emoji: '🧘', es: 'Movilidad', en: 'Mobility', color: '#0d9488' },
   { id: 'power', emoji: '💥', es: 'Potencia', en: 'Power', color: '#ea580c' },
@@ -192,7 +192,7 @@ export function pillarEmoji(id: string | null | undefined): string {
 export function pillarTagClass(id: string | null | undefined): string {
   switch (id) {
     case 'balance':
-      return 'bg-blue-500/20 text-blue-300'
+      return 'bg-acid/15 text-acid'
     case 'coordination':
       return 'bg-violet-500/20 text-violet-300'
     case 'mobility':
@@ -207,7 +207,7 @@ export function pillarTagClass(id: string | null | undefined): string {
 }
 
 export function levelTagClass(id: string | null | undefined): string {
-  if (id === 'intermediate') return 'bg-blue-500/20 text-blue-300'
+  if (id === 'intermediate') return 'bg-acid/15 text-acid'
   if (id === 'advanced') return 'bg-purple-500/20 text-purple-300'
   return 'bg-green-500/20 text-green-300'
 }

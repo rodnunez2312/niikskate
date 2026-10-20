@@ -150,23 +150,10 @@ const formatDate = (dateStr: string) => {
 <template>
   <div class="min-h-screen bg-black pb-24">
     <!-- Header -->
-    <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-      <div class="px-4 py-4 max-w-2xl mx-auto">
-        <div class="flex items-center gap-3">
-          <button @click="router.push('/member/admin/academy')" class="p-2 -ml-2 text-white">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div>
-            <h1 class="text-xl font-bold text-white">
-              {{ language === 'es' ? 'Aprobaciones de Registro' : 'Registration Approvals' }}
-            </h1>
-            <p class="text-sm text-gray-400">{{ language === 'es' ? 'Gestionar solicitudes' : 'Manage requests' }}</p>
-          </div>
-        </div>
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Aprobaciones' : 'Approvals'"
+      :subtitle="language === 'es' ? 'Gestionar solicitudes' : 'Manage requests'"
+    />
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">

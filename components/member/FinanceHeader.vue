@@ -4,7 +4,6 @@
 defineProps<{ subtitle?: string }>()
 
 const route = useRoute()
-const router = useRouter()
 const { language } = useI18n()
 const es = computed(() => language.value === 'es')
 
@@ -22,26 +21,14 @@ const isActive = (path: string) =>
 </script>
 
 <template>
-  <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-    <div class="px-4 pt-4 max-w-[1400px] mx-auto">
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex items-center gap-3 min-w-0">
-          <button
-            class="p-2 -ml-2 text-white shrink-0"
-            :aria-label="es ? 'Volver' : 'Back'"
-            @click="router.push('/member/staff/dashboard')"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div class="min-w-0">
-            <h1 class="text-xl font-bold text-white flex items-center gap-2">
-              <span class="text-2xl" aria-hidden="true">💵</span>
-              {{ es ? 'Finanzas' : 'Finance' }}
-            </h1>
-            <p v-if="subtitle" class="text-xs text-gray-400 truncate">{{ subtitle }}</p>
-          </div>
+  <header class="border-b border-gray-800 bg-gray-950">
+    <div class="px-4 pt-5 max-w-7xl mx-auto">
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-bold text-white truncate">
+            {{ es ? 'Finanzas' : 'Finance' }}
+          </h1>
+          <p v-if="subtitle" class="text-sm text-gray-500 truncate">{{ subtitle }}</p>
         </div>
         <div class="shrink-0 flex items-center gap-2">
           <slot name="actions" />

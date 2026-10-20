@@ -244,6 +244,28 @@ export const COACH_PRICING_TIER_META: Record<
 }
 
 /**
+ * Disciplines that share one price sheet. Skate, scooter and patinaje sell at
+ * the same rates; BMX and parkour get their own sheet once it exists in
+ * Finanzas, and use the standard one until then.
+ */
+export type PricingGroup = 'standard' | 'bmx' | 'parkour'
+
+export function pricingGroupForDiscipline(discipline: string | null | undefined): PricingGroup {
+  if (discipline === 'bmx') return 'bmx'
+  if (discipline === 'parkour') return 'parkour'
+  return 'standard'
+}
+
+/**
+ * A program whose class count differs from its package's session count is
+ * priced at that package's per-class rate, rounded to the nearest $10.
+ */
+export function proratePackagePriceMxn(packagePriceMxn: number, packageSessions: number, classCount: number): number {
+  if (!packageSessions || classCount === packageSessions) return packagePriceMxn
+  return Math.round((packagePriceMxn / packageSessions) * classCount / 10) * 10
+}
+
+/**
  * Programs sell at Coach Niik rates unless an admin picks another coach. The
  * tier used to be derived from the skill level, which silently charged Pro
  * Street prices for every Intermedio and Avanzado program.

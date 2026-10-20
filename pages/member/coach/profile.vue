@@ -14,6 +14,7 @@ const loading = ref(true)
 const profile = ref<any>(null)
 const editMode = ref(false)
 const saving = ref(false)
+const classStats = ref<{ given: number; cancelled: number; athletes: number; videos: number } | null>(null)
 
 const editForm = ref({
   full_name: '',
@@ -35,6 +36,19 @@ const fetchProfile = async () => {
       .single()
     
     profile.value = data
+    if (data?.role === 'coach' || data?.role === 'admin') {
+      try {
+        const { data: session } = await client.auth.getSession()
+        const token = session.session?.access_token
+        if (token) {
+          classStats.value = await $fetch('/api/coach/class-stats', {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        }
+      } catch {
+        classStats.value = null
+      }
+    }
     editForm.value = {
       full_name: data?.full_name || '',
       phone: data?.phone || '',
@@ -139,14 +153,6 @@ const menuItems = computed((): MenuRow[] => {
     },
     {
       kind: 'link',
-      icon: '📊',
-      label: language.value === 'es' ? 'Reportes' : 'Reports',
-      path: '/member/admin/reports',
-      description: language.value === 'es' ? 'Reportes financieros' : 'Financial reports',
-      disabled: true,
-    },
-    {
-      kind: 'link',
       icon: '❓',
       label: language.value === 'es' ? 'Ayuda y Soporte' : 'Help & Support',
       path: '/support',
@@ -155,18 +161,8 @@ const menuItems = computed((): MenuRow[] => {
     },
   ]
 
-  if (profile.value?.role === 'coach' || profile.value?.role === 'admin') {
-    items.unshift({
-      kind: 'link',
-      icon: '🏅',
-      label: language.value === 'es' ? 'Certificaciones' : 'Certifications',
-      path: '/member/coach/certifications',
-      description: language.value === 'es' ? 'Formación Niik y requisitos' : 'Niik training and requirements',
-    })
-  }
-
   if (profile.value?.role === 'admin') {
-    items.splice(2, 0, {
+    items.splice(1, 0, {
       kind: 'link',
       icon: '📅',
       label: language.value === 'es' ? 'Calendario' : 'Calendar',
@@ -229,29 +225,23 @@ const isCoachOrAdmin = computed(() => {
 <template>
   <div class="min-h-screen bg-black pb-24">
     <!-- Header -->
-    <header class="bg-gradient-to-br from-flame-600 via-glass-orange to-gold-500 px-4 pt-safe pb-24 relative overflow-hidden">
-      <div class="absolute inset-0 opacity-10">
-        <div class="absolute top-10 right-10 text-8xl transform rotate-12">🛹</div>
-      </div>
-      
-      <div class="max-w-lg mx-auto relative z-10 pt-4">
-        <div class="flex items-center justify-between mb-6">
-          <h1 class="text-2xl font-bold text-white">{{ language === 'es' ? 'Mi Perfil' : 'My Profile' }}</h1>
-          <button
-            v-if="!editMode && !loading"
-            @click="editMode = true"
-            class="p-2 bg-white/20 rounded-lg"
-          >
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Perfil' : 'Profile'"
+      :subtitle="language === 'es' ? 'Tu cuenta de NiikSkate' : 'Your NiikSkate account'"
+    >
+      <template v-if="!editMode && !loading" #actions>
+        <button
+          type="button"
+          class="px-4 py-2.5 rounded-xl bg-acid text-charcoal font-semibold text-sm"
+          @click="editMode = true"
+        >
+          {{ language === 'es' ? 'Editar' : 'Edit' }}
+        </button>
+      </template>
+    </MemberStaffPageHeader>
 
     <!-- Profile Card -->
-    <div class="px-4 -mt-16 max-w-lg mx-auto relative z-20">
+    <div class="px-4 py-6 max-w-lg mx-auto relative z-20">
       <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
         <!-- Loading -->
         <div v-if="loading" class="animate-pulse">
@@ -267,15 +257,37 @@ const isCoachOrAdmin = computed(() => {
         <!-- Profile Info -->
         <template v-else-if="profile && !editMode">
           <div class="flex items-center gap-4 mb-6">
-            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-flame-600 to-gold-500 flex items-center justify-center text-3xl ring-4 ring-gold-400/30">
+            <div class="w-20 h-20 rounded-full bg-acid text-charcoal flex items-center justify-center text-3xl font-black ring-4 ring-acid/30">
               {{ profile.full_name?.charAt(0)?.toUpperCase() || '🛹' }}
             </div>
             <div>
               <h2 class="text-xl font-bold text-white">{{ profile.full_name }}</h2>
               <p class="text-gray-400">{{ profile.email }}</p>
-              <span class="px-3 py-1 bg-flame-600 text-white text-xs font-bold rounded-full mt-2 inline-block">
+              <span class="px-3 py-1 bg-acid text-charcoal text-xs font-bold rounded-full mt-2 inline-block">
                 {{ roleLabels[profile.role]?.[language] || profile.role }}
               </span>
+            </div>
+          </div>
+
+          <div
+            v-if="classStats && (profile.role === 'coach' || profile.role === 'admin')"
+            class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4"
+          >
+            <div class="rounded-xl bg-gray-950 border border-gray-800 px-2 py-2 text-center">
+              <p class="text-lg font-bold text-white">{{ classStats.given }}</p>
+              <p class="text-[10px] uppercase tracking-wide text-gray-500">{{ language === 'es' ? 'Dadas' : 'Given' }}</p>
+            </div>
+            <div class="rounded-xl bg-gray-950 border border-gray-800 px-2 py-2 text-center">
+              <p class="text-lg font-bold text-sky-300">{{ classStats.cancelled }}</p>
+              <p class="text-[10px] uppercase tracking-wide text-gray-500">{{ language === 'es' ? 'Canceladas' : 'Cancelled' }}</p>
+            </div>
+            <div class="rounded-xl bg-gray-950 border border-gray-800 px-2 py-2 text-center">
+              <p class="text-lg font-bold text-white">{{ classStats.athletes }}</p>
+              <p class="text-[10px] uppercase tracking-wide text-gray-500">{{ language === 'es' ? 'Estudiantes' : 'Students' }}</p>
+            </div>
+            <div class="rounded-xl bg-gray-950 border border-gray-800 px-2 py-2 text-center">
+              <p class="text-lg font-bold text-white">{{ classStats.videos }}</p>
+              <p class="text-[10px] uppercase tracking-wide text-gray-500">Videos</p>
             </div>
           </div>
 

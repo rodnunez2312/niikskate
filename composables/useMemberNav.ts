@@ -4,6 +4,7 @@ export type MemberNavItem = {
   name: string
   path: string
   icon: string
+  children?: MemberNavItem[]
 }
 
 export type MemberNavSection = {
@@ -15,6 +16,7 @@ export type MemberNavSection = {
 type StaffNavItemDef = MemberNavItem & {
   /** Only admins see this item. Coaches never see it in the sidebar. */
   adminOnly?: boolean
+  children?: Array<MemberNavItem & { adminOnly?: boolean }>
 }
 
 type StaffNavSectionDef = {
@@ -30,7 +32,7 @@ export function useMemberNav() {
   const route = useRoute()
   const user = useSupabaseUser()
   const { language } = useI18n()
-  const { isAdmin, isCoach, isStudent, isStaff } = useSiteProfile()
+  const { isAdmin, isStudent, isStaff, roleResolving } = useSiteProfile()
   const { activeParticipant, guardianProfile, loading: crewLoading } = useCrew()
 
   /** Beginner phases (1–3) and skaters with no phase do not get competitions. */
@@ -117,11 +119,6 @@ export function useMemberNav() {
       icon: 'chart',
     },
     {
-      name: es.value ? 'Reportes' : 'Reports',
-      path: '/member/admin/reports',
-      icon: 'clipboard',
-    },
-    {
       name: es.value ? 'Competencias' : 'Competitions',
       path: '/member/admin/competitions',
       icon: 'flag',
@@ -165,10 +162,15 @@ export function useMemberNav() {
             icon: 'users',
           },
           {
-            name: es.value ? 'Actividad de coaches' : 'Coach activity',
+            name: es.value ? 'Actividad' : 'Activity',
             path: '/member/admin/scheduling/coach-activity',
             icon: 'chart',
             adminOnly: true,
+          },
+          {
+            name: es.value ? 'Sesiones' : 'Sessions',
+            path: '/member/staff/sessions',
+            icon: 'clipboard',
           },
         ],
       },
@@ -183,7 +185,7 @@ export function useMemberNav() {
             icon: 'skate-program',
           },
           {
-            name: es.value ? 'Trucos' : 'Tricks',
+            name: es.value ? 'Bolsa de trucos' : 'Bag of Tricks',
             path: '/member/coach/tricks',
             icon: 'skills',
           },
@@ -197,11 +199,6 @@ export function useMemberNav() {
             path: '/member/admin/competitions',
             icon: 'flag',
           },
-          {
-            name: es.value ? 'Certificaciones' : 'Certifications',
-            path: '/member/coach/certifications',
-            icon: 'star',
-          },
         ],
       },
       {
@@ -210,21 +207,21 @@ export function useMemberNav() {
         titleEn: 'Academy',
         items: [
           {
+            name: 'Alianzas',
+            path: '/member/admin/alliances',
+            icon: 'star',
+            adminOnly: true,
+          },
+          {
             name: es.value ? 'Panel academia' : 'Academy dashboard',
             path: '/member/admin/academy/dashboard',
             icon: 'star',
             adminOnly: true,
           },
           {
-            name: es.value ? 'Patinadores' : 'Skaters',
+            name: es.value ? 'Estudiantes' : 'Students',
             path: skatersPath,
             icon: 'users',
-          },
-          {
-            name: es.value ? 'Reportes' : 'Reports',
-            path: '/member/admin/reports',
-            icon: 'chart',
-            adminOnly: true,
           },
           {
             name: es.value ? 'Finanzas' : 'Finance',
@@ -246,21 +243,10 @@ export function useMemberNav() {
         ],
       },
       {
-        id: 'admin',
-        titleEs: 'Admin',
-        titleEn: 'Admin',
+        id: 'niikskate',
+        titleEs: 'NiikSkate',
+        titleEn: 'NiikSkate',
         items: [
-          {
-            name: es.value ? 'Perfil' : 'Profile',
-            path: '/member/coach/profile',
-            icon: 'user',
-          },
-          {
-            name: es.value ? 'Aprobaciones' : 'Approvals',
-            path: '/member/admin/academy/registrations',
-            icon: 'check',
-            adminOnly: true,
-          },
           {
             name: 'Skateshop',
             path: '/member/admin/skate-products',
@@ -272,12 +258,14 @@ export function useMemberNav() {
             path: '/member/admin/skateramps',
             icon: 'skate-program',
             adminOnly: true,
-          },
-          {
-            name: es.value ? 'Solicitudes de rampa' : 'Ramp requests',
-            path: '/member/admin/skateramp-requests',
-            icon: 'check',
-            adminOnly: true,
+            children: [
+              {
+                name: es.value ? 'Solicitudes de rampas' : 'Ramp requests',
+                path: '/member/admin/skateramp-requests',
+                icon: 'check',
+                adminOnly: true,
+              },
+            ],
           },
         ],
       },
@@ -292,7 +280,18 @@ export function useMemberNav() {
         title: es.value ? section.titleEs : section.titleEn,
         items: section.items
           .filter(item => !item.adminOnly || isAdmin.value)
-          .map(({ name, path, icon }) => ({ name, path, icon })),
+          .map(({ name, path, icon, children }) => ({
+            name,
+            path,
+            icon,
+            children: children
+              ?.filter(child => !child.adminOnly || isAdmin.value)
+              .map(({ name: childName, path: childPath, icon: childIcon }) => ({
+                name: childName,
+                path: childPath,
+                icon: childIcon,
+              })),
+          })),
       }))
       .filter(section => section.items.length > 0)
   })
@@ -300,10 +299,8 @@ export function useMemberNav() {
   const usesStaffSidebar = computed(() => Boolean(user.value && isStaff.value))
 
   const navItems = computed(() => {
-    if (!user.value) return []
-    // Staff use the grouped sidebar; keep flat tabs for students only.
-    if (isStaff.value) return []
-    if (isStudent.value) return studentNav.value
+    // Staff use the grouped sidebar; flat tabs are for students only, never while the role is unknown.
+    if (!user.value || !isStudent.value) return []
     return studentNav.value
   })
 
@@ -327,9 +324,7 @@ export function useMemberNav() {
     if (path === '/member/coach/tricks' && route.path.startsWith('/member/coach/tricks')) return true
     if (path === '/member/coach/strength' && route.path.startsWith('/member/coach/strength')) return true
     if (path === '/member/admin/competitions' && route.path.startsWith('/member/admin/competitions')) return true
-    if (path === '/member/admin/reports' && route.path.startsWith('/member/admin/reports')) return true
     if (path === '/member/coach/profile' && route.path.startsWith('/member/coach/profile')) return true
-    if (path === '/member/coach/certifications' && route.path.startsWith('/member/coach/certifications')) return true
     if (path === '/coach/availability' && route.path.startsWith('/coach/availability')) return true
     if (path === '/member/admin/academy/dashboard' && route.path.startsWith('/member/admin/academy/dashboard')) return true
     if (path === '/member/admin/academy/users' && route.path.startsWith('/member/admin/academy/users')) return true
@@ -346,6 +341,7 @@ export function useMemberNav() {
     staffDashboardItem,
     staffNavSections,
     usesStaffSidebar,
+    roleResolving,
     navItems,
     isActive,
   }

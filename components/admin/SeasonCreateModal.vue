@@ -107,7 +107,7 @@ const submit = async () => {
       class="fixed inset-0 z-[80] bg-black/70 flex items-end sm:items-center justify-center p-4"
       @click.self="emit('close')"
     >
-      <div class="w-full max-w-md rounded-2xl bg-gray-900 border border-gray-700 p-5 space-y-4">
+      <div class="add-sheet w-full max-w-md rounded-2xl border p-5 space-y-4">
         <div class="flex items-start justify-between gap-3">
           <h2 class="text-lg font-bold text-white">
             {{ es ? 'Nueva temporada' : 'New season' }}
@@ -171,7 +171,7 @@ const submit = async () => {
               class="rounded-lg border px-2 py-2 text-[11px] font-semibold"
               :class="
                 form.status === opt.id
-                  ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                  ? 'border-acid bg-acid text-charcoal'
                   : 'border-gray-600 text-gray-400'
               "
               @click="form.status = opt.id"
@@ -189,7 +189,7 @@ const submit = async () => {
               :key="ic"
               type="button"
               class="w-9 h-9 rounded-lg border text-lg"
-              :class="form.icon === ic ? 'border-cyan-400 bg-cyan-500/20' : 'border-gray-600'"
+              :class="form.icon === ic ? 'border-acid bg-acid/20' : 'border-gray-600'"
               @click="form.icon = ic"
             >
               {{ ic }}
@@ -207,7 +207,7 @@ const submit = async () => {
           </button>
           <button
             type="button"
-            class="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-teal-600 hover:bg-teal-500 transition-colors disabled:opacity-50"
+            class="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm text-charcoal bg-acid hover:bg-acid-300 transition-colors disabled:opacity-50"
             :disabled="saving"
             @click="submit"
           >

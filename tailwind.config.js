@@ -11,6 +11,32 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Public site identity: skate-brand energy, educational clarity.
+        charcoal: {
+          DEFAULT: '#151515',
+          900: '#0E0E0E',
+          800: '#202020',
+          700: '#2C2C2C',
+          600: '#3A3A3A',
+        },
+        cream: {
+          DEFAULT: '#F5F2EA',
+          50: '#FBFAF6',
+          200: '#E9E4D7',
+          300: '#D8D1C0',
+        },
+        // Named "acid" so Tailwind's built-in lime scale stays available.
+        acid: {
+          DEFAULT: '#C9EF42',
+          300: '#D9F57A',
+          600: '#A8CC22',
+        },
+        // DEFAULT is 3.4:1 on cream (borders, large text only); 700 is for body text.
+        sage: {
+          DEFAULT: '#758A83',
+          100: '#E3E9E6',
+          700: '#4D5F58',
+        },
         // NiikSkate Stained Glass Theme
         gold: {
           50: '#fefce8',
@@ -66,6 +92,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Archivo', 'Inter', 'system-ui', 'sans-serif'],
       },
       spacing: {
         'safe-top': 'env(safe-area-inset-top)',

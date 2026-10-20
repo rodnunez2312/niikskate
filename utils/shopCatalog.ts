@@ -1,9 +1,9 @@
 import type { Product, ProductCategory } from '~/types'
 import { CATEGORY_LABELS } from '~/types'
 
-export type ShopGroupId = 'skate_equip' | 'security_equip' | 'clothing' | 'accessories'
+export type ShopGroupId = 'skate_equip' | 'security_equip' | 'clothing'
 
-export type ShopIcon = 'skate' | 'helmet' | 'shirt' | 'hat'
+export type ShopIcon = 'skate' | 'helmet' | 'shirt'
 
 export type ShopGroup = {
   id: ShopGroupId
@@ -21,7 +21,7 @@ export const SHOP_GROUPS: ShopGroup[] = [
     label: { en: 'Skate', es: 'Skate' },
     title: { en: 'Skate equip', es: 'Equipo de skate' },
     icon: 'skate',
-    dbCategories: ['tablas', 'llantas', 'lijas', 'ramps'],
+    dbCategories: ['tablas', 'llantas', 'lijas', 'hardware', 'ramps'],
     defaultCategory: 'tablas',
   },
   {
@@ -34,19 +34,11 @@ export const SHOP_GROUPS: ShopGroup[] = [
   },
   {
     id: 'clothing',
-    label: { en: 'Clothing', es: 'Ropa' },
-    title: { en: 'Clothing', es: 'Ropa' },
+    label: { en: 'Apparel', es: 'Para ponerse' },
+    title: { en: 'Apparel', es: 'Para ponerse' },
     icon: 'shirt',
     dbCategories: ['merch'],
     defaultCategory: 'merch',
-  },
-  {
-    id: 'accessories',
-    label: { en: 'Accessories', es: 'Accesorios' },
-    title: { en: 'Accessories', es: 'Accesorios' },
-    icon: 'hat',
-    dbCategories: ['hardware'],
-    defaultCategory: 'hardware',
   },
 ]
 
@@ -54,7 +46,7 @@ export function groupForProductCategory(category: string): ShopGroup | undefined
   return SHOP_GROUPS.find(g => g.dbCategories.includes(category as ProductCategory))
 }
 
-/** Skate → security → clothing → accessories; unknown categories last. */
+/** Skate → security → apparel; unknown categories last. */
 export function shopGroupOrderIndex(category: string): number {
   const id = groupForProductCategory(category)?.id
   const index = SHOP_GROUPS.findIndex(g => g.id === id)

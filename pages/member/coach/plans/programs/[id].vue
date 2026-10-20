@@ -57,30 +57,10 @@ watch(programId, load)
 
 <template>
   <div class="min-h-screen bg-gray-950 pb-24">
-    <header class="sticky top-0 z-10 bg-gray-950/95 border-b border-gray-800 px-4 py-4">
-      <div class="max-w-2xl mx-auto flex items-center gap-3">
-        <NuxtLink
-          to="/member/coach/plans/programs"
-          class="p-2 -ml-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800"
-        >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-        </NuxtLink>
-        <div class="min-w-0 flex-1">
-          <h1 v-if="program" class="text-xl font-bold text-white truncate">
-            {{ program.name }}
-          </h1>
-          <p v-else class="text-sm text-gray-500">—</p>
-        </div>
-        <NuxtLink
-          to="/member/coach/plans"
-          class="text-xs text-gold-400/90 hover:underline shrink-0"
-        >
-          {{ lang === 'es' ? 'Planeación' : 'Planning' }}
-        </NuxtLink>
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="program?.name || (lang === 'es' ? 'Programa' : 'Program')"
+      :subtitle="lang === 'es' ? 'Detalle del programa' : 'Program detail'"
+    />
 
     <div v-if="loading" class="py-16 text-center text-gray-500">…</div>
     <div v-else-if="!program" class="px-4 py-12 text-center text-gray-500 text-sm max-w-md mx-auto">

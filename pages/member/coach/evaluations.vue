@@ -254,24 +254,10 @@ const getAverageRating = (evaluation: any) => {
 <template>
   <div class="min-h-screen bg-black pb-24">
     <!-- Header -->
-    <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-      <div class="px-4 py-4 max-w-lg mx-auto">
-        <div class="flex items-center gap-3 mb-4">
-          <button @click="router.push('/member/coach/students')" class="p-2 -ml-2 text-white">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div>
-            <h1 class="text-xl font-bold text-white">
-              {{ language === 'es' ? 'Evaluaciones' : 'Evaluations' }}
-            </h1>
-            <p class="text-sm text-gray-400">{{ language === 'es' ? 'Evaluar estudiantes' : 'Evaluate students' }}</p>
-          </div>
-        </div>
-
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Evaluación' : 'Evaluation'"
+      :subtitle="language === 'es' ? 'Evaluar estudiantes' : 'Evaluate students'"
+    />
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">

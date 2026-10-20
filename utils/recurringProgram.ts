@@ -24,7 +24,9 @@ export function parseYmd(ymd: string): Date {
  */
 export function nearestProgramStartDate(from: Date, weekdays: number[]): string {
   if (!weekdays.length) return format(from, 'yyyy-MM-dd')
-  const primary = Math.min(...weekdays)
+  // Weeks start on Monday, so Sunday (0) is the last training day, not the first.
+  const mondayFirst = (d: number) => (d === 0 ? 7 : d)
+  const primary = weekdays.reduce((a, b) => (mondayFirst(b) < mondayFirst(a) ? b : a))
   return format(nextDateOnOrAfterWeekday(from, primary), 'yyyy-MM-dd')
 }
 
@@ -38,7 +40,8 @@ export function clampYmd(value: string, min?: string | null, max?: string | null
 
 export type ProgramOccurrence = {
   date: string
-  slot: TimeSlot
+  /** A built-in TimeSlot or a custom horario id. */
+  slot: string
   /** Lands on a MX national holiday: scheduled for reference, never bookable. */
   isHoliday: boolean
 }
@@ -52,7 +55,7 @@ export function generateProgramOccurrences(opts: {
   startDate: string
   endDate?: string | null
   weekdays: number[]
-  slots: TimeSlot[]
+  slots: string[]
   maxClasses: number
   /** Drop these YYYY-MM-DD dates entirely. */
   skipDates?: Set<string> | string[]
@@ -92,7 +95,7 @@ export function generateProgramOccurrences(opts: {
       for (const slot of slots) {
         const listedOk = opts.allowListedSlots
         const summerOk = slot === 'summer' && dow >= 1 && dow <= 5
-        if (!listedOk && !allowed.includes(slot) && !summerOk) continue
+        if (!listedOk && !allowed.includes(slot as TimeSlot) && !summerOk) continue
         out.push({ date: dateStr, slot, isHoliday })
         if (!isHoliday) bookable += 1
         if (bookable >= opts.maxClasses) break
@@ -131,7 +134,7 @@ export function computeSummerCourseEndDate(
 export function computeProgramEndDate(opts: {
   startDate: string
   weekdays: number[]
-  slots: TimeSlot[]
+  slots: string[]
   maxClasses: number
   endCap?: string | null
   allowListedSlots?: boolean
@@ -152,7 +155,7 @@ export function computeProgramEndDate(opts: {
 export function syncProgramDateRange(opts: {
   from?: Date
   weekdays: number[]
-  slots: TimeSlot[]
+  slots: string[]
   maxClasses: number
   endCap?: string | null
   allowListedSlots?: boolean

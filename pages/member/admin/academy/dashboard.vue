@@ -120,28 +120,10 @@ const formatDate = (date: string) => {
 <template>
   <div class="min-h-screen bg-black">
     <!-- Header -->
-    <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-      <div class="px-4 py-4 max-w-2xl mx-auto">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <button type="button" @click="router.push('/member/admin/academy')" class="p-2 -ml-2 text-white">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div>
-              <h1 class="text-xl font-bold text-white">
-                {{ language === 'es' ? 'Panel de Admin' : 'Admin Dashboard' }}
-              </h1>
-              <p class="text-sm text-gray-400">NiikSkate Academy</p>
-            </div>
-          </div>
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-gold-400 to-gold-500 flex items-center justify-center">
-            <span class="text-black font-bold">👑</span>
-          </div>
-        </div>
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Panel academia' : 'Academy dashboard'"
+      subtitle="NiikSkate Academy"
+    />
 
     <!-- Loading State -->
     <div v-if="checkingRole" class="flex items-center justify-center py-20">
@@ -158,36 +140,36 @@ const formatDate = (date: string) => {
         <!-- Total Bookings -->
         <NuxtLink
           to="/member/admin/academy/registrations"
-          class="bg-gradient-to-br from-glass-blue/20 to-glass-purple/20 rounded-2xl p-4 border border-glass-blue/30 hover:border-glass-blue/50 transition-colors block"
+          class="rounded-2xl p-4 border border-charcoal-700 bg-charcoal-800 hover:border-acid/50 transition-colors block"
         >
-          <p class="text-3xl font-bold text-white">{{ stats.totalBookings }}</p>
+          <p class="text-3xl font-bold text-acid">{{ stats.totalBookings }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Reservas Totales' : 'Total Bookings' }}</p>
         </NuxtLink>
 
         <!-- Pending (Registrations) -->
         <NuxtLink
           to="/member/admin/academy/registrations"
-          class="bg-gradient-to-br from-gold-400/20 to-gold-500/20 rounded-2xl p-4 border border-gold-400/30 hover:border-gold-400/50 transition-colors block"
+          class="rounded-2xl p-4 border border-charcoal-700 bg-charcoal-800 hover:border-acid/50 transition-colors block"
         >
-          <p class="text-3xl font-bold text-gold-400">{{ stats.pendingRegistrations }}</p>
+          <p class="text-3xl font-bold text-acid">{{ stats.pendingRegistrations }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Pendientes' : 'Pending' }}</p>
         </NuxtLink>
 
         <!-- Active Coaches -->
         <NuxtLink
           to="/member/admin/scheduling/coaches"
-          class="bg-gradient-to-br from-glass-green/20 to-glass-blue/20 rounded-2xl p-4 border border-glass-green/30 hover:border-glass-green/50 transition-colors block"
+          class="rounded-2xl p-4 border border-charcoal-700 bg-charcoal-800 hover:border-acid/50 transition-colors block"
         >
-          <p class="text-3xl font-bold text-glass-green">{{ stats.activeCoaches }}</p>
+          <p class="text-3xl font-bold text-acid">{{ stats.activeCoaches }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Coaches Activos' : 'Active Coaches' }}</p>
         </NuxtLink>
 
         <!-- Patinadores → Users (customers) -->
         <NuxtLink
           to="/member/admin/academy/users?role=customer"
-          class="bg-gradient-to-br from-flame-600/20 to-glass-orange/20 rounded-2xl p-4 border border-flame-600/30 hover:border-flame-600/50 transition-colors block"
+          class="rounded-2xl p-4 border border-charcoal-700 bg-charcoal-800 hover:border-acid/50 transition-colors block"
         >
-          <p class="text-3xl font-bold text-flame-600">{{ stats.totalCustomers }}</p>
+          <p class="text-3xl font-bold text-acid">{{ stats.totalCustomers }}</p>
           <p class="text-sm text-gray-400">{{ language === 'es' ? 'Patinadores' : 'Skaters' }}</p>
         </NuxtLink>
       </div>

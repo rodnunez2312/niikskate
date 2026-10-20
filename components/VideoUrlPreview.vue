@@ -3,6 +3,9 @@ import { parseVideoUrl, type ParsedVideoUrl } from '~/utils/videoEmbed'
 
 const props = defineProps<{
   url: string
+  autoplay?: boolean
+  /** Smaller player for the tricks popup. Hides the long link. */
+  compact?: boolean
 }>()
 
 const parsed = computed<ParsedVideoUrl | null>(() => parseVideoUrl(props.url))
@@ -48,11 +51,24 @@ watch(
         class="rounded-xl overflow-hidden border border-gray-700 bg-black"
       >
         <iframe
-          :src="parsed.embedUrl"
+          :src="props.autoplay ? `${parsed.embedUrl}${parsed.embedUrl.includes('?') ? '&' : '?'}autoplay=1` : parsed.embedUrl"
           :title="`YouTube video ${parsed.videoId || ''}`.trim()"
           class="w-full aspect-video"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowfullscreen
+          loading="lazy"
+        />
+      </div>
+
+      <div
+        v-else-if="parsed.kind === 'instagram' && props.compact && parsed.embedUrl"
+        class="mx-auto w-full max-w-[400px]"
+      >
+        <iframe
+          :src="parsed.embedUrl"
+          title="Instagram"
+          class="w-full h-[640px] max-h-[75vh] rounded-xl border border-gray-700 bg-black"
+          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
           loading="lazy"
         />
       </div>
@@ -76,12 +92,22 @@ watch(
     </ClientOnly>
 
     <a
+      v-if="!props.compact"
       :href="parsed.canonicalUrl"
       target="_blank"
       rel="noopener noreferrer"
       class="inline-block text-sky-400 underline break-all text-sm"
     >
       {{ parsed.canonicalUrl }}
+    </a>
+    <a
+      v-else-if="parsed.kind === 'instagram'"
+      :href="parsed.canonicalUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="block text-center text-xs text-sky-400 underline"
+    >
+      Instagram
     </a>
   </div>
 </template>

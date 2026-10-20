@@ -4,6 +4,12 @@ definePageMeta({ layout: 'public' })
 import type { Product } from '~/types'
 import RampRequestModal from '~/components/skateramps/RampRequestModal.vue'
 import { compareShopProducts, productImageUrl } from '~/utils/shopCatalog'
+import {
+  RAMP_CONSTRUCTION_TYPES,
+  RAMP_SURFACING_OPTIONS,
+  parseRampClientOptions,
+  type RampConstructionType,
+} from '~/utils/skaterampCatalog'
 
 const { products, loading, fetchProducts } = useProducts()
 const { language, formatPrice } = useI18n()
@@ -16,7 +22,11 @@ type RampProject = {
   title: string
   slug: string | null
   description: string | null
+  build_notes: string | null
   image_urls: string[] | null
+  video_urls: string[] | null
+  construction_type: RampConstructionType | null
+  client_options: Record<string, unknown> | null
   product_id: string | null
 }
 
@@ -33,7 +43,7 @@ onMounted(async () => {
   try {
     const { data } = await client
       .from('skateramp_projects')
-      .select('id, title, slug, description, image_urls, product_id')
+      .select('id, title, slug, description, build_notes, image_urls, video_urls, construction_type, client_options, product_id')
       .eq('is_published', true)
       .order('updated_at', { ascending: false })
     rampProjects.value = (data || []) as RampProject[]
@@ -49,6 +59,24 @@ function projectImage(p: RampProject) {
   return urls[0] || null
 }
 
+function constructionLabel(type: RampConstructionType | null) {
+  const opt = RAMP_CONSTRUCTION_TYPES.find(row => row.id === type)
+  return opt ? (es.value ? opt.es : opt.en) : null
+}
+
+function clientOptionLines(p: RampProject) {
+  const opts = parseRampClientOptions(p.client_options)
+  const lines: string[] = []
+  const surfacing = RAMP_SURFACING_OPTIONS.find(row => row.id === opts.surfacing)
+  if (surfacing) lines.push(`${es.value ? 'Superficie' : 'Surfacing'}: ${es.value ? surfacing.es : surfacing.en}`)
+  if (opts.casterWheels != null) {
+    lines.push(`${es.value ? 'Ruedas caster' : 'Caster wheels'}: ${opts.casterWheels ? (es.value ? 'Sí' : 'Yes') : 'No'}`)
+  }
+  if (opts.weatherCoating != null) {
+    lines.push(`${es.value ? 'Recubrimiento' : 'Weather coating'}: ${opts.weatherCoating ? (es.value ? 'Sí' : 'Yes') : 'No'}`)
+  }
+  return lines
+}
 function productForProject(p: RampProject): Product | undefined {
   if (!p.product_id) return undefined
   return rampProducts.value.find(pr => pr.id === p.product_id)
@@ -149,9 +177,27 @@ const requestModalOpen = ref(false)
                 />
                 <div v-else class="w-full h-full flex items-center justify-center text-5xl">🛹</div>
               </div>
-              <div class="p-4">
+              <div class="p-4 space-y-2">
+                <p v-if="constructionLabel(proj.construction_type)" class="text-[10px] uppercase tracking-wide text-cyan-300 font-bold">
+                  {{ constructionLabel(proj.construction_type) }}
+                </p>
                 <h3 class="font-black uppercase text-sm">{{ proj.title }}</h3>
-                <p v-if="proj.description" class="text-gray-400 text-xs mt-2 line-clamp-3">{{ proj.description }}</p>
+                <p v-if="proj.description" class="text-gray-400 text-xs line-clamp-3">{{ proj.description }}</p>
+                <pre v-if="proj.build_notes" class="text-[11px] text-gray-300 whitespace-pre-wrap font-sans leading-snug">{{ proj.build_notes }}</pre>
+                <ul v-if="clientOptionLines(proj).length" class="text-[11px] text-gray-400 space-y-0.5">
+                  <li v-for="line in clientOptionLines(proj)" :key="line">{{ line }}</li>
+                </ul>
+                <div v-if="proj.video_urls?.length" class="space-y-2 pt-1">
+                  <video
+                    v-for="url in proj.video_urls"
+                    :key="url"
+                    :src="url"
+                    class="w-full rounded-lg border border-gray-800"
+                    controls
+                    playsinline
+                    preload="metadata"
+                  />
+                </div>
               </div>
             </article>
           </div>

@@ -13,7 +13,24 @@ import {
   compareSkillsByManualId,
   trickTaxonomySortIndex,
 } from '~/utils/skateTrickTaxonomy'
-import { hasEmbeddableVideoPreview } from '~/utils/videoEmbed'
+import { hasEmbeddableVideoPreview, parseVideoUrl } from '~/utils/videoEmbed'
+
+function tableDifficultyClass(difficulty?: string | null) {
+  if (difficulty === 'intermediate') return 'bg-lime-200 text-gray-900'
+  if (difficulty === 'advanced') return 'bg-purple-100 text-purple-800'
+  return 'bg-green-100 text-green-800'
+}
+
+function tableAreaClass(area?: string | null) {
+  const name = (area || '').trim()
+  if (name === 'Flatground') return 'bg-lime-200 text-gray-900'
+  if (name === 'Street') return 'bg-orange-100 text-orange-800'
+  if (name === 'Park' || name === 'Bowl') return 'bg-emerald-100 text-emerald-800'
+  if (name === 'Mini Ramp') return 'bg-pink-100 text-pink-800'
+  if (name === 'Vert') return 'bg-violet-100 text-violet-800'
+  if (name === 'Warmup') return 'bg-slate-100 text-slate-700'
+  return 'bg-gray-200 text-gray-700'
+}
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -27,6 +44,10 @@ const router = useRouter()
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { language } = useI18n()
+
+useHead({
+  title: computed(() => (language.value === 'es' ? 'Bolsa de trucos' : 'Bag of Tricks')),
+})
 const { syncing, syncNiikLibrary } = useNiikLibrarySync()
 const { syncing: syncingStrength, syncStrengthLibrary } = useStrengthLibrary()
 
@@ -65,6 +86,7 @@ const HABILIDAD_MOTRIZ_OPTIONS = [
 ]
 
 const trickDetailSkill = ref<any | null>(null)
+const videoPopup = ref<{ name: string; url: string; kind: 'instagram' | 'youtube' | 'website' } | null>(null)
 const detailEditing = ref(false)
 const editSaving = ref(false)
 const deletingTrick = ref(false)
@@ -132,8 +154,37 @@ function trickDetailComments(skill: any): string | null {
 }
 
 function trickDetailUrl(skill: any): string | null {
-  const url = (skill?.video_url || trickDetailMeta(skill)?.url || '').trim()
-  return url || null
+  return trickVideoSources(skill)[0]?.url || null
+}
+
+function trickVideoSources(skill: any): Array<{ kind: 'instagram' | 'youtube' | 'website'; url: string }> {
+  const raw = [skill?.video_url, trickDetailMeta(skill)?.url].filter(Boolean).join('\n')
+  const seen = new Set<string>()
+  const sources: Array<{ kind: 'instagram' | 'youtube' | 'website'; url: string }> = []
+  for (const part of raw.split(/\s+/)) {
+    const parsed = parseVideoUrl(part)
+    if (!parsed || seen.has(parsed.canonicalUrl)) continue
+    seen.add(parsed.canonicalUrl)
+    sources.push({
+      kind: parsed.kind === 'instagram' || parsed.kind === 'youtube' ? parsed.kind : 'website',
+      url: parsed.canonicalUrl,
+    })
+  }
+  return sources
+}
+
+function isDirectVideoFile(url: string) {
+  return /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(url)
+}
+
+function openVideoPopup(skill: any, url: string) {
+  const parsed = parseVideoUrl(url)
+  const kind = parsed?.kind === 'instagram' || parsed?.kind === 'youtube' ? parsed.kind : 'website'
+  videoPopup.value = {
+    name: (language.value === 'es' ? skill.name_es || skill.name : skill.name) || '',
+    url,
+    kind,
+  }
 }
 
 onMounted(async () => {
@@ -488,34 +539,30 @@ function closeDetail() {
 
 <template>
   <div class="min-h-screen bg-black pb-12">
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Bolsa de trucos' : 'Bag of Tricks'"
+      :subtitle="language === 'es' ? 'Biblioteca del manual Niik' : 'Niik manual library'"
+    >
+      <template #actions>
+        <button
+          v-if="userRole === 'admin' || userRole === 'coach'"
+          type="button"
+          :disabled="syncing || syncingStrength"
+          class="px-3 py-2 rounded-xl border border-gray-700 text-sm font-semibold text-gray-200 disabled:opacity-50"
+          @click="syncFromExcel"
+        >
+          {{ syncing || syncingStrength ? '…' : (language === 'es' ? 'Sincronizar' : 'Sync') }}
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2.5 rounded-xl bg-acid text-charcoal text-sm font-semibold"
+          @click="openAddTrickModal"
+        >
+          + {{ language === 'es' ? 'Añadir truco' : 'Add trick' }}
+        </button>
+      </template>
+    </MemberStaffPageHeader>
     <div class="max-w-lg lg:max-w-7xl mx-auto w-full px-4 py-6 space-y-6">
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h1 class="text-2xl font-bold text-white flex items-center gap-2">
-            <span aria-hidden="true">🛹</span>
-            {{ language === 'es' ? 'Trucos' : 'Tricks' }}
-          </h1>
-          <p class="text-sm text-gray-400 mt-1">
-            {{
-              language === 'es'
-                ? 'Biblioteca completa del manual Niik — filtra, añade y gestiona trucos.'
-                : 'Full Niik manual library — filter, add, and manage tricks.'
-            }}
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2 shrink-0">
-          <button
-            v-if="userRole === 'admin' || userRole === 'coach'"
-            type="button"
-            :disabled="syncing || syncingStrength"
-            class="text-sm px-4 py-2 rounded-xl bg-gray-800 text-gray-200 hover:bg-gray-700 disabled:opacity-50"
-            @click="syncFromExcel"
-          >
-            {{ syncing || syncingStrength ? '…' : (language === 'es' ? 'Sincronizar Excel' : 'Sync Excel') }}
-          </button>
-        </div>
-      </div>
 
       <!-- Pick mode banner -->
       <div
@@ -531,7 +578,7 @@ function closeDetail() {
           class="px-4 py-2 rounded-lg bg-gold-400 text-black text-sm font-bold"
           @click="applyPickToPlan"
         >
-          {{ language === 'es' ? 'Volver al plan' : 'Back to plan' }}
+          {{ language === 'es' ? 'Añadir al plan' : 'Add to plan' }}
         </button>
       </div>
 
@@ -591,65 +638,57 @@ function closeDetail() {
         <div class="w-10 h-10 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
       </div>
       <div v-else class="space-y-2">
-        <div class="flex items-center justify-end">
-          <button
-            type="button"
-            class="text-sm px-4 py-2 rounded-xl bg-gold-400 text-black font-bold hover:bg-gold-300"
-            @click="openAddTrickModal"
-          >
-            {{ language === 'es' ? '+ Añadir truco' : '+ Add trick' }}
-          </button>
-        </div>
-        <div class="overflow-x-auto rounded-xl border border-gray-800 bg-gray-950/40">
+        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white text-gray-900 [color-scheme:light]">
         <table class="w-full min-w-[720px] text-sm text-left">
-          <thead class="bg-gray-800/90 text-gray-400 text-xs uppercase tracking-wide">
+          <thead class="bg-gray-100 text-gray-900 text-[11px] uppercase tracking-wide">
             <tr>
-              <th v-if="pickMode" class="px-3 py-3 w-10" />
-              <th class="px-3 py-3 w-12">
-                <button type="button" class="hover:text-white transition-colors" @click="toggleSort('manual_id')">
+              <th v-if="pickMode" class="px-2 py-1.5 w-10" />
+              <th class="px-2 py-1.5 w-12">
+                <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('manual_id')">
                   #{{ sortIndicator('manual_id') }}
                 </button>
               </th>
-              <th class="px-3 py-3">
-                <button type="button" class="hover:text-white transition-colors" @click="toggleSort('name')">
+              <th class="px-2 py-1.5">
+                <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('name')">
                   {{ language === 'es' ? 'Habilidad' : 'Skill' }}{{ sortIndicator('name') }}
                 </button>
               </th>
-              <th class="px-3 py-3">
-                <button type="button" class="hover:text-white transition-colors" @click="toggleSort('difficulty')">
+              <th class="px-2 py-1.5">
+                <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('difficulty')">
                   {{ language === 'es' ? 'Nivel' : 'Level' }}{{ sortIndicator('difficulty') }}
                 </button>
               </th>
-              <th class="px-3 py-3">
-                <button type="button" class="hover:text-white transition-colors" @click="toggleSort('area')">
+              <th class="px-2 py-1.5">
+                <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('area')">
                   Area{{ sortIndicator('area') }}
                 </button>
               </th>
-              <th class="px-3 py-3">
-                <button type="button" class="hover:text-white transition-colors" @click="toggleSort('program')">
+              <th class="px-2 py-1.5">
+                <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('program')">
                   Program{{ sortIndicator('program') }}
                 </button>
               </th>
-              <th class="px-3 py-3">
-                <button type="button" class="hover:text-white transition-colors" @click="toggleSort('type')">
+              <th class="px-2 py-1.5">
+                <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('type')">
                   Type{{ sortIndicator('type') }}
                 </button>
               </th>
+              <th class="px-2 py-1.5 text-center">Video</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-800/80">
+          <tbody>
             <template v-if="filteredSkills.length">
               <tr
                 v-for="(skill, rowIdx) in filteredSkills"
                 :key="skill.id"
-                class="hover:bg-gray-800/70 transition-colors cursor-pointer"
+                class="hover:bg-gray-200/70 transition-colors cursor-pointer"
                 :class="[
-                  rowIdx % 2 === 0 ? 'bg-gray-900/55' : 'bg-gray-900/35',
-                  pickMode && pickedIds.includes(skill.id) ? 'ring-1 ring-inset ring-gold-400/50' : '',
+                  rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-100',
+                  pickMode && pickedIds.includes(skill.id) ? 'ring-1 ring-inset ring-gray-400' : '',
                 ]"
                 @click="openDetail(skill)"
               >
-                <td v-if="pickMode" class="px-3 py-2" @click.stop>
+                <td v-if="pickMode" class="px-2 py-1" @click.stop>
                   <input
                     type="checkbox"
                     :checked="pickedIds.includes(skill.id)"
@@ -657,33 +696,94 @@ function closeDetail() {
                     @change="togglePick(skill.id)"
                   >
                 </td>
-                <td class="px-3 py-2 font-mono text-xs text-gray-500 whitespace-nowrap">
+                <td class="px-2 py-1 font-mono text-xs text-gray-800 whitespace-nowrap">
                   {{ trickManualLabel(skill) || '—' }}
                 </td>
-                <td class="px-3 py-2 text-white font-medium max-w-[220px]">
+                <td class="px-2 py-1 text-gray-900 font-medium max-w-[220px]">
                   <span class="block truncate">{{ language === 'es' ? skill.name_es || skill.name : skill.name }}</span>
                 </td>
-                <td class="px-3 py-2">
-                  <span class="px-2 py-0.5 rounded text-xs capitalize" :class="difficultyTagClass(skill.difficulty)">{{ skill.difficulty }}</span>
+                <td class="px-2 py-1">
+                  <span class="px-2 py-0.5 rounded text-xs capitalize" :class="tableDifficultyClass(skill.difficulty)">{{ skill.difficulty }}</span>
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap">
-                  <span v-if="skill.area" class="px-2 py-0.5 rounded text-xs" :class="areaTagClass(skill.area)">{{ skill.area }}</span>
+                <td class="px-2 py-1 whitespace-nowrap">
+                  <span v-if="skill.area" class="px-2 py-0.5 rounded text-xs" :class="tableAreaClass(skill.area)">{{ skill.area }}</span>
                   <span v-else class="text-gray-500 text-xs">—</span>
                 </td>
-                <td class="px-3 py-2 text-gray-300 text-xs whitespace-nowrap">{{ skill.program || '—' }}</td>
-                <td class="px-3 py-2 text-gray-300 text-xs whitespace-nowrap">
+                <td class="px-2 py-1 text-gray-900 text-xs whitespace-nowrap">{{ skill.program || '—' }}</td>
+                <td class="px-2 py-1 text-gray-900 text-xs whitespace-nowrap">
                   {{ skill.trick_type || '—' }}
+                </td>
+                <td class="px-2 py-1" @click.stop>
+                  <div v-if="trickVideoSources(skill).length" class="flex items-center justify-center gap-1">
+                    <button
+                      v-for="(source, sourceIdx) in trickVideoSources(skill)"
+                      :key="`${skill.id}-${sourceIdx}`"
+                      type="button"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-md shrink-0"
+                      :class="source.kind === 'youtube' ? 'bg-[#FF0000] text-white' : source.kind === 'website' ? 'bg-charcoal-700 text-cream' : ''"
+                      :aria-label="source.kind"
+                      @click="openVideoPopup(skill, source.url)"
+                    >
+                      <svg v-if="source.kind === 'instagram'" viewBox="0 0 24 24" class="w-7 h-7" aria-hidden="true">
+                        <defs>
+                          <linearGradient :id="`ig-${skill.id}-${sourceIdx}`" x1="0" y1="1" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#f9ce34" />
+                            <stop offset="45%" stop-color="#ee2a7b" />
+                            <stop offset="100%" stop-color="#6228d7" />
+                          </linearGradient>
+                        </defs>
+                        <rect x="1" y="1" width="22" height="22" rx="6" :fill="`url(#ig-${skill.id}-${sourceIdx})`" />
+                        <circle cx="12" cy="12" r="4.2" fill="none" stroke="white" stroke-width="1.6" />
+                        <circle cx="17.2" cy="6.8" r="1" fill="white" />
+                      </svg>
+                      <svg v-else-if="source.kind === 'youtube'" viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true">
+                        <path fill="currentColor" d="M9.2 7.6v8.8l7.4-4.4-7.4-4.4z" />
+                      </svg>
+                      <svg v-else viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <ellipse cx="12" cy="12" rx="4" ry="9" />
+                        <path d="M3 12h18M4.6 7.5h14.8M4.6 16.5h14.8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <span v-else class="block text-center text-gray-600 text-xs">—</span>
                 </td>
               </tr>
             </template>
             <tr v-else>
-              <td :colspan="pickMode ? 7 : 6" class="px-4 py-12 text-center text-gray-500">
+              <td :colspan="pickMode ? 8 : 7" class="px-4 py-12 text-center text-gray-500">
                 {{ language === 'es' ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.' }}
               </td>
             </tr>
           </tbody>
         </table>
         </div>
+      </div>
+    </div>
+
+    <div
+      v-if="videoPopup"
+      class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+      @click="videoPopup = null"
+    >
+      <div
+        class="w-full bg-gray-900 border border-gray-700 rounded-2xl p-3"
+        :class="videoPopup.kind === 'instagram' ? 'max-w-md' : 'max-w-3xl'"
+        @click.stop
+      >
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <h3 class="text-white text-sm font-semibold min-w-0 leading-snug">{{ videoPopup.name }}</h3>
+          <button type="button" class="w-7 h-7 rounded-lg bg-gray-800 text-gray-300 shrink-0 text-sm" @click="videoPopup = null">×</button>
+        </div>
+        <video
+          v-if="isDirectVideoFile(videoPopup.url)"
+          :src="videoPopup.url"
+          class="w-full rounded-xl bg-black aspect-video"
+          controls
+          autoplay
+          playsinline
+        />
+        <VideoUrlPreview v-else :url="videoPopup.url" autoplay compact />
       </div>
     </div>
 

@@ -27,7 +27,7 @@ useHead({
   <div v-if="season">
     <section class="bg-black text-white border-b border-white/10">
       <div class="max-w-3xl mx-auto px-4 py-6 flex flex-wrap items-center justify-between gap-3">
-        <NuxtLink to="/#schedule" class="text-sm text-gold-400 hover:text-gold-300 font-bold">
+        <NuxtLink to="/skate-programs#temporadas" class="text-sm text-gold-400 hover:text-gold-300 font-bold">
           ← {{ es ? 'Temporadas' : 'Seasons' }}
         </NuxtLink>
         <NuxtLink

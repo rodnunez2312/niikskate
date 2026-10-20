@@ -41,7 +41,12 @@ const loading = ref(true)
 const users = ref<User[]>([])
 const searchQuery = ref('')
 
-const skillGroupsList = ref<Array<{ id: string; name: string; color?: string | null; sort_order: number; is_active?: boolean | null }>>([])
+const { programs: loadedSkillGroups, load: loadSkillGroups, optionLabel } = useSkillGroupPrograms()
+const skillGroupsList = loadedSkillGroups
+const trainingBoards = ref<Array<{ id: string; name: string; discipline: string }>>([])
+const boardIndex = ref(0)
+const boardIndexReady = ref(false)
+const currentBoard = computed(() => trainingBoards.value[boardIndex.value] || null)
 
 const kanbanMode = ref<'program' | 'level'>('program')
 const draggingCardKey = ref<string | null>(null)
@@ -205,17 +210,82 @@ const loadCrewMembers = async () => {
 
 const loadSkaterMeta = async () => {
   try {
-    const { data: sg, error } = await client
-      .from('skill_groups')
-      .select('id,name,color,sort_order,is_active')
+    await loadSkillGroups()
+    const boards = await client
+      .from('training_programs')
+      .select('id, name, discipline, is_active, sort_order')
       .order('sort_order')
-    if (error) throw error
-    skillGroupsList.value = ((sg || []) as typeof skillGroupsList.value).filter(
-      g => g.is_active !== false,
-    )
+    if (!boards.error && boards.data?.length) {
+      trainingBoards.value = boards.data
+        .filter(row => row.is_active !== false)
+        .map(row => ({ id: row.id, name: row.name, discipline: row.discipline }))
+    } else {
+      const seen = new Map<string, { id: string; name: string; discipline: string }>()
+      for (const group of skillGroupsList.value) {
+        if (!group.programId || seen.has(group.programId)) continue
+        seen.set(group.programId, {
+          id: group.programId,
+          name: group.programName || group.discipline || 'Program',
+          discipline: group.discipline || '',
+        })
+      }
+      trainingBoards.value = [...seen.values()]
+    }
+    if (!boardIndexReady.value) {
+      const skate = trainingBoards.value.findIndex(board => board.discipline === 'skateboarding')
+      boardIndex.value = skate >= 0 ? skate : 0
+      boardIndexReady.value = true
+    }
+    if (boardIndex.value >= trainingBoards.value.length) boardIndex.value = 0
   } catch (e) {
     console.error('loadSkaterMeta:', e)
   }
+}
+
+function shiftBoard(delta: number) {
+  const count = trainingBoards.value.length
+  if (count < 2) return
+  boardIndex.value = (boardIndex.value + delta + count) % count
+}
+
+function scrollProgramChip(index: number) {
+  if (!import.meta.client) return
+  document.getElementById(`program-chip-${index}`)?.scrollIntoView({
+    behavior: 'smooth',
+    inline: 'center',
+    block: 'nearest',
+  })
+}
+
+watch(boardIndex, index => scrollProgramChip(index))
+
+let boardTouchX = 0
+function onBoardTouchStart(event: TouchEvent) {
+  boardTouchX = event.changedTouches[0]?.clientX ?? 0
+}
+function onBoardTouchEnd(event: TouchEvent) {
+  const x = event.changedTouches[0]?.clientX ?? 0
+  const delta = x - boardTouchX
+  if (Math.abs(delta) < 48) return
+  shiftBoard(delta < 0 ? 1 : -1)
+}
+
+const boardLevelIds = computed(() => {
+  const programId = currentBoard.value?.id
+  if (!programId || !skillGroupsList.value.some(group => group.programId)) return null
+  return new Set(
+    assignableSkillGroups(skillGroupsList.value)
+      .filter(group => group.programId === programId)
+      .map(group => group.id),
+  )
+})
+
+function onThisBoard(student: { skill_group_id?: string | null }) {
+  const ids = boardLevelIds.value
+  if (!ids) return true
+  const levelId = effectiveSkaterLevelId(student.skill_group_id, skillGroupsList.value)
+  if (!levelId) return true
+  return ids.has(levelId)
 }
 
 const loadUsers = async () => {
@@ -241,7 +311,7 @@ const filteredUsers = computed(() => {
   return users.value.filter(u => {
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
-      return u.full_name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query)
+      return (u.full_name || '').toLowerCase().includes(query) || (u.email || '').toLowerCase().includes(query)
     }
     return true
   })
@@ -270,8 +340,59 @@ const seasonLabelFor = (u: User) => seasonLabelForSlug(seasonSlugFromSchedule(u.
 const programNameFor = (u: User) => {
   const gid = effectiveSkaterLevelId(u.skill_group_id, skillGroupsList.value)
   if (!gid) return null
-  const name = skillGroupsList.value.find(g => g.id === gid)?.name
-  return name ? normalizeSkillGroupDisplayName(name) : null
+  const group = skillGroupsList.value.find(g => g.id === gid)
+  return group ? optionLabel(group) : null
+}
+
+function programIdForStudent(student: { skill_group_id?: string | null }) {
+  const levelId = effectiveSkaterLevelId(student.skill_group_id, skillGroupsList.value)
+  if (!levelId) return null
+  return skillGroupsList.value.find(group => group.id === levelId)?.programId ?? null
+}
+
+const searchHits = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (query.length < 1) return []
+  return users.value
+    .filter(student => {
+      if (!isSkaterProfile(student)) return false
+      const name = (student.full_name || '').toLowerCase()
+      const email = (student.email || '').toLowerCase()
+      return name.includes(query) || email.includes(query)
+    })
+    .slice(0, 8)
+    .map(student => {
+      const programId = programIdForStudent(student)
+      const board = trainingBoards.value.find(item => item.id === programId)
+      return {
+        id: student.id,
+        name: student.full_name,
+        programId,
+        programName: board?.name || (language.value === 'es' ? 'Sin programa' : 'No program'),
+      }
+    })
+})
+
+watch(searchHits, (hits) => {
+  if (!hits.length) return
+  const here = currentBoard.value?.id
+  if (hits.some(hit => !hit.programId || hit.programId === here)) return
+  const index = trainingBoards.value.findIndex(board => board.id === hits[0]?.programId)
+  if (index >= 0) boardIndex.value = index
+})
+
+function openStudentProgram(hit: { programId: string | null; name: string }) {
+  const index = trainingBoards.value.findIndex(board => board.id === hit.programId)
+  if (index >= 0) boardIndex.value = index
+  searchQuery.value = hit.name
+}
+
+function disciplineIcon(discipline: string | undefined) {
+  if (discipline === 'scooter') return '🛴'
+  if (discipline === 'rollerblading') return '🛼'
+  if (discipline === 'bmx') return '🚲'
+  if (discipline === 'parkour') return '🤸'
+  return '🛹'
 }
 
 const skillBandLabelFor = (u: User) =>
@@ -316,23 +437,26 @@ const adminSkaterCards = computed((): AdminSkaterCard[] => {
   return cards.sort((a, b) => a.name.localeCompare(b.name))
 })
 
-const skaterCount = computed(() => adminSkaterCards.value.length)
+const skaterCount = computed(() => skaterProfileUsers.value.filter(onThisBoard).length)
 
 const inactiveSkaters = computed(() =>
-  users.value.filter(u => isSkaterProfile(u) && !u.is_active),
+  users.value.filter(u => isSkaterProfile(u) && !u.is_active && onThisBoard(u)),
 )
 
 const columnItemCount = (col: KanbanColumn) => col.students.length
 
 const programKanbanColumns = computed((): KanbanColumn[] => {
-  const pool = skaterProfileUsers.value
+  const pool = skaterProfileUsers.value.filter(onThisBoard)
+  const levels = boardLevelIds.value
+    ? assignablePrograms.value.filter(group => boardLevelIds.value!.has(group.id))
+    : assignablePrograms.value
   const cols: KanbanColumn[] = [
     {
       id: UNASSIGNED_COLUMN,
       title: language.value === 'es' ? 'Sin programa' : 'No program',
       students: [] as User[],
     },
-    ...assignablePrograms.value.map(g => ({
+    ...levels.map(g => ({
       id: g.id,
       title: normalizeSkillGroupDisplayName(g.name),
       color: g.color,
@@ -354,7 +478,7 @@ const programKanbanColumns = computed((): KanbanColumn[] => {
 })
 
 const levelKanbanColumns = computed((): KanbanColumn[] => {
-  const pool = skaterProfileUsers.value
+  const pool = skaterProfileUsers.value.filter(onThisBoard)
   const es = language.value === 'es'
   const cols: KanbanColumn[] = [
     {
@@ -868,6 +992,43 @@ const submitAddSkater = async () => {
   }
 }
 
+const familyPendingDelete = ref<User | null>(null)
+const familyDeleting = ref(false)
+const familyDeleteError = ref('')
+
+const askDeleteFamily = (family: User) => {
+  familyDeleteError.value = ''
+  familyPendingDelete.value = family
+}
+
+const confirmDeleteFamily = async () => {
+  const family = familyPendingDelete.value
+  if (!family || family.id === user.value?.id) return
+  familyDeleting.value = true
+  familyDeleteError.value = ''
+  try {
+    await $fetch('/api/admin/delete-user', {
+      method: 'POST',
+      headers: await adminAuthHeaders(),
+      body: { userId: family.id },
+    })
+    const name = family.full_name
+    familyPendingDelete.value = null
+    if (editingFamilyId.value === family.id) closeAddFamilyModal()
+    await loadUsers()
+    skaterSaveMessage.value = language.value === 'es'
+      ? `Familia ${name} eliminada. Los estudiantes se quedan.`
+      : `Family ${name} removed. Students stay.`
+    setTimeout(() => {
+      skaterSaveMessage.value = ''
+    }, 5000)
+  } catch (e: any) {
+    familyDeleteError.value = e?.data?.message || e?.message || 'Error deleting family'
+  } finally {
+    familyDeleting.value = false
+  }
+}
+
 const deleteSkater = async (u: User) => {
   if (u.role !== 'customer' || u.id === user.value?.id) return
   const msg =
@@ -1031,65 +1192,103 @@ const scheduleSummary = (u: User) => {
 <template>
   <div class="min-h-screen bg-black pb-24">
     <!-- Header -->
-    <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
-      <div class="px-4 py-4 max-w-[1400px] mx-auto">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3 min-w-0">
-            <button @click="router.push('/member/admin/academy')" class="p-2 -ml-2 text-white flex-shrink-0">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div class="min-w-0">
-              <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                <span class="text-2xl" aria-hidden="true">🛹</span>
-                {{ language === 'es' ? 'Patinadores' : 'Skaters' }}
-              </h1>
-              <p class="text-sm text-gray-400">
-                {{ language === 'es' ? 'Programas, niveles y horario' : 'Programs, levels and schedule' }}
-              </p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Estudiantes' : 'Students'"
+      :subtitle="language === 'es' ? 'Familias y patinadores de la academia' : 'Academy families and skaters'"
+    >
+      <template #actions>
             <button
               type="button"
               @click="openAddFamilyModal"
-              class="px-3 py-2 rounded-xl border border-gold-400/60 text-gold-400 font-semibold text-xs sm:text-sm flex items-center gap-1.5"
+              class="px-3 py-2 rounded-xl border border-gray-700 text-gray-200 font-semibold text-xs sm:text-sm"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              {{ language === 'es' ? 'Familia' : 'Family' }}
+              + {{ language === 'es' ? 'Familia' : 'Family' }}
             </button>
             <button
               type="button"
               @click="openAddSkaterModal"
-              class="px-3 py-2 rounded-xl bg-gold-400 text-black font-semibold text-xs sm:text-sm flex items-center gap-1.5"
+              class="px-3 py-2.5 rounded-xl bg-acid text-charcoal font-semibold text-xs sm:text-sm"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              {{ language === 'es' ? 'Patinador' : 'Skater' }}
+              + {{ language === 'es' ? 'Estudiante' : 'Student' }}
             </button>
-          </div>
-        </div>
+      </template>
+      <div
+        class="flex items-center gap-1 min-w-0"
+        @touchstart.passive="onBoardTouchStart"
+        @touchend.passive="onBoardTouchEnd"
+      >
+            <button
+              type="button"
+              class="p-2 text-white flex-shrink-0 disabled:opacity-30"
+              :disabled="trainingBoards.length < 2"
+              :title="language === 'es' ? 'Programa anterior' : 'Previous program'"
+              @click="shiftBoard(-1)"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div class="min-w-0 flex-1 overflow-x-auto flex items-center gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button
+                v-for="(board, index) in trainingBoards"
+                :id="`program-chip-${index}`"
+                :key="board.id"
+                type="button"
+                class="shrink-0 px-3 py-1.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors"
+                :class="index === boardIndex
+                  ? 'border-gold-400 bg-gold-400/15 text-white'
+                  : 'border-gray-700 text-gray-400 hover:border-gray-500'"
+                @click="boardIndex = index"
+              >
+                <span class="text-base leading-none" aria-hidden="true">{{ disciplineIcon(board.discipline) }}</span>
+                <span class="whitespace-nowrap">{{ board.name }}</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              class="p-2 text-white flex-shrink-0 disabled:opacity-30"
+              :disabled="trainingBoards.length < 2"
+              :title="language === 'es' ? 'Programa siguiente' : 'Next program'"
+              @click="shiftBoard(1)"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+              </svg>
+            </button>
       </div>
-    </header>
+    </MemberStaffPageHeader>
 
     <!-- Content -->
     <div v-if="isAdmin" class="px-4 py-6 max-w-[1400px] mx-auto">
       <!-- Search + kanban mode -->
       <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
         <div class="relative flex-1">
-          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="language === 'es' ? 'Buscar patinadores...' : 'Search skaters...'"
-            class="w-full pl-12 pr-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-500 focus:border-gold-400 outline-none"
-          />
+          <div class="relative">
+            <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              v-model="searchQuery"
+              type="text"
+              :placeholder="language === 'es' ? 'Buscar en todos los programas...' : 'Search every program...'"
+              class="w-full pl-12 pr-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-500 focus:border-gold-400 outline-none"
+            />
+          </div>
+          <div
+            v-if="searchHits.length"
+            class="absolute z-30 left-0 right-0 top-full mt-1 rounded-xl border border-gray-700 bg-gray-900 shadow-xl overflow-hidden"
+          >
+            <button
+              v-for="hit in searchHits"
+              :key="hit.id"
+              type="button"
+              class="w-full px-4 py-2.5 text-left hover:bg-gray-800 flex items-center justify-between gap-3"
+              @click="openStudentProgram(hit)"
+            >
+              <span class="text-sm text-white truncate">{{ hit.name }}</span>
+              <span class="text-xs text-amber-200 shrink-0">{{ hit.programName }}</span>
+            </button>
+          </div>
         </div>
         <div class="flex rounded-xl border border-gray-800 overflow-hidden shrink-0">
           <button
@@ -1112,7 +1311,7 @@ const scheduleSummary = (u: User) => {
       </div>
 
       <p class="text-sm text-gray-400 mb-2">
-        🛹 {{ skaterCount }} {{ language === 'es' ? 'patinadores' : 'skaters' }}
+        {{ skaterCount }} {{ language === 'es' ? 'estudiantes' : 'students' }}
         <span class="text-gray-600">·</span>
         <span class="text-gray-500 text-xs">
           {{ language === 'es' ? 'Arrastra las tarjetas entre columnas' : 'Drag cards between columns' }}
@@ -1126,18 +1325,44 @@ const scheduleSummary = (u: User) => {
           {{ language === 'es' ? 'Familias' : 'Families' }}
         </p>
         <div class="flex flex-wrap gap-2">
-          <button
+          <div
             v-for="f in familyAccounts"
             :key="f.id"
-            type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 text-gray-200 hover:bg-gray-700 border border-gray-700"
-            @click="openEditFamilyModal(f)"
+            class="inline-flex items-center rounded-lg border border-gray-700 bg-gray-800 text-xs"
           >
-            {{ f.full_name }}
-            <span class="text-gray-500 ml-1">
-              ({{ users.filter(u => u.guardian_user_id === f.id).length }})
-            </span>
-          </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 font-medium text-gray-200 hover:text-white"
+              @click="openEditFamilyModal(f)"
+            >
+              {{ f.full_name }}
+              <span class="text-gray-500 ml-1">
+                ({{ users.filter(u => u.guardian_user_id === f.id).length }})
+              </span>
+            </button>
+            <button
+              type="button"
+              class="px-1.5 py-1.5 text-gray-400 hover:text-white border-l border-gray-700"
+              :aria-label="language === 'es' ? 'Editar familia' : 'Edit family'"
+              :title="language === 'es' ? 'Editar familia' : 'Edit family'"
+              @click="openEditFamilyModal(f)"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="px-1.5 py-1.5 text-gray-400 hover:text-red-300 border-l border-gray-700"
+              :aria-label="language === 'es' ? 'Eliminar familia' : 'Delete family'"
+              :title="language === 'es' ? 'Eliminar familia' : 'Delete family'"
+              @click="askDeleteFamily(f)"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1854,6 +2079,46 @@ const scheduleSummary = (u: User) => {
           </div>
         </div>
       </Transition>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="familyPendingDelete"
+        class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 p-4"
+        @click.self="familyPendingDelete = null"
+      >
+        <div class="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-950 p-5">
+          <h2 class="text-lg font-semibold text-white">
+            {{ language === 'es' ? 'Eliminar familia' : 'Delete family' }}
+          </h2>
+          <p class="mt-2 text-sm text-gray-300">
+            {{ language === 'es'
+              ? `Se elimina ${familyPendingDelete.full_name}, su correo y su acceso. Los estudiantes se quedan; solo dejan de pertenecer a esta familia.`
+              : `${familyPendingDelete.full_name} will be removed, including their email and login. Students stay; they are only unlinked from this family.` }}
+          </p>
+          <p v-if="familyDeleteError" class="mt-2 text-sm text-red-400">{{ familyDeleteError }}</p>
+          <div class="mt-4 flex gap-2">
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl border border-gray-700 text-sm text-gray-300"
+              :disabled="familyDeleting"
+              @click="familyPendingDelete = null"
+            >
+              {{ language === 'es' ? 'Volver' : 'Back' }}
+            </button>
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl bg-red-600 text-sm font-semibold text-white disabled:opacity-50"
+              :disabled="familyDeleting"
+              @click="confirmDeleteFamily"
+            >
+              {{ familyDeleting
+                ? (language === 'es' ? 'Eliminando…' : 'Deleting…')
+                : (language === 'es' ? 'Eliminar familia' : 'Delete family') }}
+            </button>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CONTACT_EMAIL } from '~/utils/contact'
 const router = useRouter()
 const client = useSupabaseClient()
 const { language } = useI18n()
@@ -197,8 +198,8 @@ onMounted(() => {
         <div class="mt-8 text-center">
           <p class="text-gray-500 text-sm">
             {{ language === 'es' ? '¿Necesitas ayuda?' : 'Need help?' }}
-            <a href="mailto:support@niikskate.com" class="text-gold-400 hover:underline ml-1">
-              support@niikskate.com
+            <a :href="`mailto:${CONTACT_EMAIL}`" class="text-gold-400 hover:underline ml-1">
+              {{ CONTACT_EMAIL }}
             </a>
           </p>
         </div>

@@ -477,11 +477,13 @@ export {
   MONTHLY_PROGRAM_PRICE_MXN,
 } from '~/utils/classPricing'
 
-/** Default 4-week season program: Tue / Thu / Sat. Admins can also create 8-week programs. */
+/** Default 4-week season program: Tue / Thu / Sat. Admins can pick 1–8 weeks. */
 export const PROGRAM_WEEKS = 4
-export const PROGRAM_WEEK_OPTIONS = [4, 8] as const
+export const PROGRAM_WEEK_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const
 export type ProgramWeekCount = (typeof PROGRAM_WEEK_OPTIONS)[number]
 export const PROGRAM_DAYS_PER_WEEK = 3
+/** Upper bound for classes in one program (the Clases dropdown). */
+export const PROGRAM_MAX_CLASSES = 24
 export const PROGRAM_TOTAL_CLASSES = PROGRAM_WEEKS * PROGRAM_DAYS_PER_WEEK
 export const PROGRAM_CLASSES_PER_WEEK_INCLUDED = 2
 export const PROGRAM_INCLUDED_CLASSES = PROGRAM_WEEKS * PROGRAM_CLASSES_PER_WEEK_INCLUDED
@@ -516,7 +518,7 @@ export function programClassCount(
   weeks: ProgramWeekCount,
   daysPerWeek: number = PROGRAM_DAYS_PER_WEEK,
 ): number {
-  return weeks * Math.max(1, daysPerWeek)
+  return Math.min(PROGRAM_MAX_CLASSES, weeks * Math.max(1, daysPerWeek))
 }
 
 export function packPriceMxn(pack: ParentMultiClassPack): number {
@@ -555,6 +557,9 @@ export interface BookableClassSession {
   title: string
   start_date: string
   time_slot: TimeSlot | null
+  /** Real class times (HH:MM:SS); custom horarios differ from the slot's defaults. */
+  start_time?: string | null
+  end_time?: string | null
   audience_category?: string | null
   audience_categories?: string[] | null
   skill_level: string | null

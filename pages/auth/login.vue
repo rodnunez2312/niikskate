@@ -172,81 +172,79 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
-    <!-- Header -->
+  <div class="public-site min-h-screen bg-charcoal text-cream flex flex-col">
     <header class="pt-safe px-4 py-4 flex items-center justify-between">
       <button
+        type="button"
+        class="w-10 h-10 rounded-full border border-cream/25 text-cream flex items-center justify-center hover:border-acid hover:text-acid"
         @click="router.back()"
-        class="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center"
       >
-        <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
-      <LanguageCurrencyToggle class="text-gray-700" />
+      <LanguageCurrencyToggle />
     </header>
 
-    <!-- Content -->
     <div class="flex-1 flex flex-col justify-center px-4 pb-safe">
       <div class="max-w-sm mx-auto w-full">
-        <!-- Logo -->
         <div class="text-center mb-8">
-          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-yellow-400 flex items-center justify-center text-3xl">
-            🛹
-          </div>
-          <h1 class="text-2xl font-bold text-gray-900">{{ t('auth.welcomeBack') }}</h1>
-          <p class="text-gray-500 mt-1">{{ t('auth.signInTo') }}</p>
+          <img
+            src="/Niik_StainedGlass.png"
+            alt="NiikSkate"
+            class="h-36 w-auto mx-auto mb-4 object-contain"
+          />
+          <h1 class="font-display text-3xl font-black tracking-tight text-cream">{{ t('auth.welcomeBack') }}</h1>
+          <p class="text-cream/60 mt-1">{{ t('auth.signInTo') }}</p>
         </div>
 
-        <!-- Login Form -->
         <form @submit.prevent="handleLogin" class="space-y-4">
           <div>
-            <label class="label">{{ language === 'es' ? 'Correo o teléfono' : 'Email or phone' }}</label>
+            <label class="block text-sm font-medium text-cream/70 mb-1.5">{{ language === 'es' ? 'Correo o teléfono' : 'Email or phone' }}</label>
             <input
               v-model="identifier"
               type="text"
               required
-              class="input"
+              class="w-full px-4 py-3 rounded-xl border border-charcoal-600 bg-charcoal-800 text-cream placeholder-cream/40 outline-none focus:border-acid focus:ring-2 focus:ring-acid"
               :placeholder="language === 'es' ? 'Ingresa correo o teléfono' : 'Enter email or phone'"
               autocomplete="username"
             />
           </div>
 
           <div>
-            <label class="label">{{ t('auth.password') }}</label>
+            <label class="block text-sm font-medium text-cream/70 mb-1.5">{{ t('auth.password') }}</label>
             <input
               v-model="password"
               type="password"
               required
-              class="input"
+              class="w-full px-4 py-3 rounded-xl border border-charcoal-600 bg-charcoal-800 text-cream placeholder-cream/40 outline-none focus:border-acid focus:ring-2 focus:ring-acid"
               :placeholder="language === 'es' ? 'Ingresa tu contraseña' : 'Enter your password'"
               autocomplete="current-password"
             />
           </div>
 
           <div class="flex justify-end">
-            <NuxtLink to="/auth/forgot-password" class="text-sm text-yellow-600 hover:underline">
+            <NuxtLink to="/auth/forgot-password" class="text-sm font-semibold text-acid hover:text-acid-300">
               {{ t('auth.forgotPassword') }}
             </NuxtLink>
           </div>
 
-          <p v-if="error" class="text-red-600 text-sm">
+          <p v-if="error" class="text-red-300 text-sm">
             {{ error }}
           </p>
 
           <button
             type="submit"
             :disabled="loading"
-            class="btn bg-yellow-400 text-gray-900 font-bold w-full py-3"
+            class="btn-lime w-full"
           >
             {{ loading ? t('auth.signingIn') : t('auth.signIn') }}
           </button>
         </form>
 
-        <!-- Sign Up Link -->
-        <p class="text-center mt-6 text-gray-600">
+        <p class="text-center mt-6 text-cream/70">
           {{ t('auth.noAccount') }}
-          <NuxtLink to="/auth/register" class="text-yellow-600 font-medium hover:underline">
+          <NuxtLink to="/auth/register" class="text-acid font-bold hover:text-acid-300">
             {{ t('auth.signUp') }}
           </NuxtLink>
         </p>

@@ -62,6 +62,17 @@ export const RECURRING_WEEKDAY_OPTIONS = [
   { v: 6, en: 'Sat', es: 'Sáb' },
 ] as const
 
+/** Every day of the week, Monday first (JS getDay values; Sunday = 0). */
+export const ALL_WEEKDAY_OPTIONS = [
+  { v: 1, en: 'Mon', es: 'Lun' },
+  { v: 2, en: 'Tue', es: 'Mar' },
+  { v: 3, en: 'Wed', es: 'Mié' },
+  { v: 4, en: 'Thu', es: 'Jue' },
+  { v: 5, en: 'Fri', es: 'Vie' },
+  { v: 6, en: 'Sat', es: 'Sáb' },
+  { v: 0, en: 'Sun', es: 'Dom' },
+] as const
+
 /** Summer course: Mon–Fri only (JS getDay values). */
 export const SUMMER_COURSE_WEEKDAY_OPTIONS = [
   { v: 1, en: 'Mon', es: 'Lun' },

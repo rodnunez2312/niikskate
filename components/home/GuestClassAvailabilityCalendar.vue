@@ -53,18 +53,16 @@ const dayMap = computed(() => {
     map[row.start_date].push(row)
   }
   for (const key of Object.keys(map)) {
-    map[key].sort((a, b) => {
-      const ao = slotOrder(a.time_slot)
-      const bo = slotOrder(b.time_slot)
-      return ao - bo
-    })
+    map[key].sort((a, b) => (sessionTimes(a)?.start ?? '99').localeCompare(sessionTimes(b)?.start ?? '99'))
   }
   return map
 })
 
-const slotOrder = (slot: TimeSlot | null) => {
-  const order: Record<string, number> = { morning: 0, monday: 1, early: 2, late: 3 }
-  return slot ? (order[slot] ?? 9) : 9
+/** Saved class times first; the slot's defaults only for rows without them. */
+const sessionTimes = (s: BookableClassSession): { start: string; end: string } | null => {
+  if (s.start_time && s.end_time) return { start: s.start_time.slice(0, 5), end: s.end_time.slice(0, 5) }
+  const row = s.time_slot ? TIME_SLOT_LABELS[s.time_slot as TimeSlot] : null
+  return row ? { start: row.start, end: row.end } : null
 }
 
 const daySessions = (date: Date) => dayMap.value[format(date, 'yyyy-MM-dd')] || []
@@ -75,10 +73,9 @@ const hasProgramDay = (date: Date) =>
 const isPastDay = (date: Date) => isBefore(startOfDay(date), startOfDay(new Date()))
 
 /** Short range for calendar cells (e.g. 5:30–7:00) */
-const slotRangeLabel = (slot: TimeSlot | null) => {
-  if (!slot) return '—'
-  const row = TIME_SLOT_LABELS[slot]
-  if (!row) return slot
+const slotRangeLabel = (s: BookableClassSession) => {
+  const row = sessionTimes(s)
+  if (!row) return s.time_slot || '—'
   const fmt = (hm: string) => {
     const [h, m] = hm.split(':').map(Number)
     const hour12 = ((h + 11) % 12) + 1
@@ -93,7 +90,8 @@ const daySlotChips = (date: Date): DaySlotChip[] => {
   const seen = new Set<string>()
   const chips: DaySlotChip[] = []
   for (const r of rows) {
-    const slot = r.time_slot || 'early'
+    const t = sessionTimes(r)
+    const slot = t ? `${t.start}-${t.end}` : r.time_slot || 'early'
     if (seen.has(slot)) {
       const existing = chips.find(c => c.key === slot)
       if (existing && (r.status === 'full' || (r.status === 'almost_full' && existing.status === 'open'))) {
@@ -104,7 +102,7 @@ const daySlotChips = (date: Date): DaySlotChip[] => {
     seen.add(slot)
     chips.push({
       key: slot,
-      label: slotRangeLabel(r.time_slot),
+      label: slotRangeLabel(r),
       status: r.status,
     })
   }

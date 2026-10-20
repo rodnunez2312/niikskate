@@ -24,19 +24,18 @@ function isSelected(id: ShopGroupId) {
 
 const tileClass = (active: boolean) =>
   active
-    ? 'border-gold-500 text-gold-600'
-    : 'border-gray-300 text-gray-900 hover:border-gray-500'
+    ? 'border-charcoal ring-2 ring-acid text-charcoal'
+    : 'border-charcoal/15 text-charcoal hover:border-charcoal/50'
 
 /**
  * Keyed by ShopGroup.icon. The artwork is on white, same as the tile, so it
  * reads as a drawing rather than a pasted photo. Unlike the old inline SVGs it
- * cannot take the gold tint when selected — the border and label carry that.
+ * cannot take a tint when selected — the border and ring carry that.
  */
 const CATEGORY_ART: Record<string, string> = {
   skate: '/images/shop-categories/skate.jpg',
   helmet: '/images/shop-categories/safety.jpg',
-  shirt: '/images/shop-categories/clothing.jpg',
-  hat: '/images/shop-categories/accessories.jpg',
+  shirt: '/images/shop-categories/wearables.jpg',
 }
 </script>
 
@@ -106,7 +105,7 @@ const CATEGORY_ART: Record<string, string> = {
     <!-- Last tile: leaves the shop for the ramp build service. -->
     <NuxtLink
       to="/skateramps"
-      class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors border-gray-300 text-gray-900 hover:border-teal-500 hover:text-teal-700"
+      class="w-full sm:shrink-0 sm:w-24 aspect-square rounded-xl border bg-white flex flex-col items-center justify-center px-1 transition-colors border-charcoal/15 text-charcoal hover:border-charcoal/50"
     >
       <img
         src="/images/shop-categories/ramps.jpg"

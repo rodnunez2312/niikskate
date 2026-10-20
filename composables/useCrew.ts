@@ -1,4 +1,6 @@
 import { computeAgeFromDob } from '~/utils/ageEligibility'
+import { normalizeSkillGroupDisplayName } from '~/utils/skillGroupLevels'
+import { disciplineFromJoin, skillLevelWithDiscipline } from '~/utils/trainingDisciplines'
 
 export type CrewMemberRow = {
   id: string
@@ -224,12 +226,22 @@ export function useCrew() {
   async function skillGroupNames(ids: Array<string | null | undefined>) {
     const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))]
     if (!unique.length) return new Map<string, string>()
-    const { data, error } = await client.from('skill_groups').select('id, name').in('id', unique)
-    if (error) {
-      console.error('skillGroupNames:', error)
+    const joined = await client
+      .from('skill_groups')
+      .select('id, name, training_programs(discipline)')
+      .in('id', unique)
+    const rows = joined.error
+      ? (await client.from('skill_groups').select('id, name').in('id', unique)).data
+      : joined.data
+    if (joined.error && !rows) {
+      console.error('skillGroupNames:', joined.error)
       return new Map<string, string>()
     }
-    return new Map((data || []).map(row => [row.id as string, row.name as string]))
+    const es = language.value === 'es'
+    return new Map((rows || []).map(row => [
+      row.id as string,
+      skillLevelWithDiscipline(normalizeSkillGroupDisplayName(row.name as string), disciplineFromJoin(row), es),
+    ]))
   }
 
   async function loadGuardianProfile() {

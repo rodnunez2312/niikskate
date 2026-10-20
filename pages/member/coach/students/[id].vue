@@ -20,6 +20,7 @@ import { computeSkaterProgramMilestones } from '~/utils/skaterProgramProgress'
 import { skaterRatingBubbleClass } from '~/utils/skaterRatingDots'
 import { computeAgeFromDob } from '~/utils/ageEligibility'
 import { normalizeSkillGroupDisplayName } from '~/utils/skillGroupLevels'
+import { disciplineFromJoin, skillLevelWithDiscipline } from '~/utils/trainingDisciplines'
 import {
   SKATER_PUSH_OPTIONS,
   SKATER_STANCE_OPTIONS,
@@ -70,7 +71,7 @@ const savingComment = ref(false)
 
 const user = useSupabaseUser()
 
-const assignedSkillGroup = ref<{ id: string; name: string; description: string | null } | null>(null)
+const assignedSkillGroup = ref<{ id: string; name: string; description: string | null; discipline?: string | null } | null>(null)
 const assignedProgramName = ref<string | null>(null)
 const programSkillIds = ref<string[]>([])
 const programTrickIds = ref<string[]>([])
@@ -192,8 +193,13 @@ const saveProfileEditModal = async () => {
 }
 
 const assignedProgramLabel = computed(() => {
-  const name = assignedSkillGroup.value?.name
-  return name ? normalizeSkillGroupDisplayName(name) : null
+  const group = assignedSkillGroup.value
+  if (!group?.name) return null
+  return skillLevelWithDiscipline(
+    normalizeSkillGroupDisplayName(group.name),
+    group.discipline,
+    language.value === 'es',
+  )
 })
 
 const assignedProgramId = computed(() => assignedSkillGroup.value?.id ?? null)
@@ -909,9 +915,24 @@ const loadProgramProgressForGroup = async () => {
   const sid = studentId.value
   if (!gid || !sid) return
 
-  const { data: grp } = await client.from('skill_groups').select('id,name,description').eq('id', gid).maybeSingle()
-  if (grp) assignedSkillGroup.value = grp
-  else assignedSkillGroup.value = null
+  const joined = await client
+    .from('skill_groups')
+    .select('id,name,description,training_programs(discipline)')
+    .eq('id', gid)
+    .maybeSingle()
+  const grp = joined.error
+    ? (await client.from('skill_groups').select('id,name,description').eq('id', gid).maybeSingle()).data
+    : joined.data
+  if (grp) {
+    assignedSkillGroup.value = {
+      id: grp.id,
+      name: grp.name,
+      description: grp.description,
+      discipline: disciplineFromJoin(grp),
+    }
+  } else {
+    assignedSkillGroup.value = null
+  }
 
   const { data: areas } = await client.from('skill_areas').select('id').eq('group_id', gid)
   const areaIds = (areas || []).map((a: { id: string }) => a.id)
@@ -1005,21 +1026,10 @@ watch(studentId, () => loadStudent(), { immediate: false })
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <!-- Sticky back -->
-    <header class="sticky top-0 z-40 bg-black/90 backdrop-blur border-b border-gray-800">
-      <div class="px-4 py-3 max-w-lg lg:max-w-6xl xl:max-w-7xl mx-auto w-full flex items-center gap-3">
-        <button
-          @click="goBack"
-          class="p-2 -ml-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-300"
-          aria-label="Back"
-        >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span class="text-sm text-gray-500">{{ language === 'es' ? 'Panel del patinador' : 'Skater dashboard' }}</span>
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="student?.full_name || (language === 'es' ? 'Patinador' : 'Skater')"
+      :subtitle="language === 'es' ? 'Panel del patinador' : 'Skater dashboard'"
+    />
 
     <div v-if="loading" class="flex items-center justify-center py-20">
       <div class="w-12 h-12 border-4 border-gold-400 border-t-transparent rounded-full animate-spin"></div>
@@ -1039,9 +1049,9 @@ watch(studentId, () => loadStudent(), { immediate: false })
             @keydown.space.prevent="canEditSkaterProfile ? openProfileEditModal() : undefined"
           >
             <div class="flex items-start justify-between gap-2">
-              <h1 class="text-xl font-black text-white uppercase tracking-tight truncate min-w-0">
+              <p class="text-xl font-black text-white uppercase tracking-tight truncate min-w-0">
                 {{ student.full_name || (language === 'es' ? 'Alumno' : 'Student') }}
-              </h1>
+              </p>
               <span
                 v-if="canEditSkaterProfile"
                 class="text-[9px] uppercase tracking-wide text-white/60 shrink-0 pt-0.5"
@@ -1075,7 +1085,7 @@ watch(studentId, () => loadStudent(), { immediate: false })
               </span>
               <NuxtLink
                 v-if="assignedProgramLabel && assignedProgramId"
-                :to="`/member/coach/library/${assignedProgramId}`"
+                :to="'/member/coach/library'"
                 class="font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white truncate"
                 @click.stop
               >
@@ -1225,8 +1235,8 @@ watch(studentId, () => loadStudent(), { immediate: false })
               <p v-else class="text-[11px] text-gray-500 leading-snug">
                 {{
                   language === 'es'
-                    ? 'Sin programa asignado en Kanban. Arrastra al patinador a un nivel en Patinadores.'
-                    : 'No program assigned in Kanban. Drag skater to a level in Skaters.'
+                    ? 'Sin programa asignado en Kanban. Arrastra al estudiante a un nivel en Estudiantes.'
+                    : 'No program assigned in Kanban. Drag the student to a level in Students.'
                 }}
               </p>
             </div>
@@ -2059,9 +2069,6 @@ watch(studentId, () => loadStudent(), { immediate: false })
 
     <div v-else class="px-4 py-12 text-center">
       <p class="text-gray-400">{{ language === 'es' ? 'Alumno no encontrado' : 'Student not found' }}</p>
-      <button @click="goBack" class="mt-4 text-gold-400 hover:underline">
-        {{ language === 'es' ? 'Volver a patinadores' : 'Back to skaters' }}
-      </button>
     </div>
 
     <!-- Trick comment modal -->

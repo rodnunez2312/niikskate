@@ -5,10 +5,10 @@ export type PublicNavItem = {
 
 export const PUBLIC_NAV: PublicNavItem[] = [
   { label: { en: 'Home', es: 'Inicio' }, path: '/' },
-  { label: { en: 'The Niik Method', es: 'El Método Niik' }, path: '/niik-method' },
-  { label: { en: 'Skate Programs', es: 'Programas de Skate' }, path: '/skate-programs' },
-  { label: { en: 'Skateshop', es: 'Skateshop' }, path: '/skateshop' },
-  { label: { en: 'Community', es: 'Comunidad' }, path: '/community' },
+  { label: { en: 'Niik Method', es: 'Método Niik' }, path: '/niik-method' },
+  { label: { en: 'Programs', es: 'Programas' }, path: '/skate-programs' },
+  { label: { en: 'Partners', es: 'Alianzas' }, path: '/alianzas' },
+  { label: { en: 'Shop', es: 'Tienda' }, path: '/skateshop' },
 ]
 
 export function usePublicNav() {

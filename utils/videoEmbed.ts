@@ -53,7 +53,11 @@ export function parseVideoUrl(raw: string): ParsedVideoUrl | null {
       const match = parsed.pathname.match(/^\/(reel|p|tv)\/([^/?#]+)/i)
       if (match) {
         const canonicalUrl = `https://www.instagram.com/${match[1]}/${match[2]}/`
-        return { kind: 'instagram', canonicalUrl }
+        return {
+          kind: 'instagram',
+          canonicalUrl,
+          embedUrl: `${canonicalUrl}embed/`,
+        }
       }
     }
 

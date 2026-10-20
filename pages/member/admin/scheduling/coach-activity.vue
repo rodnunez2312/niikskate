@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { format, startOfWeek, subMonths, startOfMonth } from 'date-fns'
+import { format, startOfWeek, endOfWeek, addWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { CoachActivityCoach, CoachActivityResponse } from '~/server/api/admin/coach-activity.get'
 
@@ -23,26 +23,64 @@ const data = ref<CoachActivityResponse | null>(null)
 const tab = ref<'overview' | 'scorecard'>('overview')
 const programFilter = ref('')
 const periodKey = ref<'week' | 'month' | 'quarter'>('week')
+/** 0 is the current week, month, or quarter. Arrows move this. */
+const periodOffset = ref(0)
 const selectedCoachId = ref('')
+/** How many older months sit to the right of the current one. */
+const historyMonths = ref(0)
 
 const ymd = (d: Date) => format(d, 'yyyy-MM-dd')
 
-/** Periods are inclusive of today, so "this week" means Monday through now. */
-const period = computed(() => {
+function rangeFor(key: 'week' | 'month' | 'quarter', offset: number) {
   const today = new Date()
-  if (periodKey.value === 'month') return { from: ymd(startOfMonth(today)), to: ymd(today) }
-  if (periodKey.value === 'quarter') return { from: ymd(subMonths(today, 3)), to: ymd(today) }
-  return { from: ymd(startOfWeek(today, { weekStartsOn: 1 })), to: ymd(today) }
+  if (key === 'month') {
+    const start = startOfMonth(addMonths(today, offset))
+    return { from: start, to: endOfMonth(start) }
+  }
+  if (key === 'quarter') {
+    const end = endOfMonth(addMonths(startOfMonth(today), offset * 3))
+    const start = startOfMonth(subMonths(end, 2))
+    return { from: start, to: end }
+  }
+  const start = startOfWeek(addWeeks(today, offset), { weekStartsOn: 1 })
+  return { from: start, to: endOfWeek(start, { weekStartsOn: 1 }) }
+}
+
+/** This week is Monday through Sunday. Arrows step a whole week, month, or quarter. */
+const period = computed(() => {
+  const range = rangeFor(periodKey.value, periodOffset.value)
+  return { from: ymd(range.from), to: ymd(range.to) }
 })
+
+const PERIOD_KINDS = [
+  { key: 'week' as const, es: 'Semana', en: 'Week' },
+  { key: 'month' as const, es: 'Mes', en: 'Month' },
+  { key: 'quarter' as const, es: '3 meses', en: '3 months' },
+]
 
 const periodLabel = computed(() => {
   const locale = esLang.value ? es : undefined
-  const d = data.value
-  if (!d) return ''
-  return `${format(new Date(`${d.from}T00:00:00`), 'd MMM', { locale })} – ${format(new Date(`${d.to}T00:00:00`), 'd MMM yyyy', { locale })}`
+  const { from, to } = rangeFor(periodKey.value, periodOffset.value)
+  if (periodKey.value === 'month') {
+    const label = format(from, 'MMMM yyyy', { locale })
+    return label.charAt(0).toUpperCase() + label.slice(1)
+  }
+  if (periodKey.value === 'quarter') {
+    return `${format(from, 'MMM', { locale })} – ${format(to, 'MMM yyyy', { locale })}`
+  }
+  const sameMonth = from.getMonth() === to.getMonth()
+  return sameMonth
+    ? `${format(from, 'd', { locale })} – ${format(to, 'd MMM yyyy', { locale })}`
+    : `${format(from, 'd MMM', { locale })} – ${format(to, 'd MMM yyyy', { locale })}`
 })
 
+function shiftPeriod(delta: number) {
+  periodOffset.value += delta
+}
+
+let loadSeq = 0
 const load = async () => {
+  const seq = ++loadSeq
   loading.value = true
   loadError.value = ''
   try {
@@ -50,17 +88,24 @@ const load = async () => {
     const token = session.session?.access_token
     if (!token) throw new Error(esLang.value ? 'Sesión expirada' : 'Session expired')
 
-    data.value = await $fetch<CoachActivityResponse>('/api/admin/coach-activity', {
+    const next = await $fetch<CoachActivityResponse>('/api/admin/coach-activity', {
       headers: { Authorization: `Bearer ${token}` },
-      query: { from: period.value.from, to: period.value.to, program: programFilter.value || undefined },
+      query: {
+        from: period.value.from,
+        to: period.value.to,
+        program: programFilter.value || undefined,
+        historyMonths: historyMonths.value,
+      },
     })
-    if (!selectedCoachId.value && data.value.coaches.length) {
-      selectedCoachId.value = data.value.coaches[0].id
+    if (seq !== loadSeq) return
+    data.value = next
+    if (!selectedCoachId.value && next.coaches.length) {
+      selectedCoachId.value = next.coaches[0].id
     }
   } catch (e: any) {
-    loadError.value = e?.data?.message || e?.message || 'Error'
+    if (seq === loadSeq) loadError.value = e?.data?.message || e?.message || 'Error'
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -79,7 +124,42 @@ onMounted(async () => {
   await load()
 })
 
-watch([periodKey, programFilter], () => load())
+watch(periodKey, () => {
+  if (periodOffset.value !== 0) periodOffset.value = 0
+})
+
+watch([periodKey, programFilter, periodOffset], () => {
+  historyMonths.value = 0
+  load()
+})
+const weeksLoading = ref(false)
+
+/** Older months are appended inside Clases por semana. The rest of the page stays put. */
+async function loadOlderMonth() {
+  if (weeksLoading.value) return
+  weeksLoading.value = true
+  const nextMonths = historyMonths.value + 1
+  try {
+    const { data: session } = await client.auth.getSession()
+    const token = session.session?.access_token
+    if (!token) return
+    const next = await $fetch<CoachActivityResponse>('/api/admin/coach-activity', {
+      headers: { Authorization: `Bearer ${token}` },
+      query: {
+        from: period.value.from,
+        to: period.value.to,
+        program: programFilter.value || undefined,
+        historyMonths: nextMonths,
+      },
+    })
+    if (data.value) data.value = { ...data.value, nearby: next.nearby }
+    historyMonths.value = nextMonths
+  } catch (e: any) {
+    loadError.value = e?.data?.message || e?.message || 'Error'
+  } finally {
+    weeksLoading.value = false
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Derived views
@@ -88,45 +168,123 @@ watch([periodKey, programFilter], () => load())
 const coaches = computed(() => data.value?.coaches ?? [])
 const totals = computed(() => data.value?.totals)
 
+const contributionTotals = computed(() => [
+  { key: 'evaluations' as const, value: totals.value?.evaluations ?? 0, label: esLang.value ? 'Evaluaciones completadas' : 'Assessments completed' },
+  { key: 'videos' as const, value: totals.value?.videos ?? 0, label: esLang.value ? 'Videos subidos' : 'Videos uploaded' },
+  { key: 'classes_given' as const, value: totals.value?.classes_given ?? 0, label: esLang.value ? 'Clases dadas' : 'Classes given' },
+  { key: 'tricks_marked' as const, value: totals.value?.tricks_marked ?? 0, label: esLang.value ? 'Trucos marcados' : 'Tricks marked' },
+])
+
 type MetricKey = 'classes_given' | 'evaluations' | 'videos' | 'class_plans' | 'tricks_marked'
 
-const contributionMetric = ref<MetricKey>('classes_given')
+/** null ranks coaches by the sum of every module. */
+const contributionMetric = ref<MetricKey | null>(null)
+const CONTRIBUTION_KEYS = ['evaluations', 'videos', 'classes_given', 'tricks_marked'] as const
 
-const METRIC_LABELS: Record<MetricKey, { es: string; en: string }> = {
-  classes_given: { es: 'Clases dadas', en: 'Classes given' },
-  evaluations: { es: 'Evaluaciones', en: 'Evaluations' },
-  videos: { es: 'Videos subidos', en: 'Videos uploaded' },
-  class_plans: { es: 'Planes de clase', en: 'Class plans' },
-  tricks_marked: { es: 'Trucos marcados', en: 'Tricks marked' },
+function toggleContributionMetric(key: MetricKey) {
+  contributionMetric.value = contributionMetric.value === key ? null : key
 }
-
-function metricLabel(k: MetricKey) {
-  return esLang.value ? METRIC_LABELS[k].es : METRIC_LABELS[k].en
-}
-
 const contributors = computed(() => {
   const key = contributionMetric.value
-  const rows = [...coaches.value].sort((a, b) => b[key] - a[key])
-  const max = Math.max(1, ...rows.map(c => c[key]))
-  return rows.map(c => ({ coach: c, value: c[key], pct: Math.round((c[key] / max) * 100) }))
+  const valueOf = (c: CoachActivityCoach) =>
+    key ? c[key] : CONTRIBUTION_KEYS.reduce((n, k) => n + c[k], 0)
+  const rows = [...coaches.value].sort((a, b) => valueOf(b) - valueOf(a))
+  const max = Math.max(1, ...rows.map(valueOf))
+  return rows.map(c => ({ coach: c, value: valueOf(c), pct: Math.round((valueOf(c) / max) * 100) }))
 })
 
 const selectedCoach = computed(
   () => coaches.value.find(c => c.id === selectedCoachId.value) ?? null,
 )
 
-/** Bars are relative to the busiest week so a quiet period still reads clearly. */
-const weekly = computed(() => {
-  const rows = data.value?.weekly ?? []
-  const max = Math.max(1, ...rows.map(r => r.classes))
-  return rows.map(r => ({
-    ...r,
-    pct: Math.round((r.classes / max) * 100),
-    label: format(new Date(`${r.week_start}T00:00:00`), 'd MMM', {
-      locale: esLang.value ? es : undefined,
-    }),
-  }))
+const nearby = computed(() => data.value?.nearby ?? [])
+const PILL_COLORS = ['bg-violet-500', 'bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-orange-500']
+
+function pillColor(id: string, name?: string) {
+  const ordered = [...coaches.value].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  let index = ordered.findIndex(coach => coach.id === id)
+  if (index < 0 && name) {
+    const wanted = name.trim().toLowerCase()
+    index = ordered.findIndex(coach => coach.name.trim().toLowerCase() === wanted)
+  }
+  const slot = index >= 0 ? index : ordered.length
+  return PILL_COLORS[slot % PILL_COLORS.length]
+}
+
+function oldestMonthStart(today: string, back: number) {
+  const [y, m] = today.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1 - back, 1)).toISOString().slice(0, 10)
+}
+
+function mondayOf(key: string) {
+  const [y, m, d] = key.split('-').map(Number)
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  const back = dow === 0 ? 6 : dow - 1
+  return new Date(Date.UTC(y, m - 1, d - back)).toISOString().slice(0, 10)
+}
+
+function shiftKey(key: string, days: number) {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+const weekColumns = computed(() => {
+  const locale = esLang.value ? es : undefined
+  const thisMonday = mondayOf(period.value.to)
+  const oldest = oldestMonthStart(period.value.to, historyMonths.value)
+  const starts = new Set<string>([thisMonday])
+  const lastMonday = shiftKey(thisMonday, -7)
+  if (lastMonday >= oldest) starts.add(lastMonday)
+  for (const row of nearby.value) {
+    if (row.weekStart >= oldest) starts.add(row.weekStart)
+  }
+  const ordered = [...starts].sort((a, b) => {
+    if (a === thisMonday) return -1
+    if (b === thisMonday) return 1
+    return b.localeCompare(a)
+  })
+  return ordered.map(start => {
+    const rows = nearby.value.filter(row => row.weekStart === start)
+    const byDate = new Map<string, typeof rows>()
+    for (const row of rows) {
+      const list = byDate.get(row.date) || []
+      list.push(row)
+      byDate.set(row.date, list)
+    }
+    const end = shiftKey(start, 6)
+    const range = `${format(new Date(`${start}T00:00:00`), 'd MMM', { locale })}`
+    const title = start === thisMonday
+      ? (esLang.value ? 'Esta semana' : 'This week')
+      : start === shiftKey(thisMonday, -7)
+        ? (esLang.value ? 'Semana pasada' : 'Last week')
+        : range
+    return {
+      id: start,
+      current: start === thisMonday,
+      title,
+      range: format(new Date(`${end}T00:00:00`), 'd MMM', { locale }),
+      done: rows.filter(row => row.status === 'done').length,
+      cancelled: rows.filter(row => row.status === 'cancelled').length,
+      open: rows.filter(row => row.status === 'open').length,
+      classCount: rows.length,
+      days: [...byDate.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, classes]) => ({
+          date,
+          label: format(new Date(`${date}T00:00:00`), 'EEE d', { locale }),
+          classes,
+        })),
+    }
+  })
 })
+
+function chipClass(status: 'done' | 'cancelled' | 'open' | 'upcoming', currentWeek = false) {
+  if (status === 'done') return 'bg-acid text-charcoal'
+  if (currentWeek && status !== 'cancelled') return 'bg-transparent text-gray-200 border border-gray-700'
+  if (status === 'open') return 'bg-gray-500 text-white'
+  if (status === 'cancelled') return 'bg-transparent text-gray-500 line-through border border-gray-700'
+  return 'bg-gray-800 text-gray-300 border border-gray-700'
+}
 
 const needsFollowThrough = computed(() =>
   coaches.value.filter(c => c.classes_without_notes > 0),
@@ -174,6 +332,7 @@ function exportCsv() {
     esLang.value ? 'Programas' : 'Programs',
     esLang.value ? 'Activo' : 'Active',
     esLang.value ? 'Clases dadas' : 'Classes given',
+    esLang.value ? 'Clases canceladas' : 'Classes cancelled',
     esLang.value ? 'Skaters atendidos' : 'Athletes taught',
     esLang.value ? 'Evaluaciones' : 'Evaluations',
     esLang.value ? 'Videos' : 'Videos',
@@ -192,6 +351,7 @@ function exportCsv() {
         c.programs.join(' / '),
         c.is_active ? 'Si' : 'No',
         c.classes_given,
+        c.classes_cancelled,
         c.athletes_taught,
         c.evaluations,
         c.videos,
@@ -225,41 +385,22 @@ function exportCsv() {
       </div>
     </div>
 
-    <div v-else-if="isAdmin" class="px-4 py-6 max-w-5xl mx-auto space-y-5 pb-16">
-      <!-- Header -->
-      <div class="flex items-start justify-between gap-4 flex-wrap">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <NuxtLink
-              to="/member/admin/scheduling/coaches"
-              class="p-1 -ml-1 text-gray-500 hover:text-white transition-colors"
-              :aria-label="esLang ? 'Volver a coaches' : 'Back to coaches'"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </NuxtLink>
-            <h1 class="text-2xl font-bold text-white">
-              {{ esLang ? 'Actividad de coaches' : 'Coach activity' }}
-            </h1>
-          </div>
-          <p class="text-sm text-gray-400 mt-0.5">
-            {{ esLang
-              ? 'Mira el trabajo, reconoce el esfuerzo y sabe dónde ayudar.'
-              : 'See the work, recognize the effort, and know where to help.' }}
-          </p>
-        </div>
+    <template v-else-if="isAdmin">
+    <MemberStaffPageHeader
+      :title="esLang ? 'Actividad' : 'Activity'"
+      :subtitle="esLang ? 'Mira el trabajo, reconoce el esfuerzo y sabe dónde ayudar.' : 'See the work, recognize the effort, and know where to help.'"
+    >
+      <template #actions>
         <button
           type="button"
-          class="px-3 py-2 rounded-xl border border-gray-700 text-gray-200 text-sm font-medium hover:border-teal-500/60 hover:text-white transition-colors flex items-center gap-2 shrink-0"
+          class="px-4 py-2.5 rounded-xl border border-gray-700 text-gray-200 text-sm font-semibold"
           @click="exportCsv"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
           {{ esLang ? 'Exportar CSV' : 'Export CSV' }}
         </button>
-      </div>
+      </template>
+    </MemberStaffPageHeader>
+    <div class="px-4 py-6 max-w-5xl mx-auto space-y-5 pb-16">
 
       <!-- Tabs + filters -->
       <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -290,26 +431,62 @@ function exportCsv() {
             <option value="">{{ esLang ? 'Todos los programas' : 'All programs' }}</option>
             <option v-for="p in data?.programs || []" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
-          <select
-            v-model="periodKey"
-            class="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm outline-none focus:border-teal-500"
-          >
-            <option value="week">{{ esLang ? 'Esta semana' : 'This week so far' }}</option>
-            <option value="month">{{ esLang ? 'Este mes' : 'This month' }}</option>
-            <option value="quarter">{{ esLang ? 'Últimos 3 meses' : 'Last 3 months' }}</option>
-          </select>
         </div>
       </div>
 
-      <p v-if="periodLabel" class="text-[11px] text-gray-500 -mt-2">
-        Niik Skate · {{ periodLabel }}
-      </p>
+      <div class="flex items-center gap-3 flex-wrap -mt-1">
+        <div class="inline-flex rounded-lg border border-gray-800 p-0.5">
+          <button
+            v-for="kind in PERIOD_KINDS"
+            :key="kind.key"
+            type="button"
+            class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+            :class="periodKey === kind.key ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'"
+            @click="periodKey = kind.key"
+          >
+            {{ esLang ? kind.es : kind.en }}
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            class="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/5"
+            :aria-label="esLang ? 'Periodo anterior' : 'Previous period'"
+            @click="shiftPeriod(-1)"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <p class="min-w-[11rem] text-center text-sm font-semibold text-white tabular-nums">{{ periodLabel }}</p>
+          <button
+            type="button"
+            class="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/5"
+            :aria-label="esLang ? 'Periodo siguiente' : 'Next period'"
+            @click="shiftPeriod(1)"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          <button
+            v-if="periodOffset !== 0"
+            type="button"
+            class="ml-1 text-xs text-gray-500 hover:text-white"
+            @click="periodOffset = 0"
+          >
+            {{ esLang ? 'Hoy' : 'Today' }}
+          </button>
+          <span v-if="loading && totals" class="ml-2 text-xs text-gray-600">{{ esLang ? 'Actualizando…' : 'Updating…' }}</span>
+        </div>
+      </div>
 
       <p v-if="loadError" class="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-300">
         {{ loadError }}
       </p>
 
-      <div v-else-if="loading" class="rounded-xl border border-gray-800 bg-gray-900 px-4 py-10 text-center">
+      <div v-else-if="loading && !totals" class="rounded-xl border border-gray-800 bg-gray-900 px-4 py-10 text-center">
         <p class="text-sm text-gray-500">{{ esLang ? 'Cargando…' : 'Loading…' }}</p>
       </div>
 
@@ -319,23 +496,32 @@ function exportCsv() {
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
               <p class="text-xs text-gray-400">{{ esLang ? 'Clases dadas' : 'Classes given' }}</p>
-              <p class="text-3xl font-bold text-white mt-1">{{ totals.classes_given }}</p>
+              <p class="text-3xl font-bold text-white mt-1">
+                {{ totals.classes_given }}<span class="text-gray-600 text-xl"> / {{ totals.classes_in_period }}</span>
+              </p>
+              <p class="text-[11px] text-acid mt-1">
+                {{ totals.classes_cancelled }} {{ esLang ? 'canceladas' : 'cancelled' }}
+              </p>
               <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang ? 'Clases con coach asignado' : 'Classes with an assigned coach' }}
+                {{ esLang ? 'Marcadas hechas por el coach' : 'Marked done by the coach' }}
               </p>
             </div>
             <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
               <p class="text-xs text-gray-400">{{ esLang ? 'Videos subidos' : 'Videos uploaded' }}</p>
               <p class="text-3xl font-bold text-white mt-1">{{ totals.videos }}</p>
               <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang ? 'Clips de progreso en evaluaciones' : 'Progress clips on evaluations' }}
+                {{ esLang
+                  ? `${totals.session_videos} de sesión · ${totals.evaluation_videos} de evaluaciones`
+                  : `${totals.session_videos} from sessions · ${totals.evaluation_videos} from evaluations` }}
               </p>
             </div>
             <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
               <p class="text-xs text-gray-400">{{ esLang ? 'Skaters con progreso' : 'Athletes with progress' }}</p>
-              <p class="text-3xl font-bold text-white mt-1">{{ totals.athletes_with_progress }}</p>
+              <p class="text-3xl font-bold text-white mt-1">
+                {{ totals.athletes_with_progress }}<span class="text-gray-600 text-xl"> / {{ totals.active_skaters }}</span>
+              </p>
               <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang ? 'Con al menos un truco marcado' : 'With at least one trick marked' }}
+                {{ esLang ? 'Con clase comprada o asignada en el período, y al menos un truco marcado' : 'With a class bought or assigned in this period, and at least one trick marked' }}
               </p>
             </div>
             <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
@@ -344,7 +530,7 @@ function exportCsv() {
                 {{ totals.coaches_contributing }}<span class="text-gray-600 text-xl"> / {{ totals.coaches_total }}</span>
               </p>
               <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang ? 'Con trabajo registrado en el periodo' : 'With recorded work in this period' }}
+                {{ esLang ? 'Asignados a una clase en el período, con trabajo registrado' : 'Assigned to a class in this period, with recorded work' }}
               </p>
             </div>
           </div>
@@ -353,24 +539,37 @@ function exportCsv() {
             <!-- Contributors -->
             <section class="rounded-xl border border-gray-800 bg-gray-900 p-4">
               <div class="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <h2 class="text-base font-semibold text-white">
-                    {{ esLang ? 'Quién hizo qué' : 'Top contributors' }}
-                  </h2>
-                  <p class="text-xs text-gray-500 mt-0.5">
-                    {{ esLang
-                      ? 'Cada coach destaca en algo distinto.'
-                      : 'Recognize a different strength in every coach.' }}
-                  </p>
-                </div>
-                <select
-                  v-model="contributionMetric"
-                  class="px-2 py-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs outline-none focus:border-teal-500 shrink-0"
+                <h2 class="text-base font-semibold text-white">
+                  {{ esLang ? 'Quién hizo qué' : 'Top contributors' }}
+                </h2>
+                <button
+                  v-if="contributionMetric"
+                  type="button"
+                  class="text-xs text-gray-400 hover:text-white shrink-0"
+                  @click="contributionMetric = null"
                 >
-                  <option v-for="k in (['classes_given','evaluations','videos','class_plans','tricks_marked'] as MetricKey[])" :key="k" :value="k">
-                    {{ metricLabel(k) }}
-                  </option>
-                </select>
+                  {{ esLang ? 'Ver todo' : 'Show all' }}
+                </button>
+                <span v-else class="text-xs text-gray-500 shrink-0">
+                  {{ esLang ? 'Toda la actividad' : 'All activity' }}
+                </span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mb-4">
+                <button
+                  v-for="stat in contributionTotals"
+                  :key="stat.key"
+                  type="button"
+                  class="rounded-xl border px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-500"
+                  :class="contributionMetric === stat.key
+                    ? 'border-gray-400 bg-white/[0.06]'
+                    : 'border-gray-800 bg-gray-950/40 hover:border-gray-600'"
+                  :aria-pressed="contributionMetric === stat.key"
+                  @click="toggleContributionMetric(stat.key)"
+                >
+                  <p class="text-xl font-bold" :class="contributionMetric === stat.key ? 'text-acid' : 'text-white'">{{ stat.value }}</p>
+                  <p class="text-[11px] mt-0.5" :class="contributionMetric === stat.key ? 'text-gray-200' : 'text-gray-500'">{{ stat.label }}</p>
+                </button>
               </div>
 
               <p v-if="contributors.length === 0" class="text-sm text-gray-500 py-6 text-center">
@@ -383,7 +582,10 @@ function exportCsv() {
                   :key="row.coach.id"
                   class="flex items-center gap-3"
                 >
-                  <span class="w-7 h-7 rounded-full bg-gray-800 text-[11px] font-semibold text-gray-300 flex items-center justify-center shrink-0">
+                  <span
+                    class="w-7 h-7 rounded-full text-[11px] font-bold text-white flex items-center justify-center shrink-0"
+                    :class="pillColor(row.coach.id)"
+                  >
                     {{ initials(row.coach.name) }}
                   </span>
                   <div class="flex-1 min-w-0">
@@ -401,36 +603,75 @@ function exportCsv() {
                   </div>
                 </li>
               </ul>
-
-              <p class="mt-3 pt-3 border-t border-gray-800 text-[11px] text-gray-600">
-                {{ esLang
-                  ? 'Esto mide lo que quedó registrado, no la calidad del coaching.'
-                  : 'This measures what was recorded, not coaching quality.' }}
-              </p>
             </section>
 
             <div class="space-y-4">
               <!-- Weekly chart -->
               <section class="rounded-xl border border-gray-800 bg-gray-900 p-4">
                 <h2 class="text-base font-semibold text-white">
-                  {{ esLang ? 'Clases por semana' : 'Classes over time' }}
+                  {{ esLang ? 'Clases por semana' : 'Classes by week' }}
                 </h2>
-                <p class="text-xs text-gray-500 mt-0.5 mb-4">
-                  {{ esLang ? 'Clases con coach asignado en el periodo' : 'Classes with an assigned coach in the period' }}
+                <p class="text-xs text-gray-500 mt-0.5 mb-3">
+                  {{ esLang
+                    ? 'Gris sin marcar · verde hecha, cuenta para el pago · neutro si aún está programada.'
+                    : 'Gray is unmarked · lime is done and counts for pay · neutral is still scheduled.' }}
                 </p>
 
-                <p v-if="weekly.length === 0" class="text-sm text-gray-500 py-6 text-center">
-                  {{ esLang ? 'Sin clases registradas todavía.' : 'No classes recorded yet.' }}
-                </p>
-
-                <div v-else class="flex items-end justify-between gap-2 h-28">
-                  <div v-for="w in weekly" :key="w.week_start" class="flex-1 flex flex-col items-center gap-1">
-                    <span class="text-xs font-semibold text-white">{{ w.classes }}</span>
-                    <div
-                      class="w-full rounded-t bg-teal-500/80"
-                      :style="{ height: `${Math.max(w.pct, 3)}%` }"
-                    />
-                    <span class="text-[10px] text-gray-500 whitespace-nowrap">{{ w.label }}</span>
+                <div class="week-board">
+                  <div class="flex gap-3 items-start min-w-max pr-1">
+                    <div v-for="week in weekColumns" :key="week.id" class="w-64 shrink-0">
+                      <div class="sticky top-0 z-10 bg-gray-900 pb-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <p class="text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                            {{ week.title }}
+                          </p>
+                          <p class="text-[11px] text-gray-500 shrink-0">
+                            {{ esLang ? 'Hechas' : 'Done' }} <span class="font-semibold text-acid">{{ week.done }}</span>
+                          </p>
+                        </div>
+                        <p class="flex flex-wrap gap-x-2.5 text-[11px] text-gray-500 min-h-[1rem]">
+                          <span v-if="week.cancelled">{{ esLang ? 'Canceladas' : 'Cancelled' }} <span class="font-semibold text-red-400">{{ week.cancelled }}</span></span>
+                          <span v-if="week.open">{{ esLang ? 'Sin marcar' : 'Unmarked' }} <span class="font-semibold text-gray-300">{{ week.open }}</span></span>
+                        </p>
+                      </div>
+                      <p v-if="week.days.length === 0" class="text-[11px] text-gray-600">
+                        {{ esLang ? 'Sin clases' : 'No classes' }}
+                      </p>
+                      <div v-for="day in week.days" :key="day.date" class="mb-2">
+                        <p class="text-[10px] uppercase text-gray-500 mb-1">{{ day.label }}</p>
+                        <div class="space-y-1">
+                          <NuxtLink
+                            v-for="row in day.classes"
+                            :key="row.id"
+                            :to="`/member/staff/sessions/${row.id}`"
+                            class="block w-full rounded px-1.5 py-1 text-left"
+                            :class="chipClass(row.status, week.current)"
+                            :title="row.title"
+                          >
+                            <span class="flex items-center gap-1 text-[10px] font-semibold leading-tight">
+                              <span>{{ row.time }}</span>
+                              <span
+                                v-for="pill in row.pills"
+                                :key="pill.id"
+                                class="inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+                                :class="pillColor(pill.id, pill.name)"
+                                :title="pill.name"
+                              >{{ pill.initials }}</span>
+                            </span>
+                            <span class="block text-[10px] leading-tight truncate opacity-80">{{ row.title }}</span>
+                          </NuxtLink>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="shrink-0 self-start rounded-lg border border-gray-700 px-3 py-2 text-lg leading-none text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                      :title="esLang ? 'Mes anterior' : 'Previous month'"
+                      :disabled="weeksLoading"
+                      @click="loadOlderMonth"
+                    >
+                      {{ weeksLoading ? '…' : '+' }}
+                    </button>
                   </div>
                 </div>
               </section>
@@ -484,33 +725,6 @@ function exportCsv() {
             </div>
           </div>
 
-          <!-- Footer totals -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <p class="text-2xl font-bold text-white">{{ totals.evaluations }}</p>
-              <p class="text-[11px] text-gray-500 mt-0.5">
-                {{ esLang ? 'Evaluaciones completadas' : 'Assessments completed' }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <p class="text-2xl font-bold text-white">{{ totals.class_plans }}</p>
-              <p class="text-[11px] text-gray-500 mt-0.5">
-                {{ esLang ? 'Planes de clase creados' : 'Class plans created' }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <p class="text-2xl font-bold text-white">{{ totals.attendance_marked }}</p>
-              <p class="text-[11px] text-gray-500 mt-0.5">
-                {{ esLang ? 'Asistencias marcadas' : 'Attendance marked' }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <p class="text-2xl font-bold text-white">{{ totals.tricks_marked }}</p>
-              <p class="text-[11px] text-gray-500 mt-0.5">
-                {{ esLang ? 'Trucos marcados' : 'Tricks marked' }}
-              </p>
-            </div>
-          </div>
         </div>
 
         <!-- Per-coach scorecard -->
@@ -537,7 +751,16 @@ function exportCsv() {
           <template v-else>
             <section class="rounded-xl border border-gray-800 bg-gray-900 p-4">
               <div class="flex items-start gap-3 flex-wrap">
-                <span class="w-11 h-11 rounded-xl bg-gray-800 text-sm font-semibold text-gray-200 flex items-center justify-center shrink-0">
+                <img
+                  v-if="selectedCoach.avatar_url"
+                  :src="selectedCoach.avatar_url"
+                  :alt="selectedCoach.name"
+                  class="w-11 h-11 rounded-xl object-cover shrink-0"
+                >
+                <span
+                  v-else
+                  class="w-11 h-11 rounded-xl bg-gray-800 text-sm font-semibold text-gray-200 flex items-center justify-center shrink-0"
+                >
                   {{ initials(selectedCoach.name) }}
                 </span>
                 <div class="flex-1 min-w-0">
@@ -580,6 +803,7 @@ function exportCsv() {
               <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
                 <p class="text-2xl font-bold text-white">{{ selectedCoach.classes_given }}</p>
                 <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Clases dadas' : 'Classes given' }}</p>
+                <p class="text-[11px] text-acid">{{ selectedCoach.classes_cancelled }} {{ esLang ? 'canceladas' : 'cancelled' }}</p>
               </div>
               <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
                 <p class="text-2xl font-bold text-white">{{ selectedCoach.athletes_taught }}</p>
@@ -592,6 +816,11 @@ function exportCsv() {
               <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
                 <p class="text-2xl font-bold text-white">{{ selectedCoach.videos }}</p>
                 <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Videos subidos' : 'Videos uploaded' }}</p>
+                <p class="text-[11px] text-gray-600">
+                  {{ esLang
+                    ? `${selectedCoach.session_videos} de sesión · ${selectedCoach.evaluation_videos} de evaluaciones`
+                    : `${selectedCoach.session_videos} from sessions · ${selectedCoach.evaluation_videos} from evaluations` }}
+                </p>
               </div>
               <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
                 <p class="text-2xl font-bold text-white">{{ selectedCoach.class_plans }}</p>
@@ -621,9 +850,24 @@ function exportCsv() {
 
       <p class="text-[11px] text-gray-600 leading-relaxed pt-2 border-t border-gray-900">
         {{ esLang
-          ? 'Las clases dadas cuentan las sesiones donde el coach quedó asignado en el calendario. Los videos vienen de los clips adjuntos a evaluaciones. Todo lo demás se cuenta de lo que cada coach registró en el sistema.'
-          : 'Classes given counts sessions where the coach was assigned on the calendar. Videos come from clips attached to evaluations. Everything else is counted from what each coach recorded in the system.' }}
+          ? 'Las clases dadas cuentan las sesiones donde el coach quedó asignado en el calendario. Los videos cuentan los clips de la biblioteca de sesiones y los adjuntos a evaluaciones, subidos en este periodo. Todo lo demás se cuenta de lo que cada coach registró en el sistema.'
+          : 'Classes given counts sessions where the coach was assigned on the calendar. Videos count session-library clips and evaluation attachments uploaded in this period. Everything else is counted from what each coach recorded in the system.' }}
       </p>
     </div>
+    </template>
   </div>
 </template>
+
+<style scoped>
+/* One scroller for every week. Tall enough for 10 class rows; the old 26rem box only fit about 6. */
+.week-board {
+  max-height: 44rem;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.week-board::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+</style>

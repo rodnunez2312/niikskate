@@ -16,22 +16,23 @@ const goAddFamilyMember = () => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 bg-black/95 backdrop-blur border-b border-gray-800">
+  <header class="sticky top-0 z-50 bg-charcoal/95 backdrop-blur border-b border-charcoal-700">
     <div class="max-w-6xl mx-auto px-4 sm:px-6">
       <div class="flex items-center justify-between h-16 gap-4">
-        <NuxtLink to="/" class="flex items-center gap-2 shrink-0">
-          <span class="text-xl font-black tracking-tight">
-            <span class="text-gold-400">Niik</span><span class="text-white">Skate</span>
+        <NuxtLink to="/" class="flex items-center gap-2 shrink-0 rounded-md" :aria-label="language === 'es' ? 'NiikSkate, inicio' : 'NiikSkate, home'">
+          <span class="font-display text-xl font-black tracking-tight">
+            <span class="text-acid">Niik</span><span class="text-cream">Skate</span>
           </span>
         </NuxtLink>
 
-        <nav class="hidden md:flex items-center gap-1">
+        <nav class="hidden md:flex items-center gap-1" :aria-label="language === 'es' ? 'Principal' : 'Main'">
           <NuxtLink
             v-for="item in items"
             :key="item.path"
             :to="item.path"
-            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            :class="isActive(item.path) ? 'text-gold-400 bg-gold-400/10' : 'text-gray-400 hover:text-white hover:bg-gray-800'"
+            class="px-3 py-2 rounded-full text-sm font-semibold transition-colors"
+            :class="isActive(item.path) ? 'text-charcoal bg-acid' : 'text-cream/75 hover:text-cream hover:bg-charcoal-700'"
+            :aria-current="isActive(item.path) ? 'page' : undefined"
           >
             {{ item.name }}
           </NuxtLink>
@@ -42,14 +43,14 @@ const goAddFamilyMember = () => {
           <NuxtLink
             v-if="user"
             to="/member"
-            class="inline-flex px-3 py-2 rounded-lg bg-gold-400 text-black text-sm font-bold"
+            class="inline-flex px-4 py-2 rounded-full bg-acid text-charcoal text-sm font-bold hover:bg-acid-300 transition-colors"
           >
             {{ language === 'es' ? 'Mi cuenta' : 'My account' }}
           </NuxtLink>
           <NuxtLink
             v-else
             to="/auth/login"
-            class="px-3 py-2 rounded-lg border border-gray-600 text-gray-200 text-sm font-semibold hover:bg-gray-800"
+            class="px-4 py-2 rounded-full border border-cream/40 text-cream text-sm font-semibold hover:bg-cream hover:text-charcoal transition-colors"
           >
             {{ language === 'es' ? 'Entrar' : 'Sign in' }}
           </NuxtLink>
@@ -61,13 +62,14 @@ const goAddFamilyMember = () => {
       </div>
 
       <!-- Mobile nav -->
-      <nav class="md:hidden flex gap-1 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-none">
+      <nav class="md:hidden flex gap-1.5 overflow-x-auto pb-3 pt-0.5 -mx-1 px-1 scrollbar-none" :aria-label="language === 'es' ? 'Principal' : 'Main'">
         <NuxtLink
           v-for="item in items"
           :key="'m-' + item.path"
           :to="item.path"
-          class="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors"
-          :class="isActive(item.path) ? 'border-gold-400 text-gold-400 bg-gold-400/10' : 'border-gray-700 text-gray-400'"
+          class="shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold border transition-colors"
+          :class="isActive(item.path) ? 'border-acid bg-acid text-charcoal' : 'border-charcoal-600 text-cream/75'"
+          :aria-current="isActive(item.path) ? 'page' : undefined"
         >
           {{ item.name }}
         </NuxtLink>

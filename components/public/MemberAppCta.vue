@@ -10,20 +10,20 @@ function enterMemberPlatform() {
 </script>
 
 <template>
-  <div class="rounded-2xl border border-gold-400/40 bg-gradient-to-br from-gold-400/15 to-black/80 p-5 sm:p-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div class="rounded-3xl bg-charcoal text-cream p-6 sm:p-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
       <div>
-        <p class="text-gold-400 text-xs font-bold uppercase tracking-wider mb-1">
+        <p class="t-eyebrow text-acid mb-2">
           {{ language === 'es' ? 'Plataforma de miembros' : 'Member platform' }}
         </p>
-        <h2 class="text-lg sm:text-xl font-bold text-white">
+        <h2 class="font-display text-xl sm:text-2xl font-extrabold">
           {{
             language === 'es'
               ? 'Reserva clases, sigue tu progreso y más en la app'
               : 'Book classes, track progress, and more in the app'
           }}
         </h2>
-        <p class="text-sm text-gray-400 mt-2 max-w-xl">
+        <p class="text-sm text-cream/75 mt-2 max-w-xl">
           {{
             language === 'es'
               ? 'Descarga NiikSkate en tu celular o abre la app si ya la tienes instalada.'
@@ -31,11 +31,7 @@ function enterMemberPlatform() {
           }}
         </p>
       </div>
-      <button
-        type="button"
-        class="shrink-0 px-5 py-3 rounded-xl bg-gold-400 text-black font-bold text-sm hover:bg-gold-300 transition-colors"
-        @click="enterMemberPlatform"
-      >
+      <button type="button" class="btn-lime shrink-0" @click="enterMemberPlatform">
         {{ language === 'es' ? 'Abrir app' : 'Open app' }}
       </button>
     </div>

@@ -14,6 +14,20 @@ const { language } = useI18n()
 const loading = ref(true)
 const profile = ref<any>(null)
 const todayReservations = ref<any[]>([])
+type AssignedClass = {
+  id: string
+  title: string
+  start_time: string | null
+  skatepark: string | null
+  location: string | null
+  session_outcome: string | null
+}
+const assignedClasses = ref<AssignedClass[]>([])
+const classActionError = ref('')
+const makeupOpen = ref(false)
+const makeupNote = ref('')
+const makeupEventId = ref('')
+const makeupBusy = ref(false)
 const stats = ref({ students: 0, today: 0, week: 0, pending: 0 })
 const selectedSlot = ref<TimeSlot>('early')
 const showEmergencyModal = ref(false)
@@ -60,6 +74,7 @@ onMounted(async () => {
     ])
 
     todayReservations.value = todayRes.data || []
+    await loadAssignedClasses()
     stats.value = {
       students: students.count || 0,
       today: todayReservations.value.length,
@@ -70,6 +85,78 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+async function staffHeaders() {
+  const { data } = await client.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error(language.value === 'es' ? 'Sesión expirada' : 'Session expired')
+  return { Authorization: `Bearer ${token}` }
+}
+
+function classTime(value: string | null) {
+  if (!value) return ''
+  const [hours, minutes] = value.slice(0, 5).split(':').map(Number)
+  const suffix = hours >= 12 ? 'PM' : 'AM'
+  const hour = ((hours + 11) % 12) + 1
+  return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+async function loadAssignedClasses() {
+  if (!user.value) return
+  try {
+    const res = await $fetch<{ classes: AssignedClass[] }>('/api/coach/my-classes', {
+      headers: await staffHeaders(),
+      query: { date: todayStr },
+    })
+    assignedClasses.value = res.classes || []
+  } catch {
+    assignedClasses.value = []
+  }
+}
+
+async function markAssignedDone(id: string) {
+  classActionError.value = ''
+  try {
+    await $fetch('/api/classes/session-status', {
+      method: 'POST',
+      headers: await staffHeaders(),
+      body: { eventId: id, outcome: 'done' },
+    })
+    await loadAssignedClasses()
+  } catch (e: any) {
+    classActionError.value = e?.data?.message || e?.message || 'Error'
+  }
+}
+
+function askCancelAssigned(id: string) {
+  makeupEventId.value = id
+  makeupNote.value = ''
+  classActionError.value = ''
+  makeupOpen.value = true
+}
+
+async function confirmCancelAssigned() {
+  if (!makeupNote.value.trim()) {
+    classActionError.value = language.value === 'es'
+      ? 'Escribe cuándo se puede reponer.'
+      : 'Say when it can be retaken.'
+    return
+  }
+  makeupBusy.value = true
+  try {
+    await $fetch('/api/classes/session-status', {
+      method: 'POST',
+      headers: await staffHeaders(),
+      body: { eventId: makeupEventId.value, outcome: 'cancelled', makeupNote: makeupNote.value.trim() },
+    })
+    makeupOpen.value = false
+    await loadAssignedClasses()
+  } catch (e: any) {
+    classActionError.value = e?.data?.message || e?.message || 'Error'
+  } finally {
+    makeupBusy.value = false
+  }
+}
 
 async function openEmergency() {
   showEmergencyModal.value = true
@@ -88,24 +175,20 @@ function slotLabel(slot: TimeSlot) {
 
 <template>
   <div class="pb-8">
-    <header class="bg-gradient-to-br from-flame-600/90 to-gold-500/80 px-4 py-6">
-      <div class="max-w-lg mx-auto">
-        <h1 class="text-2xl font-bold text-white">
-          {{ language === 'es' ? `Hola, ${firstName}` : `Hello, ${firstName}` }}
-        </h1>
-        <p class="text-white/80 text-sm mt-1">
-          {{ format(today, language === 'es' ? "EEEE, d 'de' MMMM" : 'EEEE, MMMM d', { locale: language === 'es' ? es : undefined }) }}
-        </p>
-        <div v-if="!loading" class="grid grid-cols-4 gap-2 mt-4">
-          <div v-for="(val, key) in { today: stats.today, week: stats.week, students: stats.students, pending: stats.pending }" :key="key" class="bg-white/20 rounded-xl p-2 text-center">
-            <p class="text-xl font-bold text-white">{{ val }}</p>
-            <p class="text-[10px] text-white/80 uppercase">
+    <MemberStaffPageHeader
+      :title="language === 'es' ? `Hola, ${firstName}` : `Hello, ${firstName}`"
+      :subtitle="format(today, language === 'es' ? 'EEEE, d \'de\' MMMM' : 'EEEE, MMMM d', { locale: language === 'es' ? es : undefined })"
+    />
+    <div class="px-4 max-w-lg mx-auto pt-6">
+        <div v-if="!loading" class="grid grid-cols-4 gap-2">
+          <div v-for="(val, key) in { today: stats.today, week: stats.week, students: stats.students, pending: stats.pending }" :key="key" class="bg-charcoal-800 rounded-xl p-2 text-center">
+            <p class="text-xl font-bold text-acid">{{ val }}</p>
+            <p class="text-[10px] text-cream/60 uppercase">
               {{ key === 'today' ? (language === 'es' ? 'Hoy' : 'Today') : key === 'week' ? (language === 'es' ? 'Semana' : 'Week') : key === 'students' ? (language === 'es' ? 'Alumnos' : 'Students') : (language === 'es' ? 'Solic.' : 'Req.') }}
             </p>
           </div>
         </div>
-      </div>
-    </header>
+    </div>
 
     <div class="px-4 max-w-lg mx-auto py-6 space-y-6">
       <div v-if="loading" class="flex justify-center py-12">
@@ -113,6 +196,48 @@ function slotLabel(slot: TimeSlot) {
       </div>
 
       <template v-else>
+        <section v-if="assignedClasses.length" class="rounded-xl border border-gray-800 bg-gray-900 divide-y divide-gray-800">
+          <p class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            {{ language === 'es' ? 'Tus clases' : 'Your classes' }}
+          </p>
+          <div v-for="ev in assignedClasses" :key="ev.id" class="px-4 py-3 flex items-center gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-white truncate">
+                {{ ev.title }}
+                <span v-if="ev.session_outcome === 'done'" class="text-emerald-400">✓</span>
+                <span v-else-if="ev.session_outcome === 'cancelled'" class="text-sky-300">✕</span>
+              </p>
+              <p class="text-xs text-gray-500">
+                {{ classTime(ev.start_time) }}
+                <span v-if="ev.skatepark || ev.location"> · {{ ev.skatepark || ev.location }}</span>
+              </p>
+            </div>
+            <button
+              v-if="ev.session_outcome !== 'done'"
+              type="button"
+              class="p-1.5 rounded-md text-gray-400 hover:text-emerald-300"
+              :aria-label="language === 'es' ? 'Marcar hecha' : 'Mark done'"
+              @click="markAssignedDone(ev.id)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+            </button>
+            <button
+              v-if="ev.session_outcome !== 'cancelled'"
+              type="button"
+              class="p-1.5 rounded-md text-gray-400 hover:text-sky-300"
+              :aria-label="language === 'es' ? 'Cancelar' : 'Cancel'"
+              @click="askCancelAssigned(ev.id)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="classActionError" class="px-4 py-2 text-xs text-red-400">{{ classActionError }}</p>
+        </section>
+
         <section v-if="isClassDay(today)" class="rounded-xl border border-gray-800 bg-gray-900 p-4 space-y-3">
           <h2 class="font-bold text-white text-sm">
             {{ language === 'es' ? 'Clases de hoy' : "Today's classes" }}
@@ -146,21 +271,21 @@ function slotLabel(slot: TimeSlot) {
         <section>
           <h2 class="text-sm font-bold text-white mb-3">{{ language === 'es' ? 'Acciones rápidas' : 'Quick actions' }}</h2>
           <div class="grid grid-cols-2 gap-3">
-            <NuxtLink to="/member/coach/plans" class="rounded-xl bg-gradient-to-br from-purple-600/80 to-blue-600/80 p-4">
+            <NuxtLink to="/member/coach/plans" class="rounded-xl border border-charcoal-700 bg-charcoal-800 p-4">
               <span class="text-2xl">📋</span>
-              <p class="font-bold text-white text-sm mt-1">{{ language === 'es' ? 'Planear clase' : 'Plan class' }}</p>
+              <p class="font-bold text-cream text-sm mt-1">{{ language === 'es' ? 'Planear clase' : 'Plan class' }}</p>
             </NuxtLink>
-            <NuxtLink to="/member/coach/students" class="rounded-xl bg-gradient-to-br from-gold-400 to-orange-500 p-4">
+            <NuxtLink to="/member/coach/students" class="rounded-xl border border-acid/40 bg-acid p-4">
               <span class="text-2xl">👥</span>
-              <p class="font-bold text-black text-sm mt-1">{{ language === 'es' ? 'Alumnos' : 'Students' }}</p>
+              <p class="font-bold text-charcoal text-sm mt-1">{{ language === 'es' ? 'Alumnos' : 'Students' }}</p>
             </NuxtLink>
-            <NuxtLink to="/member/coach/evaluations" class="rounded-xl bg-gradient-to-br from-green-600/80 to-teal-600/80 p-4">
+            <NuxtLink to="/member/coach/evaluations" class="rounded-xl border border-charcoal-700 bg-charcoal-800 p-4">
               <span class="text-2xl">📝</span>
-              <p class="font-bold text-white text-sm mt-1">{{ language === 'es' ? 'Evaluar' : 'Evaluate' }}</p>
+              <p class="font-bold text-cream text-sm mt-1">{{ language === 'es' ? 'Evaluar' : 'Evaluate' }}</p>
             </NuxtLink>
-            <NuxtLink to="/member/coach/plans?tab=tips" class="rounded-xl bg-gradient-to-br from-flame-600/80 to-orange-600/80 p-4">
+            <NuxtLink to="/member/coach/plans?tab=tips" class="rounded-xl border border-charcoal-700 bg-charcoal-800 p-4">
               <span class="text-2xl">💡</span>
-              <p class="font-bold text-white text-sm mt-1">{{ language === 'es' ? 'Conocimiento' : 'Knowledge' }}</p>
+              <p class="font-bold text-cream text-sm mt-1">{{ language === 'es' ? 'Conocimiento' : 'Knowledge' }}</p>
             </NuxtLink>
             <button type="button" class="col-span-2 rounded-xl bg-rose-700/80 p-4 text-left" @click="openEmergency">
               <span class="text-2xl">📞</span>
@@ -170,6 +295,32 @@ function slotLabel(slot: TimeSlot) {
         </section>
       </template>
     </div>
+
+    <Teleport to="body">
+      <div v-if="makeupOpen" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70" @click.self="makeupOpen = false">
+        <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-4">
+          <h3 class="font-bold text-white">{{ language === 'es' ? 'Cancelar clase' : 'Cancel class' }}</h3>
+          <p class="text-sm text-gray-400 mt-1">
+            {{ language === 'es' ? 'Se avisa a las familias inscritas.' : 'Enrolled families are emailed.' }}
+          </p>
+          <textarea
+            v-model="makeupNote"
+            rows="3"
+            class="mt-3 w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white"
+            :placeholder="language === 'es' ? 'Cuándo se puede reponer' : 'When it can be retaken'"
+          />
+          <p v-if="classActionError" class="mt-2 text-xs text-red-400">{{ classActionError }}</p>
+          <div class="mt-3 flex gap-2">
+            <button type="button" class="flex-1 py-2 rounded-lg bg-gray-800 text-white text-sm" :disabled="makeupBusy" @click="makeupOpen = false">
+              {{ language === 'es' ? 'Volver' : 'Back' }}
+            </button>
+            <button type="button" class="flex-1 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold disabled:opacity-50" :disabled="makeupBusy" @click="confirmCancelAssigned">
+              {{ language === 'es' ? 'Cancelar y avisar' : 'Cancel and notify' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div v-if="showEmergencyModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" @click.self="showEmergencyModal = false">

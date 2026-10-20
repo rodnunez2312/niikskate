@@ -13,6 +13,7 @@ import { es as esLocale } from 'date-fns/locale'
 import { getDay } from 'date-fns'
 import { PROGRAM_AGE_BANDS, TIME_SLOT_NAMES, type TimeSlot } from '~/types'
 import { computeAgeFromDob, isAgeEligibleForSession, sessionAgeBounds } from '~/utils/ageEligibility'
+import { disciplineFromJoin, skillLevelWithDiscipline } from '~/utils/trainingDisciplines'
 import {
   couponCoversScope,
   couponDiscountSummary,
@@ -154,12 +155,15 @@ onMounted(async () => {
     loadFutureBookings(),
   ])
   await loadAttendanceMarks(enrollments.value.map(r => r.id))
-  const [{ data: profileRows }, { data: crewRows }, { data: seasonRows }, { data: skillGroups }] = await Promise.all([
+  const [{ data: profileRows }, { data: crewRows }, { data: seasonRows }] = await Promise.all([
     client.from('profiles').select('id, full_name, guardian_user_id, date_of_birth, age, skill_group_id').eq('role', 'customer').order('full_name'),
     client.from('crew_members').select('id, first_name, last_name, guardian_user_id, date_of_birth, age').order('first_name'),
     client.from('program_seasons').select('slug, name_es, name_en, start_date, end_date, status, icon'),
-    client.from('skill_groups').select('id, name'),
   ])
+  const skillGroupsJoined = await client.from('skill_groups').select('id, name, training_programs(discipline)')
+  const skillGroups = skillGroupsJoined.error
+    ? (await client.from('skill_groups').select('id, name')).data
+    : skillGroupsJoined.data
   const levelByGroup = new Map(
     ((skillGroups || []) as Array<{ id: string; name: string }>).map(group => [
       group.id,
@@ -167,7 +171,10 @@ onMounted(async () => {
     ]),
   )
   const nameByGroup = new Map(
-    ((skillGroups || []) as Array<{ id: string; name: string }>).map(group => [group.id, group.name]),
+    ((skillGroups || []) as Array<{ id: string; name: string; training_programs?: { discipline?: string | null } | { discipline?: string | null }[] | null }>).map(group => [
+      group.id,
+      skillLevelWithDiscipline(group.name, disciplineFromJoin(group), language.value === 'es'),
+    ]),
   )
   people.value = [
     ...((profileRows || []) as Array<{ id: string; full_name: string; guardian_user_id: string | null; date_of_birth: string | null; age: number | null; skill_group_id: string | null }>).map(p => ({
@@ -819,25 +826,30 @@ async function submitPurchase() {
         <span v-if="loading" class="text-xs text-gray-500">{{ es ? 'Cargando…' : 'Loading…' }}</span>
       </div>
 
-      <div class="overflow-x-auto rounded-2xl border border-gray-800">
-        <div class="hidden lg:grid lg:min-w-[1250px] grid-cols-[2fr_1fr_1.4fr_70px_repeat(5,1fr)_36px] gap-3 px-4 py-2 bg-gray-900 text-[10px] uppercase font-bold text-gray-500">
+      <div class="overflow-x-auto rounded-2xl border border-gray-200 bg-white text-gray-900 [color-scheme:light]">
+        <div class="hidden lg:grid lg:min-w-[1250px] grid-cols-[2fr_1fr_1.4fr_70px_repeat(5,1fr)_36px] gap-3 px-3 py-1.5 bg-gray-100 text-[10px] uppercase font-bold text-gray-900">
           <span>{{ es ? 'Alumno' : 'Student' }}</span><span>{{ es ? 'Grupo de edad' : 'Age group' }}</span><span>{{ es ? 'Programa asignado' : 'Assigned program' }}</span><span>{{ es ? 'Agregar' : 'Add' }}</span><span>{{ es ? 'Pagadas' : 'Paid' }}</span><span>{{ es ? 'Restantes' : 'Left' }}</span><span>{{ es ? 'Activas' : 'Active' }}</span><span>{{ es ? 'Asistió / faltó' : 'Attended / absent' }}</span><span>{{ es ? 'Último pago' : 'Last payment' }}</span><span />
         </div>
         <div v-if="!filtered.length" class="p-10 text-center text-sm text-gray-500">{{ es ? 'No hay alumnos con este filtro.' : 'No students match this filter.' }}</div>
-        <article v-for="student in filtered" :key="student.key" class="lg:min-w-[1250px] border-t border-gray-800 first:border-t-0">
-          <div class="w-full grid grid-cols-2 lg:grid-cols-[2fr_1fr_1.4fr_70px_repeat(5,1fr)_36px] gap-3 items-center px-4 py-4 text-left hover:bg-gray-900/60">
-            <button type="button" class="col-span-2 lg:col-span-1 font-bold text-white text-left" @click="expanded = expanded === student.key ? null : student.key">{{ student.studentName }}</button>
-            <span class="text-xs text-gray-300"><small class="lg:hidden text-gray-500 block">{{ es ? 'Grupo de edad' : 'Age group' }}</small>{{ ageGroupFor(student.key) }}</span>
-            <span class="text-xs text-gray-300"><small class="lg:hidden text-gray-500 block">{{ es ? 'Programa asignado' : 'Assigned program' }}</small>{{ programFor(student.key) }}</span>
-            <button type="button" class="h-9 w-9 rounded-full bg-gold-400 text-black text-xl font-black justify-self-start lg:justify-self-center" :aria-label="es ? `Agregar clases a ${student.studentName}` : `Add classes for ${student.studentName}`" @click="openPurchaseForm(student)">+</button>
-            <span class="text-sm text-gray-300"><small class="lg:hidden text-gray-500 block">{{ es ? 'Pagadas' : 'Paid' }}</small>{{ student.sessionsPaid }}</span>
-            <span class="text-sm font-bold" :class="student.remaining <= 0 ? 'text-red-300' : student.remaining <= 2 ? 'text-amber-300' : 'text-green-300'"><small class="lg:hidden text-gray-500 block">{{ es ? 'Restantes' : 'Left' }}</small>{{ student.remaining }}</span>
-            <span class="text-sm text-cyan-300"><small class="lg:hidden text-gray-500 block">{{ es ? 'Activas' : 'Active' }}</small>{{ student.futureBookedClasses }}</span>
-            <span class="text-sm text-gray-300"><small class="lg:hidden text-gray-500 block">{{ es ? 'Asistió / faltó' : 'Attended / absent' }}</small>{{ student.attended }} / {{ student.absences }}</span>
-            <span class="text-sm text-gray-400"><small class="lg:hidden text-gray-500 block">{{ es ? 'Último pago' : 'Last payment' }}</small>{{ formatDateEs(student.lastPaymentOn) }}</span>
+        <article
+          v-for="(student, rowIdx) in filtered"
+          :key="student.key"
+          class="lg:min-w-[1250px] border-t border-gray-200 first:border-t-0"
+          :class="rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-100'"
+        >
+          <div class="w-full grid grid-cols-2 lg:grid-cols-[2fr_1fr_1.4fr_70px_repeat(5,1fr)_36px] gap-2 items-center px-3 py-1.5 text-left hover:bg-gray-200/70">
+            <button type="button" class="col-span-2 lg:col-span-1 text-sm font-bold text-gray-900 text-left" @click="expanded = expanded === student.key ? null : student.key">{{ student.studentName }}</button>
+            <span class="text-xs text-gray-900"><small class="lg:hidden text-gray-700 block">{{ es ? 'Grupo de edad' : 'Age group' }}</small>{{ ageGroupFor(student.key) }}</span>
+            <span class="text-xs text-gray-900"><small class="lg:hidden text-gray-700 block">{{ es ? 'Programa asignado' : 'Assigned program' }}</small>{{ programFor(student.key) }}</span>
+            <button type="button" class="h-6 w-6 rounded-full bg-acid text-charcoal text-base font-black leading-none justify-self-start lg:justify-self-center" :aria-label="es ? `Agregar clases a ${student.studentName}` : `Add classes for ${student.studentName}`" @click="openPurchaseForm(student)">+</button>
+            <span class="text-sm text-gray-900"><small class="lg:hidden text-gray-700 block">{{ es ? 'Pagadas' : 'Paid' }}</small>{{ student.sessionsPaid }}</span>
+            <span class="text-sm font-bold" :class="student.remaining <= 0 ? 'text-red-700' : student.remaining <= 2 ? 'text-amber-700' : 'text-emerald-700'"><small class="lg:hidden text-gray-500 block">{{ es ? 'Restantes' : 'Left' }}</small>{{ student.remaining }}</span>
+            <span class="text-sm text-sky-700"><small class="lg:hidden text-gray-500 block">{{ es ? 'Activas' : 'Active' }}</small>{{ student.futureBookedClasses }}</span>
+            <span class="text-sm text-gray-900"><small class="lg:hidden text-gray-700 block">{{ es ? 'Asistió / faltó' : 'Attended / absent' }}</small>{{ student.attended }} / {{ student.absences }}</span>
+            <span class="text-sm text-gray-900"><small class="lg:hidden text-gray-700 block">{{ es ? 'Último pago' : 'Last payment' }}</small>{{ formatDateEs(student.lastPaymentOn) }}</span>
             <button type="button" class="hidden lg:block text-gray-500" @click="expanded = expanded === student.key ? null : student.key">{{ expanded === student.key ? '⌃' : '⌄' }}</button>
           </div>
-          <div v-if="expanded === student.key" class="grid lg:grid-cols-2 gap-4 p-4 bg-gray-950 border-t border-gray-800">
+          <div v-if="expanded === student.key" class="grid lg:grid-cols-2 gap-4 p-4 bg-gray-50 border-t border-gray-200">
             <div class="min-w-0">
               <h3 class="text-xs uppercase font-bold text-gray-400 mb-2">{{ es ? 'Próximas clases' : 'Upcoming classes' }}</h3>
               <div class="max-h-[5.75rem] overflow-y-auto pr-1">
@@ -845,9 +857,9 @@ async function submitPurchase() {
                   <article
                     v-for="(cls, index) in upcomingFor(student.key)"
                     :key="`${cls.startDate}-${index}`"
-                    class="rounded-xl border border-gray-800 bg-gray-900 px-2.5 py-2 min-w-0"
+                    class="rounded-xl border border-gray-200 bg-white px-2.5 py-2 min-w-0"
                   >
-                    <p class="truncate text-xs font-semibold text-white">{{ cls.title }}</p>
+                    <p class="truncate text-xs font-semibold text-gray-900">{{ cls.title }}</p>
                     <p class="text-[11px] text-cyan-300">{{ formatDateEs(cls.startDate) }}<span v-if="cls.startTime"> · {{ cls.startTime.slice(0, 5) }}</span></p>
                   </article>
                 </div>
@@ -857,9 +869,9 @@ async function submitPurchase() {
             <div class="min-w-0">
               <h3 class="text-xs uppercase font-bold text-gray-400 mb-2">{{ es ? 'Historial de compras' : 'Purchase history' }}</h3>
               <div class="max-h-64 overflow-y-auto space-y-2 pr-1">
-                <div v-for="row in student.enrollments" :key="row.id" class="rounded-xl border border-gray-800 bg-gray-900 p-3">
+                <div v-for="row in student.enrollments" :key="row.id" class="rounded-xl border border-gray-200 bg-white p-3">
                   <div class="flex justify-between gap-3">
-                    <div><p class="text-sm font-semibold text-white">{{ row.plan_label || (es ? 'Paquete' : 'Package') }}</p><p class="text-[11px] text-gray-500">{{ formatDateEs(row.last_payment_on) }} · {{ weekdaysLabel(row.attend_weekdays) }}</p></div>
+                    <div><p class="text-sm font-semibold text-gray-900">{{ row.plan_label || (es ? 'Paquete' : 'Package') }}</p><p class="text-[11px] text-gray-500">{{ formatDateEs(row.last_payment_on) }} · {{ weekdaysLabel(row.attend_weekdays) }}</p></div>
                     <p class="text-sm font-bold text-gold-300">{{ formatMoneyMxn(row.amount_paid_mxn) }}</p>
                   </div>
                   <p class="mt-2 text-xs text-gray-400">{{ row.sessions_paid }} {{ es ? 'pagadas' : 'paid' }} · {{ remainingSessions(row) }} {{ es ? 'restantes' : 'left' }}</p>

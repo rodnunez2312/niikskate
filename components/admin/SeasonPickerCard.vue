@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** One row of the season picker, used by both the active list and the archive. */
 import type { ProgramSeason } from '~/utils/programSeasons'
+import { disciplineEmoji } from '~/utils/trainingDisciplines'
 
 const props = defineProps<{
   season: ProgramSeason
@@ -9,6 +10,11 @@ const props = defineProps<{
   color: { solid: string; fillMuted: string }
   status: { kind: 'enroll' | 'soon' | 'done'; label: string }
   removing?: boolean
+  /** Programs currently running in this season. */
+  activePrograms?: number
+  /** Programs scheduled in this season that have not finished. */
+  scheduledPrograms?: number
+  disciplines?: string[]
 }>()
 
 defineEmits<{ toggle: []; remove: [] }>()
@@ -31,6 +37,26 @@ const compactDates = computed(() => {
   }
   return `${formatDate(props.season.startDate)} — ${formatDate(props.season.endDate)}`
 })
+
+const programLine = computed(() => {
+  const active = props.activePrograms ?? 0
+  const scheduled = props.scheduledPrograms ?? 0
+  if (active > 0) {
+    return es.value
+      ? `${active} activo${active === 1 ? '' : 's'}`
+      : `${active} active`
+  }
+  if (scheduled > 0) {
+    return es.value
+      ? `${scheduled} programa${scheduled === 1 ? '' : 's'}`
+      : `${scheduled} program${scheduled === 1 ? '' : 's'}`
+  }
+  return es.value ? 'Sin programas' : 'No programs'
+})
+
+const sportIcons = computed(() =>
+  (props.disciplines || []).map(id => disciplineEmoji(id)).filter(Boolean),
+)
 
 const statusBadge = computed(() => {
   if (props.past) return ''
@@ -71,7 +97,12 @@ const statusBadge = computed(() => {
         </span>
       </div>
       <div class="mt-1 pl-[18px] flex items-center justify-between gap-2">
-        <span class="text-[10px] text-gray-500 font-semibold">Mérida</span>
+        <span class="inline-flex items-center gap-1 min-w-0 text-[10px] text-gray-400 font-semibold">
+          <span v-if="sportIcons.length" class="inline-flex gap-0.5" aria-hidden="true">
+            <span v-for="(icon, i) in sportIcons" :key="i">{{ icon }}</span>
+          </span>
+          <span class="truncate">{{ programLine }}</span>
+        </span>
         <span
           v-if="statusBadge"
           class="inline-flex items-center rounded-full border border-gray-700 px-2 py-0.5 text-[9px] font-black tracking-wide text-gray-300"

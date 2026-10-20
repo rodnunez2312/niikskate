@@ -8,6 +8,10 @@ export type RampSketchType =
   | 'manual_pad'
   | 'custom'
 
+export type KickerShape = 'radius' | 'angle'
+export type RailCoping = 'round' | 'flat'
+export type RailFlatProfile = '1x3' | '2x4'
+
 export type RampSketch = {
   rampType: RampSketchType
   heightFt: number
@@ -15,6 +19,18 @@ export type RampSketch = {
   lengthFt: number
   transitionRadiusFt: number
   platformDepthFt: number
+  /** Developed riding surface. Coating uses these two. */
+  surfaceLengthFt: number
+  surfaceWidthFt: number
+  /** Kicker only: curved transition, or a straight bank. */
+  kickerShape: KickerShape
+  /** Bank angle from the floor, in degrees. */
+  bankAngleDeg: number
+  /** Mini-ramp flat bottom between the transitions. */
+  flatLengthFt: number
+  /** Rail coping: round tube or flat bar. */
+  railCoping: RailCoping
+  railFlatProfile: RailFlatProfile
   notes: string
 }
 
@@ -25,6 +41,13 @@ export const DEFAULT_RAMP_SKETCH: RampSketch = {
   lengthFt: 12,
   transitionRadiusFt: 6,
   platformDepthFt: 2,
+  surfaceLengthFt: 0,
+  surfaceWidthFt: 0,
+  kickerShape: 'angle',
+  bankAngleDeg: 14,
+  flatLengthFt: 0,
+  railCoping: 'round',
+  railFlatProfile: '1x3',
   notes: '',
 }
 
@@ -52,6 +75,13 @@ export function parseRampSketch(raw: unknown): RampSketch {
     lengthFt: clampNum(o.lengthFt, 4, 40, DEFAULT_RAMP_SKETCH.lengthFt),
     transitionRadiusFt: clampNum(o.transitionRadiusFt, 2, 12, DEFAULT_RAMP_SKETCH.transitionRadiusFt),
     platformDepthFt: clampNum(o.platformDepthFt, 0, 8, DEFAULT_RAMP_SKETCH.platformDepthFt),
+    surfaceLengthFt: clampNum(o.surfaceLengthFt, 0, 80, 0),
+    surfaceWidthFt: clampNum(o.surfaceWidthFt, 0, 24, 0),
+    kickerShape: o.kickerShape === 'radius' ? 'radius' : 'angle',
+    bankAngleDeg: clampNum(o.bankAngleDeg, 0, 80, DEFAULT_RAMP_SKETCH.bankAngleDeg),
+    flatLengthFt: clampNum(o.flatLengthFt, 0, 40, 0),
+    railCoping: o.railCoping === 'flat' ? 'flat' : 'round',
+    railFlatProfile: o.railFlatProfile === '2x4' ? '2x4' : '1x3',
     notes: typeof o.notes === 'string' ? o.notes : '',
   }
 }

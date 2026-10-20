@@ -169,36 +169,22 @@ function detailRows(request: SkaterampRequest) {
 </script>
 
 <template>
-  <div v-if="ready" class="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
-    <header class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-black uppercase text-white">
-          {{ es ? 'Solicitudes de rampa' : 'Ramp requests' }}
-        </h1>
-        <p class="text-sm text-gray-400 mt-1">
-          {{
-            es
-              ? 'Formulario “Rampa a tu medida” de la página pública de Skateramps.'
-              : 'Custom ramp form from the public Skateramps page.'
-          }}
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <NuxtLink
-          to="/member/admin/skateramps"
-          class="px-4 py-2 rounded-xl border border-gray-700 text-sm font-semibold text-gray-300 hover:border-gold-400 hover:text-white transition-colors"
-        >
-          {{ es ? 'Estudio de diseño' : 'Design studio' }}
-        </NuxtLink>
+  <div v-if="ready" class="min-h-screen bg-black pb-16">
+    <MemberStaffPageHeader
+      :title="es ? 'Solicitudes de rampas' : 'Ramp requests'"
+      :subtitle="es ? 'Formulario de rampa a tu medida' : 'Custom ramp form from the public page'"
+    >
+      <template #actions>
         <button
           type="button"
-          class="px-4 py-2 rounded-xl bg-gray-800 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
+          class="px-4 py-2.5 rounded-xl border border-gray-700 text-sm font-semibold text-gray-200"
           @click="loadRequests"
         >
           {{ es ? 'Actualizar' : 'Refresh' }}
         </button>
-      </div>
-    </header>
+      </template>
+    </MemberStaffPageHeader>
+    <div class="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
 
     <div
       v-if="undelivered.length"
@@ -273,7 +259,7 @@ function detailRows(request: SkaterampRequest) {
           <span v-if="request.image_urls?.length" class="text-xs text-gray-500 shrink-0">
             📷 {{ request.image_urls.length }}
           </span>
-          <span class="text-gray-600 shrink-0">{{ expandedId === request.id ? '▴' : '▾' }}</span>
+          <span class="text-base leading-none text-gray-500 shrink-0" aria-hidden="true">{{ expandedId === request.id ? '−' : '+' }}</span>
         </button>
 
         <div v-if="expandedId === request.id" class="border-t border-gray-800 px-4 py-4 space-y-5">
@@ -361,5 +347,6 @@ function detailRows(request: SkaterampRequest) {
         </div>
       </li>
     </ul>
+    </div>
   </div>
 </template>

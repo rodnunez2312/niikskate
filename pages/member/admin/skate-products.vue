@@ -76,6 +76,14 @@ const bulkImportReadyRows = ref<ParsedShopProductRow[]>([])
 const bulkDuplicateGroups = ref<BulkDuplicateGroup[]>([])
 const bulkExistingByMatchKey = ref(new Map<string, any>())
 
+const catalogView = ref<'cards' | 'table'>('cards')
+if (import.meta.client && localStorage.getItem('niik-shop-catalog-view') === 'table') {
+  catalogView.value = 'table'
+}
+watch(catalogView, (view) => {
+  if (import.meta.client) localStorage.setItem('niik-shop-catalog-view', view)
+})
+
 const shopGroups = SHOP_GROUPS
 
 const dbCategoryOptions: Array<{ id: ProductCategory; name: { en: string; es: string }; group: ShopGroupId }> = [
@@ -85,8 +93,8 @@ const dbCategoryOptions: Array<{ id: ProductCategory; name: { en: string; es: st
   { id: 'ramps', name: { en: 'Ramps', es: 'Rampas' }, group: 'skate_equip' },
   { id: 'cascos', name: { en: 'Helmets', es: 'Cascos' }, group: 'security_equip' },
   { id: 'protecciones', name: { en: 'Pads', es: 'Protecciones' }, group: 'security_equip' },
-  { id: 'merch', name: { en: 'Merch / clothing', es: 'Merch / ropa' }, group: 'clothing' },
-  { id: 'hardware', name: { en: 'Hardware / accessories', es: 'Hardware / accesorios' }, group: 'accessories' },
+  { id: 'merch', name: { en: 'Apparel', es: 'Para ponerse' }, group: 'clothing' },
+  { id: 'hardware', name: { en: 'Hardware', es: 'Hardware' }, group: 'skate_equip' },
 ]
 
 const emptyForm = () => ({
@@ -608,7 +616,7 @@ async function deleteProduct(product: any) {
 
 function onShopGroupPick(groupId: ShopGroupId) {
   const group = shopGroups.find(g => g.id === groupId)
-  if (!group) return
+  if (!group?.dbCategories.length) return
   if (!group.dbCategories.includes(form.value.category)) {
     form.value.category = group.defaultCategory
   }
@@ -783,40 +791,52 @@ const productPhotoUploadHint = computed(() =>
 
 <template>
   <div class="min-h-screen bg-black pb-24">
+    <MemberStaffPageHeader
+      title="Skateshop"
+      :subtitle="es ? 'Administra el catálogo que se muestra en la tienda' : 'Manage the catalog shown in the shop'"
+    >
+      <template #actions>
+        <NuxtLink
+          to="/skateshop"
+          class="px-3 py-2 rounded-xl border border-gray-700 text-sm font-semibold text-gray-200"
+        >
+          {{ es ? 'Ver tienda' : 'View shop' }}
+        </NuxtLink>
+        <button
+          type="button"
+          class="px-3 py-2 rounded-xl border border-gray-700 text-sm font-semibold text-gray-200"
+          @click="openBulkImport"
+        >
+          {{ es ? 'Importar' : 'Import' }}
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2.5 rounded-xl bg-acid text-charcoal text-sm font-semibold"
+          @click="openCreate"
+        >
+          + {{ es ? 'Producto' : 'Product' }}
+        </button>
+      </template>
+    </MemberStaffPageHeader>
     <div class="max-w-7xl mx-auto px-4 lg:px-6 py-6 space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h1 class="text-2xl font-black text-white">Skateshop</h1>
-          <p class="text-sm text-gray-400 mt-1">
-            {{
-              es
-                ? 'Administra el catálogo que se muestra en /skateshop'
-                : 'Manage the catalog shown on /skateshop'
-            }}
-          </p>
-        </div>
-        <div class="flex flex-wrap lg:flex-nowrap gap-2">
-          <NuxtLink
-            to="/skateshop"
-            class="px-4 py-2 rounded-xl border border-white/15 text-sm font-bold text-gray-200 hover:border-gold-400/50"
-          >
-            {{ es ? 'Ver tienda' : 'View shop' }}
-          </NuxtLink>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl border border-gold-400/40 text-gold-400 text-sm font-bold hover:bg-gold-400/10"
-            @click="openBulkImport"
-          >
-            {{ es ? 'Importación masiva' : 'Bulk import' }}
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl bg-gold-400 text-black text-sm font-bold hover:bg-gold-300"
-            @click="openCreate"
-          >
-            + {{ es ? 'Agregar producto' : 'Add product' }}
-          </button>
-        </div>
+
+      <div class="inline-flex rounded-xl border border-gray-700 p-1 bg-gray-950">
+        <button
+          type="button"
+          class="px-4 py-1.5 rounded-lg text-sm font-bold"
+          :class="catalogView === 'cards' ? 'bg-acid text-charcoal' : 'text-gray-400'"
+          @click="catalogView = 'cards'"
+        >
+          {{ es ? 'Productos' : 'Products' }}
+        </button>
+        <button
+          type="button"
+          class="px-4 py-1.5 rounded-lg text-sm font-bold"
+          :class="catalogView === 'table' ? 'bg-acid text-charcoal' : 'text-gray-400'"
+          @click="catalogView = 'table'"
+        >
+          {{ es ? 'Tabla' : 'Table' }}
+        </button>
       </div>
 
       <div class="grid grid-cols-3 gap-3">
@@ -834,7 +854,7 @@ const productPhotoUploadHint = computed(() =>
         </div>
       </div>
 
-      <div class="flex flex-col gap-6">
+      <div v-show="catalogView === 'cards'" class="flex flex-col gap-6">
       <div class="order-1 space-y-3">
         <input
           v-model="searchQuery"
@@ -1105,6 +1125,13 @@ const productPhotoUploadHint = computed(() =>
       </div>
       </div>
       </div>
+
+      <AdminShopCatalogTable
+        v-show="catalogView === 'table'"
+        :products="products"
+        :categories="dbCategoryOptions"
+        @refresh="fetchProducts"
+      />
     </div>
 
     <!-- Bulk import modal -->
@@ -1132,18 +1159,15 @@ const productPhotoUploadHint = computed(() =>
           </div>
 
           <div class="p-5 space-y-3">
-            <details class="text-[11px] text-gray-500">
-              <summary class="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
-                {{ es ? 'Ayuda' : 'Help' }}
-              </summary>
-              <p class="mt-2 leading-relaxed">
+            <AdminCollapsible :title="es ? 'Ayuda' : 'Help'">
+              <p class="text-[11px] text-gray-500 leading-relaxed">
                 {{
                   es
                     ? 'Fila 1 = encabezados (nombre, marca, categoria…). Copia tus productos desde WordPress y pégalos desde la fila 2. No cambies la fila 1.'
                     : 'Row 1 = headers (nombre, marca, categoria…). Copy products from WordPress and paste from row 2. Do not change row 1.'
                 }}
               </p>
-            </details>
+            </AdminCollapsible>
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1199,14 +1223,16 @@ const productPhotoUploadHint = computed(() =>
               <ul class="text-sm text-flame-100/90 list-disc pl-4 space-y-2">
                 <li v-for="(err, i) in bulkImportErrors" :key="'e' + i">{{ err }}</li>
               </ul>
-              <details v-if="bulkImportErrorDetails.length" class="text-xs text-gray-500">
-                <summary class="cursor-pointer hover:text-gray-400">
-                  {{ es ? 'Detalle por fila' : 'Row details' }}
-                </summary>
-                <ul class="mt-2 space-y-0.5 max-h-32 overflow-y-auto">
+              <AdminCollapsible
+                v-if="bulkImportErrorDetails.length"
+                bare
+                :title="es ? 'Detalle por fila' : 'Row details'"
+                :meta="bulkImportErrorDetails.length"
+              >
+                <ul class="space-y-0.5 max-h-32 overflow-y-auto text-xs text-gray-500">
                   <li v-for="(d, i) in bulkImportErrorDetails" :key="'d' + i">{{ d }}</li>
                 </ul>
-              </details>
+              </AdminCollapsible>
             </div>
             <p v-if="bulkImportReadyRows.length && !bulkImportErrors.length" class="text-sm text-glass-green">
               {{ bulkImportReadyRows.length }}

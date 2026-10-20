@@ -4,6 +4,7 @@ import type { CrewParticipant } from '~/composables/useCrew'
 import { skaterRatingBubbleClass } from '~/utils/skaterRatingDots'
 import { computeSkaterProgramMilestones } from '~/utils/skaterProgramProgress'
 import { normalizeSkillGroupDisplayName } from '~/utils/skillGroupLevels'
+import { disciplineFromJoin, skillLevelWithDiscipline } from '~/utils/trainingDisciplines'
 import {
   SKATER_PUSH_OPTIONS,
   SKATER_STANCE_OPTIONS,
@@ -150,14 +151,19 @@ type SkaterProfileBits = {
 }
 
 const profileBits = ref<SkaterProfileBits | null>(null)
-const assignedSkillGroup = ref<{ id: string; name: string } | null>(null)
+const assignedSkillGroup = ref<{ id: string; name: string; discipline?: string | null } | null>(null)
 const groupAveragePct = ref(0)
 const emailCopied = ref(false)
 let emailCopiedTimer: ReturnType<typeof setTimeout> | null = null
 
 const assignedProgramLabel = computed(() => {
-  const name = assignedSkillGroup.value?.name
-  return name ? normalizeSkillGroupDisplayName(name) : null
+  const group = assignedSkillGroup.value
+  if (!group?.name) return null
+  return skillLevelWithDiscipline(
+    normalizeSkillGroupDisplayName(group.name),
+    group.discipline,
+    language.value === 'es',
+  )
 })
 
 const skillAttributeDots = computed(() =>
@@ -265,8 +271,21 @@ async function loadData() {
     groupAveragePct.value = 0
     const groupId = profileBits.value?.skill_group_id
     if (groupId) {
-      const { data: grp } = await client.from('skill_groups').select('id,name').eq('id', groupId).maybeSingle()
-      if (grp) assignedSkillGroup.value = grp as { id: string; name: string }
+      const joined = await client
+        .from('skill_groups')
+        .select('id,name,training_programs(discipline)')
+        .eq('id', groupId)
+        .maybeSingle()
+      const grp = joined.error
+        ? (await client.from('skill_groups').select('id,name').eq('id', groupId).maybeSingle()).data
+        : joined.data
+      if (grp) {
+        assignedSkillGroup.value = {
+          id: grp.id,
+          name: grp.name,
+          discipline: disciplineFromJoin(grp),
+        }
+      }
       const { data: avg } = await client.rpc('skater_skill_group_average_pct', { p_student_id: props.studentId })
       const avgNum = typeof avg === 'number' ? avg : Number(avg)
       if (Number.isFinite(avgNum)) groupAveragePct.value = avgNum

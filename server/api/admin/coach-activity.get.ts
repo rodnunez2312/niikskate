@@ -8,22 +8,29 @@
  */
 import { requireAdmin } from '~/server/utils/requireAdmin'
 import { ADMIN_COACH_EMAIL } from '~/composables/coachDirectory'
+import { coachMatchesFirstName, defaultBackupFirstName } from '~/utils/coachBackups'
 
 export interface CoachActivityCoach {
   id: string
   name: string
   email: string
+  avatar_url: string | null
   title: string | null
   is_active: boolean
   is_head_coach: boolean
   programs: string[]
   /** Classes this coach ran in the period. */
   classes_given: number
+  /** Assigned classes marked cancelled in the period. */
+  classes_cancelled: number
   /** Skaters enrolled in those classes, deduplicated. */
   athletes_taught: number
   attendance_marked: number
   evaluations: number
+  /** Session library clips plus evaluation attachments. */
   videos: number
+  session_videos: number
+  evaluation_videos: number
   class_plans: number
   tricks_marked: number
   /** Distinct skaters this coach recorded any progress for. */
@@ -39,15 +46,40 @@ export interface CoachActivityWeek {
   classes: number
 }
 
+export interface CoachActivityClass {
+  id: string
+  date: string
+  time: string
+  title: string
+  coaches: string
+  /** Who is taking the class. A cover shows that coach, not the person they replaced. */
+  pills: Array<{ id: string; initials: string; name: string }>
+  /** Coaches who can mark this class, and who are paid when it is marked done. */
+  coachIds: string[]
+  /** Monday of the class week, yyyy-mm-dd. */
+  weekStart: string
+  /** done, cancelled, open (past, not marked), upcoming */
+  status: 'done' | 'cancelled' | 'open' | 'upcoming'
+  /** Assigned coach is off and nobody available is covering. */
+  warning: string
+}
+
 export interface CoachActivityResponse {
   from: string
   to: string
   coaches: CoachActivityCoach[]
   totals: {
     classes_given: number
+    classes_in_period: number
+    classes_cancelled: number
     videos: number
+    session_videos: number
+    evaluation_videos: number
     athletes_with_progress: number
+    /** Skaters with a class bought or assigned in the period. */
+    active_skaters: number
     coaches_contributing: number
+    /** Coaches assigned to a class in the period. */
     coaches_total: number
     evaluations: number
     class_plans: number
@@ -55,11 +87,17 @@ export interface CoachActivityResponse {
     tricks_marked: number
   }
   weekly: CoachActivityWeek[]
+  /** Calendar classes from 7 days ago through 7 days ahead. */
+  nearby: CoachActivityClass[]
   /** Programs seen on the roster, for the page's filter. */
   programs: Array<{ id: string; name: string }>
 }
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10)
+
+/** Coach activity dates are calendar days in Yucatán, not UTC. */
+const mxDayStart = (day: string) => `${day}T00:00:00-06:00`
+const mxDayEnd = (day: string) => `${day}T23:59:59.999-06:00`
 
 /** Monday of the week containing `d`. */
 function weekStart(d: Date): Date {
@@ -67,6 +105,223 @@ function weekStart(d: Date): Date {
   const dow = out.getUTCDay()
   out.setUTCDate(out.getUTCDate() - (dow === 0 ? 6 : dow - 1))
   return out
+}
+
+const SLOT_FROM_START: Record<string, string> = {
+  '07:00': 'morning',
+  '16:30': 'monday',
+  '17:30': 'early',
+  '19:00': 'late',
+  '09:00': 'summer',
+}
+
+function classTimeLabel(start: string | null) {
+  const hhmm = start?.slice(0, 5)
+  if (!hhmm) return ''
+  const [hours, minutes] = hhmm.split(':').map(Number)
+  const suffix = hours >= 12 ? 'PM' : 'AM'
+  const hour = ((hours + 11) % 12) + 1
+  return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+/** First and last name initials, e.g. "Marco Antonio Rodriguez" → MR. */
+function initialsOf(name: string) {
+  const parts = name.split(/\s+/).filter(Boolean)
+  const picked = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : parts
+  return picked.map(part => part[0]?.toUpperCase() || '').join('')
+}
+
+/**
+ * Calendar classes from the start of the loaded month through this Sunday.
+ * The pill is the coach taking the class. A cover shows that coach only.
+ */
+function shiftYmd(key: string, days: number) {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+async function loadNearbyClasses(
+  adminClient: Awaited<ReturnType<typeof requireAdmin>>['adminClient'],
+  coachIds: string[],
+  assignedOnly: boolean,
+  todayKey: string,
+  historyMonths: number,
+): Promise<CoachActivityClass[]> {
+  const thisMonday = (() => {
+    const [y, m, d] = todayKey.split('-').map(Number)
+    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+    return shiftYmd(todayKey, dow === 0 ? -6 : 1 - dow)
+  })()
+  const [year, month] = todayKey.split('-').map(Number)
+  const monthStart = new Date(Date.UTC(year, month - 1 - historyMonths, 1)).toISOString().slice(0, 10)
+  const from = monthStart
+  const to = shiftYmd(thisMonday, 6)
+
+  const { data: events } = await adminClient
+    .from('school_calendar_events')
+    .select('id, title, start_date, start_time, time_slot, session_outcome, cancelled_at')
+    .in('event_type', ['class_session', 'class_individual'])
+    .gte('start_date', from)
+    .lte('start_date', to)
+    .order('start_date', { ascending: true })
+    .order('start_time', { ascending: true })
+
+  const rows = (events || []) as Array<{
+    id: string
+    title: string
+    start_date: string
+    start_time: string | null
+    time_slot: string | null
+    session_outcome: string | null
+    cancelled_at: string | null
+  }>
+  if (!rows.length) return []
+
+  const eventIds = rows.map(row => row.id)
+  const dates = [...new Set(rows.map(row => row.start_date))]
+  let assigned: Array<{ calendar_event_id: string; coach_id: string; covering_for: string | null }> | null = null
+  const [withCover, withBackup, { data: blockedRows }] = await Promise.all([
+    adminClient
+      .from('class_session_coaches')
+      .select('calendar_event_id, coach_id, covering_for')
+      .in('calendar_event_id', eventIds),
+    adminClient
+      .from('profiles')
+      .select('id, full_name, backup_coach_id')
+      .in('role', ['coach', 'admin']),
+    adminClient
+      .from('coach_date_availability')
+      .select('coach_id, date, time_slot')
+      .in('date', dates)
+      .eq('is_available', false),
+  ])
+  if (withCover.error) {
+    const plain = await adminClient
+      .from('class_session_coaches')
+      .select('calendar_event_id, coach_id')
+      .in('calendar_event_id', eventIds)
+    assigned = ((plain.data || []) as Array<{ calendar_event_id: string; coach_id: string }>).map(row => ({
+      ...row,
+      covering_for: null,
+    }))
+  } else {
+    assigned = (withCover.data || []) as NonNullable<typeof assigned>
+  }
+
+  let people: Array<{ id: string; full_name: string | null; backup_coach_id: string | null }> = []
+  if (withBackup.error) {
+    const plain = await adminClient.from('profiles').select('id, full_name').in('role', ['coach', 'admin'])
+    people = ((plain.data || []) as Array<{ id: string; full_name: string | null }>).map(row => ({
+      ...row,
+      backup_coach_id: null,
+    }))
+  } else {
+    people = (withBackup.data || []) as typeof people
+  }
+
+  const nameOf = new Map(people.map(person => [person.id, (person.full_name || '').trim() || 'Coach']))
+  /** Assignments pointing at a non-staff profile are shown as the staff coach with the same first name. */
+  const staffAlias = new Map<string, string>()
+  const outsiders = [...new Set((assigned || []).map(row => row.coach_id))].filter(id => !nameOf.has(id))
+  if (outsiders.length) {
+    const { data: extra } = await adminClient
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', outsiders)
+    for (const person of (extra || []) as Array<{ id: string; full_name: string | null }>) {
+      const first = (person.full_name || '').trim().split(/\s+/)[0]?.toLowerCase()
+      const match = first ? people.find(staff => coachMatchesFirstName(staff.full_name, first)) : undefined
+      if (match) staffAlias.set(person.id, match.id)
+    }
+  }
+  const backupOf = new Map<string, string>()
+  for (const person of people) {
+    if (person.backup_coach_id && person.backup_coach_id !== person.id) {
+      backupOf.set(person.id, person.backup_coach_id)
+      continue
+    }
+    const want = defaultBackupFirstName(person.full_name)
+    if (!want) continue
+    const backup = people.find(other => other.id !== person.id && coachMatchesFirstName(other.full_name, want))
+    if (backup) backupOf.set(person.id, backup.id)
+  }
+
+  const blocked = new Set(
+    ((blockedRows || []) as Array<{ coach_id: string; date: string; time_slot: string }>)
+      .map(row => `${row.coach_id}|${row.date}|${row.time_slot}`),
+  )
+
+  const byEvent = new Map<string, Array<{ id: string; coveringFor: string | null }>>()
+  for (const row of (assigned || []) as Array<{ calendar_event_id: string; coach_id: string; covering_for: string | null }>) {
+    const list = byEvent.get(row.calendar_event_id) || []
+    list.push({ id: row.coach_id, coveringFor: row.covering_for })
+    byEvent.set(row.calendar_event_id, list)
+  }
+
+  const allowed = new Set(coachIds)
+  const classes: CoachActivityClass[] = []
+  for (const ev of rows) {
+    const coaches = byEvent.get(ev.id) || []
+    if (assignedOnly && !coaches.some(coach => allowed.has(coach.id))) continue
+    const slot = ev.time_slot || SLOT_FROM_START[ev.start_time?.slice(0, 5) || ''] || ''
+    const labels: string[] = []
+    const pills: Array<{ id: string; initials: string; name: string }> = []
+    const payCoachIds: string[] = []
+    let warning = ''
+    if (!coaches.length) {
+      warning = 'Sin coach'
+    }
+    for (const coach of coaches) {
+      const show = (id: string) => {
+        const pillId = staffAlias.get(id) ?? id
+        const name = nameOf.get(pillId) || ''
+        const initials = name ? initialsOf(name) : '?'
+        labels.push(initials)
+        if (!pills.some(pill => pill.id === pillId)) pills.push({ id: pillId, initials, name: name || 'Sin coach del equipo' })
+        payCoachIds.push(id)
+      }
+      if (coach.coveringFor) {
+        show(coach.id)
+        continue
+      }
+      const off = Boolean(slot) && blocked.has(`${coach.id}|${ev.start_date}|${slot}`)
+      const backupId = backupOf.get(coach.id)
+      const backupFree = Boolean(backupId) && !(slot && blocked.has(`${backupId}|${ev.start_date}|${slot}`))
+      if (off && backupFree && backupId) {
+        show(backupId)
+      } else {
+        show(coach.id)
+        if (off) warning = warning || `${nameOf.get(coach.id) || 'Coach'} no está disponible`
+      }
+    }
+    const cancelled = ev.session_outcome === 'cancelled' || Boolean(ev.cancelled_at)
+    const status: CoachActivityClass['status'] = cancelled
+      ? 'cancelled'
+      : ev.session_outcome === 'done'
+        ? 'done'
+        : ev.start_date < todayKey
+          ? 'open'
+          : 'upcoming'
+    classes.push({
+      id: ev.id,
+      date: ev.start_date,
+      time: classTimeLabel(ev.start_time),
+      title: ev.title,
+      coaches: labels.join(' · '),
+      pills,
+      coachIds: [...new Set(payCoachIds)],
+      weekStart: ev.start_date < thisMonday
+        ? shiftYmd(ev.start_date, (() => {
+            const [y, m, d] = ev.start_date.split('-').map(Number)
+            const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+            return dow === 0 ? -6 : 1 - dow
+          })())
+        : thisMonday,
+      status,
+      warning,
+    })
+  }
+  return classes
 }
 
 /** Keep the newest of two nullable timestamps. */
@@ -88,16 +343,19 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   const programFilter = typeof query.program === 'string' && query.program ? query.program : ''
 
   // --- Roster: coaches plus the one admin who also teaches -------------------
-  const [{ data: coachRows }, { data: adminCoachRows }] = await Promise.all([
+  const [{ data: coachRows }, { data: adminCoachRows }, { data: programLinks }] = await Promise.all([
     adminClient
       .from('profiles')
-      .select('id, full_name, email, title, is_active, is_head_coach')
+      .select('id, full_name, email, title, is_active, is_head_coach, avatar_url')
       .eq('role', 'coach'),
     adminClient
       .from('profiles')
-      .select('id, full_name, email, title, is_active, is_head_coach')
+      .select('id, full_name, email, title, is_active, is_head_coach, avatar_url')
       .eq('role', 'admin')
       .ilike('email', ADMIN_COACH_EMAIL),
+    adminClient
+      .from('program_coaches')
+      .select('coach_id, program_id, programs(id, name)'),
   ])
 
   const roster = new Map<string, CoachActivityCoach>()
@@ -107,15 +365,19 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       id: p.id,
       name: p.full_name || p.email,
       email: p.email,
+      avatar_url: p.avatar_url || null,
       title: p.title ?? null,
       is_active: Boolean(p.is_active),
       is_head_coach: Boolean(p.is_head_coach),
       programs: [],
       classes_given: 0,
+      classes_cancelled: 0,
       athletes_taught: 0,
       attendance_marked: 0,
       evaluations: 0,
       videos: 0,
+      session_videos: 0,
+      evaluation_videos: 0,
       class_plans: 0,
       tricks_marked: 0,
       athletes_with_progress: 0,
@@ -125,10 +387,6 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   }
 
   // --- Program assignments ---------------------------------------------------
-  const { data: programLinks } = await adminClient
-    .from('program_coaches')
-    .select('coach_id, program_id, programs(id, name)')
-
   const programs = new Map<string, string>()
   for (const link of programLinks || []) {
     const program = link.programs as unknown as { id: string; name: string } | null
@@ -154,8 +412,13 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       coaches: [],
       totals: {
         classes_given: 0,
+        classes_in_period: 0,
+        classes_cancelled: 0,
         videos: 0,
+        session_videos: 0,
+        evaluation_videos: 0,
         athletes_with_progress: 0,
+        active_skaters: 0,
         coaches_contributing: 0,
         coaches_total: 0,
         evaluations: 0,
@@ -164,19 +427,123 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
         tricks_marked: 0,
       },
       weekly: [],
+      nearby: [],
       programs: [...programs].map(([id, name]) => ({ id, name })),
     }
   }
 
-  // --- Classes given ---------------------------------------------------------
-  const { data: taught } = await adminClient
-    .from('class_session_coaches')
-    .select('coach_id, notes, created_at, calendar_event_id, school_calendar_events!inner(id, start_date)')
-    .in('coach_id', coachIds)
-    .eq('delivered', true)
-    .gte('school_calendar_events.start_date', from)
-    .lte('school_calendar_events.start_date', to)
+  const historyMonths = Math.max(0, Number(query.historyMonths) || 0)
+  const [
+    { data: taught },
+    { data: cancelledRows, error: cancelledErr },
+    { data: evaluations },
+    { data: videos },
+    { data: plans },
+    { data: progress },
+    { data: attendance },
+    { data: sessionVideos, error: sessionVideoError },
+    nearby,
+    { data: periodSeatRows },
+    { data: periodEvents },
+    { data: reservations, error: reservationError },
+    { data: purchases, error: purchaseError },
+    { data: periodAssigned },
+    { count: periodClassCount },
+  ] = await Promise.all([
+    adminClient
+      .from('class_session_coaches')
+      .select('coach_id, notes, created_at, calendar_event_id, school_calendar_events!inner(id, start_date)')
+      .in('coach_id', coachIds)
+      .eq('delivered', true)
+      .gte('school_calendar_events.start_date', from)
+      .lte('school_calendar_events.start_date', to),
+    adminClient
+      .from('class_session_coaches')
+      .select('coach_id, school_calendar_events!inner(start_date, session_outcome)')
+      .in('coach_id', coachIds)
+      .eq('school_calendar_events.session_outcome', 'cancelled')
+      .gte('school_calendar_events.start_date', from)
+      .lte('school_calendar_events.start_date', to),
+    adminClient
+      .from('student_evaluations')
+      .select('coach_id, evaluation_date')
+      .in('coach_id', coachIds)
+      .gte('evaluation_date', from)
+      .lte('evaluation_date', to),
+    adminClient
+      .from('evaluation_videos')
+      .select('coach_id, created_at')
+      .in('coach_id', coachIds)
+      .gte('created_at', mxDayStart(from))
+      .lte('created_at', mxDayEnd(to)),
+    adminClient
+      .from('class_plans')
+      .select('coach_id, plan_date')
+      .in('coach_id', coachIds)
+      .gte('plan_date', from)
+      .lte('plan_date', to),
+    adminClient
+      .from('student_progress')
+      .select('marked_by, student_id, learned_at')
+      .in('marked_by', coachIds)
+      .gte('learned_at', mxDayStart(from))
+      .lte('learned_at', mxDayEnd(to)),
+    adminClient
+      .from('attendance')
+      .select('marked_by, class_date')
+      .in('marked_by', coachIds)
+      .gte('class_date', from)
+      .lte('class_date', to),
+    adminClient
+      .from('session_videos')
+      .select('owner_id, created_at')
+      .in('owner_id', coachIds)
+      .gte('created_at', mxDayStart(from))
+      .lte('created_at', mxDayEnd(to)),
+    loadNearbyClasses(adminClient, coachIds, Boolean(programFilter), to, historyMonths),
+    adminClient
+      .from('class_session_coaches')
+      .select('coach_id, calendar_event_id, school_calendar_events!inner(start_date, event_type)')
+      .in('coach_id', coachIds)
+      .gte('school_calendar_events.start_date', from)
+      .lte('school_calendar_events.start_date', to)
+      .in('school_calendar_events.event_type', ['class_session', 'class_individual']),
+    programFilter
+      ? Promise.resolve({ data: [] as Array<{ id: string }> })
+      : adminClient
+        .from('school_calendar_events')
+        .select('id')
+        .in('event_type', ['class_session', 'class_individual'])
+        .gte('start_date', from)
+        .lte('start_date', to),
+    adminClient
+      .from('class_reservations')
+      .select('user_id, status')
+      .gte('reservation_date', from)
+      .lte('reservation_date', to),
+    adminClient
+      .from('finance_student_enrollments')
+      .select('skater_id, started_on, last_payment_on')
+      .eq('is_active', true),
+    programFilter
+      ? adminClient
+        .from('class_session_coaches')
+        .select('calendar_event_id, school_calendar_events!inner(start_date)')
+        .in('coach_id', coachIds)
+        .gte('school_calendar_events.start_date', from)
+        .lte('school_calendar_events.start_date', to)
+      : Promise.resolve({ data: [] as Array<{ calendar_event_id: string }> }),
+    programFilter
+      ? Promise.resolve({ count: 0 })
+      : adminClient
+        .from('school_calendar_events')
+        .select('id', { count: 'exact', head: true })
+        .in('event_type', ['class_session', 'class_individual'])
+        .gte('start_date', from)
+        .lte('start_date', to),
+  ])
 
+  // --- Classes given ---------------------------------------------------------
   const weekly = new Map<string, number>()
   const eventIds = new Set<string>()
   for (const row of taught || []) {
@@ -190,6 +557,13 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
     if (session?.start_date) {
       const k = ymd(weekStart(new Date(`${session.start_date}T00:00:00Z`)))
       weekly.set(k, (weekly.get(k) || 0) + 1)
+    }
+  }
+
+  if (!cancelledErr) {
+    for (const row of cancelledRows || []) {
+      const coach = roster.get(row.coach_id)
+      if (coach) coach.classes_cancelled += 1
     }
   }
 
@@ -235,45 +609,6 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   }
 
   // --- Everything else the schema attributes to a coach ----------------------
-  const [
-    { data: evaluations },
-    { data: videos },
-    { data: plans },
-    { data: progress },
-    { data: attendance },
-  ] = await Promise.all([
-    adminClient
-      .from('student_evaluations')
-      .select('coach_id, evaluation_date')
-      .in('coach_id', coachIds)
-      .gte('evaluation_date', from)
-      .lte('evaluation_date', to),
-    adminClient
-      .from('evaluation_videos')
-      .select('coach_id, created_at')
-      .in('coach_id', coachIds)
-      .gte('created_at', `${from}T00:00:00Z`)
-      .lte('created_at', `${to}T23:59:59Z`),
-    adminClient
-      .from('class_plans')
-      .select('coach_id, plan_date')
-      .in('coach_id', coachIds)
-      .gte('plan_date', from)
-      .lte('plan_date', to),
-    adminClient
-      .from('student_progress')
-      .select('marked_by, student_id, learned_at')
-      .in('marked_by', coachIds)
-      .gte('learned_at', `${from}T00:00:00Z`)
-      .lte('learned_at', `${to}T23:59:59Z`),
-    adminClient
-      .from('attendance')
-      .select('marked_by, class_date')
-      .in('marked_by', coachIds)
-      .gte('class_date', from)
-      .lte('class_date', to),
-  ])
-
   for (const row of evaluations || []) {
     const c = roster.get(row.coach_id)
     if (!c) continue
@@ -283,8 +618,18 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   for (const row of videos || []) {
     const c = row.coach_id ? roster.get(row.coach_id) : null
     if (!c) continue
+    c.evaluation_videos += 1
     c.videos += 1
     c.last_active = laterOf(c.last_active, String(row.created_at).slice(0, 10))
+  }
+  if (!sessionVideoError) {
+    for (const row of sessionVideos || []) {
+      const c = row.owner_id ? roster.get(row.owner_id) : null
+      if (!c) continue
+      c.session_videos += 1
+      c.videos += 1
+      c.last_active = laterOf(c.last_active, String(row.created_at).slice(0, 10))
+    }
   }
   for (const row of plans || []) {
     const c = roster.get(row.coach_id)
@@ -316,10 +661,58 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
 
   const coaches = [...roster.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
   const didSomething = (c: CoachActivityCoach) =>
-    c.classes_given + c.evaluations + c.videos + c.class_plans + c.tricks_marked + c.attendance_marked > 0
+    c.classes_given + c.classes_cancelled + c.evaluations + c.videos + c.class_plans + c.tricks_marked + c.attendance_marked > 0
 
   const allProgressSkaters = new Set<string>()
   for (const set of progressSkaters.values()) for (const s of set) allProgressSkaters.add(s)
+
+  const coachesInPeriod = new Set<string>()
+  const coachEventIds = new Set<string>()
+  for (const row of periodSeatRows || []) {
+    if (row.coach_id) coachesInPeriod.add(row.coach_id)
+    if (row.calendar_event_id) coachEventIds.add(row.calendar_event_id)
+  }
+
+  const periodSkaters = new Set<string>()
+  const periodEventIds = programFilter
+    ? [...coachEventIds]
+    : ((periodEvents || []) as Array<{ id: string }>).map(row => row.id)
+  const seatSlices: string[][] = []
+  for (let i = 0; i < periodEventIds.length; i += 200) seatSlices.push(periodEventIds.slice(i, i + 200))
+  const seatResults = await Promise.all(seatSlices.map(slice =>
+    adminClient
+      .from('class_session_enrollments')
+      .select('user_id, skater_profile_id')
+      .in('calendar_event_id', slice)
+      .neq('status', 'cancelled'),
+  ))
+  for (const { data: seats } of seatResults) {
+    for (const seat of seats || []) {
+      const id = seat.skater_profile_id || seat.user_id
+      if (id) periodSkaters.add(id)
+    }
+  }
+  if (!reservationError) {
+    for (const row of reservations || []) {
+      if (!row.user_id) continue
+      if (row.status === 'cancelled' || row.status === 'expired') continue
+      periodSkaters.add(row.user_id)
+    }
+  }
+  if (!purchaseError) {
+    for (const row of purchases || []) {
+      if (!row.skater_id) continue
+      const started = row.started_on && row.started_on >= from && row.started_on <= to
+      const paid = row.last_payment_on && row.last_payment_on >= from && row.last_payment_on <= to
+      if (started || paid) periodSkaters.add(row.skater_id)
+    }
+  }
+  let progressInPeriod = 0
+  for (const id of allProgressSkaters) if (periodSkaters.has(id)) progressInPeriod += 1
+
+  const classesInPeriod = programFilter
+    ? new Set(((periodAssigned || []) as Array<{ calendar_event_id: string }>).map(row => row.calendar_event_id)).size
+    : periodClassCount || 0
 
   const sum = (pick: (c: CoachActivityCoach) => number) =>
     coaches.reduce((n, c) => n + pick(c), 0)
@@ -330,10 +723,15 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
     coaches,
     totals: {
       classes_given: sum(c => c.classes_given),
+      classes_in_period: classesInPeriod,
+      classes_cancelled: sum(c => c.classes_cancelled),
       videos: sum(c => c.videos),
-      athletes_with_progress: allProgressSkaters.size,
-      coaches_contributing: coaches.filter(didSomething).length,
-      coaches_total: coaches.length,
+      session_videos: sum(c => c.session_videos),
+      evaluation_videos: sum(c => c.evaluation_videos),
+      athletes_with_progress: progressInPeriod,
+      active_skaters: periodSkaters.size,
+      coaches_contributing: coaches.filter(c => coachesInPeriod.has(c.id) && didSomething(c)).length,
+      coaches_total: coachesInPeriod.size,
       evaluations: sum(c => c.evaluations),
       class_plans: sum(c => c.class_plans),
       attendance_marked: sum(c => c.attendance_marked),
@@ -342,6 +740,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
     weekly: [...weekly]
       .map(([week_start, classes]) => ({ week_start, classes }))
       .sort((a, b) => a.week_start.localeCompare(b.week_start)),
+    nearby,
     programs: [...programs]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es')),

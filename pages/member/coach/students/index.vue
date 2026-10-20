@@ -72,16 +72,10 @@ const navigateToNewEvaluation = (studentId: string) => {
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <header class="bg-gray-900 border-b border-gray-800 px-4 py-4 sticky top-0 z-40">
-      <div class="max-w-lg mx-auto">
-        <h1 class="text-xl font-bold text-white">
-          {{ language === 'es' ? 'Patinadores' : 'Skaters' }}
-        </h1>
-        <p class="text-xs text-gray-500 mt-0.5">
-          {{ language === 'es' ? 'Perfil y evaluaciones' : 'Profile and evaluations' }}
-        </p>
-      </div>
-    </header>
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Estudiantes' : 'Students'"
+      :subtitle="language === 'es' ? 'Perfil y evaluaciones' : 'Profile and evaluations'"
+    />
 
     <div class="px-4 py-4 max-w-lg mx-auto">
       <input
@@ -96,7 +90,7 @@ const navigateToNewEvaluation = (studentId: string) => {
       </div>
 
       <div v-else-if="!filteredStudents.length" class="text-center py-12 text-gray-500 text-sm">
-        {{ language === 'es' ? 'No se encontraron patinadores' : 'No skaters found' }}
+        {{ language === 'es' ? 'No se encontraron estudiantes' : 'No students found' }}
       </div>
 
       <div v-else class="space-y-1.5">

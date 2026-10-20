@@ -32,12 +32,12 @@ const handleReset = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-black flex items-center justify-center p-4">
+  <div class="public-site min-h-screen bg-charcoal text-cream flex items-center justify-center p-4">
     <div class="w-full max-w-md">
-      <!-- Logo -->
       <div class="text-center mb-8">
-        <h1 class="text-3xl font-black text-gold-400">NiikSkate</h1>
-        <p class="text-gray-400 mt-2">{{ language === 'es' ? 'Recuperar Contraseña' : 'Reset Password' }}</p>
+        <img src="/Niik_StainedGlass.png" alt="NiikSkate" class="h-28 w-auto mx-auto mb-3 object-contain" />
+        <h1 class="font-display text-3xl font-black tracking-tight"><span class="text-acid">Niik</span>Skate</h1>
+        <p class="text-cream/60 mt-2">{{ language === 'es' ? 'Recuperar contraseña' : 'Reset password' }}</p>
       </div>
 
       <!-- Success Message -->
@@ -45,13 +45,13 @@ const handleReset = async () => {
         <svg class="w-12 h-12 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
         </svg>
-        <h2 class="text-white font-bold mb-2">{{ language === 'es' ? '¡Email Enviado!' : 'Email Sent!' }}</h2>
-        <p class="text-gray-400 text-sm">
+        <h2 class="text-cream font-bold mb-2">{{ language === 'es' ? '¡Email enviado!' : 'Email sent!' }}</h2>
+        <p class="text-cream/60 text-sm">
           {{ language === 'es' 
             ? 'Revisa tu bandeja de entrada para restablecer tu contraseña.' 
             : 'Check your inbox to reset your password.' }}
         </p>
-        <NuxtLink to="/auth/login" class="inline-block mt-4 text-gold-400 hover:underline">
+        <NuxtLink to="/auth/login" class="inline-block mt-4 text-acid font-semibold hover:text-acid-300">
           {{ language === 'es' ? 'Volver al Login' : 'Back to Login' }}
         </NuxtLink>
       </div>
@@ -59,11 +59,11 @@ const handleReset = async () => {
       <!-- Reset Form -->
       <form v-else @submit.prevent="handleReset" class="space-y-4">
         <div>
-          <label class="block text-gray-400 text-sm mb-2">Email</label>
+          <label class="block text-cream/70 text-sm mb-2">Email</label>
           <input
             v-model="email"
             type="email"
-            class="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:border-gold-400 focus:outline-none"
+            class="w-full px-4 py-3 bg-charcoal-800 border border-charcoal-600 rounded-xl text-cream placeholder-cream/40 focus:border-acid focus:outline-none"
             :placeholder="language === 'es' ? 'tu@email.com' : 'your@email.com'"
           />
         </div>
@@ -73,7 +73,7 @@ const handleReset = async () => {
         <button
           type="submit"
           :disabled="loading"
-          class="w-full py-3 bg-gold-400 text-black font-bold rounded-xl hover:bg-gold-300 transition-colors disabled:opacity-50"
+          class="btn-lime w-full disabled:opacity-50"
         >
           {{ loading 
             ? '...' 
@@ -81,7 +81,7 @@ const handleReset = async () => {
         </button>
 
         <div class="text-center">
-          <NuxtLink to="/auth/login" class="text-gray-400 hover:text-gold-400 text-sm">
+          <NuxtLink to="/auth/login" class="text-cream/60 hover:text-acid text-sm">
             {{ language === 'es' ? '← Volver al Login' : '← Back to Login' }}
           </NuxtLink>
         </div>

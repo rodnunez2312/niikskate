@@ -231,29 +231,20 @@ const formatDate = (date: string) => {
 
     <template v-else-if="isAdmin">
       <!-- Header -->
-      <header class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-4 pt-safe pb-6">
-        <div class="max-w-4xl mx-auto pt-4">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <NuxtLink to="/member/admin/academy" class="p-2 -ml-2 hover:bg-white/10 rounded-lg">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-              </NuxtLink>
-              <div>
-                <h1 class="text-2xl font-bold">{{ language === 'es' ? 'Gestión de Noticias' : 'News Management' }}</h1>
-                <p class="text-gray-400 text-sm">{{ language === 'es' ? 'Crea y administra el blog' : 'Create and manage blog posts' }}</p>
-              </div>
-            </div>
-            <button
-              @click="openModal()"
-              class="px-4 py-2 bg-gold-400 text-black font-bold rounded-xl hover:bg-gold-500 transition-all"
-            >
-              + {{ language === 'es' ? 'Nueva Noticia' : 'New Post' }}
-            </button>
-          </div>
-        </div>
-      </header>
+      <MemberStaffPageHeader
+        :title="language === 'es' ? 'Noticias' : 'News'"
+        :subtitle="language === 'es' ? 'Crea y administra el blog' : 'Create and manage blog posts'"
+      >
+        <template #actions>
+          <button
+            type="button"
+            class="px-4 py-2.5 rounded-xl bg-acid text-charcoal font-semibold text-sm"
+            @click="openModal()"
+          >
+            + {{ language === 'es' ? 'Nueva noticia' : 'New post' }}
+          </button>
+        </template>
+      </MemberStaffPageHeader>
 
       <div class="px-4 max-w-4xl mx-auto py-6">
         <!-- Stats -->

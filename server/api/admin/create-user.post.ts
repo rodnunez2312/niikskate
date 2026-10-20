@@ -4,6 +4,7 @@
  */
 import { requireAdmin } from '~/server/utils/requireAdmin'
 import { computeAgeFromDob } from '~/utils/ageEligibility'
+import { isTrainingDiscipline } from '~/utils/trainingDisciplines'
 
 function normalizeDateOfBirth(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw.trim()) return null
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const { adminClient: supabase } = await requireAdmin(event)
 
   const body = await readBody(event)
-  const { email, password, full_name, role, phone, date_of_birth, customer_kind, guardian_user_id } = body || {}
+  const { email, password, full_name, role, phone, date_of_birth, customer_kind, guardian_user_id, disciplines, discipline } = body || {}
 
   if (!email || typeof email !== 'string' || !email.trim()) {
     throw createError({
@@ -44,6 +45,15 @@ export default defineEventHandler(async (event) => {
 
   const kind = customer_kind === 'guardian' ? 'guardian' : 'skater'
   const dob = normalizeDateOfBirth(date_of_birth)
+  const coachSports = (Array.isArray(disciplines) ? disciplines : discipline ? [discipline] : [])
+    .filter((id: unknown): id is string => isTrainingDiscipline(typeof id === 'string' ? id : null))
+  if (role === 'coach' && !coachSports.length) {
+    throw createError({
+      statusCode: 400,
+      message: 'Choose at least one sport for the coach',
+    })
+  }
+
   if (role === 'customer' && kind === 'skater' && !dob) {
     throw createError({
       statusCode: 400,
@@ -118,6 +128,12 @@ export default defineEventHandler(async (event) => {
 
   if (profileError) {
     console.error('Profile upsert after create user:', profileError)
+  } else if (role === 'coach') {
+    const { error: sportError } = await supabase
+      .from('profiles')
+      .update({ coach_discipline: coachSports })
+      .eq('id', userId)
+    if (sportError) console.error('Coach sport:', sportError)
   }
 
   return {

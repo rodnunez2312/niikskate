@@ -18,9 +18,12 @@ import {
 import { es } from 'date-fns/locale'
 import { getDay } from 'date-fns'
 import type { AudienceCategory, SkateSkillLevelId, TimeSlot } from '~/types'
+import { TRAINING_DISCIPLINES, disciplineEmoji, disciplineLabel, isTrainingDiscipline } from '~/utils/trainingDisciplines'
+import { coachMatchesFirstName, defaultBackupFirstName } from '~/utils/coachBackups'
 import {
   DEFAULT_SKATEPARK,
   EVENT_LOCATIONS,
+  PROGRAM_MAX_CLASSES,
   PROGRAM_TOTAL_CLASSES,
   PROGRAM_WEEK_OPTIONS,
   PROGRAM_AGE_BANDS,
@@ -40,16 +43,22 @@ import {
   type ProgramSkillTrack,
   type ProgramWeekCount,
 } from '~/types'
-import { DEFAULT_PROGRAM_WEEKDAYS, PRACTICE_TIME_SLOTS, RECURRING_WEEKDAY_OPTIONS, SUMMER_COURSE_WEEKDAY_OPTIONS, slotsForWeekday, slotsForWeekdays } from '~/utils/classSchedule'
+import { ALL_WEEKDAY_OPTIONS, DEFAULT_PROGRAM_WEEKDAYS, PRACTICE_TIME_SLOTS, SUMMER_COURSE_WEEKDAY_OPTIONS, slotsForWeekday, slotsForWeekdays } from '~/utils/classSchedule'
+import { horarioDisplay, horarioFromId, isTimeSlot, resolveHorario, type ProgramHorario } from '~/utils/programHorarios'
 import { bookableOccurrences, computeSummerCourseEndDate, generateProgramOccurrences, nearestProgramStartDate, parseYmd, syncProgramDateRange, computeProgramEndDate } from '~/utils/recurringProgram'
 import { MEXICO_NATIONAL_HOLIDAYS_2026_2027, mexicoHolidayName } from '~/utils/mexicoHolidays'
 import { getProgramSeasonBySlug, isSummerCourseSeason, pickDefaultProgramSeason, resolveSeasonStatus, seasonStatusLabel, findOverlappingRegularSeason, seasonHighlightColor, stripedSeasonFill } from '~/utils/programSeasons'
 import type { ProgramSeason } from '~/utils/programSeasons'
 import {
   DEFAULT_COACH_TIER,
+  getClassPriceMxn,
+  getClassPriceRow,
   normalizeCoachTier,
+  pricingGroupForDiscipline,
+  proratePackagePriceMxn,
   resolveDefaultProgramPriceMxn,
   resolveProgramPackageKind,
+  type ClassPackageKind,
   type CoachPricingTier,
 } from '~/utils/classPricing'
 import {
@@ -57,7 +66,9 @@ import {
   coachTierSheetLabel,
   effectivePriceMxn,
   formatMoneyMxn,
+  FINANCE_CLASS_KINDS,
   FINANCE_COACH_TIERS,
+  type FinancePriceRow,
 } from '~/utils/finance'
 import { useFinance } from '~/composables/useFinance'
 import { fetchCoachDirectoryProfiles } from '~/composables/coachDirectory'
@@ -108,6 +119,11 @@ export interface SchoolCalendarRow {
   program_series_id?: string | null
   max_capacity_override?: number | null
   season_slug?: string | null
+  discipline?: string | null
+  cancelled_at?: string | null
+  cancellation_reason?: string | null
+  makeup_note?: string | null
+  session_outcome?: 'done' | 'cancelled' | null
   created_at: string
 }
 
@@ -190,6 +206,7 @@ const SERIES_SHARED_FIELDS = [
   'coach_tier',
   'max_capacity_override',
   'season_slug',
+  'discipline',
 ] as const
 
 const form = ref({
@@ -213,13 +230,14 @@ const form = ref({
   practice_time_slot: 'early' as TimeSlot,
   is_recurring: false,
   recurring_weekdays: [...DEFAULT_PROGRAM_WEEKDAYS] as number[],
-  recurring_slots: ['early'] as TimeSlot[],
+  recurring_slots: ['early'] as string[],
   recurring_class_count: PROGRAM_TOTAL_CLASSES,
   program_weeks: 4 as ProgramWeekCount,
   summer_weeks: 1 as 1 | 2,
   skill_tracks: ['beginner'] as ProgramSkillTrack[],
   max_capacity_override: 6,
   season_slug: '',
+  discipline: 'skateboarding',
 })
 
 const HIDDEN_EVENT_TYPES: SchoolCalendarEventType[] = ['school_closure', 'school_open', 'camp', 'show', 'practice', 'custom', 'holiday']
@@ -236,6 +254,9 @@ const selectableEventTypes = computed(() => {
 const filterEventTypes = computed(() =>
   eventTypeOrder.filter(t => !HIDDEN_EVENT_TYPES.includes(t) || t === 'holiday' || t === 'practice'),
 )
+
+/** Level buttons share one row, so labels past 8 characters are abbreviated. */
+const shortLabel = (label: string) => (label.length > 8 ? `${label.slice(0, 8)}.` : label)
 
 const isAudienceSelected = (id: AudienceCategory) => form.value.audience_categories.includes(id)
 
@@ -265,9 +286,18 @@ const programOccurrenceEndDate = (): string | null => {
   return raw
 }
 
-const programSlotsForGenerate = (): TimeSlot[] => {
+const programSlotsForGenerate = (): string[] => {
   if (isSummerCourseForm.value) return [...SUMMER_COURSE_SLOTS]
-  return form.value.recurring_slots.length ? form.value.recurring_slots : ['early']
+  const visible = new Set(programHorarios.value.map(h => h.id))
+  const picked = form.value.recurring_slots.filter(s => visible.has(s))
+  return picked.length ? picked : defaultHorarioIds()
+}
+
+/** Session 1 when it's still offered, otherwise the earliest remaining horario. */
+const defaultHorarioIds = (): string[] => {
+  const ids = programHorarios.value.map(h => h.id)
+  if (ids.includes('early')) return ['early']
+  return ids.length ? [ids[0]!] : ['early']
 }
 
 const formCoachTier = computed(() => normalizeCoachTier(form.value.coach_tier))
@@ -282,8 +312,8 @@ onMounted(() => {
   loadPriceRows()
 })
 
-/** Which package this program shape sells as: monthly_4, group_pack_5, … */
-const programPackageKind = computed(() =>
+/** Package the class count maps to: monthly_4, group_pack_5, … */
+const autoPackageKind = computed(() =>
   resolveProgramPackageKind({
     eventType: form.value.event_type as 'class_session' | 'class_individual',
     isRecurring: form.value.is_recurring || isSummerCourseForm.value,
@@ -293,47 +323,96 @@ const programPackageKind = computed(() =>
   }),
 )
 
+/** '' follows the class count; otherwise the admin picked the package to sell. */
+const priceKindOverride = ref<ClassPackageKind | ''>('')
+
+watch(modalOpen, open => {
+  if (open) priceKindOverride.value = ''
+})
+
+const priceKindOptions = computed(() => {
+  const individual = form.value.event_type === 'class_individual'
+  return FINANCE_CLASS_KINDS.filter(k => k.id.startsWith('individual') === individual)
+})
+
+watch(priceKindOptions, opts => {
+  if (priceKindOverride.value && !opts.some(o => o.id === priceKindOverride.value)) {
+    priceKindOverride.value = ''
+  }
+})
+
+const programPackageKind = computed(() => priceKindOverride.value || autoPackageKind.value)
+
+const programPricingGroup = computed(() => pricingGroupForDiscipline(form.value.discipline))
+
+const rowPricingGroup = (r: FinancePriceRow) => r.price_group || 'standard'
+
+/** The sport's own sheet when Finanzas has one, else the shared skate/scooter/patinaje sheet. */
+const programHasOwnPriceSheet = computed(
+  () => financePriceRows.value.some(r => r.is_active && rowPricingGroup(r) === programPricingGroup.value),
+)
+
+const activePriceRows = computed(() => {
+  const group = programHasOwnPriceSheet.value ? programPricingGroup.value : 'standard'
+  return financePriceRows.value.filter(r => r.is_active && rowPricingGroup(r) === group)
+})
+
 /** The Finanzas row for this tier + package, when the sheet has one. */
 const programPriceRow = computed(
   () =>
-    financePriceRows.value.find(
-      r =>
-        r.is_active
-        && r.coach_tier === formCoachTier.value
-        && r.class_kind === programPackageKind.value,
+    activePriceRows.value.find(
+      r => r.coach_tier === formCoachTier.value && r.class_kind === programPackageKind.value,
     ) ?? null,
+)
+
+/** Classes the price covers; only recurring non-summer programs pick their own count. */
+const pricedClassCount = computed((): number | null => {
+  if (isSummerCourseForm.value || !form.value.is_recurring) return null
+  return Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES
+})
+
+const programPackageSessions = computed(
+  () =>
+    programPriceRow.value?.sessions
+    ?? getClassPriceRow(formCoachTier.value, programPackageKind.value)?.sessions
+    ?? 0,
+)
+
+const programPriceIsProrated = computed(
+  () =>
+    pricedClassCount.value != null
+    && programPackageSessions.value > 0
+    && pricedClassCount.value !== programPackageSessions.value,
 )
 
 /** Finanzas price; the built-in table only covers packages missing from the sheet. */
 const programPriceMxn = computed(() => {
   const row = programPriceRow.value
-  if (row) return effectivePriceMxn(row)
-  return resolveDefaultProgramPriceMxn({
-    eventType: form.value.event_type as 'class_session' | 'class_individual',
-    isRecurring: form.value.is_recurring || isSummerCourseForm.value,
-    isSummerCourse: isSummerCourseForm.value,
-    summerWeeks: form.value.summer_weeks,
-    classCount: form.value.recurring_class_count,
-    coachTier: formCoachTier.value,
-  })
+  const packagePrice = row
+    ? effectivePriceMxn(row)
+    : isSummerCourseForm.value
+      ? resolveDefaultProgramPriceMxn({
+          eventType: form.value.event_type as 'class_session' | 'class_individual',
+          isRecurring: true,
+          isSummerCourse: true,
+          summerWeeks: form.value.summer_weeks,
+          coachTier: formCoachTier.value,
+        })
+      : getClassPriceMxn(formCoachTier.value, programPackageKind.value)
+  if (!programPriceIsProrated.value) return packagePrice
+  return proratePackagePriceMxn(packagePrice, programPackageSessions.value, pricedClassCount.value!)
 })
 
 const programPriceLabel = computed(() => {
   const es = language.value === 'es'
   const row = programPriceRow.value
-  const pack = row ? row.label_es : classKindLabel(programPackageKind.value, es)
-  return `${pack} · ${coachTierSheetLabel(formCoachTier.value, es)}`
-})
-
-/** Splits the price the sheet's way: academy keeps its %, the coach gets the rest. */
-const priceSplitHint = computed(() => {
-  const price = Number(form.value.price_mxn) || 0
-  const pct = programPriceRow.value?.academy_pct
-  if (!price || pct == null) return ''
-  const academy = price * Number(pct)
-  return language.value === 'es'
-    ? `Academia ${formatMoneyMxn(academy)} · Coach ${formatMoneyMxn(price - academy)}`
-    : `Academy ${formatMoneyMxn(academy)} · Coach ${formatMoneyMxn(price - academy)}`
+  const pack = row ? (es ? row.label_es : row.label_en || row.label_es) : classKindLabel(programPackageKind.value, es)
+  const count = programPriceIsProrated.value
+    ? es
+      ? `${pricedClassCount.value} clases a tarifa de ${pack}`
+      : `${pricedClassCount.value} classes at the ${pack} rate`
+    : pack
+  return `${count} · ${coachTierSheetLabel(formCoachTier.value, es)} · ${disciplineLabel(form.value.discipline, es) || 'Skate'}`
 })
 
 /** An existing program keeps the price it was sold at until it is re-synced. */
@@ -350,8 +429,8 @@ const syncPriceFromFinance = () => {
 
 const isSkillTrackSelected = (track: ProgramSkillTrack) => form.value.skill_tracks.includes(track)
 
-const skillTrackSelectedClass = (track: ProgramSkillTrack) =>
-  SKILL_LEVEL_COLORS[track].selected
+const skillTrackSelectedClass = (_track: ProgramSkillTrack) =>
+  'bg-acid text-charcoal border-acid'
 
 const toggleSkillTrack = (track: ProgramSkillTrack) => {
   const cur = [...form.value.skill_tracks]
@@ -477,14 +556,92 @@ const buildProgramTitle = (): string => {
       .map(id => PROGRAM_AGE_TITLE[id as keyof typeof PROGRAM_AGE_TITLE])
       .filter(Boolean)
       .map(a => (es ? a.es : a.en))
-  if (ages.length === 0) return `${typePart} ${skillPart}`
-  const ageList = ages.length === 1
-    ? ages[0]
-    : es
-      ? `${ages.slice(0, -1).join(', ')} y ${ages[ages.length - 1]}`
-      : ages.join(', ')
-  const agePart = es ? `Grupo de edad: ${ageList}` : `Age group: ${ageList}`
-  return `${typePart} ${skillPart} · ${agePart}`
+  const sportWord: Record<string, string> = {
+    skateboarding: 'Skate',
+    scooter: 'Scooter',
+    rollerblading: 'Patines',
+    bmx: 'BMX',
+    parkour: 'Parkour',
+  }
+  const sport = sportWord[form.value.discipline] || 'Skate'
+  const body = ages.length === 0
+    ? `${typePart} ${skillPart}`
+    : `${typePart} ${skillPart} · ${es ? `Grupo de edad: ${ageList(ages, es)}` : `Age group: ${ageList(ages, es)}`}`
+  return `${sport} · ${body}`
+}
+
+function ageList(ages: string[], es: boolean) {
+  if (ages.length === 1) return ages[0]
+  return es
+    ? `${ages.slice(0, -1).join(', ')} y ${ages[ages.length - 1]}`
+    : ages.join(', ')
+}
+
+function pickProgramSport(id: string) {
+  form.value.discipline = id
+  programTitleManual.value = false
+  applyProgramTitle(true)
+}
+
+const skateSpots = ref<{ id: string; name: string; city: string | null }[]>([])
+const addingSpot = ref(false)
+const newSpotName = ref('')
+const newSpotCity = ref('')
+const spotError = ref('')
+const spotSaving = ref(false)
+
+const locationOptions = computed(() => {
+  const names = skateSpots.value.map(spot => spot.name)
+  const current = form.value.location?.trim()
+  if (current && !names.includes(current)) names.push(current)
+  if (!names.length) return [...EVENT_LOCATIONS]
+  return names
+})
+
+async function loadSkateSpots() {
+  const { data, error } = await client
+    .from('skate_spots')
+    .select('id, name, city')
+    .order('name')
+  if (error) {
+    skateSpots.value = []
+    return
+  }
+  skateSpots.value = (data || []) as { id: string; name: string; city: string | null }[]
+}
+
+async function saveSkateSpot() {
+  spotError.value = ''
+  const name = newSpotName.value.trim()
+  if (!name) {
+    spotError.value = language.value === 'es' ? 'Escribe el nombre del lugar.' : 'Enter the place name.'
+    return
+  }
+  spotSaving.value = true
+  try {
+    const { error } = await client.from('skate_spots').insert({
+      name,
+      city: newSpotCity.value.trim() || null,
+      country: 'México',
+      created_by: user.value?.id ?? null,
+    })
+    if (error) {
+      spotError.value = /schema cache|does not exist/i.test(error.message)
+        ? (language.value === 'es'
+          ? 'Ejecuta supabase/migrations/add_skate_spots.sql en el editor SQL.'
+          : 'Run supabase/migrations/add_skate_spots.sql in the SQL editor.')
+        : error.message
+      return
+    }
+    form.value.location = name
+    form.value.skatepark = name
+    newSpotName.value = ''
+    newSpotCity.value = ''
+    addingSpot.value = false
+    await loadSkateSpots()
+  } finally {
+    spotSaving.value = false
+  }
 }
 
 const applyProgramTitle = (force = false) => {
@@ -500,6 +657,7 @@ watch(
   () =>
     [
       form.value.event_type,
+      form.value.discipline,
       form.value.skill_tracks.join(','),
       form.value.audience_categories.join(','),
       language.value,
@@ -553,6 +711,9 @@ const formStartWeekday = computed(() => {
   return getDay(new Date(y, m - 1, d))
 })
 
+/** Times of the class being edited, kept so a custom horario survives a re-save. */
+const editingClassTimes = ref<{ id: string; slot: string; start: string; end: string } | null>(null)
+
 const classSessionSlotOptions = computed((): TimeSlot[] => {
   if (isClassSessionForm.value && isSummerCourseForm.value && !editingId.value) {
     return [...SUMMER_COURSE_SLOTS]
@@ -561,13 +722,62 @@ const classSessionSlotOptions = computed((): TimeSlot[] => {
     return slotsForWeekdays(form.value.recurring_weekdays)
   }
   const wd = formStartWeekday.value
-  if (wd == null) return ['early', 'late']
-  return slotsForWeekday(wd)
+  const forDay = wd == null ? (['early', 'late'] as TimeSlot[]) : slotsForWeekday(wd)
+  const list: TimeSlot[] = forDay.length ? forDay : ['morning', 'early', 'late']
+  const kept = editingClassTimes.value
+  if (kept && kept.id === editingId.value && isTimeSlot(kept.slot) && !list.includes(kept.slot)) {
+    return [kept.slot, ...list]
+  }
+  return list
 })
 
-const recurringSlotOptions = computed((): TimeSlot[] =>
-  isSummerCourseForm.value ? [...SUMMER_COURSE_SLOTS] : slotsForWeekdays(form.value.recurring_weekdays),
+const { horarios: programHorarios, addHorario, removeHorario } = useProgramHorarios()
+
+const recurringSlotOptions = computed((): ProgramHorario[] =>
+  isSummerCourseForm.value
+    ? SUMMER_COURSE_SLOTS.map(s => horarioFromId(s)!).filter(Boolean)
+    : programHorarios.value,
 )
+
+const addingHorario = ref(false)
+const newHorarioStart = ref('16:00')
+const newHorarioEnd = ref('17:30')
+const horarioError = ref('')
+
+const submitNewHorario = () => {
+  const res = addHorario(newHorarioStart.value, newHorarioEnd.value)
+  if ('error' in res) {
+    const es = language.value === 'es'
+    horarioError.value = res.error === 'duplicate'
+      ? es ? 'Ese horario ya existe.' : 'That time already exists.'
+      : es ? 'La hora de fin debe ser después del inicio.' : 'End time must be after the start.'
+    return
+  }
+  horarioError.value = ''
+  addingHorario.value = false
+  if (!form.value.recurring_slots.includes(res.id)) {
+    form.value.recurring_slots = [...form.value.recurring_slots, res.id]
+  }
+}
+
+const confirmRemoveHorario = (h: ProgramHorario) => {
+  const msg = language.value === 'es'
+    ? `¿Eliminar el horario ${h.display}?`
+    : `Delete the ${h.display} time?`
+  if (!window.confirm(msg)) return
+  removeHorario(h.id)
+  form.value.recurring_slots = form.value.recurring_slots.filter(s => s !== h.id)
+}
+
+const confirmRemoveHorarioById = (id: string) => {
+  const h = recurringSlotOptions.value.find(o => o.id === id)
+  if (h) confirmRemoveHorario(h)
+}
+
+const clampClassCount = () => {
+  const n = Math.round(Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES)
+  form.value.recurring_class_count = Math.min(PROGRAM_MAX_CLASSES, Math.max(1, n))
+}
 
 const recurringPreview = computed(() => {
   if ((!form.value.is_recurring && !isSummerCourseForm.value) || !form.value.start_date || editingId.value) return []
@@ -676,10 +886,11 @@ watch(
       form.value.time_slot = SUMMER_COURSE_SLOT
       return
     }
-    const allowed = new Set(slotsForWeekdays(weekdays))
-    form.value.recurring_slots = form.value.recurring_slots.filter(s => allowed.has(s))
-    if (!form.value.recurring_slots.length && allowed.size) {
-      form.value.recurring_slots = [slotsForWeekdays(weekdays)[0]]
+    if (form.value.recurring_slots.some(s => s === 'summer')) {
+      form.value.recurring_slots = form.value.recurring_slots.filter(s => s !== 'summer')
+    }
+    if (!form.value.recurring_slots.length && programHorarios.value.length) {
+      form.value.recurring_slots = [programHorarios.value[0]!.id]
     }
   },
   { deep: true },
@@ -722,7 +933,7 @@ const toggleRecurringWeekday = (v: number) => {
   }
 }
 
-const toggleRecurringSlot = (slot: TimeSlot) => {
+const toggleRecurringSlot = (slot: string) => {
   if (isSummerCourseForm.value) {
     form.value.recurring_slots = [...SUMMER_COURSE_SLOTS]
     return
@@ -734,11 +945,11 @@ const toggleRecurringSlot = (slot: TimeSlot) => {
 }
 
 const isRecurringWeekday = (v: number) => form.value.recurring_weekdays.includes(v)
-const isRecurringSlot = (slot: TimeSlot) => form.value.recurring_slots.includes(slot)
+const isRecurringSlot = (slot: string) => form.value.recurring_slots.includes(slot)
 
 const recurringWeekdayOptions = computed(() => {
   if (isSummerCourseForm.value) return SUMMER_COURSE_WEEKDAY_OPTIONS
-  return RECURRING_WEEKDAY_OPTIONS
+  return ALL_WEEKDAY_OPTIONS
 })
 
 watch(classSessionSlotOptions, slots => {
@@ -804,6 +1015,7 @@ const tLabel = (type: SchoolCalendarEventType) =>
   language.value === 'es' ? EVENT_META[type].label.es : EVENT_META[type].label.en
 
 const eventTypeSelectedClass = (type: SchoolCalendarEventType) => {
+  if (type === 'class_session' || type === 'class_individual') return 'bg-acid text-charcoal border-acid'
   if (type === 'competition') return EVENT_TYPE_COLORS.competition.badge
   if (type === 'holiday') return EVENT_TYPE_COLORS.holiday.badge
   if (type === 'practice') return EVENT_TYPE_COLORS.practice.badge
@@ -811,6 +1023,7 @@ const eventTypeSelectedClass = (type: SchoolCalendarEventType) => {
 }
 
 const isProgramType = (type: SchoolCalendarEventType) => PROGRAM_ONLY_TYPES.includes(type)
+const isQuickSession = (ev: SchoolCalendarRow) => ev.description === 'quick_session'
 
 /** Map Postgres/PostgREST errors to the migration the admin still needs to run. */
 const calendarDbErrorMessage = (msg: string) => {
@@ -832,6 +1045,11 @@ const calendarDbErrorMessage = (msg: string) => {
     return es
       ? 'Falta el tipo clase individual / cumpleaños. Ejecuta: supabase/migrations/add_birthday_and_class_individual.sql'
       : 'Missing individual/birthday event types. Run: supabase/migrations/add_birthday_and_class_individual.sql'
+  }
+  if (m.includes('discipline')) {
+    return es
+      ? 'Falta la columna del deporte. En Supabase SQL Editor ejecuta de nuevo: supabase/migrations/add_class_cancellations.sql'
+      : 'Missing sport column. In Supabase SQL Editor run supabase/migrations/add_class_cancellations.sql again.'
   }
   if (m.includes('season_slug')) {
     return es
@@ -888,7 +1106,7 @@ const bootstrapPage = async () => {
       await router.push('/member/staff/dashboard')
       return
     }
-    await Promise.all([loadEvents(), loadCoachRoster()])
+    await Promise.all([loadEvents(), loadCoachRoster(), loadSkateSpots()])
   } catch (e: unknown) {
     accessError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -927,7 +1145,8 @@ const loadEvents = async () => {
       if (eventId) counts[eventId] = (counts[eventId] || 0) + 1
     }
     enrollmentCounts.value = counts
-    await ensureMexicoHolidays()
+    await Promise.all([ensureMexicoHolidays(), loadAssignments()])
+    await applyBackupCovers(visibleDays.value)
   } catch (e: any) {
     console.error('loadEvents:', e)
     formError.value = e?.message || String(e)
@@ -1036,11 +1255,10 @@ const overlapsDay = (ev: SchoolCalendarRow, day: Date) => {
 const eventsOnDay = (day: Date) => {
   const list = filteredEvents.value.filter(ev => {
     if (!overlapsDay(ev, day)) return false
-    if (
-      selectedSeasonSlugs.value.length
-      && isProgramType(ev.event_type)
-      && !isEventInSelectedSeason(ev)
-    ) {
+    if (selectedSeasonSlugs.value.length && isProgramType(ev.event_type) && !isEventInSelectedSeason(ev)) {
+      return false
+    }
+    if (selectedSeasonSlugs.value.length && isQuickSession(ev) && !selectedSeasonSlugs.value.includes(ev.season_slug || '')) {
       return false
     }
     return true
@@ -1053,13 +1271,14 @@ const eventsOnDay = (day: Date) => {
   }
 
   return list.sort((a, b) => {
-    const at = a.start_time || '99:99'
-    const bt = b.start_time || '99:99'
-    if (at !== bt) return at.localeCompare(bt)
+    // Special events (anything that is not a class) lead the day, all-day ones first.
+    const aSpecial = isProgramType(a.event_type) ? 1 : 0
+    const bSpecial = isProgramType(b.event_type) ? 1 : 0
+    if (aSpecial !== bSpecial) return aSpecial - bSpecial
 
-    const aProg = isProgramType(a.event_type) ? 0 : 1
-    const bProg = isProgramType(b.event_type) ? 0 : 1
-    if (aProg !== bProg) return aProg - bProg
+    const at = a.start_time || (aSpecial === 0 ? '00:00' : '99:99')
+    const bt = b.start_time || (bSpecial === 0 ? '00:00' : '99:99')
+    if (at !== bt) return at.localeCompare(bt)
 
     const aSkill = skillOrder[skillTrackFromLevelId(a.skill_level)] ?? 9
     const bSkill = skillOrder[skillTrackFromLevelId(b.skill_level)] ?? 9
@@ -1072,12 +1291,18 @@ const eventsOnDay = (day: Date) => {
 const eventStartKey = (ev: SchoolCalendarRow) => ev.start_time?.slice(0, 5) || ''
 
 const eventTimeGroups = (day: Date) => {
-  const groups: { key: string; label: string; events: SchoolCalendarRow[] }[] = []
+  const groups: { key: string; label: string; special: boolean; events: SchoolCalendarRow[] }[] = []
   for (const ev of eventsOnDay(day)) {
-    const key = eventStartKey(ev)
+    const quick = isQuickSession(ev)
+    const special = quick || !isProgramType(ev.event_type)
+    // Prefixed so a special event and classes at the same time get separate, uniquely keyed groups.
+    const key = quick ? 'quick' : `${special ? 'special' : 'class'}-${eventStartKey(ev) || 'all-day'}`
+    const label = quick
+      ? (language.value === 'es' ? 'Sesión rápida' : 'Quick session')
+      : agendaTime(ev)
     const last = groups[groups.length - 1]
     if (last && last.key === key) last.events.push(ev)
-    else groups.push({ key, label: agendaTime(ev), events: [ev] })
+    else groups.push({ key, label, special, events: [ev] })
   }
   return groups
 }
@@ -1167,9 +1392,9 @@ function setCalendarView(view: 'today' | 'week' | 'month') {
 }
 
 watch(
-  [calendarView, selectedDate],
-  () => {
-    if (calendarView.value === 'today') loadDayCoaches(selectedDate.value)
+  selectedDate,
+  async (day) => {
+    loadDayCoaches(day)
   },
   { immediate: true },
 )
@@ -1228,6 +1453,116 @@ async function loadDayCoaches(day: Date) {
 
 const coachesForEvent = (ev: SchoolCalendarRow) =>
   ev.time_slot ? (dayCoachNames.value[ev.time_slot] || []) : []
+
+/**
+ * Coach calendar: a day is available unless that class time was turned off.
+ * Only explicit is_available = false counts. No row means the coach is on.
+ */
+/** Keys are coach|yyyy-mm-dd|slot, loaded for every visible day. */
+const blockedCoachSlots = ref<Set<string>>(new Set())
+const availabilityReady = ref(false)
+
+const visibleDays = computed(() => {
+  const seen = new Map<string, Date>()
+  for (const month of visibleMonths.value) {
+    for (const day of displayedDays(month)) seen.set(format(day, 'yyyy-MM-dd'), day)
+  }
+  seen.set(format(selectedDate.value, 'yyyy-MM-dd'), selectedDate.value)
+  return [...seen.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, day]) => day)
+})
+
+const visibleRangeKey = computed(() => {
+  const days = visibleDays.value
+  return `${format(days[0], 'yyyy-MM-dd')}|${format(days[days.length - 1], 'yyyy-MM-dd')}`
+})
+
+async function loadAvailabilityRange(from: string, to: string) {
+  const { data: dated } = await client
+    .from('coach_date_availability')
+    .select('coach_id, date, time_slot, is_available')
+    .gte('date', from)
+    .lte('date', to)
+    .eq('is_available', false)
+
+  const blocked = new Set<string>()
+  for (const row of (dated as { coach_id: string; date: string; time_slot: string }[]) || []) {
+    blocked.add(`${row.coach_id}|${row.date}|${row.time_slot}`)
+  }
+  blockedCoachSlots.value = blocked
+  availabilityReady.value = true
+}
+
+function isCoachBlocked(coachId: string, date: string, slot: string) {
+  return blockedCoachSlots.value.has(`${coachId}|${date}|${slot}`)
+}
+
+const eventSlot = (ev: SchoolCalendarRow) => ev.time_slot || slotFromStartTime(ev.start_time)
+
+/** How many live classes each coach holds per date and class time. More than one is a clash. */
+const coachBookings = computed(() => {
+  const counts = new Map<string, number>()
+  for (const ev of events.value) {
+    if (!isProgramType(ev.event_type) || ev.session_outcome === 'cancelled' || ev.cancelled_at) continue
+    const slot = eventSlot(ev)
+    if (!slot) continue
+    for (const coach of assignedByEvent.value[ev.id] || []) {
+      const key = `${coach.id}|${ev.start_date}|${slot}`
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+  }
+  return counts
+})
+
+watch(
+  visibleRangeKey,
+  async (range) => {
+    const [from, to] = range.split('|')
+    await loadAvailabilityRange(from, to)
+    await applyBackupCovers(visibleDays.value)
+  },
+  { immediate: true },
+)
+
+function slotFromStartTime(start: string | null | undefined) {
+  const hhmm = start?.slice(0, 5)
+  if (!hhmm) return ''
+  const match = (Object.entries(TIME_SLOT_LABELS) as [string, { start: string }][])
+    .find(([, label]) => label.start === hhmm)
+  return match?.[0] || ''
+}
+
+function chipTitle(ev: SchoolCalendarRow) {
+  const warning = classStaffWarning(ev)
+  if (isBlockedProgram(ev)) return `${ev.title} — ${blockedProgramTitle(ev)}`
+  return warning ? `${ev.title} — ${warning}` : ev.title
+}
+
+function classStaffWarning(ev: SchoolCalendarRow): string {
+  if (!isProgramType(ev.event_type) || ev.session_outcome === 'cancelled' || ev.cancelled_at) return ''
+  const assigned = assignedByEvent.value[ev.id] || []
+  const es = language.value === 'es'
+  if (!assigned.length) {
+    return es ? 'Sin coach asignado' : 'No coach assigned'
+  }
+  const slot = eventSlot(ev)
+  if (!slot) return ''
+  const unavailable = availabilityReady.value
+    ? assigned.filter(coach => isCoachBlocked(coach.id, ev.start_date, slot))
+    : []
+  if (unavailable.length) {
+    const names = unavailable.map(coach => coach.name).join(', ')
+    if (!es) return `${names} marked this time as unavailable`
+    return unavailable.length === 1
+      ? `${names} no está disponible en este horario`
+      : `${names} no están disponibles en este horario`
+  }
+  const doubled = assigned.filter(coach => (coachBookings.value.get(`${coach.id}|${ev.start_date}|${slot}`) || 0) > 1)
+  if (doubled.length) {
+    const names = doubled.map(coach => coach.name).join(', ')
+    return es ? `${names} tiene otra clase a esta hora` : `${names} has another class at this time`
+  }
+  return ''
+}
 
 // ---------------------------------------------------------------------------
 // Coach assignment — who actually taught the class
@@ -1298,6 +1633,15 @@ const toggleAssignedCoach = (coachId: string) => {
  */
 const syncCoachAssignments = async (eventIds: string[]) => {
   if (!eventIds.length) return
+  const { data: existing } = await client
+    .from('class_session_coaches')
+    .select('calendar_event_id, coach_id, delivered')
+    .in('calendar_event_id', eventIds)
+  const keptDelivered = new Map(
+    ((existing as { calendar_event_id: string; coach_id: string; delivered: boolean }[]) || [])
+      .filter(row => row.delivered)
+      .map(row => [`${row.calendar_event_id}:${row.coach_id}`, true]),
+  )
   const { error: delErr } = await client
     .from('class_session_coaches')
     .delete()
@@ -1307,15 +1651,256 @@ const syncCoachAssignments = async (eventIds: string[]) => {
     return
   }
   if (!assignedCoachIds.value.length) return
-  const rows = eventIds.flatMap(eventId =>
-    assignedCoachIds.value.map(coachId => ({
+  const rows = eventIds.flatMap(eventId => {
+    const markedDone = events.value.find(ev => ev.id === eventId)?.session_outcome === 'done'
+    return assignedCoachIds.value.map(coachId => ({
       calendar_event_id: eventId,
       coach_id: coachId,
       assigned_by: user.value?.id ?? null,
-    })),
-  )
+      delivered: markedDone || keptDelivered.has(`${eventId}:${coachId}`),
+    }))
+  })
   const { error } = await client.from('class_session_coaches').insert(rows)
   if (error) coachAssignError.value = error.message
+}
+
+type AssignedCoach = { id: string; name: string; coveringForId: string | null; coveringForName: string | null }
+const assignedByEvent = ref<Record<string, AssignedCoach[]>>({})
+/** Absent coach id → backup coach id. */
+const backupByCoach = ref<Record<string, string>>({})
+let coverSyncing = false
+
+async function loadBackupMap() {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id, full_name, backup_coach_id')
+    .in('role', ['coach', 'admin'])
+  const rows = (error ? [] : (data as { id: string; full_name: string | null; backup_coach_id: string | null }[]) || [])
+  let people = rows
+  if (error) {
+    const fallback = await client.from('profiles').select('id, full_name').in('role', ['coach', 'admin'])
+    people = ((fallback.data as { id: string; full_name: string | null }[]) || []).map(row => ({
+      ...row,
+      backup_coach_id: null,
+    }))
+  }
+  const map: Record<string, string> = {}
+  for (const person of people) {
+    if (person.backup_coach_id && person.backup_coach_id !== person.id) {
+      map[person.id] = person.backup_coach_id
+      continue
+    }
+    const want = defaultBackupFirstName(person.full_name)
+    if (!want) continue
+    const backup = people.find(other => other.id !== person.id && coachMatchesFirstName(other.full_name, want))
+    if (backup) map[person.id] = backup.id
+  }
+  backupByCoach.value = map
+}
+
+const loadAssignments = async () => {
+  let { data, error } = await client
+    .from('class_session_coaches')
+    .select('calendar_event_id, coach_id, covering_for, profiles:coach_id(full_name, role)')
+  let withCover = true
+  if (error) {
+    withCover = false
+    const fallback = await client
+      .from('class_session_coaches')
+      .select('calendar_event_id, coach_id, profiles:coach_id(full_name, role)')
+    data = fallback.data
+    error = fallback.error
+  }
+  if (error) return
+  const names = new Map<string, string>()
+  for (const row of (data as any[]) || []) {
+    names.set(row.coach_id, (row.profiles?.full_name || '').trim() || 'Coach')
+  }
+  if (withCover) {
+    const coveredIds = [...new Set(((data as any[]) || []).map(row => row.covering_for).filter(Boolean))]
+    const missing = coveredIds.filter(id => !names.has(id))
+    if (missing.length) {
+      const { data: covered } = await client.from('profiles').select('id, full_name').in('id', missing)
+      for (const row of (covered as { id: string; full_name: string | null }[]) || []) {
+        names.set(row.id, (row.full_name || '').trim() || 'Coach')
+      }
+    }
+  }
+  const map: Record<string, AssignedCoach[]> = {}
+  for (const row of (data as any[]) || []) {
+    const role = row.profiles?.role as string | null | undefined
+    if (role && role !== 'coach' && role !== 'admin') continue
+    const coveringForId = withCover ? (row.covering_for as string | null) : null
+    const list = map[row.calendar_event_id] || []
+    list.push({
+      id: row.coach_id,
+      name: names.get(row.coach_id) || 'Coach',
+      coveringForId,
+      coveringForName: coveringForId ? (names.get(coveringForId) || null) : null,
+    })
+    map[row.calendar_event_id] = list
+  }
+  assignedByEvent.value = map
+}
+
+/**
+ * The assigned coach is off for this class time and their backup is on:
+ * the backup takes the class. When the original coach is available again, they return.
+ * A coach never ends up with two classes at the same date and class time.
+ */
+async function applyBackupCovers(days: Date[]) {
+  if (coverSyncing || !availabilityReady.value) return
+  const todayKey = format(new Date(), 'yyyy-MM-dd')
+  const dayKeys = new Set(days.map(day => format(day, 'yyyy-MM-dd')).filter(key => key >= todayKey))
+  if (!dayKeys.size) return
+  if (!Object.keys(backupByCoach.value).length) await loadBackupMap()
+
+  type CoverChange = { eventId: string; fromId: string; toId: string; coveringFor: string | null }
+  const changes: CoverChange[] = []
+  const busy = new Map(coachBookings.value)
+  const isBusy = (coachId: string, date: string, slot: string) => (busy.get(`${coachId}|${date}|${slot}`) || 0) > 0
+  const move = (fromId: string, toId: string, date: string, slot: string) => {
+    const from = `${fromId}|${date}|${slot}`
+    const to = `${toId}|${date}|${slot}`
+    busy.set(from, Math.max(0, (busy.get(from) || 0) - 1))
+    busy.set(to, (busy.get(to) || 0) + 1)
+  }
+
+  for (const ev of events.value) {
+    if (!dayKeys.has(ev.start_date)) continue
+    if (!isProgramType(ev.event_type) || ev.session_outcome === 'done' || ev.session_outcome === 'cancelled' || ev.cancelled_at) continue
+    const slot = eventSlot(ev)
+    if (!slot) continue
+    const date = ev.start_date
+    const assigned = assignedByEvent.value[ev.id] || []
+    for (const coach of assigned) {
+      const coachOff = isCoachBlocked(coach.id, date, slot)
+      if (coach.coveringForId && !isCoachBlocked(coach.coveringForId, date, slot) && !isBusy(coach.coveringForId, date, slot)) {
+        changes.push({ eventId: ev.id, fromId: coach.id, toId: coach.coveringForId, coveringFor: null })
+        move(coach.id, coach.coveringForId, date, slot)
+        continue
+      }
+      if (!coachOff || coach.coveringForId) continue
+      const backupId = backupByCoach.value[coach.id]
+      if (!backupId || backupId === coach.id) continue
+      if (isCoachBlocked(backupId, date, slot)) continue
+      if (assigned.some(other => other.id === backupId)) continue
+      if (isBusy(backupId, date, slot)) continue
+      changes.push({ eventId: ev.id, fromId: coach.id, toId: backupId, coveringFor: coach.id })
+      move(coach.id, backupId, date, slot)
+    }
+  }
+
+  if (!changes.length) return
+  coverSyncing = true
+  try {
+    for (const change of changes) {
+      const withCover = await client
+        .from('class_session_coaches')
+        .update({ coach_id: change.toId, covering_for: change.coveringFor })
+        .eq('calendar_event_id', change.eventId)
+        .eq('coach_id', change.fromId)
+      if (withCover.error && /covering_for/i.test(withCover.error.message)) {
+        await client
+          .from('class_session_coaches')
+          .update({ coach_id: change.toId })
+          .eq('calendar_event_id', change.eventId)
+          .eq('coach_id', change.fromId)
+      }
+    }
+    await loadAssignments()
+  } finally {
+    coverSyncing = false
+  }
+}
+
+const coachInitials = (name: string) =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase() || '').join('')
+
+const assignOpen = ref(false)
+const assignEventId = ref<string | null>(null)
+const assignDraftIds = ref<string[]>([])
+const assignBusy = ref(false)
+
+const openAssign = (ev: SchoolCalendarRow) => {
+  assignEventId.value = ev.id
+  assignDraftIds.value = (assignedByEvent.value[ev.id] || []).map(c => c.id)
+  assignOpen.value = true
+}
+
+const toggleAssignDraft = (coachId: string) => {
+  const i = assignDraftIds.value.indexOf(coachId)
+  if (i >= 0) assignDraftIds.value.splice(i, 1)
+  else assignDraftIds.value.push(coachId)
+}
+
+const saveAssign = async () => {
+  const eventId = assignEventId.value
+  if (!eventId) return
+  assignBusy.value = true
+  const previous = assignedCoachIds.value.slice()
+  assignedCoachIds.value = assignDraftIds.value.slice()
+  try {
+    await syncCoachAssignments([eventId])
+    if (!coachAssignError.value) {
+      assignOpen.value = false
+      await loadAssignments()
+    }
+  } finally {
+    assignedCoachIds.value = previous
+    assignBusy.value = false
+  }
+}
+
+const markClassDone = async (ev: SchoolCalendarRow) => {
+  await markClassesDone([ev.id])
+}
+
+const dayClassesToComplete = computed(() =>
+  selectedDayEvents.value.filter(ev =>
+    isProgramType(ev.event_type)
+    && ev.session_outcome !== 'done'
+    && ev.session_outcome !== 'cancelled'
+    && !ev.cancelled_at,
+  ),
+)
+
+const dayClassesToCancel = computed(() =>
+  selectedDayEvents.value.filter(ev =>
+    isProgramType(ev.event_type)
+    && ev.session_outcome !== 'cancelled'
+    && !ev.cancelled_at,
+  ),
+)
+
+const doneConfirmOpen = ref(false)
+const doneConfirmIds = ref<string[]>([])
+
+const askMarkClassesDone = (eventIds: string[]) => {
+  if (!eventIds.length) return
+  doneConfirmIds.value = eventIds
+  weatherError.value = ''
+  doneConfirmOpen.value = true
+}
+
+const markClassesDone = async (eventIds: string[]) => {
+  if (!eventIds.length) return
+  weatherError.value = ''
+  try {
+    await $fetch('/api/classes/session-status', {
+      method: 'POST',
+      headers: await adminAuthHeaders(),
+      body: { eventIds, outcome: 'done' },
+    })
+    doneConfirmOpen.value = false
+    await loadEvents()
+  } catch (e: unknown) {
+    const msg = e && typeof e === 'object' && 'data' in e
+      ? String((e as { data?: { message?: string } }).data?.message || '')
+      : ''
+    weatherResult.value = ''
+    weatherError.value = msg || (e instanceof Error ? e.message : String(e))
+  }
 }
 
 /** Same sizing rule as booking: an override wins, else six spots per coach. */
@@ -1326,11 +1911,77 @@ const capacityForEvent = (ev: SchoolCalendarRow) => {
   return coachesForEvent(ev).length * SPOTS_PER_COACH
 }
 
+const weatherOpen = ref(false)
+const weatherEventIds = ref<string[]>([])
+const weatherMakeup = ref('')
+const weatherBusy = ref(false)
+const weatherError = ref('')
+const weatherResult = ref('')
+
+const adminAuthHeaders = async (): Promise<Record<string, string>> => {
+  const { data } = await client.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error(language.value === 'es' ? 'Sesión expirada' : 'Session expired')
+  return { Authorization: `Bearer ${token}` }
+}
+
+const openWeatherCancel = (ids: string[]) => {
+  weatherEventIds.value = ids.filter(id => {
+    const ev = events.value.find(row => row.id === id)
+    return ev && ev.session_outcome !== 'cancelled' && !ev.cancelled_at
+  })
+  weatherMakeup.value = ''
+  weatherError.value = ''
+  weatherResult.value = ''
+  weatherOpen.value = weatherEventIds.value.length > 0
+}
+
+const confirmWeatherCancel = async () => {
+  weatherError.value = ''
+  weatherResult.value = ''
+  if (!weatherMakeup.value.trim()) {
+    weatherError.value = language.value === 'es'
+      ? 'Escribe cuándo se puede reponer la clase.'
+      : 'Say when the class can be retaken.'
+    return
+  }
+  weatherBusy.value = true
+  try {
+    const res = await $fetch<{
+      cancelled: number
+      emailed: number
+      skipped: number
+      recipients: number
+    }>('/api/admin/cancel-classes', {
+      method: 'POST',
+      headers: await adminAuthHeaders(),
+      body: {
+        eventIds: weatherEventIds.value,
+        reason: 'weather',
+        makeupNote: weatherMakeup.value.trim(),
+      },
+    })
+    weatherOpen.value = false
+    const es = language.value === 'es'
+    weatherResult.value = es
+      ? `Canceladas ${res.cancelled}. Avisos enviados: ${res.emailed}${res.skipped ? ` · sin correo: ${res.skipped}` : ''}.`
+      : `Cancelled ${res.cancelled}. Emails sent: ${res.emailed}${res.skipped ? ` · not sent: ${res.skipped}` : ''}.`
+    await loadEvents()
+  } catch (e: unknown) {
+    const msg = e && typeof e === 'object' && 'data' in e
+      ? String((e as { data?: { message?: string } }).data?.message || '')
+      : ''
+    weatherError.value = msg || (e instanceof Error ? e.message : String(e))
+  } finally {
+    weatherBusy.value = false
+  }
+}
+
 const agendaMeta = (ev: SchoolCalendarRow) => {
   const parts: string[] = []
   if (isProgramType(ev.event_type)) {
     const count = enrollmentCounts.value[ev.id] || 0
-    parts.push(`${count} ${language.value === 'es' ? 'skaters' : 'skaters'}`)
+    parts.push(`${count} ${language.value === 'es' ? 'estudiantes' : 'students'}`)
   }
   parts.push(ev.location || ev.skatepark || 'Mérida')
   return parts.join(' · ')
@@ -1541,13 +2192,14 @@ const defaultForm = (ymd: string, mode: CreateMode, seasonSlug = '') => ({
   practice_time_slot: 'early' as TimeSlot,
   is_recurring: mode === 'program',
   recurring_weekdays: [...DEFAULT_PROGRAM_WEEKDAYS] as number[],
-  recurring_slots: isSummerCourseSeason(seasonSlug) ? [...SUMMER_COURSE_SLOTS] : (['early'] as TimeSlot[]),
+  recurring_slots: isSummerCourseSeason(seasonSlug) ? [...SUMMER_COURSE_SLOTS] as string[] : defaultHorarioIds(),
   recurring_class_count: isSummerCourseSeason(seasonSlug) ? 5 : PROGRAM_TOTAL_CLASSES,
   program_weeks: 4 as ProgramWeekCount,
   summer_weeks: 1 as 1 | 2,
   skill_tracks: ['beginner'] as ProgramSkillTrack[],
   max_capacity_override: mode === 'program' ? 6 : 6,
   season_slug: seasonSlug,
+  discipline: 'skateboarding',
 })
 
 const openCreateForDay = (day: Date, mode: CreateMode = 'event') => {
@@ -1584,10 +2236,32 @@ const openAddProgram = () => {
   openCreateForDay(selectedDate.value || new Date(), 'program')
 }
 
+/** The edited class's real times while its slot is unchanged; otherwise the slot's built-in times. */
+const formClassTimes = (): { start: string; end: string } => {
+  const kept = editingClassTimes.value
+  if (kept && kept.id === editingId.value && kept.slot === form.value.time_slot) {
+    return { start: kept.start, end: kept.end }
+  }
+  const t = TIME_SLOT_LABELS[form.value.time_slot]
+  return { start: t.start, end: t.end }
+}
+
+const classSlotOptionLabel = (slot: TimeSlot) => {
+  const kept = editingClassTimes.value
+  if (kept && kept.id === editingId.value && kept.slot === slot) {
+    return horarioDisplay(kept.start, kept.end)
+  }
+  return TIME_SLOT_LABELS[slot].display
+}
+
 const openEdit = (ev: SchoolCalendarRow, e?: Event) => {
   e?.stopPropagation?.()
   selectedDate.value = new Date(ev.start_date + 'T12:00:00')
   editingId.value = ev.id
+  editingClassTimes.value =
+    ev.time_slot && ev.start_time && ev.end_time
+      ? { id: ev.id, slot: ev.time_slot, start: ev.start_time.slice(0, 5), end: ev.end_time.slice(0, 5) }
+      : null
   createMode.value = PROGRAM_ONLY_TYPES.includes(ev.event_type) ? 'program' : 'event'
   form.value = {
     title: ev.title,
@@ -1620,6 +2294,7 @@ const openEdit = (ev: SchoolCalendarRow, e?: Event) => {
     summer_weeks: 1 as 1 | 2,
     max_capacity_override: ev.max_capacity_override ?? (ev.event_type === 'class_individual' ? 1 : 6),
     season_slug: ev.season_slug ?? '',
+    discipline: isTrainingDiscipline(ev.discipline) ? ev.discipline : 'skateboarding',
   }
   editScope.value = ev.program_series_id ? 'series' : 'single'
   void loadEditSeriesCount(ev.program_series_id ?? null)
@@ -1767,11 +2442,13 @@ const submitEvent = async () => {
 
     const buildClassPayload = (
       dateStr: string,
-      slot: TimeSlot,
+      horarioId: string,
       programSeriesId: string | null,
       isHoliday = false,
     ) => {
-      const slotTimes = TIME_SLOT_LABELS[slot] ?? TIME_SLOT_LABELS.summer
+      const horario = resolveHorario(horarioId) ?? resolveHorario('summer')!
+      const slot = horario.timeSlot
+      const slotTimes = { start: horario.start, end: horario.end }
       const capOverride = Number(form.value.max_capacity_override) || null
       const ages = selectedAudienceAges()
       const holidayNote = isHoliday
@@ -1806,6 +2483,7 @@ const submitEvent = async () => {
         program_series_id: programSeriesId,
         max_capacity_override: capOverride,
         season_slug: form.value.season_slug.trim() || null,
+        discipline: isTrainingDiscipline(form.value.discipline) ? form.value.discipline : 'skateboarding',
         created_by: user.value!.id,
       }
     }
@@ -1887,10 +2565,10 @@ const submitEvent = async () => {
       end_date: end === form.value.start_date ? null : end,
       all_day: isClass || isPractice ? false : form.value.all_day,
       start_time: isClass
-        ? `${TIME_SLOT_LABELS[form.value.time_slot].start}:00`
+        ? `${formClassTimes().start}:00`
         : practiceTimes?.start ?? null,
       end_time: isClass
-        ? `${TIME_SLOT_LABELS[form.value.time_slot].end}:00`
+        ? `${formClassTimes().end}:00`
         : practiceTimes?.end ?? null,
       location: form.value.location || DEFAULT_SKATEPARK,
       description: form.value.description.trim() || null,
@@ -1908,6 +2586,9 @@ const submitEvent = async () => {
       // Editing one class must not detach it from its program series.
       program_series_id: editingSeriesId.value,
       season_slug: isClass ? form.value.season_slug.trim() || null : null,
+      discipline: isClass
+        ? (isTrainingDiscipline(form.value.discipline) ? form.value.discipline : 'skateboarding')
+        : null,
     }
 
     const withAudienceArray = {
@@ -2241,6 +2922,33 @@ const filteredProgramSummaries = computed(() => {
   return list
 })
 
+function programDiscipline(program: { title: string; representative: SchoolCalendarRow }) {
+  if (isTrainingDiscipline(program.representative.discipline)) return program.representative.discipline
+  const text = program.title.toLowerCase()
+  if (text.includes('scooter')) return 'scooter'
+  if (text.includes('bmx')) return 'bmx'
+  if (text.includes('parkour')) return 'parkour'
+  if (text.includes('patinaje') || text.includes('roller') || text.includes('inline')) return 'rollerblading'
+  return 'skateboarding'
+}
+
+function eventSportEmoji(ev: SchoolCalendarRow) {
+  if (!isProgramType(ev.event_type)) return ''
+  return disciplineEmoji(isTrainingDiscipline(ev.discipline) ? ev.discipline : 'skateboarding')
+}
+
+const seasonProgramInfo = (slug: string, includePast = false) => {
+  const list = programSeriesSummaries.value.filter(p => p.seasonSlug === slug && (includePast ? p.isPast : !p.isPast))
+  const disciplines: string[] = []
+  let active = 0
+  for (const program of list) {
+    if (program.isActive) active += 1
+    const discipline = programDiscipline(program)
+    if (!disciplines.includes(discipline)) disciplines.push(discipline)
+  }
+  return { active, scheduled: list.length, disciplines }
+}
+
 const programSidebarSeasonLabel = (slug: string) => {
   if (!slug) return ''
   const season = seasonBySlug(slug) || getProgramSeasonBySlug(slug)
@@ -2387,24 +3095,15 @@ const selectDay = (day: Date) => {
 
 <template>
   <div class="min-h-screen bg-black pb-24">
-    <header class="border-b border-gray-800 bg-gray-950">
-      <div class="px-4 py-5 max-w-7xl mx-auto flex items-center justify-between gap-4">
-        <div class="min-w-0">
-          <h1 class="text-2xl font-bold text-white">
-            {{ language === 'es' ? 'Calendario' : 'Calendar' }}
-          </h1>
-          <p class="text-sm text-gray-500 truncate">
-            {{
-              language === 'es'
-                ? 'Eventos, clases y temporadas de Niik Skate'
-                : 'Niik Skate events, classes, and seasons'
-            }}
-          </p>
-        </div>
-        <div class="relative shrink-0">
+    <MemberStaffPageHeader
+      :title="language === 'es' ? 'Calendario' : 'Calendar'"
+      :subtitle="language === 'es' ? 'Eventos, clases y temporadas de Niik Skate' : 'Niik Skate events, classes, and seasons'"
+    >
+      <template #actions>
+        <div class="relative">
           <button
             type="button"
-            class="px-4 py-2.5 rounded-xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-500 transition-colors"
+            class="px-4 py-2.5 rounded-xl bg-acid text-charcoal font-semibold text-sm hover:bg-acid-300 transition-colors"
             :aria-expanded="addMenuOpen"
             @click="addMenuOpen = !addMenuOpen"
           >
@@ -2412,33 +3111,33 @@ const selectDay = (day: Date) => {
           </button>
           <div
             v-if="addMenuOpen"
-            class="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-700 bg-gray-900 shadow-2xl"
+            class="absolute right-0 top-full z-[80] mt-2 w-52 overflow-hidden rounded-xl border border-[#353535] bg-[#171717] shadow-2xl"
           >
             <button
               type="button"
-              class="block w-full px-4 py-3 text-left text-sm font-semibold text-white hover:bg-gray-800"
+              class="block w-full px-4 py-3 text-left text-sm font-semibold text-[#F5F5F5] hover:bg-[#262626]"
               @click="addMenuOpen = false; openAddProgram()"
             >
               {{ language === 'es' ? 'Clase / Programa' : 'Class / Program' }}
             </button>
             <button
               type="button"
-              class="block w-full border-t border-gray-800 px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-800"
+              class="block w-full border-t border-[#353535] px-4 py-3 text-left text-sm text-[#F5F5F5] hover:bg-[#262626]"
               @click="addMenuOpen = false; openAddEvent()"
             >
               {{ language === 'es' ? 'Evento' : 'Event' }}
             </button>
             <button
               type="button"
-              class="block w-full border-t border-gray-800 px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-800"
+              class="block w-full border-t border-[#353535] px-4 py-3 text-left text-sm text-[#F5F5F5] hover:bg-[#262626]"
               @click="addMenuOpen = false; addSeasonOpen = true"
             >
               {{ language === 'es' ? 'Temporada' : 'Season' }}
             </button>
           </div>
         </div>
-      </div>
-    </header>
+      </template>
+    </MemberStaffPageHeader>
 
     <div v-if="checkingAccess || profileLoading" class="flex justify-center py-16 px-4">
       <div class="w-10 h-10 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
@@ -2495,38 +3194,24 @@ const selectDay = (day: Date) => {
               :color="seasonColorFor(season.slug)"
               :status="seasonMerida(season)"
               :removing="removingSeasonSlug === season.slug"
+              :active-programs="seasonProgramInfo(season.slug).active"
+              :scheduled-programs="seasonProgramInfo(season.slug).scheduled"
+              :disciplines="seasonProgramInfo(season.slug).disciplines"
               @toggle="toggleSeason(season.slug)"
               @remove="confirmRemoveSeason(season)"
             />
           </div>
 
           <!-- Archive: finished seasons, out of the way but still reachable -->
-          <div v-if="archivedSeasons.length" class="mt-3">
-            <button
-              type="button"
-              class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-gray-800 bg-gray-950 text-gray-400 hover:text-gray-200 hover:border-gray-700 transition-colors"
-              @click="showSeasonArchive = !archiveIsOpen"
-            >
-              <span class="text-[11px] font-bold uppercase tracking-wider">
-                🗄️ {{ language === 'es' ? 'Archivo' : 'Archive' }}
-                <span class="text-gray-600">({{ archivedSeasons.length }})</span>
-              </span>
-              <svg
-                class="w-4 h-4 transition-transform"
-                :class="archiveIsOpen ? 'rotate-180' : ''"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-            <div
-              v-if="archiveIsOpen"
-              class="mt-2 rounded-2xl border border-gray-800 bg-gray-950 overflow-y-auto max-h-[50vh]"
-            >
+          <AdminCollapsible
+            v-if="archivedSeasons.length"
+            class="mt-3 px-1"
+            :title="language === 'es' ? 'Archivo' : 'Archive'"
+            :meta="archivedSeasons.length"
+            :open="archiveIsOpen"
+            @update:open="showSeasonArchive = $event"
+          >
+            <div class="rounded-2xl border border-gray-800 bg-gray-950 overflow-y-auto max-h-[50vh]">
               <AdminSeasonPickerCard
                 v-for="season in archivedSeasons"
                 :key="season.slug"
@@ -2536,11 +3221,14 @@ const selectDay = (day: Date) => {
                 :color="seasonColorFor(season.slug)"
                 :status="seasonMerida(season)"
                 :removing="removingSeasonSlug === season.slug"
+                :active-programs="seasonProgramInfo(season.slug, true).active"
+                :scheduled-programs="seasonProgramInfo(season.slug, true).scheduled"
+                :disciplines="seasonProgramInfo(season.slug, true).disciplines"
                 @toggle="toggleSeason(season.slug)"
                 @remove="confirmRemoveSeason(season)"
               />
             </div>
-          </div>
+          </AdminCollapsible>
         </aside>
 
         <div class="order-1 min-w-0 flex-1 space-y-4">
@@ -2609,14 +3297,31 @@ const selectDay = (day: Date) => {
         v-else-if="calendarView === 'today'"
         class="bg-gray-950 border border-gray-800 rounded-b-2xl"
       >
-        <div class="px-4 py-3 border-b border-gray-800">
-          <p class="text-[13px] font-bold uppercase tracking-[0.1em] text-white">
-            {{ todayHeading }}
-          </p>
-          <p class="text-[11px] uppercase tracking-wider text-gray-500 mt-0.5">
-            {{ todaySkatepark }}
-          </p>
+        <div class="px-4 py-3 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-[13px] font-bold uppercase tracking-[0.1em] text-white">
+              {{ todayHeading }}
+            </p>
+            <p class="text-[11px] uppercase tracking-wider text-gray-500 mt-0.5">
+              {{ todaySkatepark }}
+            </p>
+          </div>
+          <button
+            v-if="todayClasses.some(ev => !ev.cancelled_at)"
+            type="button"
+            class="px-3 py-1.5 rounded-lg border border-sky-500/50 text-sky-200 hover:bg-sky-950/60 text-xs font-semibold"
+            @click="openWeatherCancel(todayClasses.map(ev => ev.id))"
+          >
+            {{ language === 'es' ? 'Cancelar por clima' : 'Cancel for weather' }}
+          </button>
         </div>
+
+        <p
+          v-if="weatherResult"
+          class="px-4 py-2 text-xs text-emerald-300 border-b border-gray-800"
+        >
+          {{ weatherResult }}
+        </p>
 
         <p
           v-if="!todayClasses.length && !todayOtherEvents.length"
@@ -2639,7 +3344,7 @@ const selectDay = (day: Date) => {
             aria-hidden="true"
           />
           <p class="text-base font-semibold text-white flex items-center gap-2">
-            <span class="leading-none" aria-hidden="true">{{ eventAgeEmojis(ev).join('') || eventChipEmoji(ev) }}</span>
+            <span class="leading-none" aria-hidden="true">{{ eventSportEmoji(ev) }}{{ eventAgeEmojis(ev).join('') || eventChipEmoji(ev) }}</span>
             <span class="truncate">{{ eventChipLabel(ev) }}</span>
           </p>
           <p v-if="ev.season_slug" class="text-xs text-gray-400 mt-0.5">
@@ -2652,7 +3357,7 @@ const selectDay = (day: Date) => {
               <span v-if="capacityForEvent(ev) > 0" class="text-gray-500">
                 / {{ capacityForEvent(ev) }}
               </span>
-              <span class="text-gray-500"> skaters</span>
+              <span class="text-gray-500"> {{ language === 'es' ? 'estudiantes' : 'students' }}</span>
             </span>
             <span class="text-gray-500">
               {{ language === 'es' ? 'Coach' : 'Coach' }}:
@@ -2662,6 +3367,14 @@ const selectDay = (day: Date) => {
             </span>
           </div>
 
+          <p
+            v-if="ev.cancelled_at"
+            class="mt-2 text-xs font-semibold text-sky-300"
+          >
+            {{ language === 'es' ? 'Cancelada por clima' : 'Cancelled for weather' }}
+            <span v-if="ev.makeup_note" class="font-normal text-gray-400"> · {{ ev.makeup_note }}</span>
+          </p>
+
           <div class="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -2669,6 +3382,14 @@ const selectDay = (day: Date) => {
               @click="openEdit(ev, $event)"
             >
               {{ language === 'es' ? 'Ver clase' : 'View class' }}
+            </button>
+            <button
+              v-if="!ev.cancelled_at"
+              type="button"
+              class="px-3 py-1.5 rounded-lg border border-sky-500/40 text-sky-200 hover:bg-sky-950/50 text-xs font-semibold"
+              @click="openWeatherCancel([ev.id])"
+            >
+              {{ language === 'es' ? 'Cancelar por clima' : 'Cancel for weather' }}
             </button>
           </div>
         </article>
@@ -2718,7 +3439,7 @@ const selectDay = (day: Date) => {
             :key="idx"
             role="button"
             tabindex="0"
-            class="min-h-[170px] border-b border-r border-gray-800 p-2 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
+            class="min-h-[240px] border-b border-r border-gray-800 p-2 text-left align-top transition-colors hover:bg-gray-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400/60 cursor-pointer"
             :class="{
               'bg-gray-950/50': !isSameMonth(day, month) && !isDayInHighlightedSeason(day),
               'opacity-50': isPastDay(day) && !isDayInHighlightedSeason(day),
@@ -2746,30 +3467,44 @@ const selectDay = (day: Date) => {
               {{ format(day, 'd') }}
             </div>
             <div
-              class="flex flex-col gap-1 max-h-[7.5rem] overflow-y-auto overscroll-contain"
+              class="flex flex-col gap-1 max-h-[12.5rem] overflow-y-auto overscroll-contain"
             >
               <div
                 v-for="group in eventTimeGroups(day)"
                 :key="group.key || 'all-day'"
-                class="rounded-md border border-white/25 bg-black/20 px-0.5 py-0.5"
+                class="rounded-md border px-0.5 py-0.5"
+                :class="group.special ? 'border-acid/50 bg-acid/10' : 'border-white/25 bg-black/20'"
               >
-                <p class="px-0.5 text-[9px] font-black leading-none tracking-wide text-gold-300">
-                  {{ group.label }}
+                <p
+                  class="px-0.5 text-[9px] font-black leading-none tracking-wide"
+                  :class="group.special ? 'text-acid' : 'text-gold-300'"
+                >
+                  <template v-if="group.special">★ </template>{{ group.label }}
                 </p>
                 <button
                   v-for="ev in group.events"
                   :key="ev.id"
                   type="button"
-                  class="mt-0.5 w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate border transition-colors shrink-0"
-                  :class="isProgramChipTinted(ev)
-                    ? 'text-white font-semibold border-transparent'
-                    : isPastDay(day)
-                      ? 'bg-gray-900/80 text-gray-500 border-gray-800'
-                      : 'bg-gray-800/90 text-gray-200 border-gray-700 hover:border-gold-500/50'"
+                  class="relative mt-0.5 w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate border transition-colors shrink-0"
+                  :class="[
+                    isProgramChipTinted(ev)
+                      ? 'text-white font-semibold border-transparent'
+                      : isPastDay(day)
+                        ? 'bg-gray-900/80 text-gray-500 border-gray-800'
+                        : 'bg-gray-800/90 text-gray-200 border-gray-700 hover:border-gold-500/50',
+                    classStaffWarning(ev) && !isPastDay(day) ? 'pr-5' : '',
+                  ]"
                   :style="eventChipHighlightStyle(ev, day)"
-                  :title="isBlockedProgram(ev) ? `${ev.title} — ${blockedProgramTitle(ev)}` : ev.title"
+                  :title="chipTitle(ev)"
                   @click.stop="openEdit(ev, $event)"
                 >
+                  <span
+                    v-if="classStaffWarning(ev) && !isPastDay(day)"
+                    class="absolute right-0.5 top-1/2 -translate-y-1/2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#FACC15] text-[9px] font-black leading-none text-[#151515] shadow-[0_0_0_1.5px_#151515]"
+                    :title="classStaffWarning(ev)"
+                    role="img"
+                    :aria-label="classStaffWarning(ev)"
+                  >!</span>
                   <span
                     v-if="isBlockedProgram(ev)"
                     class="inline-block mr-0.5 align-middle text-[11px] leading-none"
@@ -2780,13 +3515,13 @@ const selectDay = (day: Date) => {
                     class="inline-block mr-0.5 align-middle text-[11px] leading-none"
                     :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
                     aria-hidden="true"
-                  >{{ eventAgeEmojis(ev).join('') }}</span>
+                  >{{ eventSportEmoji(ev) }}{{ eventAgeEmojis(ev).join('') }}</span>
                   <span
                     v-else-if="isProgramType(ev.event_type)"
                     class="inline-block mr-0.5 align-middle text-[11px] leading-none"
                     :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
                     aria-hidden="true"
-                  >{{ eventChipEmoji(ev) }}</span>
+                  >{{ eventSportEmoji(ev) || eventChipEmoji(ev) }}</span>
                   <span
                     v-else
                     class="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle"
@@ -2803,38 +3538,139 @@ const selectDay = (day: Date) => {
       </template>
 
       <section class="pt-3">
-        <h2 class="mb-3 text-[13px] font-bold uppercase tracking-[0.1em] text-gray-400">
-          {{ selectedDayHeading }}
-        </h2>
-        <div class="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950">
-          <p v-if="!selectedDayEvents.length" class="px-4 py-6 text-sm text-gray-500">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <h2 class="text-[13px] font-bold uppercase tracking-[0.1em] text-gray-400">
+            {{ selectedDayHeading }}
+          </h2>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="dayClassesToComplete.length"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 px-2 py-1 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-950/40"
+              @click="askMarkClassesDone(dayClassesToComplete.map(ev => ev.id))"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ language === 'es' ? 'Todas hechas' : 'All done' }}
+            </button>
+            <button
+              v-if="dayClassesToCancel.length"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 px-2 py-1 text-[11px] font-semibold text-sky-200 hover:bg-sky-950/40"
+              @click="openWeatherCancel(dayClassesToCancel.map(ev => ev.id))"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              {{ language === 'es' ? 'Todas canceladas' : 'Cancel all' }}
+            </button>
+          </div>
+        </div>
+        <p v-if="weatherError" class="mb-2 text-xs text-red-400">{{ weatherError }}</p>
+        <div class="space-y-3">
+          <p v-if="!selectedDayEvents.length" class="rounded-2xl border border-gray-800 bg-gray-950 px-4 py-6 text-sm text-gray-500">
             {{ language === 'es' ? 'No hay actividades este día.' : 'No activities on this day.' }}
           </p>
-          <button
-            v-for="ev in selectedDayEvents"
-            :key="ev.id"
-            type="button"
-            class="grid w-full grid-cols-[92px_12px_1fr] gap-3 border-b border-gray-800 px-4 py-3 text-left last:border-b-0 hover:bg-gray-900"
-            @click="openEdit(ev, $event)"
+          <section
+            v-for="group in eventTimeGroups(selectedDate)"
+            :key="group.key || 'all-day'"
+            class="overflow-hidden rounded-2xl border bg-gray-950"
+            :class="group.special ? 'border-acid/50' : 'border-white/20'"
           >
-            <span class="mt-0.5 inline-flex rounded-md border border-white/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-300">{{ agendaTime(ev) }}</span>
-            <span
-              class="mt-1 h-2.5 w-2.5 rounded-full"
-              :class="!isProgramType(ev.event_type) ? EVENT_META[ev.event_type]?.dot : ''"
-              :style="isProgramType(ev.event_type)
-                ? { backgroundColor: SKILL_CHIP_COLOR[skillTrackFromLevelId(ev.skill_level)].solid }
-                : {}"
-            />
-            <span class="min-w-0">
-              <span class="block truncate text-sm font-semibold text-white">
-                <span v-if="eventAgeEmojis(ev).length" class="mr-1" aria-hidden="true">{{ eventAgeEmojis(ev).join('') }}</span>{{ ev.title }}
-              </span>
-              <span v-if="ev.season_slug" class="block truncate text-xs text-gray-400">
-                {{ programSidebarSeasonLabel(ev.season_slug) }}
-              </span>
-              <span class="block text-xs text-gray-500">{{ agendaMeta(ev) }}</span>
-            </span>
-          </button>
+            <p class="px-4 pt-3 text-sm font-bold" :class="group.special ? 'text-acid' : 'text-gold-300'">
+              <template v-if="group.special">★ {{ language === 'es' ? 'Evento especial' : 'Special event' }} · </template>{{ group.label }}
+            </p>
+            <div
+              v-for="ev in group.events"
+              :key="ev.id"
+              class="grid w-full grid-cols-[12px_minmax(0,1fr)_auto] gap-3 border-b border-gray-800 px-4 py-3 last:border-b-0 items-start"
+              :class="classStaffWarning(ev) ? 'bg-amber-500/5' : ''"
+            >
+              <button type="button" class="col-span-2 grid grid-cols-[12px_minmax(0,1fr)] gap-3 text-left min-w-0" @click="openEdit(ev, $event)">
+                <span
+                  class="mt-1.5 h-2.5 w-2.5 rounded-full"
+                  :class="!isProgramType(ev.event_type) ? EVENT_META[ev.event_type]?.dot : ''"
+                  :style="isProgramType(ev.event_type)
+                    ? { backgroundColor: SKILL_CHIP_COLOR[skillTrackFromLevelId(ev.skill_level)].solid }
+                    : {}"
+                />
+                <span class="min-w-0">
+                  <span class="block truncate text-sm font-semibold text-white">
+                    <span class="mr-1" aria-hidden="true">{{ eventSportEmoji(ev) }}<span v-if="eventAgeEmojis(ev).length">{{ eventAgeEmojis(ev).join('') }}</span></span>{{ ev.title }}
+                    <span
+                      v-if="ev.session_outcome === 'done'"
+                      class="ml-1 text-emerald-400"
+                      aria-label="done"
+                    >✓</span>
+                    <span
+                      v-else-if="ev.session_outcome === 'cancelled' || ev.cancelled_at"
+                      class="ml-1 text-sky-300"
+                      aria-label="cancelled"
+                    >✕</span>
+                  </span>
+                  <span v-if="ev.season_slug" class="block truncate text-xs text-gray-400">
+                    {{ programSidebarSeasonLabel(ev.season_slug) }}
+                  </span>
+                  <span class="block text-xs text-gray-500">
+                    {{ agendaMeta(ev) }}
+                    <template v-if="assignedByEvent[ev.id]?.length">
+                      · {{ assignedByEvent[ev.id].map(c => coachInitials(c.name)).join(' ') }}
+                      <template v-for="c in assignedByEvent[ev.id].filter(coach => coach.coveringForName)" :key="c.id">
+                        · {{ language === 'es' ? 'cubre a' : 'covering' }} {{ coachInitials(c.coveringForName || '') }}
+                      </template>
+                    </template>
+                  </span>
+                  <span
+                    v-if="classStaffWarning(ev)"
+                    class="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-300"
+                  >
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l6.518 11.59c.75 1.335-.213 2.986-1.742 2.986H3.48c-1.53 0-2.493-1.651-1.743-2.986l6.52-11.59zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-7a1 1 0 00-1 1v3a1 1 0 002 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    {{ classStaffWarning(ev) }}
+                  </span>
+                </span>
+              </button>
+              <div v-if="isProgramType(ev.event_type)" class="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  class="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-800"
+                  :aria-label="language === 'es' ? 'Asignar coach' : 'Assign coach'"
+                  :title="language === 'es' ? 'Asignar coach' : 'Assign coach'"
+                  @click="openAssign(ev)"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7zM19 8v6m3-3h-6" />
+                  </svg>
+                </button>
+                <button
+                  v-if="ev.session_outcome !== 'done'"
+                  type="button"
+                  class="p-1.5 rounded-md text-gray-400 hover:text-emerald-300 hover:bg-gray-800"
+                  :aria-label="language === 'es' ? 'Marcar hecha' : 'Mark done'"
+                  :title="language === 'es' ? 'Marcar hecha' : 'Mark done'"
+                  @click="markClassDone(ev)"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <button
+                  v-if="ev.session_outcome !== 'cancelled' && !ev.cancelled_at"
+                  type="button"
+                  class="p-1.5 rounded-md text-gray-400 hover:text-sky-300 hover:bg-gray-800"
+                  :aria-label="language === 'es' ? 'Cancelar por clima' : 'Cancel for weather'"
+                  :title="language === 'es' ? 'Cancelar por clima' : 'Cancel for weather'"
+                  @click="openWeatherCancel([ev.id])"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
         </div>
@@ -2926,7 +3762,7 @@ const selectDay = (day: Date) => {
                     }"
                     aria-hidden="true"
                   />
-                  <span class="text-base leading-none" aria-hidden="true">{{ eventChipEmoji(program.representative) }}</span>
+                  <span class="text-base leading-none" aria-hidden="true">{{ eventSportEmoji(program.representative) }}{{ eventChipEmoji(program.representative) }}</span>
                   <span class="line-clamp-2">{{ programIdentityLabel(program) }}</span>
                 </p>
                 <p class="text-xs text-gray-400 mt-0.5">
@@ -2987,7 +3823,7 @@ const selectDay = (day: Date) => {
         @click.self="requestCloseModal"
       >
         <div
-          class="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto shadow-xl"
+          class="add-sheet border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto shadow-xl"
           @click.stop
         >
           <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900/95 backdrop-blur">
@@ -3003,8 +3839,8 @@ const selectDay = (day: Date) => {
                       : 'Edit event'
                   : createMode === 'program'
                     ? language === 'es'
-                      ? 'Añadir programa de skate'
-                      : 'Add skate program'
+                      ? `Añadir programa de ${disciplineLabel(form.discipline, true) || 'skate'}`
+                      : `Add ${disciplineLabel(form.discipline, false) || 'skate'} program`
                     : language === 'es'
                       ? 'Añadir evento'
                       : 'Add event'
@@ -3019,6 +3855,13 @@ const selectDay = (day: Date) => {
 
           <div class="p-4 space-y-4">
             <div v-if="formError" class="text-sm text-red-400">{{ formError }}</div>
+
+            <div class="flex justify-end -mb-2">
+              <label class="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                <input v-model="form.visible_to_parents" type="checkbox" class="rounded border-gray-600 accent-[#D0F43A]" />
+                {{ language === 'es' ? 'Visible para familias / estudiantes' : 'Visible to parents / students' }}
+              </label>
+            </div>
 
             <div
               v-if="editingId && editingSeriesId"
@@ -3076,6 +3919,26 @@ const selectDay = (day: Date) => {
               </p>
             </div>
 
+            <div v-if="isProgramForm">
+              <label for="program-season" class="block text-xs font-medium text-gray-400 mb-1">
+                {{ language === 'es' ? 'Temporada' : 'Season' }}
+                <span class="text-red-400">*</span>
+              </label>
+              <select
+                id="program-season"
+                v-model="form.season_slug"
+                class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+              >
+                <option value="">
+                  {{ language === 'es' ? '— Elige temporada —' : '— Select season —' }}
+                </option>
+                <option v-for="s in seasonChoicesForForm" :key="s.slug" :value="s.slug">
+                  {{ language === 'es' ? s.name.es : s.name.en }}
+                  · {{ language === 'es' ? s.dates.es : s.dates.en }}
+                </option>
+              </select>
+            </div>
+
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Título' : 'Title' }} *</label>
               <input
@@ -3101,6 +3964,64 @@ const selectDay = (day: Date) => {
               </p>
             </div>
 
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <label for="event-location" class="text-xs font-medium text-gray-400">{{ language === 'es' ? 'Ubicación' : 'Location' }}</label>
+                <button
+                  type="button"
+                  class="text-[11px] font-semibold text-gold-300 hover:text-gold-200"
+                  @click="addingSpot = !addingSpot"
+                >
+                  {{ language === 'es' ? '+ Lugar' : '+ Place' }}
+                </button>
+              </div>
+              <select
+                id="event-location"
+                v-model="form.location"
+                class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                @change="form.skatepark = form.location"
+              >
+                <option v-for="loc in locationOptions" :key="loc" :value="loc">{{ loc }}</option>
+              </select>
+              <div v-if="addingSpot" class="mt-2 space-y-2 rounded-xl border border-gray-700 p-3">
+                <input
+                  v-model="newSpotName"
+                  type="text"
+                  class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+                  :placeholder="language === 'es' ? 'Nombre del lugar' : 'Place name'"
+                />
+                <input
+                  v-model="newSpotCity"
+                  type="text"
+                  class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+                  :placeholder="language === 'es' ? 'Ciudad' : 'City'"
+                />
+                <p v-if="spotError" class="text-[11px] text-red-400">{{ spotError }}</p>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 rounded-lg bg-gold-400 text-black text-xs font-bold disabled:opacity-50"
+                  :disabled="spotSaving"
+                  @click="saveSkateSpot"
+                >
+                  {{ language === 'es' ? 'Guardar lugar' : 'Save place' }}
+                </button>
+              </div>
+            </div>
+
+            <AdminCollapsible
+              :key="editingId || 'new'"
+              :title="language === 'es' ? 'Descripción' : 'Description'"
+              :meta="language === 'es' ? 'opcional' : 'optional'"
+              :default-open="Boolean(form.description)"
+            >
+              <textarea
+                v-model="form.description"
+                rows="3"
+                class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm resize-y min-h-[72px]"
+                :aria-label="language === 'es' ? 'Descripción' : 'Description'"
+              />
+            </AdminCollapsible>
+
             <div v-if="!isProgramForm" class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Inicio' : 'Start date' }} *</label>
@@ -3110,6 +4031,31 @@ const selectDay = (day: Date) => {
                 <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Fin' : 'End date' }}</label>
                 <input v-model="form.end_date" type="date" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm" />
               </div>
+            </div>
+
+            <div
+              :class="createMode === 'program' || isProgramForm
+                ? 'grid sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 items-start'
+                : ''"
+            >
+            <div v-if="createMode === 'program' || isProgramForm">
+              <label for="program-sport" class="block text-xs font-medium text-gray-400 mb-2">
+                {{ language === 'es' ? 'Deporte' : 'Sport' }} *
+              </label>
+              <select
+                id="program-sport"
+                :value="form.discipline"
+                class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                @change="pickProgramSport(($event.target as HTMLSelectElement).value)"
+              >
+                <option
+                  v-for="sport in TRAINING_DISCIPLINES"
+                  :key="sport.id"
+                  :value="sport.id"
+                >
+                  {{ disciplineEmoji(sport.id) }} {{ language === 'es' ? sport.es : sport.en }}
+                </option>
+              </select>
             </div>
 
             <div>
@@ -3125,7 +4071,28 @@ const selectDay = (day: Date) => {
                 }}
                 *
               </p>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div
+                v-if="createMode === 'program' || isProgramForm"
+                class="flex flex-wrap gap-1.5"
+              >
+                <button
+                  v-for="t in selectableEventTypes"
+                  :key="t"
+                  type="button"
+                  class="h-11 inline-flex items-center gap-1.5 rounded-xl border px-3 transition-all text-xs font-semibold"
+                  :class="
+                    form.event_type === t
+                      ? eventTypeSelectedClass(t)
+                      : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                  "
+                  :aria-pressed="form.event_type === t"
+                  @click="form.event_type = t"
+                >
+                  <span aria-hidden="true">{{ EVENT_META[t].emoji }}</span>
+                  {{ tLabel(t) }}
+                </button>
+              </div>
+              <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   v-for="t in selectableEventTypes"
                   :key="t"
@@ -3143,140 +4110,100 @@ const selectDay = (day: Date) => {
                 </button>
               </div>
             </div>
+            </div>
 
             <div v-if="isProgramForm" class="space-y-3">
-              <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">
-                  {{ language === 'es' ? 'Temporada' : 'Season' }}
-                  <span class="text-red-400">*</span>
-                </label>
-                <select
-                  v-model="form.season_slug"
-                  class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
-                >
-                  <option value="">
-                    {{ language === 'es' ? '— Elige temporada —' : '— Select season —' }}
-                  </option>
-                  <option v-for="s in seasonChoicesForForm" :key="s.slug" :value="s.slug">
-                    {{ language === 'es' ? s.name.es : s.name.en }}
-                    · {{ language === 'es' ? s.dates.es : s.dates.en }}
-                  </option>
-                </select>
-              </div>
-              <div class="space-y-2">
-                <p class="text-xs font-medium text-gray-400">
-                  {{ language === 'es' ? 'Edad (puedes elegir varias)' : 'Age (select one or more)' }}
-                  <span class="text-red-400">*</span>
-                </p>
-                <div class="grid grid-cols-4 gap-1.5">
-                  <button
-                    v-for="band in PROGRAM_AGE_BANDS"
-                    :key="band.id"
-                    type="button"
-                    class="rounded-lg border px-1 py-2 text-center text-[11px] font-semibold transition-all"
-                    :class="
-                      isAudienceSelected(band.id)
-                        ? 'border-white bg-white text-black ring-2 ring-gray-400'
-                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
-                    "
-                    @click="toggleAudience(band.id)"
-                  >
-                    {{ language === 'es' ? band.label.es : band.label.en }}
-                  </button>
+              <div class="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,11rem)] gap-3 items-start">
+                <div>
+                  <p class="text-xs font-medium text-gray-400 mb-2">
+                    {{ language === 'es' ? 'Nivel (puedes elegir varios)' : 'Level (select one or more)' }}
+                    <span class="text-red-400">*</span>
+                  </p>
+                  <div class="grid grid-cols-3 gap-1.5">
+                    <button
+                      v-for="track in PROGRAM_SKILL_TRACKS"
+                      :key="track.id"
+                      type="button"
+                      class="h-11 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border px-1.5 text-xs font-semibold transition-all"
+                      :class="
+                        isSkillTrackSelected(track.id)
+                          ? skillTrackSelectedClass(track.id)
+                          : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                      "
+                      :aria-pressed="isSkillTrackSelected(track.id)"
+                      :title="language === 'es' ? track.label.es : track.label.en"
+                      :aria-label="language === 'es' ? track.label.es : track.label.en"
+                      @click="toggleSkillTrack(track.id)"
+                    >
+                      <span aria-hidden="true">{{ track.emoji }}</span>
+                      <span class="truncate" aria-hidden="true">{{ shortLabel(language === 'es' ? track.label.es : track.label.en) }}</span>
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p id="program-age-label" class="text-xs font-medium text-gray-400 mb-2">
+                    {{ language === 'es' ? 'Edad' : 'Age' }}
+                    <span class="text-red-400">*</span>
+                  </p>
+                  <AdminCheckboxDropdown
+                    labelledby="program-age-label"
+                    :options="PROGRAM_AGE_BANDS.map(band => ({ id: band.id, label: language === 'es' ? band.label.es : band.label.en }))"
+                    :selected="form.audience_categories"
+                    :placeholder="language === 'es' ? 'Elige edades' : 'Choose ages'"
+                    @toggle="id => toggleAudience(id as AudienceCategory)"
+                  />
                 </div>
               </div>
 
-              <div class="space-y-2">
-                <p class="text-xs font-medium text-gray-400">
-                  {{ language === 'es' ? 'Nivel (puedes elegir varios)' : 'Level (select one or more)' }}
-                  <span class="text-red-400">*</span>
-                </p>
-                <div class="grid grid-cols-3 gap-1.5">
-                  <button
-                    v-for="track in PROGRAM_SKILL_TRACKS"
-                    :key="track.id"
-                    type="button"
-                    class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"
-                    :class="
-                      isSkillTrackSelected(track.id)
-                        ? skillTrackSelectedClass(track.id)
-                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
-                    "
-                    @click="toggleSkillTrack(track.id)"
+              <div class="grid sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 items-start">
+                <div>
+                  <label for="program-coach-tier" class="block text-xs font-medium text-gray-400 mb-2">
+                    {{ language === 'es' ? 'Coach / precios' : 'Coach / prices' }}
+                    <span class="text-red-400">*</span>
+                  </label>
+                  <select
+                    id="program-coach-tier"
+                    :value="formCoachTier"
+                    class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                    @change="form.coach_tier = ($event.target as HTMLSelectElement).value as CoachPricingTier"
                   >
-                    <span class="block text-sm mb-0.5" aria-hidden="true">{{ track.emoji }}</span>
-                    {{ language === 'es' ? track.label.es : track.label.en }}
-                  </button>
+                    <option v-for="tier in FINANCE_COACH_TIERS" :key="tier.id" :value="tier.id">
+                      {{ language === 'es' ? tier.es : tier.en }}
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <p id="program-coaches-label" class="text-xs font-medium text-gray-400 mb-2">
+                    {{ language === 'es' ? 'Coaches asignados' : 'Assigned coaches' }}
+                  </p>
+                  <AdminCheckboxDropdown
+                    labelledby="program-coaches-label"
+                    :options="coachRoster.map(c => ({ id: c.id, label: c.name }))"
+                    :selected="assignedCoachIds"
+                    :placeholder="language === 'es' ? 'Sin coaches asignados' : 'No coaches assigned'"
+                    :empty-text="language === 'es' ? 'No hay coaches registrados todavía.' : 'No coaches registered yet.'"
+                    @toggle="toggleAssignedCoach"
+                  />
                 </div>
               </div>
 
-              <div class="space-y-2">
-                <p class="text-xs font-medium text-gray-400">
-                  {{ language === 'es' ? 'Coach / precios' : 'Coach / prices' }}
-                  <span class="text-red-400">*</span>
-                </p>
-                <div class="grid grid-cols-3 gap-1.5">
-                  <button
-                    v-for="tier in FINANCE_COACH_TIERS"
-                    :key="tier.id"
-                    type="button"
-                    class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"
-                    :class="
-                      formCoachTier === tier.id
-                        ? 'border-amber-500 bg-amber-500/15 text-white'
-                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
-                    "
-                    @click="form.coach_tier = tier.id"
-                  >
-                    <span
-                      class="block w-2 h-2 rounded-full mx-auto mb-1"
-                      :style="{ backgroundColor: tier.color }"
-                      aria-hidden="true"
-                    />
-                    {{ language === 'es' ? tier.es : tier.en }}
-                  </button>
-                </div>
+              <div class="space-y-1">
                 <p class="text-[10px] text-amber-300/70">
                   {{
                     language === 'es'
-                      ? 'Define la lista de precios del programa (Finanzas → Precios).'
-                      : 'Sets which price list the program sells at (Finanzas → Precios).'
+                      ? 'Coach / precios define la lista de precios del programa (Finanzas → Precios).'
+                      : 'Coach / prices sets which price list the program sells at (Finanzas → Precios).'
                   }}
-                </p>
-              </div>
-
-              <div class="space-y-2">
-                <p class="text-xs font-medium text-gray-400">
-                  {{ language === 'es' ? 'Coaches asignados' : 'Assigned coaches' }}
-                </p>
-                <p v-if="coachRoster.length === 0" class="text-[11px] text-gray-500">
-                  {{ language === 'es' ? 'No hay coaches registrados todavía.' : 'No coaches registered yet.' }}
                 </p>
                 <p v-if="coachRosterError" class="text-[10px] text-red-300">
                   {{ language === 'es' ? 'No se pudo cargar la lista:' : 'Could not load roster:' }}
                   {{ coachRosterError }}
                 </p>
-                <div v-else class="flex flex-wrap gap-1.5">
-                  <button
-                    v-for="c in coachRoster"
-                    :key="c.id"
-                    type="button"
-                    class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
-                    :class="
-                      assignedCoachIds.includes(c.id)
-                        ? 'border-teal-500 bg-teal-500/15 text-teal-200'
-                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
-                    "
-                    @click="toggleAssignedCoach(c.id)"
-                  >
-                    {{ c.name }}
-                  </button>
-                </div>
                 <p class="text-[10px] text-gray-500">
                   {{
                     language === 'es'
-                      ? 'Cuenta como clase dada en Actividad de coaches.'
-                      : 'Counts as a class given on the coach activity page.'
+                      ? 'Cuenta como clase dada cuando la clase se marca hecha.'
+                      : 'Counts as a class given once the class is marked done.'
                   }}
                   <span v-if="editingId && editScope === 'series'">
                     {{ language === 'es' ? 'Se aplica a toda la serie.' : 'Applies to the whole series.' }}
@@ -3347,12 +4274,13 @@ const selectDay = (day: Date) => {
                       · {{ language === 'es' ? 'Lun–Vie' : 'Mon–Fri' }}
                     </span>
                   </p>
-                  <div class="flex flex-wrap gap-2">
+                  <div class="grid gap-1.5" :class="recurringWeekdayOptions.length > 5 ? 'grid-cols-7' : 'grid-cols-5'">
                     <button
                       v-for="d in recurringWeekdayOptions"
                       :key="d.v"
                       type="button"
-                      class="px-3 py-1.5 rounded-full border text-xs font-bold transition-colors disabled:opacity-60"
+                      :aria-pressed="isRecurringWeekday(d.v)"
+                      class="h-9 rounded-full border text-xs font-bold transition-colors disabled:opacity-60"
                       :class="
                         isRecurringWeekday(d.v)
                           ? 'border-cyan-400 bg-cyan-500/20 text-white'
@@ -3398,26 +4326,44 @@ const selectDay = (day: Date) => {
                   <p class="text-xs font-medium text-gray-400">
                     {{ language === 'es' ? 'Duración del programa' : 'Program length' }}
                   </p>
-                  <div class="grid grid-cols-2 gap-1.5">
-                    <button
-                      v-for="weeks in PROGRAM_WEEK_OPTIONS"
-                      :key="weeks"
-                      type="button"
-                      class="rounded-lg border px-2 py-2 text-center text-[11px] font-semibold transition-all"
-                      :class="
-                        form.program_weeks === weeks
-                          ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                          : 'border-gray-600 text-gray-400'
-                      "
-                      @click="form.program_weeks = weeks"
-                    >
-                      {{
-                        language === 'es'
-                          ? `${weeks} semanas · ${weeks * programDaysPerWeek} clases`
-                          : `${weeks} weeks · ${weeks * programDaysPerWeek} classes`
-                      }}
-                    </button>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="program-weeks" class="block text-[11px] text-gray-500 mb-1">
+                        {{ language === 'es' ? 'Semanas' : 'Weeks' }}
+                      </label>
+                      <select
+                        id="program-weeks"
+                        v-model.number="form.program_weeks"
+                        class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                      >
+                        <option v-for="weeks in PROGRAM_WEEK_OPTIONS" :key="weeks" :value="weeks">
+                          {{ language === 'es' ? `${weeks} ${weeks === 1 ? 'semana' : 'semanas'}` : `${weeks} ${weeks === 1 ? 'week' : 'weeks'}` }}
+                        </option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="program-classes" class="block text-[11px] text-gray-500 mb-1">
+                        {{ language === 'es' ? 'Clases' : 'Classes' }}
+                      </label>
+                      <input
+                        id="program-classes"
+                        v-model.number="form.recurring_class_count"
+                        type="number"
+                        min="1"
+                        :max="PROGRAM_MAX_CLASSES"
+                        step="1"
+                        class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                        @change="clampClassCount"
+                      />
+                    </div>
                   </div>
+                  <p class="text-[10px] text-gray-500">
+                    {{
+                      language === 'es'
+                        ? 'Al cambiar semanas o días se recalculan las clases; puedes ajustarlas después.'
+                        : 'Changing weeks or days recalculates the classes; you can adjust them afterwards.'
+                    }}
+                  </p>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
@@ -3463,26 +4409,75 @@ const selectDay = (day: Date) => {
                 </p>
 
                 <div>
-                  <p class="text-xs font-medium text-gray-400 mb-2">
-                    {{ language === 'es' ? 'Horarios por día' : 'Session times' }}
-                  </p>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      v-for="slot in recurringSlotOptions"
-                      :key="slot"
-                      type="button"
-                      class="px-3 py-1.5 rounded-full border text-xs font-bold transition-colors"
-                      :class="
-                        isRecurringSlot(slot)
-                          ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                          : 'border-gray-600 text-gray-400'
-                      "
-                      :disabled="isSummerCourseForm"
-                      @click="toggleRecurringSlot(slot)"
-                    >
-                      {{ TIME_SLOT_LABELS[slot].display }}
-                    </button>
+                  <div class="grid grid-cols-[1fr_6.5rem] gap-3 items-start">
+                    <div>
+                      <p id="program-horarios-label" class="text-xs font-medium text-gray-400 mb-1">
+                        {{ language === 'es' ? 'Horarios por día' : 'Session times' }}
+                      </p>
+                      <AdminCheckboxDropdown
+                        :options="recurringSlotOptions.map(h => ({ id: h.id, label: h.display }))"
+                        :selected="form.recurring_slots"
+                        :placeholder="language === 'es' ? 'Elige horarios' : 'Choose times'"
+                        labelledby="program-horarios-label"
+                        :empty-text="language === 'es' ? 'Sin horarios — agrega uno abajo.' : 'No times — add one below.'"
+                        :removable="!isSummerCourseForm"
+                        :remove-label="label => (language === 'es' ? `Eliminar horario ${label}` : `Delete ${label}`)"
+                        @toggle="toggleRecurringSlot"
+                        @remove="id => confirmRemoveHorarioById(id)"
+                      >
+                        <template v-if="!isSummerCourseForm" #footer>
+                          <button
+                            v-if="!addingHorario"
+                            type="button"
+                            class="w-full h-9 rounded-lg border border-dashed border-gray-600 text-xs font-bold text-gray-300 hover:border-cyan-400 hover:text-white"
+                            @click="addingHorario = true; horarioError = ''"
+                          >
+                            {{ language === 'es' ? '+ Horario' : '+ Time' }}
+                          </button>
+                          <div v-else class="space-y-1.5">
+                            <div class="grid grid-cols-[1fr_1fr_auto] gap-1.5 items-center">
+                              <input
+                                v-model="newHorarioStart"
+                                type="time"
+                                step="900"
+                                :aria-label="language === 'es' ? 'Inicio' : 'Start'"
+                                class="w-full h-9 px-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-xs"
+                              />
+                              <input
+                                v-model="newHorarioEnd"
+                                type="time"
+                                step="900"
+                                :aria-label="language === 'es' ? 'Fin' : 'End'"
+                                class="w-full h-9 px-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-xs"
+                              />
+                              <button
+                                type="button"
+                                class="h-9 px-3 rounded-lg bg-cyan-600 text-white text-xs font-bold hover:bg-cyan-500"
+                                @click="submitNewHorario"
+                              >
+                                {{ language === 'es' ? 'Agregar' : 'Add' }}
+                              </button>
+                            </div>
+                            <p v-if="horarioError" class="text-[11px] text-red-400">{{ horarioError }}</p>
+                          </div>
+                        </template>
+                      </AdminCheckboxDropdown>
+                    </div>
+                    <div>
+                      <label for="program-capacity" class="block text-xs font-medium text-gray-400 mb-1">
+                        {{ language === 'es' ? 'Cupo máximo' : 'Max students' }}
+                      </label>
+                      <input
+                        id="program-capacity"
+                        v-model.number="form.max_capacity_override"
+                        type="number"
+                        min="1"
+                        max="99"
+                        class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                      />
+                    </div>
                   </div>
+
                   <p class="text-[10px] text-gray-500 mt-1">
                     {{
                       isSummerCourseForm
@@ -3490,8 +4485,8 @@ const selectDay = (day: Date) => {
                           ? 'Curso de verano: 9:00 AM – 1:00 PM (Lun–Vie).'
                           : 'Summer course: 9:00 AM – 1:00 PM (Mon–Fri).'
                         : language === 'es'
-                          ? 'Tarde/noche Mar/Jue/Sáb · Mañana 7–8:30 solo sábado.'
-                          : 'Early/late Tue/Thu/Sat · Morning 7–8:30 Saturday only.'
+                          ? 'Cada horario elegido se repite en todos los días seleccionados.'
+                          : 'Each chosen time repeats on every selected day.'
                     }}
                   </p>
                   <p
@@ -3543,29 +4538,6 @@ const selectDay = (day: Date) => {
                     }}
                   </p>
                 </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                  <div v-if="!isSummerCourseForm">
-                    <p class="block text-xs font-medium text-gray-400 mb-1">
-                      {{ language === 'es' ? 'Clases en el calendario' : 'Classes on the calendar' }}
-                    </p>
-                    <p class="px-3 py-2 rounded-xl bg-gray-800/80 border border-gray-700 text-sm text-white">
-                      {{ form.recurring_class_count }}
-                    </p>
-                  </div>
-                  <div :class="isSummerCourseForm ? 'col-span-2' : ''">
-                    <label class="block text-xs font-medium text-gray-400 mb-1">
-                      {{ language === 'es' ? 'Cupo máximo' : 'Max skaters' }}
-                    </label>
-                    <input
-                      v-model.number="form.max_capacity_override"
-                      type="number"
-                      min="1"
-                      max="99"
-                      class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
-                    />
-                  </div>
-                </div>
               </div>
 
               <div v-if="!form.is_recurring || editingId" class="space-y-3">
@@ -3583,13 +4555,13 @@ const selectDay = (day: Date) => {
                   <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Horario' : 'Time slot' }} *</label>
                   <select v-model="form.time_slot" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm">
                     <option v-for="slot in classSessionSlotOptions" :key="slot" :value="slot">
-                      {{ TIME_SLOT_LABELS[slot].display }}
+                      {{ classSlotOptionLabel(slot) }}
                     </option>
                   </select>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-400 mb-1">
-                    {{ language === 'es' ? 'Cupo máximo' : 'Max skaters' }}
+                    {{ language === 'es' ? 'Cupo máximo' : 'Max students' }}
                   </label>
                   <input
                     v-model.number="form.max_capacity_override"
@@ -3613,7 +4585,7 @@ const selectDay = (day: Date) => {
                   <p class="text-lg font-semibold text-white leading-tight mt-0.5">
                     {{ formatMoneyMxn(Number(form.price_mxn) || 0) }}
                   </p>
-                  <p class="text-[11px] text-gray-400 truncate">{{ programPriceLabel }}</p>
+                  <p class="text-[11px] text-gray-400">{{ programPriceLabel }}</p>
                 </div>
                 <NuxtLink
                   to="/member/admin/finance/prices"
@@ -3622,8 +4594,27 @@ const selectDay = (day: Date) => {
                   {{ language === 'es' ? 'Editar precios' : 'Edit prices' }}
                 </NuxtLink>
               </div>
-              <p v-if="priceSplitHint" class="text-[10px] text-amber-300/80 mt-2">
-                {{ priceSplitHint }}
+              <div v-if="!isSummerCourseForm" class="mt-3">
+                <label for="program-price-kind" class="block text-[11px] text-gray-500 mb-1">
+                  {{ language === 'es' ? 'Tipo de clase' : 'Class type' }}
+                </label>
+                <select
+                  id="program-price-kind"
+                  v-model="priceKindOverride"
+                  class="w-full h-11 px-3 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
+                >
+                  <option value="">
+                    {{ language === 'es' ? 'Automático' : 'Automatic' }} · {{ classKindLabel(autoPackageKind, language === 'es') }}
+                  </option>
+                  <option v-for="kind in priceKindOptions" :key="kind.id" :value="kind.id">
+                    {{ language === 'es' ? kind.es : kind.en }}
+                  </option>
+                </select>
+              </div>
+              <p v-if="programPricingGroup !== 'standard' && !programHasOwnPriceSheet" class="text-[10px] text-amber-300/80 mt-2">
+                {{ language === 'es'
+                  ? `${disciplineLabel(form.discipline, true)} aún no tiene su tabla de precios; se usa la de skate / scooter / patinaje.`
+                  : `${disciplineLabel(form.discipline, false)} has no price sheet yet; the skate / scooter / rollerblading one is used.` }}
               </p>
               <p v-if="!programPriceRow" class="text-[10px] text-amber-300/80 mt-1">
                 {{ language === 'es'
@@ -3645,31 +4636,6 @@ const selectDay = (day: Date) => {
                 </button>
               </div>
             </div>
-
-            <div>
-              <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Ubicación' : 'Location' }}</label>
-              <select
-                v-model="form.location"
-                class="w-full px-3 py-2.5 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
-              >
-                <option v-for="loc in EVENT_LOCATIONS" :key="loc" :value="loc">{{ loc }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-gray-400 mb-1">{{ language === 'es' ? 'Descripción' : 'Description' }}</label>
-              <textarea
-                v-model="form.description"
-                rows="3"
-                class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm resize-y min-h-[72px]"
-                :placeholder="language === 'es' ? 'Opcional' : 'Optional'"
-              />
-            </div>
-
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input v-model="form.visible_to_parents" type="checkbox" class="rounded border-gray-600 text-sky-500 focus:ring-sky-500" />
-              {{ language === 'es' ? 'Visible para familias / patinadores' : 'Visible to parents / skaters' }}
-            </label>
           </div>
 
           <div class="sticky bottom-0 flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-800 bg-gray-900/95">
@@ -3694,7 +4660,7 @@ const selectDay = (day: Date) => {
               </button>
               <button
                 type="button"
-                class="px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold disabled:opacity-50"
+                class="px-4 py-2.5 rounded-xl bg-acid text-charcoal text-sm font-semibold disabled:opacity-50 hover:bg-acid-300"
                 :disabled="saving"
                 @click="submitEvent"
               >
@@ -3751,6 +4717,145 @@ const selectDay = (day: Date) => {
               @click="deleteSeriesOpen = false"
             >
               {{ language === 'es' ? 'Cancelar' : 'Cancel' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="assignOpen"
+        class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 p-4"
+        @click.self="assignOpen = false"
+      >
+        <div class="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-950 p-5">
+          <h2 class="text-lg font-semibold text-white">
+            {{ language === 'es' ? 'Asignar coach' : 'Assign coach' }}
+          </h2>
+          <p v-if="!coachRoster.length" class="mt-2 text-sm text-gray-500">
+            {{ language === 'es' ? 'No hay coaches registrados.' : 'No coaches registered.' }}
+          </p>
+          <div v-else class="mt-3 flex flex-wrap gap-1.5">
+            <button
+              v-for="c in coachRoster"
+              :key="c.id"
+              type="button"
+              class="rounded-full border px-2.5 py-1 text-[11px] font-medium"
+              :class="assignDraftIds.includes(c.id)
+                ? 'border-teal-500 bg-teal-500/15 text-teal-200'
+                : 'border-gray-700 text-gray-400'"
+              @click="toggleAssignDraft(c.id)"
+            >
+              {{ c.name }}
+            </button>
+          </div>
+          <p v-if="coachAssignError" class="mt-2 text-sm text-red-400">{{ coachAssignError }}</p>
+          <div class="mt-4 flex gap-2">
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl border border-gray-700 text-sm text-gray-300"
+              :disabled="assignBusy"
+              @click="assignOpen = false"
+            >
+              {{ language === 'es' ? 'Volver' : 'Back' }}
+            </button>
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl bg-teal-600 text-sm font-semibold text-white disabled:opacity-50"
+              :disabled="assignBusy"
+              @click="saveAssign"
+            >
+              {{ language === 'es' ? 'Guardar' : 'Save' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="doneConfirmOpen"
+        class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 p-4"
+        @click.self="doneConfirmOpen = false"
+      >
+        <div class="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-950 p-5">
+          <h2 class="text-lg font-semibold text-white">
+            {{ language === 'es' ? 'Marcar todas hechas' : 'Mark all done' }}
+          </h2>
+          <p class="mt-2 text-sm text-gray-300">
+            {{ language === 'es'
+              ? `Se marcan ${doneConfirmIds.length} clase(s) de este día como hechas. Cuentan para los coaches asignados.`
+              : `${doneConfirmIds.length} class(es) this day will be marked done. They count for the assigned coaches.` }}
+          </p>
+          <p v-if="weatherError" class="mt-2 text-sm text-red-400">{{ weatherError }}</p>
+          <div class="mt-4 flex gap-2">
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl border border-gray-700 text-sm text-gray-300"
+              @click="doneConfirmOpen = false"
+            >
+              {{ language === 'es' ? 'Volver' : 'Back' }}
+            </button>
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl bg-emerald-600 text-sm font-semibold text-white"
+              @click="markClassesDone(doneConfirmIds)"
+            >
+              {{ language === 'es' ? 'Confirmar' : 'Confirm' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="weatherOpen"
+        class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 p-4"
+        @click.self="weatherOpen = false"
+      >
+        <div class="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-950 p-5">
+          <h2 class="text-lg font-semibold text-white">
+            {{ weatherEventIds.length > 1
+              ? (language === 'es' ? 'Cancelar todas' : 'Cancel all')
+              : (language === 'es' ? 'Cancelar por clima' : 'Cancel for weather') }}
+          </h2>
+          <p class="mt-1 text-sm text-gray-400">
+            {{ language === 'es'
+              ? `Se marcan ${weatherEventIds.length} clase(s) como canceladas porque el parque está mojado, y se avisa a los papás y estudiantes inscritos.`
+              : `${weatherEventIds.length} class(es) will be marked cancelled because the park is wet, and enrolled parents and students will be emailed.` }}
+          </p>
+          <label class="mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-400">
+            {{ language === 'es' ? 'Cuándo se puede reponer' : 'When it can be retaken' }}
+          </label>
+          <textarea
+            v-model="weatherMakeup"
+            rows="3"
+            class="mt-1 w-full rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white"
+            :placeholder="language === 'es'
+              ? 'Ej. el mismo horario el próximo sábado, o un crédito para otra clase de la temporada'
+              : 'e.g. same time next Saturday, or a credit for another class this season'"
+          />
+          <p v-if="weatherError" class="mt-2 text-sm text-red-400">{{ weatherError }}</p>
+          <div class="mt-4 flex gap-2">
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl border border-gray-700 text-sm text-gray-300"
+              :disabled="weatherBusy"
+              @click="weatherOpen = false"
+            >
+              {{ language === 'es' ? 'Volver' : 'Back' }}
+            </button>
+            <button
+              type="button"
+              class="flex-1 py-2.5 rounded-xl bg-sky-600 text-sm font-semibold text-white disabled:opacity-50"
+              :disabled="weatherBusy"
+              @click="confirmWeatherCancel"
+            >
+              {{ weatherBusy
+                ? (language === 'es' ? 'Enviando…' : 'Sending…')
+                : (language === 'es' ? 'Cancelar y avisar' : 'Cancel and notify') }}
             </button>
           </div>
         </div>

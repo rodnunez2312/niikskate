@@ -46,9 +46,9 @@ export interface FinanceSheetColumn {
 }
 
 const TONE_TEXT: Record<'good' | 'warn' | 'bad', string> = {
-  good: 'text-glass-green',
-  warn: 'text-amber-300',
-  bad: 'text-red-400',
+  good: 'text-emerald-700',
+  warn: 'text-amber-700',
+  bad: 'text-red-700',
 }
 
 const TONE_CELL: Record<'good' | 'warn' | 'bad', string> = {
@@ -155,11 +155,11 @@ const alignClass = (col: FinanceSheetColumn) =>
 const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
   const tone = toneText(row, col)
   return [
-    'w-full bg-transparent border border-transparent rounded-md px-2 py-1.5 text-xs',
-    'hover:border-gray-700 focus:border-gold-400 focus:bg-gray-950 outline-none transition-colors',
+    'w-full bg-transparent border border-transparent rounded-md px-1.5 py-0.5 text-xs',
+    'hover:border-gray-300 focus:border-gray-400 focus:bg-white outline-none transition-colors',
     'tabular-nums',
     alignClass(col),
-    tone ? `${tone} font-bold` : col.highlight ? 'font-bold text-gold-300' : 'text-white',
+    tone ? `${tone} font-bold` : col.highlight ? 'font-bold text-gray-900' : 'text-gray-900',
   ]
 }
 </script>
@@ -167,43 +167,44 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
 <template>
   <div>
     <!-- Laptop: real spreadsheet -->
-    <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-800">
+    <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white text-gray-900 [color-scheme:light]">
       <table class="w-full min-w-max border-collapse">
         <thead>
-          <tr class="bg-gray-900">
+          <tr class="bg-gray-100">
             <th
               v-for="col in columns"
               :key="col.key"
               scope="col"
-              class="px-2 py-2 text-[10px] font-bold uppercase tracking-wide text-gray-400 border-b border-gray-800 whitespace-nowrap"
+              class="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-900 border-b border-gray-200 whitespace-nowrap"
               :class="[alignClass(col), col.width]"
             >
               {{ col.label }}
             </th>
-            <th v-if="deletable" class="w-10 border-b border-gray-800" />
+            <th v-if="deletable" class="w-10 border-b border-gray-200" />
           </tr>
         </thead>
 
         <tbody>
           <tr
-            v-for="row in rows"
+            v-for="(row, rowIdx) in rows"
             :key="idOf(row)"
-            class="border-b border-gray-800/60 hover:bg-gray-900/40 transition-colors"
+            class="border-b border-gray-200 hover:bg-gray-200/70 transition-colors"
+            :class="rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-100'"
           >
             <td
               v-for="col in columns"
               :key="col.key"
-              class="px-1 py-0.5 align-middle"
+              class="px-1 py-0 align-middle"
               :class="[col.width, toneCell(row, col)]"
             >
               <p
                 v-if="isStatic(row, col)"
-                class="px-2 py-1.5 text-xs tabular-nums"
+                class="px-1.5 py-0.5 text-xs tabular-nums text-gray-900"
                 :class="[
                   alignClass(col),
                   toneText(row, col)
                     ? `${toneText(row, col)} font-bold`
-                    : col.highlight ? 'font-bold text-gold-300' : 'text-gray-300',
+                    : col.highlight ? 'font-bold text-gray-900' : 'text-gray-800',
                 ]"
               >
                 {{ displayValue(row, col) }}
@@ -217,7 +218,7 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
                   class="w-6 h-6 rounded text-[10px] font-bold transition-colors"
                   :class="isDayOn(row, col, day.value)
                     ? 'bg-glass-blue text-white'
-                    : 'bg-gray-950 text-gray-600 hover:text-gray-300'"
+                    : 'bg-white text-gray-500 border border-gray-200 hover:text-gray-800'"
                   :title="day.es"
                   @click="toggleWeekday(row, col, day.value)"
                 >
@@ -228,7 +229,7 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
               <select
                 v-else-if="col.type === 'select'"
                 :value="row[col.key] ?? ''"
-                class="w-full bg-transparent border border-transparent hover:border-gray-700 focus:border-gold-400 focus:bg-gray-950 rounded-md px-2 py-1.5 text-xs text-white outline-none"
+                class="w-full bg-transparent border border-transparent hover:border-gray-300 focus:border-gray-400 focus:bg-white rounded-md px-1.5 py-0.5 text-xs text-gray-900 outline-none"
                 @change="commit(row, col, $event)"
               >
                 <option v-for="opt in col.options" :key="opt.value" :value="opt.value">
@@ -240,7 +241,7 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
                 <input
                   type="checkbox"
                   :checked="!!row[col.key]"
-                  class="w-4 h-4 rounded border-gray-600 text-gold-400 focus:ring-gold-400 bg-gray-900"
+                  class="w-4 h-4 rounded border-gray-400 text-gray-900 focus:ring-gray-400 bg-white"
                   @change="commit(row, col, $event)"
                 />
               </div>
@@ -261,7 +262,7 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
             <td v-if="deletable" class="px-1">
               <button
                 type="button"
-                class="w-7 h-7 rounded-md text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                class="w-7 h-7 rounded-md text-gray-500 hover:text-red-700 hover:bg-red-50 transition-colors"
                 :title="'Eliminar'"
                 @click="emit('remove', idOf(row))"
               >
@@ -278,16 +279,16 @@ const inputClass = (row: Record<string, any>, col: FinanceSheetColumn) => {
         </tbody>
 
         <tfoot v-if="totals && rows.length">
-          <tr class="bg-gray-900/80">
+          <tr class="bg-gray-100">
             <td
               v-for="col in columns"
               :key="col.key"
-              class="px-3 py-2 text-xs font-bold text-white tabular-nums border-t border-gray-800"
+              class="px-2 py-1 text-xs font-bold text-gray-900 tabular-nums border-t border-gray-200"
               :class="alignClass(col)"
             >
               {{ totals[col.key] ?? '' }}
             </td>
-            <td v-if="deletable" class="border-t border-gray-800" />
+            <td v-if="deletable" class="border-t border-gray-200" />
           </tr>
         </tfoot>
       </table>

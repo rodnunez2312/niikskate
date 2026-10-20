@@ -124,13 +124,13 @@ watch(
 <template>
   <section v-if="brands.length" class="space-y-2">
     <div class="flex items-center justify-between gap-3">
-      <p class="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">
+      <p class="text-[11px] font-black uppercase tracking-[0.2em] text-sage-700">
         {{ es ? 'Nuestras marcas' : 'Our brands' }}
       </p>
       <button
         v-if="selected"
         type="button"
-        class="text-[11px] font-bold uppercase tracking-wide text-gold-400 hover:text-gold-300"
+        class="text-[11px] font-bold uppercase tracking-wide text-charcoal underline underline-offset-4 hover:text-sage-700"
         @click="emit('clear')"
       >
         {{ es ? 'Ver todas' : 'Show all' }}
@@ -154,16 +154,16 @@ watch(
           v-for="(brand, index) in items"
           :key="`${brand.name}-${index}`"
           type="button"
-          class="group shrink-0 w-[5.5rem] sm:w-24 rounded-xl border bg-[#111] p-2.5 transition-colors"
+          class="group shrink-0 w-[5.5rem] sm:w-24 rounded-xl border bg-white p-2.5 transition-colors"
           :class="
             brand.name === selected
-              ? 'border-gold-500'
-              : 'border-white/10 hover:border-white/30'
+              ? 'border-charcoal ring-2 ring-acid'
+              : 'border-charcoal/10 hover:border-charcoal/40'
           "
           :aria-pressed="brand.name === selected"
           @click="emit('select', brand.name)"
         >
-          <div class="aspect-square rounded-lg bg-gray-900 flex items-center justify-center p-2 overflow-hidden">
+          <div class="aspect-square rounded-lg bg-cream-50 flex items-center justify-center p-2 overflow-hidden">
             <img
               v-if="brand.image"
               :src="brand.image"
@@ -179,8 +179,7 @@ watch(
             />
           </div>
           <p
-            class="mt-2 text-[10px] font-black uppercase tracking-wide text-center leading-tight truncate"
-            :class="brand.name === selected ? 'text-gold-400' : 'text-white'"
+            class="mt-2 text-[10px] font-black uppercase tracking-wide text-center leading-tight truncate text-charcoal"
           >
             {{ brand.name }}
           </p>
@@ -188,12 +187,12 @@ watch(
       </div>
 
       <template v-if="duplicated">
-        <div class="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-black to-transparent" />
-        <div class="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-black to-transparent" />
+        <div class="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-cream to-transparent" />
+        <div class="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-cream to-transparent" />
 
         <button
           type="button"
-          class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-white/20 bg-black/80 text-white flex items-center justify-center hover:border-gold-400 hover:text-gold-400 transition-colors"
+          class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-charcoal/20 bg-white text-charcoal flex items-center justify-center hover:bg-charcoal hover:text-acid transition-colors"
           :aria-label="es ? 'Marcas anteriores' : 'Previous brands'"
           @click="nudge(-1)"
         >
@@ -203,7 +202,7 @@ watch(
         </button>
         <button
           type="button"
-          class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-white/20 bg-black/80 text-white flex items-center justify-center hover:border-gold-400 hover:text-gold-400 transition-colors"
+          class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-charcoal/20 bg-white text-charcoal flex items-center justify-center hover:bg-charcoal hover:text-acid transition-colors"
           :aria-label="es ? 'Más marcas' : 'More brands'"
           @click="nudge(1)"
         >

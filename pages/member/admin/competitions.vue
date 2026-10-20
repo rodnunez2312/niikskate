@@ -35,22 +35,20 @@ onActivated(loadCompetitions)
 </script>
 
 <template>
+  <MemberStaffPageHeader
+    :title="language === 'es' ? 'Competencias' : 'Competitions'"
+    :subtitle="language === 'es' ? 'Eventos de competencia en el calendario' : 'Competition events on the school calendar'"
+  >
+    <template #actions>
+      <NuxtLink
+        to="/member/admin/scheduling/calendar?filter=competition"
+        class="px-4 py-2.5 rounded-xl bg-acid text-charcoal font-semibold text-sm"
+      >
+        + {{ language === 'es' ? 'Añadir' : 'Add' }}
+      </NuxtLink>
+    </template>
+  </MemberStaffPageHeader>
   <div class="px-4 py-6 max-w-lg mx-auto space-y-6 pb-8">
-    <div>
-      <h1 class="text-xl font-bold text-white">
-        {{ language === 'es' ? 'Competencias' : 'Competitions' }}
-      </h1>
-      <p class="text-sm text-gray-400 mt-1">
-        {{ language === 'es' ? 'Gestiona eventos de competencia en el calendario escolar.' : 'Manage competition events on the school calendar.' }}
-      </p>
-    </div>
-
-    <NuxtLink
-      to="/member/admin/scheduling/calendar?filter=competition"
-      class="block rounded-xl bg-gold-400 text-black font-bold text-center py-3 text-sm"
-    >
-      {{ language === 'es' ? '+ Añadir competencia en calendario' : '+ Add competition in calendar' }}
-    </NuxtLink>
 
     <p v-if="loadError" class="text-sm text-red-400 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
       {{ loadError }}

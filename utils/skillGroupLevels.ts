@@ -1,3 +1,5 @@
+import { PROGRAM_SKILL_TRACKS, SKATE_SKILL_LEVELS, type SkateSkillLevelId } from '~/types'
+
 /** Strength Training is for class planning (drills/skills), not skater level assignment. */
 
 export const PLANNING_SKILL_GROUP_NAMES = ['Strength Training', '0 - Warmup'] as const
@@ -13,6 +15,30 @@ export function normalizeSkillGroupDisplayName(name?: string | null): string {
   const n = (name || '').trim()
   if (n === '0 - Warmup') return STRENGTH_TRAINING_DISPLAY_NAME
   return n
+}
+
+/** Levels 1–5 use the public Principiante / Intermedio / Avanzado copy. */
+const PUBLIC_LEVEL_BY_NUMBER: Record<number, SkateSkillLevelId> = {
+  1: 'beginner_1',
+  2: 'beginner_2',
+  3: 'intermediate_3',
+  4: 'intermediate_4',
+  5: 'advanced_5',
+}
+
+export function publicProgramLevelCopy(name: string | null | undefined, es: boolean) {
+  const match = (name || '').match(/(?:level|nivel)\s*(\d+)/i)
+  const levelNum = match ? Number(match[1]) : 0
+  const id = PUBLIC_LEVEL_BY_NUMBER[levelNum]
+  const level = SKATE_SKILL_LEVELS.find(row => row.id === id)
+  if (!level) return null
+  const trackId = levelNum <= 2 ? 'beginner' : levelNum <= 4 ? 'intermediate' : 'advanced'
+  const track = PROGRAM_SKILL_TRACKS.find(row => row.id === trackId)
+  return {
+    emoji: track?.emoji || '🛹',
+    title: es ? level.title.es : level.title.en,
+    description: es ? level.description.es : level.description.en,
+  }
 }
 
 export type SkillGroupRow = { id: string; name: string; sort_order?: number; is_active?: boolean | null }

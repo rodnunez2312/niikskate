@@ -25,7 +25,7 @@ import type { CoachPricingTier, ClassPackageKind } from '~/utils/classPricing'
 /** Sheet labels for the three tiers. `principiante` is "Coach Niik" in the sheet. */
 export const FINANCE_COACH_TIERS = [
   { id: 'principiante', es: 'Coach Niik', en: 'Coach Niik', color: '#22c55e' },
-  { id: 'pro_street', es: 'Coach Pro Street', en: 'Coach Pro Street', color: '#38bdf8' },
+  { id: 'pro_street', es: 'Coach Pro Street', en: 'Coach Pro Street', color: '#C9EF42' },
   { id: 'pro_bowl', es: 'Coach Pro Bowl', en: 'Coach Pro Bowl', color: '#f59e0b' },
 ] as const satisfies ReadonlyArray<{ id: CoachPricingTier; es: string; en: string; color: string }>
 
@@ -113,6 +113,8 @@ export interface FinancePriceRow {
   id: string
   coach_tier: CoachPricingTier
   class_kind: ClassPackageKind
+  /** PricingGroup this row prices; missing/null rows belong to the standard sheet. */
+  price_group?: string | null
   label_es: string
   label_en: string | null
   list_mxn: number

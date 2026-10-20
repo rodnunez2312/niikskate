@@ -39,7 +39,10 @@ function goAddCrew() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 bg-gray-950/95 backdrop-blur border-b border-gray-800">
+  <header
+    class="sticky top-0 z-40 backdrop-blur border-b"
+    :class="isAdmin || isCoach ? 'bg-charcoal/95 border-charcoal-700' : 'bg-gray-950/95 border-gray-800'"
+  >
     <div class="max-w-lg lg:max-w-none mx-auto px-4 py-3 space-y-2">
       <div class="h-10 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2 shrink-0 min-w-0">
@@ -59,7 +62,7 @@ function goAddCrew() {
             </svg>
           </button>
           <NuxtLink to="/" class="text-sm font-semibold text-gray-400 hover:text-white shrink-0">
-            ← {{ language === 'es' ? 'Sitio' : 'Website' }}
+            {{ language === 'es' ? 'Sitio' : 'Website' }}
           </NuxtLink>
         </div>
 

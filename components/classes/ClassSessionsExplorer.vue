@@ -12,7 +12,6 @@ import {
   PROGRAM_AGE_BANDS,
   PROGRAM_SKILL_TRACKS,
   SKATE_SKILL_LEVELS,
-  TIME_SLOT_LABELS,
   audienceAgeRange,
   audienceCategoryLabel,
   CARD_CLASS_PACKS,
@@ -30,6 +29,7 @@ import {
 } from '~/types'
 import { ineligibilityReason, isAgeEligibleForSession, sessionAgeBounds } from '~/utils/ageEligibility'
 import { classKindForPack } from '~/utils/coupons'
+import { classTimeDisplay } from '~/utils/programHorarios'
 import { SKILL_LEVEL_COLORS } from '~/utils/semanticColors'
 import type { AppliedCoupon } from '~/components/checkout/CouponField.vue'
 import {
@@ -495,7 +495,7 @@ const sessionDetailsText = (s: BookableClassSession) => {
     s.min_age != null || s.max_age != null
       ? `${s.min_age ?? '—'}–${s.max_age ?? '—'}`
       : null
-  const slot = s.time_slot ? TIME_SLOT_LABELS[s.time_slot]?.display : null
+  const slot = classTimeDisplay(s)
   if (language.value === 'es') {
     const bits = [
       `Clase grupal NiikSkate en ${s.skatepark || selectedSkatepark.value}.`,
@@ -1098,8 +1098,8 @@ onMounted(async () => {
                 <span>📅</span>
                 <span>
                   {{ formatSessionDate(s.start_date) }}
-                  <template v-if="s.time_slot">
-                    · {{ TIME_SLOT_LABELS[s.time_slot].display }}
+                  <template v-if="classTimeDisplay(s)">
+                    · {{ classTimeDisplay(s) }}
                   </template>
                 </span>
               </li>

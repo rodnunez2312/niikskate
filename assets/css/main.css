@@ -1,5 +1,5 @@
 /* Import Inter font - MUST be before @tailwind */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,600..900&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -18,6 +18,30 @@
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+
+  /* Two-tone ring stays visible on both cream and charcoal surfaces. */
+  .public-site :focus-visible {
+    outline: 2px solid #151515;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px #C9EF42;
+  }
+
+  .public-site h1,
+  .public-site h2,
+  .public-site h3 {
+    @apply font-display;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .public-site *,
+    .public-site *::before,
+    .public-site *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   ::-webkit-scrollbar {
@@ -101,6 +125,60 @@
 
   .section-title {
     @apply text-xl font-bold text-white mb-4;
+  }
+
+  /* ---- Public site system (layouts/public.vue sets .public-site) ---- */
+
+  .t-eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.2em];
+  }
+
+  .t-display {
+    @apply font-display font-black text-[2.6rem] leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl;
+    font-stretch: 110%;
+  }
+
+  .t-h2 {
+    @apply font-display font-black text-3xl leading-[1.02] tracking-tight sm:text-5xl;
+    font-stretch: 108%;
+  }
+
+  .t-h3 {
+    @apply font-display font-extrabold text-xl leading-tight sm:text-2xl;
+  }
+
+  .t-lead {
+    @apply text-lg leading-relaxed sm:text-xl;
+  }
+
+  .section-y {
+    @apply py-20 sm:py-28;
+  }
+
+  .btn-lime {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-acid text-charcoal font-bold
+      transition-[background-color,transform] duration-200 hover:bg-acid-300 active:scale-[0.98] motion-reduce:transform-none;
+  }
+
+  /* Outline button for charcoal / photo backgrounds. */
+  .btn-outline-light {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full border-2 border-cream/60 text-cream font-bold
+      transition-colors duration-200 hover:bg-cream hover:text-charcoal;
+  }
+
+  /* Outline button for cream backgrounds. */
+  .btn-outline-dark {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full border-2 border-charcoal text-charcoal font-bold
+      transition-colors duration-200 hover:bg-charcoal hover:text-cream;
+  }
+
+  .card-lift {
+    @apply transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-1 hover:shadow-[0_14px_30px_-18px_rgba(21,21,21,0.45)]
+      motion-reduce:transition-none motion-reduce:hover:translate-y-0;
+  }
+
+  .link-underline {
+    @apply font-bold underline decoration-2 underline-offset-4 transition-colors;
   }
 }
 
@@ -224,4 +302,305 @@
 .page-leave-from {
   opacity: 1;
   transform: translateX(0);
+}
+
+/* Admin and coach views use the public site palette: black, charcoal, acid lime. */
+:is(.niik-app, html.niik-staff) {
+  --staff-accent: #C9EF42;
+  --staff-accent-soft: #D9F57A;
+  --staff-ink: #151515;
+}
+
+:is(.niik-app, html.niik-staff) .btn-primary {
+  background-color: var(--staff-accent);
+  color: var(--staff-ink);
+}
+:is(.niik-app, html.niik-staff) .btn-primary:hover {
+  background-color: var(--staff-accent-soft);
+}
+:is(.niik-app, html.niik-staff) .btn-outline {
+  border-color: var(--staff-accent);
+  color: var(--staff-accent);
+}
+:is(.niik-app, html.niik-staff) .btn-outline:hover {
+  background-color: rgb(201 239 66 / 0.12);
+}
+:is(.niik-app, html.niik-staff) .badge-primary {
+  background-color: rgb(201 239 66 / 0.16);
+  color: var(--staff-accent);
+}
+:is(.niik-app, html.niik-staff) .input:focus {
+  --tw-ring-color: var(--staff-accent);
+}
+:is(.niik-app, html.niik-staff) .accent-amber-500 {
+  accent-color: var(--staff-accent);
+}
+
+:is(.niik-app, html.niik-staff) :is(
+  .text-amber-100,
+  .text-amber-200,
+  .text-amber-300,
+  .text-amber-400,
+  .text-amber-500,
+  .text-gold-200,
+  .text-gold-300,
+  .text-gold-400,
+  .text-gold-500,
+  .text-teal-100,
+  .text-teal-200,
+  .text-teal-300,
+  .text-teal-400,
+  .text-teal-500,
+  .text-teal-700
+) {
+  color: var(--staff-accent);
+}
+:is(.niik-app, html.niik-staff) :is(
+  .text-amber-100\/70,
+  .text-amber-200\/70,
+  .text-amber-300\/70,
+  .text-amber-500\/70,
+  .text-gold-400\/70
+) { color: rgb(201 239 66 / 0.7); }
+:is(.niik-app, html.niik-staff) :is(.text-amber-200\/80, .text-amber-300\/80, .text-amber-400\/80, .text-amber-500\/80, .text-teal-300\/80) {
+  color: rgb(201 239 66 / 0.8);
+}
+:is(.niik-app, html.niik-staff) :is(.text-amber-200\/90, .text-amber-400\/90, .text-amber-500\/90, .text-gold-400\/90) {
+  color: rgb(201 239 66 / 0.9);
+}
+:is(.niik-app, html.niik-staff) :is(
+  .hover\:text-amber-200:hover,
+  .hover\:text-amber-300:hover,
+  .hover\:text-amber-400:hover,
+  .hover\:text-gold-200:hover,
+  .hover\:text-gold-300:hover,
+  .hover\:text-gold-400:hover,
+  .hover\:text-teal-300:hover
+) {
+  color: var(--staff-accent-soft);
+}
+
+:is(.niik-app, html.niik-staff) :is(
+  .bg-amber-300,
+  .bg-amber-400,
+  .bg-amber-500,
+  .bg-gold-400,
+  .bg-gold-500,
+  .bg-teal-500,
+  .bg-teal-600
+) {
+  background-color: var(--staff-accent);
+  color: var(--staff-ink);
+}
+:is(.niik-app, html.niik-staff) .bg-amber-500\/80 {
+  background-color: rgb(201 239 66 / 0.8);
+  color: var(--staff-ink);
+}
+:is(.niik-app, html.niik-staff) :is(
+  .hover\:bg-amber-400:hover,
+  .hover\:bg-gold-300:hover,
+  .hover\:bg-gold-500:hover,
+  .hover\:bg-teal-500:hover
+) {
+  background-color: var(--staff-accent-soft);
+  color: var(--staff-ink);
+}
+:is(.niik-app, html.niik-staff) .bg-amber-500\/5,
+:is(.niik-app, html.niik-staff) .bg-gold-400\/5 { background-color: rgb(201 239 66 / 0.05); }
+:is(.niik-app, html.niik-staff) :is(.bg-amber-500\/10, .bg-gold-400\/10, .bg-gold-500\/10, .bg-teal-500\/10) {
+  background-color: rgb(201 239 66 / 0.1);
+}
+:is(.niik-app, html.niik-staff) :is(.bg-amber-500\/15, .bg-gold-400\/15, .bg-teal-500\/15) {
+  background-color: rgb(201 239 66 / 0.15);
+}
+:is(.niik-app, html.niik-staff) :is(.bg-amber-300\/20, .bg-amber-400\/10, .bg-amber-500\/20, .bg-gold-400\/20, .bg-gold-500\/20, .bg-teal-500\/20, .bg-teal-950\/20) {
+  background-color: rgb(201 239 66 / 0.2);
+}
+:is(.niik-app, html.niik-staff) .bg-amber-500\/25 { background-color: rgb(201 239 66 / 0.25); }
+:is(.niik-app, html.niik-staff) .hover\:bg-gold-400\/10:hover { background-color: rgb(201 239 66 / 0.1); }
+:is(.niik-app, html.niik-staff) .hover\:bg-gold-400\/25:hover { background-color: rgb(201 239 66 / 0.25); }
+:is(.niik-app, html.niik-staff) .hover\:bg-gold-400\/30:hover { background-color: rgb(201 239 66 / 0.3); }
+:is(.niik-app, html.niik-staff) .hover\:bg-amber-500\/35:hover { background-color: rgb(201 239 66 / 0.35); }
+
+:is(.niik-app, html.niik-staff) :is(
+  .border-amber-300,
+  .border-amber-400,
+  .border-gold-400,
+  .border-gold-500,
+  .border-teal-400,
+  .border-teal-500,
+  .border-teal-700
+) { border-color: var(--staff-accent); }
+:is(.niik-app, html.niik-staff) :is(.border-amber-500\/20) { border-color: rgb(201 239 66 / 0.2); }
+:is(.niik-app, html.niik-staff) :is(.border-amber-500\/25, .border-gold-800\/30) { border-color: rgb(201 239 66 / 0.25); }
+:is(.niik-app, html.niik-staff) :is(.border-amber-400\/30, .border-amber-500\/30, .border-gold-400\/30, .border-teal-500\/30) {
+  border-color: rgb(201 239 66 / 0.3);
+}
+:is(.niik-app, html.niik-staff) :is(.border-amber-400\/40, .border-amber-500\/40, .border-gold-400\/40, .border-gold-500\/40, .border-teal-500\/40) {
+  border-color: rgb(201 239 66 / 0.4);
+}
+:is(.niik-app, html.niik-staff) :is(.border-amber-400\/50, .border-amber-500\/50, .border-gold-400\/50, .border-teal-500\/50, .border-teal-600\/50) {
+  border-color: rgb(201 239 66 / 0.5);
+}
+:is(.niik-app, html.niik-staff) .border-gold-400\/60 { border-color: rgb(201 239 66 / 0.6); }
+:is(.niik-app, html.niik-staff) .border-amber-400\/70 { border-color: rgb(201 239 66 / 0.7); }
+:is(.niik-app, html.niik-staff) :is(
+  .hover\:border-amber-400:hover,
+  .hover\:border-gold-400:hover,
+  .hover\:border-teal-500:hover
+) { border-color: var(--staff-accent); }
+:is(.niik-app, html.niik-staff) :is(.hover\:border-gold-400\/50:hover, .hover\:border-gold-500\/50:hover) {
+  border-color: rgb(201 239 66 / 0.5);
+}
+:is(.niik-app, html.niik-staff) :is(.hover\:border-gold-400\/60:hover, .hover\:border-teal-500\/60:hover) {
+  border-color: rgb(201 239 66 / 0.6);
+}
+:is(.niik-app, html.niik-staff) :is(
+  .focus\:border-amber-400:focus,
+  .focus\:border-gold-400:focus,
+  .focus\:border-teal-500:focus
+) {
+  border-color: var(--staff-accent);
+  --tw-ring-color: var(--staff-accent);
+}
+:is(.niik-app, html.niik-staff) :is(.focus\:ring-gold-400:focus, .focus\:ring-teal-500:focus) {
+  --tw-ring-color: var(--staff-accent);
+}
+
+:is(.niik-app, html.niik-staff) .ring-teal-400 { --tw-ring-color: var(--staff-accent); }
+:is(.niik-app, html.niik-staff) .ring-amber-400\/25 { --tw-ring-color: rgb(201 239 66 / 0.25); }
+:is(.niik-app, html.niik-staff) .ring-gold-400\/30 { --tw-ring-color: rgb(201 239 66 / 0.3); }
+:is(.niik-app, html.niik-staff) .ring-amber-400\/40 { --tw-ring-color: rgb(201 239 66 / 0.4); }
+:is(.niik-app, html.niik-staff) :is(.ring-gold-400\/50, .ring-teal-500\/50) { --tw-ring-color: rgb(201 239 66 / 0.5); }
+:is(.niik-app, html.niik-staff) .ring-gold-400\/60 { --tw-ring-color: rgb(201 239 66 / 0.6); }
+:is(.niik-app, html.niik-staff) .ring-gold-400\/70 { --tw-ring-color: rgb(201 239 66 / 0.7); }
+
+:is(.niik-app, html.niik-staff) :is(.from-amber-500, .from-gold-400) {
+  --tw-gradient-from: #C9EF42 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(201 239 66 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+:is(.niik-app, html.niik-staff) .from-gold-400\/20 {
+  --tw-gradient-from: rgb(201 239 66 / 0.2) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(201 239 66 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+:is(.niik-app, html.niik-staff) .from-gold-900\/50 {
+  --tw-gradient-from: #202020 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(32 32 32 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+:is(.niik-app, html.niik-staff) :is(.to-amber-500, .to-amber-600, .to-gold-500) {
+  --tw-gradient-to: #A8CC22 var(--tw-gradient-to-position);
+}
+:is(.niik-app, html.niik-staff) .to-gold-500\/20 { --tw-gradient-to: rgb(201 239 66 / 0.2) var(--tw-gradient-to-position); }
+:is(.niik-app, html.niik-staff) :is(.to-gold-500\/80, .to-amber-600\/90, .to-teal-600\/80) {
+  --tw-gradient-to: rgb(201 239 66 / 0.85) var(--tw-gradient-to-position);
+}
+
+/* Surfaces and type match the public home: charcoal cards, cream text, lime figures. */
+:is(.niik-app, html.niik-staff) .bg-black { background-color: #0E0E0E; }
+:is(.niik-app, html.niik-staff) :is(.bg-gray-950, .bg-gray-950\/95, .bg-gray-950\/80, .bg-gray-950\/70, .bg-gray-950\/60, .bg-gray-950\/40) { background-color: #151515; }
+:is(.niik-app, html.niik-staff) :is(.bg-gray-900, .bg-gray-900\/95, .bg-gray-900\/80, .bg-gray-900\/70, .bg-gray-900\/60, .bg-gray-900\/50, .bg-gray-900\/40) { background-color: #202020; }
+:is(.niik-app, html.niik-staff) :is(.bg-gray-800, .bg-gray-800\/80, .bg-gray-800\/60, .bg-gray-800\/50, .bg-gray-800\/40, .bg-gray-800\/30) { background-color: #2C2C2C; }
+:is(.niik-app, html.niik-staff) .bg-gray-700 { background-color: #3A3A3A; }
+:is(.niik-app, html.niik-staff) .hover\:bg-gray-900:hover,
+:is(.niik-app, html.niik-staff) .hover\:bg-gray-800:hover,
+:is(.niik-app, html.niik-staff) .hover\:bg-gray-700:hover { background-color: #2C2C2C; }
+:is(.niik-app, html.niik-staff) :is(.border-gray-800, .border-gray-700, .border-gray-600) { border-color: #3A3A3A; }
+:is(.niik-app, html.niik-staff) .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #3A3A3A; }
+:is(.niik-app, html.niik-staff) .text-white,
+:is(.niik-app, html.niik-staff) .hover\:text-white:hover { color: #F5F2EA; }
+:is(.niik-app, html.niik-staff) .text-gray-200,
+:is(.niik-app, html.niik-staff) .text-gray-300 { color: rgb(245 242 234 / 0.88); }
+:is(.niik-app, html.niik-staff) .text-gray-400 { color: rgb(245 242 234 / 0.68); }
+:is(.niik-app, html.niik-staff) .text-gray-500 { color: rgb(245 242 234 / 0.5); }
+:is(.niik-app, html.niik-staff) .text-gray-600 { color: rgb(245 242 234 / 0.4); }
+:is(.niik-app, html.niik-staff) h1,
+:is(.niik-app, html.niik-staff) h2 {
+  font-family: Archivo, Inter, system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+:is(.niik-app, html.niik-staff) .text-3xl {
+  color: #C9EF42;
+  font-family: Archivo, Inter, system-ui, sans-serif;
+  font-weight: 900;
+}
+:is(.niik-app, html.niik-staff) .input {
+  background-color: #202020;
+  border-color: #3A3A3A;
+  color: #F5F2EA;
+}
+:is(.niik-app, html.niik-staff) :is(.text-glass-blue, .text-glass-green, .text-cyan-100, .text-cyan-200, .text-cyan-300, .text-sky-300, .text-sky-400) {
+  color: var(--staff-accent);
+}
+:is(.niik-app, html.niik-staff) :is(.bg-glass-green\/10, .bg-glass-blue\/10, .bg-glass-blue\/20, .bg-cyan-500\/10, .bg-cyan-500\/20) {
+  background-color: rgb(201 239 66 / 0.12);
+}
+:is(.niik-app, html.niik-staff) :is(.border-glass-green\/30, .border-glass-green\/40, .border-glass-blue\/30, .border-glass-blue\/40, .border-cyan-500) {
+  border-color: rgb(201 239 66 / 0.4);
+}
+:is(.niik-app, html.niik-staff) .bg-glass-green { background-color: #C9EF42; }
+:is(.niik-app, html.niik-staff) :is(.focus\:ring-glass-blue:focus, .focus\:ring-cyan-500:focus) {
+  --tw-ring-color: var(--staff-accent);
+}
+:is(.niik-app, html.niik-staff) :is(.bg-blue-500, .bg-blue-600, .bg-glass-blue, .bg-cyan-500, .bg-cyan-600, .bg-acid, .bg-teal-500, .bg-teal-600, .bg-amber-400, .bg-amber-500, .bg-gold-400, .bg-gold-500) {
+  background-color: #C9EF42;
+  color: #151515;
+}
+:is(.niik-app, html.niik-staff) :is(.bg-acid, .bg-teal-500, .bg-teal-600, .bg-amber-400, .bg-amber-500, .bg-gold-400, .bg-gold-500).text-white,
+:is(.niik-app, html.niik-staff) :is(.bg-acid, .bg-teal-500, .bg-teal-600).text-white {
+  color: #151515;
+}
+
+/* Shared sheet for add dialogs. The menu and modals need an opaque surface. */
+:is(.niik-app, html.niik-staff) .add-sheet {
+  background-color: #171717;
+  color: #F5F5F5;
+  border-color: #353535;
+}
+
+/* Dialogs teleported to body share the calendar's dark surfaces. */
+html.niik-staff {
+  color-scheme: dark;
+  --niik-bg: #0D0D0D;
+  --niik-sidebar: #141414;
+  --niik-surface: #171717;
+  --niik-surface-raised: #202020;
+  --niik-surface-hover: #262626;
+  --niik-lime: #D0F43A;
+  --niik-lime-text: #101010;
+  --niik-text: #F5F5F5;
+  --niik-text-secondary: #A3A3A3;
+  --niik-text-muted: #737373;
+  --niik-border: #353535;
+  --niik-overlay: rgba(0, 0, 0, 0.72);
+}
+html.niik-staff :is(input, select, textarea) {
+  color-scheme: dark;
+  accent-color: var(--niik-lime);
+}
+html.niik-staff select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #171717;
+  color: #F5F5F5;
+  border-color: #353535;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23F5F5F5' stroke-width='1.8'%3E%3Cpath d='M5 7.5 10 12.5 15 7.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 0.9rem;
+  padding-right: 2rem;
+}
+html.niik-staff select option {
+  background-color: #171717;
+  color: #F5F5F5;
+}
+html.niik-staff :is(input, select, textarea):focus {
+  outline: 2px solid var(--niik-lime);
+  outline-offset: 1px;
+  border-color: var(--niik-lime);
+}
+:is(.niik-app, html.niik-staff) :is(.text-blue-300, .text-blue-400, .text-blue-500, .text-sky-300, .text-sky-400) {
+  color: #C9EF42;
 }

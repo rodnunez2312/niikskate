@@ -49,6 +49,8 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no' },
         { name: 'description', content: 'Learn to skate with expert coaches at NiikSkate Academy. Book classes and shop for gear!' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-title', content: 'NiikSkate' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'theme-color', content: '#000000' },
       ],
@@ -67,7 +69,7 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/auth/login',
       callback: '/auth/confirm',
-      exclude: ['/', '/classes', '/niik-method', '/skate-programs', '/community', '/shop', '/shop/*', '/skateshop', '/cart', '/equipment', '/equipment/*'],
+      exclude: ['/', '/classes', '/niik-method', '/skate-programs', '/community', '/alianzas', '/alianzas/*', '/shop', '/shop/*', '/skateshop', '/cart', '/equipment', '/equipment/*'],
     },
   },
 
@@ -79,6 +81,8 @@ export default defineNuxtConfig({
       memberAppIosUrl: process.env.NUXT_PUBLIC_MEMBER_APP_IOS_URL || '',
       memberAppAndroidUrl: process.env.NUXT_PUBLIC_MEMBER_APP_ANDROID_URL || '',
       memberAppDeepLink: process.env.NUXT_PUBLIC_MEMBER_APP_DEEP_LINK || 'niikskate://member',
+      /** Browser key for Places Autocomplete. Restrict it to Maps JavaScript, Places, and this site's origins. */
+      googleMapsBrowserKey: process.env.NUXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY || '',
     },
     // Server-only: for admin create user (use in server/api)
     supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',

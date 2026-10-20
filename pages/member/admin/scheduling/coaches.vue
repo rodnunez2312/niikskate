@@ -12,13 +12,16 @@ import {
   isSameDay,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { UserRole } from '~/types'
-import { daySlotsFullyUnavailable, isClassDay, slotsForDate, slotsForDateStr } from '~/utils/classSchedule'
+import type { TimeSlot, UserRole } from '~/types'
+import { TIME_SLOT_LABELS } from '~/types'
+import { daySlotsFullyUnavailable, isClassDay, slotsForDate } from '~/utils/classSchedule'
 import {
   buildNiikSkaterEmail,
   DEFAULT_SKATER_PASSWORD,
   niikEmailLocalFromFullName,
 } from '~/utils/skaterNiikEmail'
+import { coachMatchesFirstName, defaultBackupFirstName } from '~/utils/coachBackups'
+import { TRAINING_DISCIPLINES, disciplineEmoji, isTrainingDiscipline, type TrainingDiscipline } from '~/utils/trainingDisciplines'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -40,6 +43,7 @@ type CoachUi = {
   last_name: string | null
   email: string
   phone: string | null
+  avatar_url: string | null
   role: UserRole
   is_active: boolean
   title: string | null
@@ -48,10 +52,13 @@ type CoachUi = {
   specialties: string[]
   certifications: string[]
   is_head_coach: boolean
+  backup_coach_id: string | null
+  disciplines: TrainingDiscipline[]
   /** Program ids, with the primary one first. */
   program_ids: string[]
   primary_program_id: string | null
-  availability: Record<string, boolean>
+  /** date → slot → on. Missing slot means available. */
+  availability: Record<string, Record<string, boolean>>
   accent: (typeof ACCENTS)[number]
 }
 
@@ -71,7 +78,79 @@ const programs = ref<ProgramRow[]>([])
 
 const activeCount = computed(() => coaches.value.filter(c => c.is_active).length)
 const headCoachCount = computed(() => coaches.value.filter(c => c.is_head_coach).length)
-const unassignedCount = computed(() => coaches.value.filter(c => c.program_ids.length === 0).length)
+const showCertifications = ref(false)
+const approvalsLoading = ref(false)
+const monthlyApprovals = ref<Array<{ year: number; month: number; approved_at: string | null }>>([])
+
+const certificationTracks = computed(() => [
+  {
+    id: 'niik-l1',
+    icon: '🎯',
+    title: esLang.value ? 'Coach Niik — Nivel 1' : 'Niik Coach — Level 1',
+    desc: esLang.value ? 'Fundamentos del Método Niik, seguridad y clase intro.' : 'Niik Method basics, safety, and intro classes.',
+    status: 'active' as const,
+  },
+  {
+    id: 'niik-l2',
+    icon: '🛹',
+    title: esLang.value ? 'Coach Niik — Nivel 2' : 'Niik Coach — Level 2',
+    desc: esLang.value ? 'Planificación avanzada, evaluaciones y progresión por grupo.' : 'Advanced planning, evaluations, and group progression.',
+    status: 'in_progress' as const,
+  },
+  {
+    id: 'first-aid',
+    icon: '🩹',
+    title: esLang.value ? 'Primeros auxilios' : 'First aid',
+    desc: esLang.value ? 'Certificación vigente recomendada para coaches en campo.' : 'Current certification recommended for on-field coaches.',
+    status: 'pending' as const,
+  },
+  {
+    id: 'safeguarding',
+    icon: '🛡️',
+    title: esLang.value ? 'Protección infantil' : 'Safeguarding',
+    desc: esLang.value ? 'Políticas NiikSkate y conducta con menores.' : 'NiikSkate policies and working with minors.',
+    status: 'pending' as const,
+  },
+])
+
+function certStatusLabel(status: string) {
+  if (esLang.value) return status === 'active' ? 'Completo' : status === 'in_progress' ? 'En curso' : 'Pendiente'
+  return status === 'active' ? 'Complete' : status === 'in_progress' ? 'In progress' : 'Pending'
+}
+
+function certStatusClass(status: string) {
+  if (status === 'active') return 'bg-green-500/20 text-green-400'
+  if (status === 'in_progress') return 'bg-gold-400/20 text-gold-400'
+  return 'bg-gray-700 text-gray-400'
+}
+
+function approvalMonthName(year: number, month: number) {
+  return new Date(year, month - 1, 1).toLocaleDateString(esLang.value ? 'es-MX' : 'en-US', {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+async function loadMonthlyApprovals() {
+  if (!user.value || monthlyApprovals.value.length || approvalsLoading.value) return
+  approvalsLoading.value = true
+  try {
+    const { data } = await client
+      .from('coach_monthly_approvals')
+      .select('year, month, approved_at')
+      .eq('coach_id', user.value.id)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+      .limit(6)
+    monthlyApprovals.value = data || []
+  } finally {
+    approvalsLoading.value = false
+  }
+}
+
+watch(showCertifications, (open) => {
+  if (open) loadMonthlyApprovals()
+})
 
 const programNameById = computed(() => {
   const m = new Map<string, string>()
@@ -103,16 +182,20 @@ const loadPrograms = async () => {
   programs.value = (data || []) as ProgramRow[]
 }
 
+const COACH_PROFILE_SELECT =
+  'id, full_name, first_name, last_name, email, phone, avatar_url, is_active, role, title, bio, experience, specialties, certifications, is_head_coach'
+
 const loadCoachesFromDb = async () => {
   loadingCoaches.value = true
   try {
-    const data = await fetchCoachDirectoryProfiles<{
+    type CoachProfileRow = {
       id: string
       full_name: string
       first_name: string | null
       last_name: string | null
       email: string
       phone: string | null
+      avatar_url?: string | null
       is_active: boolean
       role: string
       title: string | null
@@ -121,11 +204,28 @@ const loadCoachesFromDb = async () => {
       specialties: string[] | null
       certifications: string[] | null
       is_head_coach: boolean | null
-    }>(client, {
-      select:
-        'id, full_name, first_name, last_name, email, phone, is_active, role, title, bio, experience, specialties, certifications, is_head_coach',
-      activeOnly: false,
-    })
+      backup_coach_id?: string | null
+      coach_discipline?: string | null
+    }
+    let data: CoachProfileRow[]
+    try {
+      data = await fetchCoachDirectoryProfiles<CoachProfileRow>(client, {
+        select: `${COACH_PROFILE_SELECT}, backup_coach_id, coach_discipline`,
+        activeOnly: false,
+      })
+    } catch {
+      try {
+        data = await fetchCoachDirectoryProfiles<CoachProfileRow>(client, {
+          select: `${COACH_PROFILE_SELECT}, backup_coach_id`,
+          activeOnly: false,
+        })
+      } catch {
+        data = await fetchCoachDirectoryProfiles<CoachProfileRow>(client, {
+          select: COACH_PROFILE_SELECT,
+          activeOnly: false,
+        })
+      }
+    }
 
     const { data: links } = await client
       .from('program_coaches')
@@ -150,6 +250,7 @@ const loadCoachesFromDb = async () => {
         last_name: p.last_name,
         email: p.email,
         phone: p.phone,
+        avatar_url: p.avatar_url ?? null,
         role: p.role as UserRole,
         is_active: p.is_active,
         title: p.title,
@@ -158,12 +259,22 @@ const loadCoachesFromDb = async () => {
         specialties: p.specialties ?? [],
         certifications: p.certifications ?? [],
         is_head_coach: Boolean(p.is_head_coach),
+        backup_coach_id: p.backup_coach_id ?? null,
+        disciplines: coachSportList(p.coach_discipline),
         program_ids: primary ? [primary, ...ids.filter(id => id !== primary)] : ids,
         primary_program_id: primary,
         availability: {},
         accent: ACCENTS[i % ACCENTS.length],
       }
     })
+    for (const coach of coaches.value) {
+      if (coach.backup_coach_id) continue
+      const want = defaultBackupFirstName(coach.full_name)
+      if (!want) continue
+      coach.backup_coach_id = coaches.value.find(other =>
+        other.id !== coach.id && coachMatchesFirstName(other.full_name, want),
+      )?.id ?? null
+    }
     await loadMonthOverrides()
   } catch (e) {
     console.error('loadCoachesFromDb:', e)
@@ -246,6 +357,58 @@ function availabilitySummary(coach: CoachUi): { on: number; total: number } {
   }
 }
 
+const sportFilter = ref<TrainingDiscipline | null>(null)
+
+/** Parkour only shows up once a coach teaches it. */
+const sportFilterOptions = computed(() =>
+  TRAINING_DISCIPLINES
+    .map(sport => ({
+      id: sport.id,
+      label: esLang.value ? sport.es : sport.en,
+      count: coaches.value.filter(coach => coach.disciplines.includes(sport.id)).length,
+    }))
+    .filter(sport => sport.id !== 'parkour' || sport.count > 0),
+)
+
+function setSportFilter(id: TrainingDiscipline | null) {
+  sportFilter.value = sportFilter.value === id ? null : id
+}
+
+const coachSections = computed(() =>
+  TRAINING_DISCIPLINES
+    .filter(sport => !sportFilter.value || sport.id === sportFilter.value)
+    .map(sport => ({
+      id: sport.id,
+      coaches: coaches.value.filter(coach => coach.disciplines.includes(sport.id)),
+    })),
+)
+
+function coachSportList(raw: unknown): TrainingDiscipline[] {
+  const values = Array.isArray(raw) ? raw : typeof raw === 'string' && raw ? [raw] : []
+  const ids = values.filter((id): id is TrainingDiscipline => isTrainingDiscipline(id))
+  return ids.length ? ids : ['skateboarding']
+}
+
+function toggleSport(list: TrainingDiscipline[], id: TrainingDiscipline) {
+  if (list.includes(id)) return list.filter(item => item !== id)
+  return [...list, id]
+}
+
+function coachSectionLabel(id: string) {
+  const es = esLang.value
+  if (id === 'skateboarding') return es ? 'Coaches de skate' : 'Skate coaches'
+  if (id === 'scooter') return es ? 'Coaches de scooter' : 'Scooter coaches'
+  if (id === 'rollerblading') return es ? 'Coaches de patines' : 'Rollerblading coaches'
+  if (id === 'bmx') return es ? 'Coaches de BMX' : 'BMX coaches'
+  if (id === 'parkour') return es ? 'Coaches de parkour' : 'Parkour coaches'
+  return id
+}
+
+function backupName(coach: CoachUi) {
+  if (!coach.backup_coach_id) return ''
+  return coaches.value.find(other => other.id === coach.backup_coach_id)?.full_name || ''
+}
+
 const weekDays = computed(() =>
   esLang.value ? ['D', 'L', 'M', 'M', 'J', 'V', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
 )
@@ -265,6 +428,14 @@ function buildMonthCells(monthStart: Date): (Date | null)[] {
 
 const editOpen = ref(false)
 const editing = ref<CoachUi | null>(null)
+const editingCoachId = computed(() => editing.value?.id ?? null)
+const {
+  uploadingAvatar: uploadingCoachPhoto,
+  fileInputRef: coachPhotoInput,
+  onAvatarFileChange: onCoachPhotoChange,
+  openAvatarPicker: openCoachPhotoPicker,
+  removeAvatar: removeCoachPhoto,
+} = useSkaterAvatarUpload(editing as unknown as Parameters<typeof useSkaterAvatarUpload>[0], { subjectUserId: editingCoachId })
 const editTab = ref<'details' | 'availability'>('details')
 const savingCoach = ref(false)
 const editError = ref('')
@@ -276,6 +447,8 @@ type EditForm = {
   phone: string
   title: string
   is_head_coach: boolean
+  backup_coach_id: string | null
+  disciplines: TrainingDiscipline[]
   bio: string
   experience: string
   specialties: string[]
@@ -291,6 +464,8 @@ const form = ref<EditForm>({
   phone: '',
   title: '',
   is_head_coach: false,
+  backup_coach_id: null,
+  disciplines: ['skateboarding'],
   bio: '',
   experience: '',
   specialties: [],
@@ -303,7 +478,8 @@ const specialtyDraft = ref('')
 const certificationDraft = ref('')
 
 /** Availability snapshot when the drawer opened, so save only writes real edits. */
-const availabilitySnapshot = ref<Record<string, boolean>>({})
+const availabilitySnapshot = ref<Record<string, Record<string, boolean>>>({})
+const selectedAvailDay = ref<Date | null>(null)
 const availabilityToday = ref<Date | null>(null)
 
 const modalFirstMonthStart = computed(() =>
@@ -347,22 +523,51 @@ function isModalDateEditable(date: Date): boolean {
   return true
 }
 
+function slotIsOn(dateKey: string, slot: string): boolean {
+  return editing.value?.availability[dateKey]?.[slot] !== false
+}
+
 function getDateAvailability(date: Date): boolean {
   if (!editing.value) return false
-  return editing.value.availability[toDateKey(date)] ?? true
+  return slotsForDate(date).some(slot => slotIsOn(toDateKey(date), slot))
 }
 
-function toggleDateAvailability(date: Date) {
+function selectAvailDay(date: Date) {
+  if (!isModalDateEditable(date)) return
+  selectedAvailDay.value = date
+}
+
+function toggleSlotAvailability(date: Date, slot: string) {
   if (!editing.value || !isModalDateEditable(date)) return
   const key = toDateKey(date)
-  editing.value.availability[key] = !getDateAvailability(date)
+  const current = editing.value.availability[key] || {}
+  editing.value.availability[key] = { ...current, [slot]: !slotIsOn(key, slot) }
 }
 
-/** Flip every editable class day at once; the one-by-one version was tedious. */
+const CLASS_TIME_LABEL: Record<string, string> = {
+  morning: '7:00 AM',
+  early: '5:30 PM',
+  late: '7:00 PM',
+  monday: '4:30 PM',
+  summer: '9:00 AM',
+}
+
+function classTimeLabel(slot: string) {
+  return CLASS_TIME_LABEL[slot] || TIME_SLOT_LABELS[slot as TimeSlot]?.display || slot
+}
+
+const selectedDaySlots = computed(() =>
+  selectedAvailDay.value ? slotsForDate(selectedAvailDay.value) : [],
+)
+
+/** Flip every class time on every editable day. */
 function setAllAvailability(value: boolean) {
   if (!editing.value) return
   for (const day of editableModalClassDays.value) {
-    editing.value.availability[toDateKey(day)] = value
+    const key = toDateKey(day)
+    const next: Record<string, boolean> = {}
+    for (const slot of slotsForDate(day)) next[slot] = value
+    editing.value.availability[key] = next
   }
 }
 
@@ -389,14 +594,21 @@ const loadAvailabilityForCoach = async (coach: CoachUi) => {
     byDate.set(row.date as string, cur)
   }
 
-  const avail: Record<string, boolean> = {}
+  const avail: Record<string, Record<string, boolean>> = {}
   for (const day of eachDayOfInterval({ start: rangeStart, end: rangeEnd })) {
     if (!isClassDay(day)) continue
     const key = toDateKey(day)
-    avail[key] = !daySlotsFullyUnavailable(byDate.get(key), slotsForDate(day))
+    const recorded = byDate.get(key)
+    const slots: Record<string, boolean> = {}
+    for (const slot of slotsForDate(day)) slots[slot] = recorded?.[slot] !== false
+    avail[key] = slots
   }
   coach.availability = avail
-  availabilitySnapshot.value = { ...avail }
+  availabilitySnapshot.value = JSON.parse(JSON.stringify(avail))
+  const today = availabilityToday.value
+  selectedAvailDay.value = today && isClassDay(today)
+    ? today
+    : editableModalClassDays.value[0] ?? null
 }
 
 const openEdit = async (coach: CoachUi, tab: 'details' | 'availability' = 'details') => {
@@ -415,6 +627,8 @@ const openEdit = async (coach: CoachUi, tab: 'details' | 'availability' = 'detai
     phone: coach.phone || '',
     title: coach.title || '',
     is_head_coach: coach.is_head_coach,
+    backup_coach_id: coach.backup_coach_id || '',
+    disciplines: [...coach.disciplines],
     bio: coach.bio || '',
     experience: coach.experience || '',
     specialties: [...coach.specialties],
@@ -468,6 +682,10 @@ const saveCoach = async () => {
     editError.value = esLang.value ? 'El nombre es obligatorio.' : 'First name is required.'
     return
   }
+  if (!form.value.disciplines.length) {
+    editError.value = esLang.value ? 'Elige al menos un deporte.' : 'Choose at least one sport.'
+    return
+  }
 
   savingCoach.value = true
   try {
@@ -491,6 +709,18 @@ const saveCoach = async () => {
       })
       .eq('id', coach.id)
     if (profileErr) throw profileErr
+
+    const { error: backupErr } = await client
+      .from('profiles')
+      .update({ backup_coach_id: form.value.backup_coach_id || null })
+      .eq('id', coach.id)
+    if (backupErr && !/backup_coach_id/i.test(backupErr.message)) throw backupErr
+
+    const { error: sportErr } = await client
+      .from('profiles')
+      .update({ coach_discipline: form.value.disciplines })
+      .eq('id', coach.id)
+    if (sportErr && !/coach_discipline/i.test(sportErr.message)) throw sportErr
 
     // Replace the coach's program links rather than diffing: a handful of rows,
     // and it keeps the primary flag consistent in one write.
@@ -522,41 +752,44 @@ const saveCoach = async () => {
   }
 }
 
-/** Only the days that changed: unavailable days get rows, available days lose them. */
+/** Write only the class times that changed. Off saves a false row; on removes it. */
 const saveAvailability = async (coach: CoachUi) => {
   const initial = availabilitySnapshot.value
-  const nowUnavailable: string[] = []
-  const nowAvailable: string[] = []
+  const turnOff: { date: string; time_slot: string }[] = []
+  const turnOn: { date: string; time_slot: string }[] = []
 
   for (const day of editableModalClassDays.value) {
     const key = toDateKey(day)
-    const now = coach.availability[key] ?? true
-    if (now === (initial[key] ?? true)) continue
-    ;(now ? nowAvailable : nowUnavailable).push(key)
+    for (const time_slot of slotsForDate(day)) {
+      const was = initial[key]?.[time_slot] !== false
+      const now = coach.availability[key]?.[time_slot] !== false
+      if (was === now) continue
+      ;(now ? turnOn : turnOff).push({ date: key, time_slot })
+    }
   }
 
-  if (nowUnavailable.length > 0) {
-    const rows = nowUnavailable.flatMap(d =>
-      slotsForDateStr(d).map(time_slot => ({
-        coach_id: coach.id,
-        date: d,
-        time_slot,
-        is_available: false,
-      })),
-    )
+  if (turnOff.length) {
     const { error } = await client
       .from('coach_date_availability')
-      .upsert(rows, { onConflict: 'coach_id,date,time_slot' })
+      .upsert(
+        turnOff.map(row => ({
+          coach_id: coach.id,
+          date: row.date,
+          time_slot: row.time_slot,
+          is_available: false,
+        })),
+        { onConflict: 'coach_id,date,time_slot' },
+      )
     if (error) throw error
   }
 
-  for (const d of nowAvailable) {
+  for (const row of turnOn) {
     const { error } = await client
       .from('coach_date_availability')
       .delete()
       .eq('coach_id', coach.id)
-      .eq('date', d)
-      .in('time_slot', slotsForDateStr(d))
+      .eq('date', row.date)
+      .eq('time_slot', row.time_slot)
     if (error) throw error
   }
 
@@ -640,6 +873,7 @@ const newCoachForm = ref({
   password: DEFAULT_SKATER_PASSWORD,
   full_name: '',
   phone: '',
+  disciplines: [] as TrainingDiscipline[],
 })
 const coachEmailManual = ref(false)
 
@@ -654,7 +888,7 @@ watch(() => newCoachForm.value.full_name, () => syncCoachEmailFromName())
 
 const openAddCoachModal = () => {
   coachEmailManual.value = false
-  newCoachForm.value = { email: '', password: DEFAULT_SKATER_PASSWORD, full_name: '', phone: '' }
+  newCoachForm.value = { email: '', password: DEFAULT_SKATER_PASSWORD, full_name: '', phone: '', disciplines: [] }
   addCoachError.value = ''
   showAddCoachModal.value = true
 }
@@ -666,6 +900,10 @@ const closeAddCoachModal = () => {
 
 const submitAddCoach = async () => {
   addCoachError.value = ''
+  if (!newCoachForm.value.disciplines.length) {
+    addCoachError.value = esLang.value ? 'Elige al menos un deporte' : 'Choose at least one sport'
+    return
+  }
   if (!newCoachForm.value.email?.trim()) {
     addCoachError.value = esLang.value ? 'El email es obligatorio' : 'Email is required'
     return
@@ -688,6 +926,7 @@ const submitAddCoach = async () => {
         full_name: newCoachForm.value.full_name.trim() || undefined,
         phone: newCoachForm.value.phone.trim() || undefined,
         role: 'coach',
+        disciplines: newCoachForm.value.disciplines,
       },
     })
     closeAddCoachModal()
@@ -709,37 +948,28 @@ const submitAddCoach = async () => {
       </div>
     </div>
 
-    <div v-else-if="isAdmin" class="px-4 py-6 max-w-5xl mx-auto space-y-6 pb-16">
-      <!-- Header -->
-      <div class="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 class="text-2xl font-bold text-white">{{ esLang ? 'Coaches' : 'Coaches' }}</h1>
-          <p class="text-sm text-gray-400 mt-0.5">
-            {{ esLang ? 'Staff de coaching en Niik Skate' : 'Coaching staff at Niik Skate' }}
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
-          <NuxtLink
-            to="/member/admin/scheduling/coach-activity"
-            class="px-3 py-2 rounded-xl border border-gray-700 text-gray-200 text-sm font-medium hover:border-teal-500/60 hover:text-white transition-colors flex items-center gap-2"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            {{ esLang ? 'Actividad' : 'Activity' }}
-          </NuxtLink>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 transition-colors text-white font-semibold text-sm flex items-center gap-2"
-            @click="openAddCoachModal"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            {{ esLang ? 'Invitar coach' : 'Invite coach' }}
-          </button>
-        </div>
-      </div>
+    <template v-else-if="isAdmin">
+    <MemberStaffPageHeader
+      title="Coaches"
+      :subtitle="esLang ? 'Staff de coaching en Niik Skate' : 'Coaching staff at Niik Skate'"
+    >
+      <template #actions>
+        <NuxtLink
+          to="/member/admin/scheduling/coach-activity"
+          class="px-3 py-2 rounded-xl border border-gray-700 text-gray-200 text-sm font-medium"
+        >
+          {{ esLang ? 'Actividad' : 'Activity' }}
+        </NuxtLink>
+        <button
+          type="button"
+          class="px-4 py-2.5 rounded-xl bg-acid text-charcoal font-semibold text-sm"
+          @click="openAddCoachModal"
+        >
+          + {{ esLang ? 'Invitar coach' : 'Invite coach' }}
+        </button>
+      </template>
+    </MemberStaffPageHeader>
+    <div class="px-4 py-6 max-w-5xl mx-auto space-y-6 pb-16">
 
       <!-- Counters -->
       <div class="grid grid-cols-3 gap-3">
@@ -755,40 +985,140 @@ const submitAddCoach = async () => {
             {{ esLang ? 'Head coaches' : 'Head coaches' }}
           </p>
         </div>
-        <div class="rounded-xl border border-gray-800 bg-gray-900 p-4 text-center">
-          <p class="text-2xl font-bold" :class="unassignedCount > 0 ? 'text-amber-400' : 'text-white'">
-            {{ unassignedCount }}
+        <button
+          type="button"
+          class="rounded-xl border p-4 text-center transition-colors"
+          :class="showCertifications
+            ? 'border-teal-500 bg-teal-500/10'
+            : 'border-gray-800 bg-gray-900 hover:border-gray-600'"
+          @click="showCertifications = !showCertifications"
+        >
+          <p class="text-2xl" aria-hidden="true">🏅</p>
+          <p class="text-[11px] uppercase tracking-wider font-medium mt-0.5" :class="showCertifications ? 'text-teal-300' : 'text-gray-500'">
+            {{ esLang ? 'Certificaciones' : 'Certifications' }}
           </p>
-          <p class="text-[11px] uppercase tracking-wider text-gray-500 font-medium mt-0.5">
-            {{ esLang ? 'Sin programa' : 'No program' }}
+        </button>
+      </div>
+
+      <section v-if="showCertifications" class="rounded-2xl border border-gray-800 bg-gray-950 p-4 space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-white">
+            {{ esLang ? 'Certificaciones' : 'Certifications' }}
+          </h2>
+          <p class="text-sm text-gray-400 mt-1">
+            {{ esLang ? 'Formación Niik y requisitos de coach.' : 'Niik training and coach requirements.' }}
           </p>
+        </div>
+        <ul class="space-y-3">
+          <li
+            v-for="track in certificationTracks"
+            :key="track.id"
+            class="rounded-xl border border-gray-800 bg-gray-900 p-4"
+          >
+            <div class="flex items-start gap-3">
+              <span class="text-2xl">{{ track.icon }}</span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <p class="font-bold text-white text-sm">{{ track.title }}</p>
+                  <span class="text-xs font-bold px-2 py-0.5 rounded-full" :class="certStatusClass(track.status)">
+                    {{ certStatusLabel(track.status) }}
+                  </span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">{{ track.desc }}</p>
+              </div>
+            </div>
+          </li>
+        </ul>
+        <div class="space-y-3">
+          <h3 class="text-sm font-bold text-gold-400 uppercase tracking-wide">
+            {{ esLang ? 'Aprobaciones mensuales' : 'Monthly sign-offs' }}
+          </h3>
+          <div v-if="approvalsLoading" class="flex justify-center py-4">
+            <div class="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <ul v-else-if="monthlyApprovals.length" class="space-y-2">
+            <li
+              v-for="a in monthlyApprovals"
+              :key="`${a.year}-${a.month}`"
+              class="flex justify-between rounded-lg bg-gray-900 border border-gray-800 px-4 py-3 text-sm"
+            >
+              <span class="text-white">{{ approvalMonthName(a.year, a.month) }}</span>
+              <span class="text-green-400 font-semibold">{{ esLang ? 'Aprobado' : 'Approved' }}</span>
+            </li>
+          </ul>
+          <p v-else class="text-sm text-gray-500">
+            {{ esLang ? 'Sin registros aún — contacta al admin de academia.' : 'No records yet — contact academy admin.' }}
+          </p>
+        </div>
+        <div class="flex flex-col gap-2">
+          <NuxtLink to="/member/coach/plans?tab=tips" class="text-center text-gold-400 text-sm font-semibold underline">
+            {{ esLang ? 'Base de conocimiento →' : 'Knowledge base →' }}
+          </NuxtLink>
+          <NuxtLink to="/member/coach/plans" class="text-center text-gray-400 text-sm underline">
+            {{ esLang ? 'Planes de clase →' : 'Lesson plans →' }}
+          </NuxtLink>
+        </div>
+      </section>
+
+      <!-- Sport filter -->
+      <div class="rounded-xl border border-gray-800 bg-gray-900 p-3">
+        <p class="px-1 mb-2 text-[11px] uppercase tracking-wider text-gray-500 font-medium">
+          {{ esLang ? 'Deportes' : 'Sports' }}
+        </p>
+        <div class="flex flex-wrap gap-2" role="group" :aria-label="esLang ? 'Filtrar por deporte' : 'Filter by sport'">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors"
+            :class="!sportFilter ? 'border-acid bg-acid/10 text-white' : 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'"
+            :aria-pressed="!sportFilter"
+            @click="sportFilter = null"
+          >
+            {{ esLang ? 'Todos' : 'All' }}
+            <span class="text-xs text-gray-500">{{ coaches.length }}</span>
+          </button>
+          <button
+            v-for="sport in sportFilterOptions"
+            :key="sport.id"
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors"
+            :class="sportFilter === sport.id ? 'border-acid bg-acid/10 text-white' : 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'"
+            :aria-pressed="sportFilter === sport.id"
+            @click="setSportFilter(sport.id)"
+          >
+            <span aria-hidden="true">{{ disciplineEmoji(sport.id) }}</span>
+            {{ sport.label }}
+            <span class="text-xs text-gray-500">{{ sport.count }}</span>
+          </button>
         </div>
       </div>
 
-      <!-- Coach cards -->
-      <section class="space-y-3">
+      <p v-if="loadingCoaches" class="text-sm text-gray-500">{{ esLang ? 'Cargando…' : 'Loading…' }}</p>
+
+      <template v-else>
+      <section v-for="section in coachSections" :key="section.id" class="space-y-3">
         <h2 class="text-[13px] font-bold uppercase tracking-[0.1em] text-gray-400">
-          {{ esLang ? 'Todos los coaches' : 'All coaches' }} ({{ coaches.length }})
+          <span class="mr-1" aria-hidden="true">{{ disciplineEmoji(section.id) }}</span>{{ coachSectionLabel(section.id) }} ({{ section.coaches.length }})
         </h2>
 
-        <p v-if="loadingCoaches" class="text-sm text-gray-500">{{ esLang ? 'Cargando…' : 'Loading…' }}</p>
-        <p v-else-if="coaches.length === 0" class="text-sm text-gray-400">
-          {{ esLang ? 'No hay coaches todavía.' : 'No coaches yet.' }}
+        <p v-if="section.coaches.length === 0" class="text-sm text-gray-500">
+          {{ esLang ? 'Sin coaches' : 'No coaches' }}
         </p>
 
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div v-else class="grid gap-3 sm:grid-cols-2">
           <article
-            v-for="coach in coaches"
+            v-for="coach in section.coaches"
             :key="coach.id"
-            class="rounded-2xl border bg-gray-900 p-4 transition-colors"
+            class="rounded-2xl border bg-gray-900 p-4 transition-colors cursor-pointer"
             :class="coach.is_active ? 'border-gray-800 hover:border-gray-700' : 'border-gray-800/60 opacity-70'"
+            @click="openEdit(coach)"
           >
             <div class="flex items-start gap-3">
               <div
-                class="w-11 h-11 rounded-xl flex items-center justify-center ring-1 shrink-0"
+                class="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center ring-1 shrink-0"
                 :class="[`bg-gradient-to-br ${coach.accent.gradient}`, coach.accent.ring]"
               >
-                <span class="text-xl">{{ coach.accent.emoji }}</span>
+                <img v-if="coach.avatar_url" :src="coach.avatar_url" :alt="coach.full_name" class="w-full h-full object-cover">
+                <span v-else class="text-xl">{{ coach.accent.emoji }}</span>
               </div>
 
               <div class="flex-1 min-w-0">
@@ -808,37 +1138,18 @@ const submitAddCoach = async () => {
                   </span>
                 </div>
                 <p class="text-xs text-gray-400">{{ coach.title || (esLang ? 'Coach' : 'Coach') }}</p>
+                <p v-if="backupName(coach)" class="text-[11px] text-teal-300/80 truncate">
+                  {{ esLang ? 'Respaldo' : 'Backup' }}: {{ backupName(coach) }}
+                </p>
               </div>
 
               <div class="flex items-center gap-0.5 shrink-0">
                 <button
                   type="button"
-                  :title="esLang ? 'Editar' : 'Edit'"
-                  :aria-label="esLang ? 'Editar coach' : 'Edit coach'"
-                  class="p-1.5 rounded-lg text-gray-500 hover:text-teal-400 hover:bg-gray-800 transition-colors"
-                  @click="openEdit(coach)"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  :title="esLang ? 'Horarios' : 'Schedule'"
-                  :aria-label="esLang ? 'Editar horarios' : 'Edit schedule'"
-                  class="p-1.5 rounded-lg text-gray-500 hover:text-teal-400 hover:bg-gray-800 transition-colors"
-                  @click="openEdit(coach, 'availability')"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
                   :title="esLang ? 'Quitar' : 'Remove'"
                   :aria-label="esLang ? 'Quitar coach' : 'Remove coach'"
                   class="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
-                  @click="openRemove(coach)"
+                  @click.stop="openRemove(coach)"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -903,7 +1214,7 @@ const submitAddCoach = async () => {
                 :class="coach.is_active
                   ? 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-600'
                   : 'border-glass-green/40 text-glass-green hover:bg-glass-green/10'"
-                @click="toggleCoachStatus(coach)"
+                @click.stop="toggleCoachStatus(coach)"
               >
                 {{ coach.is_active ? (esLang ? 'Desactivar' : 'Deactivate') : (esLang ? 'Activar' : 'Activate') }}
               </button>
@@ -911,7 +1222,9 @@ const submitAddCoach = async () => {
           </article>
         </div>
       </section>
+      </template>
     </div>
+    </template>
 
     <!-- Edit drawer -->
     <Teleport to="body">
@@ -928,17 +1241,60 @@ const submitAddCoach = async () => {
           <div class="bg-gray-900 w-full max-w-2xl rounded-t-3xl sm:rounded-2xl border border-gray-800 max-h-[92vh] flex flex-col">
             <!-- Drawer header -->
             <div class="px-5 py-4 border-b border-gray-800 flex items-center gap-3">
-              <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                :class="`bg-gradient-to-br ${editing.accent.gradient}`"
-              >
-                <span class="text-lg">{{ editing.accent.emoji }}</span>
+              <div class="group/photo relative w-14 h-14 shrink-0">
+                <button
+                  type="button"
+                  class="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-acid text-charcoal focus:outline-none focus-visible:ring-2 focus-visible:ring-acid/60"
+                  :aria-label="editing.avatar_url ? (esLang ? 'Cambiar foto' : 'Change photo') : (esLang ? 'Subir foto' : 'Upload photo')"
+                  :disabled="uploadingCoachPhoto"
+                  @click="openCoachPhotoPicker"
+                >
+                  <img v-if="editing.avatar_url" :src="editing.avatar_url" :alt="editing.full_name" class="w-full h-full object-cover">
+                  <span v-else class="text-2xl">{{ editing.accent.emoji }}</span>
+                  <span
+                    class="absolute inset-0 rounded-xl bg-black/55 flex items-center justify-center transition-opacity"
+                    :class="uploadingCoachPhoto ? 'opacity-100' : 'opacity-0 group-hover/photo:opacity-100'"
+                    aria-hidden="true"
+                  >
+                    <span v-if="uploadingCoachPhoto" class="w-5 h-5 border-2 border-acid border-t-transparent rounded-full animate-spin" />
+                    <svg v-else class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                    </svg>
+                  </span>
+                </button>
+                <input
+                  ref="coachPhotoInput"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  class="sr-only"
+                  @change="onCoachPhotoChange"
+                >
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-base font-semibold text-white truncate">
                   {{ esLang ? 'Editar coach' : 'Edit coach' }}
                 </h3>
                 <p class="text-xs text-gray-400 truncate">{{ editing.full_name }}</p>
+                <div class="mt-1 flex items-center gap-3 text-[11px]">
+                  <button
+                    type="button"
+                    class="text-gray-400 hover:text-white disabled:opacity-40"
+                    :disabled="uploadingCoachPhoto"
+                    @click="openCoachPhotoPicker"
+                  >
+                    {{ editing.avatar_url ? (esLang ? 'Cambiar foto' : 'Change photo') : (esLang ? 'Subir foto' : 'Upload photo') }}
+                  </button>
+                  <button
+                    v-if="editing.avatar_url"
+                    type="button"
+                    class="text-gray-500 hover:text-red-300 disabled:opacity-40"
+                    :disabled="uploadingCoachPhoto"
+                    @click="removeCoachPhoto"
+                  >
+                    {{ esLang ? 'Quitar' : 'Remove' }}
+                  </button>
+                </div>
               </div>
               <button
                 type="button"
@@ -975,6 +1331,29 @@ const submitAddCoach = async () => {
             <div class="flex-1 overflow-y-auto px-5 py-4">
               <!-- Details -->
               <div v-show="editTab === 'details'" class="space-y-4">
+                <div>
+                  <p class="text-xs font-medium text-gray-400 mb-2">
+                    {{ esLang ? 'Deportes' : 'Sports' }}
+                  </p>
+                  <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                    <button
+                      v-for="sport in TRAINING_DISCIPLINES"
+                      :key="sport.id"
+                      type="button"
+                      class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"
+                      :class="form.disciplines.includes(sport.id)
+                        ? 'border-white bg-white text-black'
+                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'"
+                      @click="form.disciplines = toggleSport(form.disciplines, sport.id)"
+                    >
+                      <span class="block text-base mb-0.5" aria-hidden="true">{{ disciplineEmoji(sport.id) }}</span>
+                      {{ esLang ? sport.es : sport.en }}
+                    </button>
+                  </div>
+                  <p class="mt-1 text-[11px] text-gray-500">
+                    {{ esLang ? 'Puede enseñar varios deportes.' : 'A coach can teach more than one sport.' }}
+                  </p>
+                </div>
                 <div>
                   <p class="text-[11px] uppercase tracking-wider text-gray-500 font-medium mb-2">
                     {{ esLang ? 'Programas asignados' : 'Program assignments' }}
@@ -1079,6 +1458,30 @@ const submitAddCoach = async () => {
                       class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-600 outline-none focus:border-teal-500"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-400 mb-1">
+                    {{ esLang ? 'Coach de respaldo' : 'Backup coach' }}
+                  </label>
+                  <select
+                    v-model="form.backup_coach_id"
+                    class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm outline-none focus:border-teal-500"
+                  >
+                    <option value="">{{ esLang ? 'Sin respaldo' : 'No backup' }}</option>
+                    <option
+                      v-for="other in coaches.filter(c => editing && c.id !== editing.id && c.is_active)"
+                      :key="other.id"
+                      :value="other.id"
+                    >
+                      {{ other.full_name }}
+                    </option>
+                  </select>
+                  <p class="mt-1 text-[11px] text-gray-500">
+                    {{ esLang
+                      ? 'Si este coach no está en ese horario, la clase pasa al respaldo cuando él sí está disponible.'
+                      : 'If this coach is off for that class time, the class goes to the backup when they are available.' }}
+                  </p>
                 </div>
 
                 <label class="flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 cursor-pointer">
@@ -1201,8 +1604,8 @@ const submitAddCoach = async () => {
                 <div class="flex items-start justify-between gap-3 flex-wrap">
                   <p class="text-xs text-gray-400 max-w-sm">
                     {{ esLang
-                      ? 'Toca un día para marcar si el coach está disponible. Editable desde hoy hasta el final del próximo mes, en días de clase.'
-                      : 'Tap a day to mark whether the coach is available. Editable from today through the end of next month, on class days.' }}
+                      ? 'Elige un día y confirma cada clase: 7:00 AM, 5:30 PM o 7:00 PM.'
+                      : 'Pick a day and confirm each class: 7:00 AM, 5:30 PM, or 7:00 PM.' }}
                   </p>
                   <div class="flex gap-1.5 shrink-0">
                     <button
@@ -1256,8 +1659,9 @@ const submitAddCoach = async () => {
                               ? 'bg-glass-green/85 text-white hover:bg-glass-green'
                               : 'bg-gray-700 text-gray-400 hover:bg-gray-600',
                             isModalToday(day) ? 'ring-2 ring-teal-400 ring-offset-1 ring-offset-gray-900' : '',
+                            selectedAvailDay && isSameDay(day, selectedAvailDay) ? 'outline outline-2 outline-white' : '',
                           ]"
-                          @click="toggleDateAvailability(day)"
+                          @click="selectAvailDay(day)"
                         >
                           {{ format(day, 'd') }}
                         </button>
@@ -1279,10 +1683,29 @@ const submitAddCoach = async () => {
                   </div>
                 </div>
 
+                <div v-if="selectedAvailDay" class="rounded-xl border border-gray-800 bg-gray-950 px-3 py-3">
+                  <p class="text-xs font-semibold text-white capitalize">
+                    {{ format(selectedAvailDay, 'EEEE d MMM', { locale: esLang ? es : undefined }) }}
+                  </p>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <button
+                      v-for="slot in selectedDaySlots"
+                      :key="slot"
+                      type="button"
+                      class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors"
+                      :class="slotIsOn(toDateKey(selectedAvailDay), slot)
+                        ? 'border-teal-400 bg-teal-500/20 text-teal-100'
+                        : 'border-gray-700 text-gray-500'"
+                      @click="toggleSlotAvailability(selectedAvailDay, slot)"
+                    >
+                      {{ classTimeLabel(slot) }}
+                    </button>
+                  </div>
+                </div>
                 <p class="text-[11px] text-gray-600">
                   {{ esLang
-                    ? 'Lun 4:30–6:00; Mar/Jue/Sáb 5:30–7:00 y 7:00–8:30. El anillo turquesa es hoy.'
-                    : 'Mon 4:30–6:00 PM; Tue/Thu/Sat 5:30–7:00 and 7:00–8:30 PM. Teal ring = today.' }}
+                    ? 'Verde: al menos una clase confirmada. El anillo turquesa es hoy.'
+                    : 'Green: at least one class confirmed. Teal ring is today.' }}
                 </p>
               </div>
             </div>
@@ -1423,6 +1846,26 @@ const submitAddCoach = async () => {
             </div>
             <form class="p-5 space-y-3" @submit.prevent="submitAddCoach">
               <div>
+                <p class="text-xs font-medium text-gray-400 mb-2">
+                  {{ esLang ? 'Deportes' : 'Sports' }} *
+                </p>
+                <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                  <button
+                    v-for="sport in TRAINING_DISCIPLINES"
+                    :key="sport.id"
+                    type="button"
+                    class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"
+                    :class="newCoachForm.disciplines.includes(sport.id)
+                      ? 'border-acid bg-acid text-charcoal'
+                      : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'"
+                    @click="newCoachForm.disciplines = toggleSport(newCoachForm.disciplines, sport.id)"
+                  >
+                    <span class="block text-base mb-0.5" aria-hidden="true">{{ disciplineEmoji(sport.id) }}</span>
+                    {{ esLang ? sport.es : sport.en }}
+                  </button>
+                </div>
+              </div>
+              <div>
                 <label class="block text-xs font-medium text-gray-400 mb-1">
                   {{ esLang ? 'Nombre completo' : 'Full name' }}
                 </label>
@@ -1492,7 +1935,7 @@ const submitAddCoach = async () => {
                 </button>
                 <button
                   type="submit"
-                  class="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+                  class="flex-1 py-2.5 rounded-xl bg-acid hover:bg-acid-300 transition-colors text-charcoal text-sm font-semibold disabled:opacity-50"
                   :disabled="addCoachSaving"
                 >
                   {{ addCoachSaving ? '…' : (esLang ? 'Crear coach' : 'Create coach') }}

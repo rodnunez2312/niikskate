@@ -174,7 +174,7 @@ export function compareSkillsByManualId(a: TrickManualSortable, b: TrickManualSo
 }
 
 export function difficultyTagClass(difficulty?: string | null): string {
-  if (difficulty === 'intermediate') return 'bg-blue-500/20 text-blue-300'
+  if (difficulty === 'intermediate') return 'bg-acid/15 text-acid'
   if (difficulty === 'advanced') return 'bg-purple-500/20 text-purple-300'
   return 'bg-green-500/20 text-green-300'
 }
@@ -185,7 +185,7 @@ export function areaTagClass(area?: string | null): string {
   if (a === 'Flatground') return 'bg-teal-500/20 text-teal-300'
   if (a === 'Street') return 'bg-orange-500/20 text-orange-300'
   if (a === 'Park') return 'bg-emerald-500/20 text-emerald-300'
-  if (a === 'Bowl') return 'bg-indigo-500/20 text-indigo-300'
+  if (a === 'Bowl') return 'bg-acid/10 text-cream'
   if (a === 'Mini Ramp') return 'bg-pink-500/20 text-pink-300'
   if (a === 'Vert') return 'bg-violet-500/20 text-violet-300'
   return 'bg-gray-700/50 text-gray-400'
@@ -195,7 +195,7 @@ export function typeTagClass(trickType?: string | null): string {
   const t = (trickType || '').trim()
   if (t === 'Exercise') return 'bg-purple-500/20 text-purple-300'
   if (t === 'Drill') return 'bg-amber-500/20 text-amber-300'
-  if (t === 'Trick') return 'bg-sky-500/20 text-sky-300'
+  if (t === 'Trick') return 'bg-acid/15 text-acid'
   return 'bg-gray-700/50 text-gray-400'
 }
 

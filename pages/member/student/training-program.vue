@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { disciplineFromJoin } from '~/utils/trainingDisciplines'
+
 definePageMeta({ middleware: ['auth', 'member'], layout: 'member' })
 
 const client = useSupabaseClient()
@@ -42,12 +44,33 @@ async function loadBoards() {
   const people = skaterParticipants.value
   loading.value = true
   try {
-    const { data: groups } = await client
+    const groupsJoined = await client
       .from('skill_groups')
-      .select('id, name, description, color, sort_order')
+      .select('id, name, description, color, sort_order, program_id, training_programs(discipline)')
       .eq('is_active', true)
       .order('sort_order')
-    const groupRows = groups || []
+    const groups = groupsJoined.error
+      ? await client
+        .from('skill_groups')
+        .select('id, name, description, color, sort_order')
+        .eq('is_active', true)
+        .order('sort_order')
+      : groupsJoined
+    const groupRows = (groups.data || []) as Array<{
+      id: string
+      name: string
+      description: string | null
+      color: string | null
+      sort_order: number
+      program_id?: string | null
+      training_programs?: { discipline?: string | null } | { discipline?: string | null }[] | null
+    }>
+    const phasesFor = (skillGroupId: string | null | undefined) => {
+      const assigned = groupRows.find(group => group.id === skillGroupId)
+      if (assigned?.program_id) return groupRows.filter(group => group.program_id === assigned.program_id)
+      const skate = groupRows.filter(group => disciplineFromJoin(group) === 'skateboarding')
+      return skate.length ? skate : groupRows
+    }
     const groupIds = groupRows.map(group => group.id)
     const { data: areas } = groupIds.length
       ? await client.from('skill_areas').select('id, group_id').in('group_id', groupIds)
@@ -78,7 +101,7 @@ async function loadBoards() {
 
     boards.value = await Promise.all(people.map(async (person) => {
       const uid = studentIdFor(person)
-      const emptyPhases = () => groupRows.map(group => ({
+      const emptyPhases = () => phasesFor(null).map(group => ({
         id: group.id,
         name: group.name,
         description: group.description,
@@ -115,7 +138,7 @@ async function loadBoards() {
       ])
 
       const learnedIds = new Set((progress || []).map(row => row.skill_id))
-      const programPhases = groupRows.map(group => {
+      const programPhases = phasesFor(prof?.skill_group_id).map(group => {
         const skillIds = [...(skillIdsByGroup.get(group.id) || new Set<string>())]
         const learned = skillIds.filter(id => learnedIds.has(id)).length
         return {
