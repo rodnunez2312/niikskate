@@ -256,7 +256,8 @@ async function load() {
     .select('user_id, skater_profile_id, crew_member_id')
     .eq('calendar_event_id', eventId.value)
     .neq('status', 'cancelled')
-  const profileIds = [...new Set((seats || []).flatMap(row => [row.skater_profile_id, row.user_id]).filter(Boolean))] as string[]
+  // A booking names one skater. The paying account is not a second inscrito.
+  const profileIds = [...new Set((seats || []).map(row => row.crew_member_id ? null : (row.skater_profile_id || row.user_id)).filter(Boolean))] as string[]
   const crewIds = [...new Set((seats || []).map(row => row.crew_member_id).filter(Boolean))] as string[]
   const roster: AthleteRow[] = []
   const seen = new Set<string>()
@@ -319,13 +320,6 @@ async function load() {
     const setup = focusSetup.value === 'learning' ? (es.value ? 'Aprendizaje' : 'Learning') : focusSetup.value === 'performance' ? 'Performance' : ''
     const placeLabel = typeof parsed.place_label === 'string' ? parsed.place_label : ''
     focusLabel.value = [setup, placeLabel].filter(Boolean).join(' · ')
-    const plannedSkaterIds = Array.isArray(parsed.skater_ids)
-      ? parsed.skater_ids.filter((id: unknown): id is string => typeof id === 'string')
-      : []
-    if (plannedSkaterIds.length) {
-      const { data: planned } = await client.from('profiles').select('id, full_name').in('id', plannedSkaterIds)
-      for (const person of planned || []) if (person.full_name) rememberAthlete({ id: person.id, name: person.full_name, kind: 'profile' })
-    }
     const skillIds = Array.isArray(plan.planned_skills) ? plan.planned_skills.filter((id: unknown) => typeof id === 'string') : []
     if (skillIds.length) {
       const { data: skills } = await client.from('skills_library').select('id, name, name_es').in('id', skillIds)
@@ -609,27 +603,46 @@ async function addSkater(skaterId: string) {
     editError.value = error.message
     return
   }
-  const ids = Array.isArray(planNotes.value.skater_ids) ? planNotes.value.skater_ids.filter((id): id is string => typeof id === 'string') : []
-  if (!ids.includes(skaterId)) {
-    try { await savePlan({ skater_ids: [...ids, skaterId] }) } catch { /* enrollment is already saved */ }
-  }
   skaterPickerOpen.value = false
   editingRoster.value = false
   await load()
 }
 
+async function dropEnrollmentRows(ids: string[]) {
+  if (!ids.length) return
+  const removed = await client.from('class_session_enrollments').delete().in('id', ids)
+  if (!removed.error) return
+  const cancelled = await client.from('class_session_enrollments').update({ status: 'cancelled' }).in('id', ids)
+  if (cancelled.error) throw removed.error
+}
+
 async function removeAthlete(athlete: AthleteRow) {
-  if (!event.value) return
+  if (!event.value || editingRoster.value) return
+  editingRoster.value = true
   editError.value = ''
-  if (athlete.kind === 'crew') {
-    await client.from('class_session_enrollments').delete().eq('calendar_event_id', event.value.id).eq('crew_member_id', athlete.id)
-  } else {
-    await client.from('class_session_enrollments').delete().eq('calendar_event_id', event.value.id).eq('skater_profile_id', athlete.id)
-    await client.from('class_session_enrollments').delete().eq('calendar_event_id', event.value.id).eq('user_id', athlete.id).is('skater_profile_id', null).is('crew_member_id', null)
-    const ids = Array.isArray(planNotes.value.skater_ids) ? planNotes.value.skater_ids.filter((id): id is string => typeof id === 'string' && id !== athlete.id) : []
-    try { await savePlan({ skater_ids: ids }) } catch (e: any) { editError.value = e?.message || '' }
+  try {
+    const { data: seats, error: readErr } = await client
+      .from('class_session_enrollments')
+      .select('id, user_id, skater_profile_id, crew_member_id')
+      .eq('calendar_event_id', event.value.id)
+    if (readErr) throw readErr
+    const seatIds = (seats || [])
+      .filter(row => athlete.kind === 'crew'
+        ? row.crew_member_id === athlete.id
+        : row.skater_profile_id === athlete.id || row.user_id === athlete.id)
+      .map(row => row.id)
+    await dropEnrollmentRows(seatIds)
+    await load()
+    if (athletes.value.some(row => row.kind === athlete.kind && row.id === athlete.id)) {
+      editError.value = es.value
+        ? 'No se pudo quitar al patinador de esta clase.'
+        : 'Could not remove this skater from the class.'
+    }
+  } catch (e: any) {
+    editError.value = e?.message || (es.value ? 'No se pudo quitar al patinador.' : 'Could not remove the skater.')
+  } finally {
+    editingRoster.value = false
   }
-  await load()
 }
 
 async function toggleTrickPicker() {

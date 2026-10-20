@@ -13,7 +13,7 @@
  * Usage:
  *   git show HEAD:public/data/niik-trick-library.json > old.json
  *   npm run niik:parse
- *   node scripts/rekey-trick-library.mjs old.json supabase/migrations/<name>.sql
+ *   node scripts/rekey-trick-library.mjs old.json supabase/migrations/<name>.sql [pairs.json]
  */
 
 import { readFileSync, writeFileSync } from 'fs'
@@ -79,6 +79,30 @@ for (const o of [...leftoverOld].sort((a, b) => a.manual_id - b.manual_id)) {
 }
 leftoverOld = leftoverOld.filter(o => !movedByName.some(m => m.oldId === o.manual_id))
 leftoverNew = leftoverNew.filter(n => !consumed.has(n.manual_id))
+
+// Third pass: renames the sheet cannot reveal ("Crooked" -> "Crooked Grind"), from a
+// reviewed pairs file: { "renames": [[old#, new#]], "merges": [[old#, survivingOld#]] }.
+const pairsPath = process.argv[4]
+if (pairsPath) {
+  const die = msg => { console.error('ABORT:', msg); process.exit(1) }
+  const pairs = readJson(pairsPath)
+  for (const [oldId, newId] of pairs.renames || []) {
+    const o = leftoverOld.find(t => t.manual_id === oldId)
+    const n = leftoverNew.find(t => t.manual_id === newId)
+    if (!o || !n) die(`rename #${oldId} -> #${newId} is not a leftover pair`)
+    mapping.push({ oldId, newId, name: o.name })
+    movedByName.push({ oldId, newId, name: `${o.name} -> ${n.name}` })
+    leftoverOld = leftoverOld.filter(t => t !== o)
+    leftoverNew = leftoverNew.filter(t => t !== n)
+  }
+  for (const [loserId, winnerId] of pairs.merges || []) {
+    const o = leftoverOld.find(t => t.manual_id === loserId)
+    if (!o) die(`merge #${loserId} is not a leftover`)
+    if (!mapping.some(m => m.oldId === winnerId)) die(`merge target #${winnerId} is not kept`)
+    merges.push({ loserId, winnerId, name: o.name })
+    leftoverOld = leftoverOld.filter(t => t !== o)
+  }
+}
 
 const retired = leftoverOld.map(t => ({ oldId: t.manual_id, name: t.name }))
 const inserts = leftoverNew.map(t => ({ newId: t.manual_id, name: t.name }))
