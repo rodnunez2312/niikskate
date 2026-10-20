@@ -1225,6 +1225,26 @@ const monthSpanBetween = (startYmd: string, endYmd: string) => {
   return span
 }
 
+const parseSelectedSeasonSlugs = (): string[] => {
+  const multi = route.query.temporadas
+  if (typeof multi === 'string' && multi.trim()) {
+    return multi.split(',').map(s => s.trim()).filter(Boolean)
+  }
+  if (Array.isArray(multi)) {
+    return multi.flatMap(v => (typeof v === 'string' ? v.split(',') : [])).map(s => s.trim()).filter(Boolean)
+  }
+  const single = route.query.temporada
+  return typeof single === 'string' && single.trim() ? [single.trim()] : []
+}
+
+const selectedSeasonSlugs = computed(() => parseSelectedSeasonSlugs())
+
+const selectedSeasons = computed(() =>
+  selectedSeasonSlugs.value
+    .map(slug => seasonBySlug(slug) || getProgramSeasonBySlug(slug))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s)),
+)
+
 /**
  * How many month grids to stack. A season that runs Jul 1 – Aug 31 shows both
  * months, so the whole run is visible without paging back and forth.
@@ -1986,26 +2006,6 @@ const agendaMeta = (ev: SchoolCalendarRow) => {
   parts.push(ev.location || ev.skatepark || 'Mérida')
   return parts.join(' · ')
 }
-
-const parseSelectedSeasonSlugs = (): string[] => {
-  const multi = route.query.temporadas
-  if (typeof multi === 'string' && multi.trim()) {
-    return multi.split(',').map(s => s.trim()).filter(Boolean)
-  }
-  if (Array.isArray(multi)) {
-    return multi.flatMap(v => (typeof v === 'string' ? v.split(',') : [])).map(s => s.trim()).filter(Boolean)
-  }
-  const single = route.query.temporada
-  return typeof single === 'string' && single.trim() ? [single.trim()] : []
-}
-
-const selectedSeasonSlugs = computed(() => parseSelectedSeasonSlugs())
-
-const selectedSeasons = computed(() =>
-  selectedSeasonSlugs.value
-    .map(slug => seasonBySlug(slug) || getProgramSeasonBySlug(slug))
-    .filter((s): s is NonNullable<typeof s> => Boolean(s)),
-)
 
 const seasonColorFor = (slug: string) => {
   const idx = programSeasons.value.findIndex(s => s.slug === slug)
