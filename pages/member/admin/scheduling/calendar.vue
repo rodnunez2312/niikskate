@@ -18,7 +18,7 @@ import {
 import { es } from 'date-fns/locale'
 import { getDay } from 'date-fns'
 import type { AudienceCategory, SkateSkillLevelId, TimeSlot } from '~/types'
-import { TRAINING_DISCIPLINES, disciplineEmoji, disciplineLabel, isTrainingDiscipline } from '~/utils/trainingDisciplines'
+import { disciplineEmoji, disciplineLabel, isTrainingDiscipline, type TrainingDiscipline } from '~/utils/trainingDisciplines'
 import { coachMatchesFirstName, defaultBackupFirstName } from '~/utils/coachBackups'
 import {
   DEFAULT_SKATEPARK,
@@ -150,6 +150,12 @@ const selectedDate = ref<Date>(new Date())
 const filterType = ref<SchoolCalendarEventType | 'all'>('all')
 const calendarView = ref<'today' | 'week' | 'month'>('week')
 const addMenuOpen = ref(false)
+/** The small + on the selected day cell. */
+const dayAddMenuOpen = ref(false)
+watch(selectedDate, () => { dayAddMenuOpen.value = false })
+const closeDayAddMenu = () => { dayAddMenuOpen.value = false }
+onMounted(() => window.addEventListener('click', closeDayAddMenu))
+onBeforeUnmount(() => window.removeEventListener('click', closeDayAddMenu))
 const enrollmentCounts = ref<Record<string, number>>({})
 /** Coach names per time slot for the day Hoy is showing. */
 const dayCoachNames = ref<Record<string, string[]>>({})
@@ -566,7 +572,7 @@ const buildProgramTitle = (): string => {
   const sport = sportWord[form.value.discipline] || 'Skate'
   const body = ages.length === 0
     ? `${typePart} ${skillPart}`
-    : `${typePart} ${skillPart} · ${es ? `Grupo de edad: ${ageList(ages, es)}` : `Age group: ${ageList(ages, es)}`}`
+    : `${typePart} ${skillPart} ${es ? 'para' : 'for'} ${ageList(ages, es)}`
   return `${sport} · ${body}`
 }
 
@@ -582,6 +588,14 @@ function pickProgramSport(id: string) {
   programTitleManual.value = false
   applyProgramTitle(true)
 }
+
+const { enabled: enabledSports, catalog: academySports, matchesSport } = useEnabledSports()
+const sportChoices = computed(() => academySports.filter(sport => enabledSports.value.includes(sport.id)))
+watch(enabledSports, (ids) => {
+  if (!ids.includes(form.value.discipline as TrainingDiscipline)) {
+    pickProgramSport(ids[0] || 'skateboarding')
+  }
+})
 
 const skateSpots = ref<{ id: string; name: string; city: string | null }[]>([])
 const addingSpot = ref(false)
@@ -1197,8 +1211,9 @@ async function ensureMexicoHolidays() {
 }
 
 const filteredEvents = computed(() => {
-  if (filterType.value === 'all') return events.value
-  return events.value.filter(e => e.event_type === filterType.value)
+  const inSport = events.value.filter(matchesSport)
+  if (filterType.value === 'all') return inSport
+  return inSport.filter(e => e.event_type === filterType.value)
 })
 
 const monthGrid = (month: Date) => {
@@ -2209,9 +2224,13 @@ const openCreateForDay = (day: Date, mode: CreateMode = 'event') => {
   const ymd = format(day, 'yyyy-MM-dd')
   const activeSeason = mode === 'program' ? pickDefaultProgramSeason(programSeasons.value) : undefined
   const seasonFromQuery = mode === 'program'
-    ? (activeSeason?.slug || seasonSlugForProgramDay(day))
+    ? (isPastDay(day)
+        ? (seasonSlugForProgramDay(day) || activeSeason?.slug || '')
+        : (activeSeason?.slug || seasonSlugForProgramDay(day)))
     : ''
   form.value = defaultForm(ymd, mode, seasonFromQuery)
+  // A class on a past day records a session that already happened, not a new program.
+  if (mode === 'program' && isPastDay(day)) form.value.is_recurring = false
   if (mode === 'event' && filterType.value !== 'all' && EVENT_ONLY_TYPES.includes(filterType.value as SchoolCalendarEventType)) {
     form.value.event_type = filterType.value as SchoolCalendarEventType
   }
@@ -3344,6 +3363,7 @@ const selectDay = (day: Date) => {
             aria-hidden="true"
           />
           <p class="text-base font-semibold text-white flex items-center gap-2">
+            <MemberSessionKindIcon v-if="ev.event_type === 'class_session' || ev.event_type === 'class_individual'" :kind="ev.event_type" />
             <span class="leading-none" aria-hidden="true">{{ eventSportEmoji(ev) }}{{ eventAgeEmojis(ev).join('') || eventChipEmoji(ev) }}</span>
             <span class="truncate">{{ eventChipLabel(ev) }}</span>
           </p>
@@ -3450,21 +3470,62 @@ const selectDay = (day: Date) => {
             @keydown.enter.prevent="selectDay(day)"
             @keydown.space.prevent="selectDay(day)"
           >
-            <div
-              class="text-xs font-semibold mb-1"
-              :class="[
-                isToday(day)
-                  ? 'text-gold-400'
-                  : isDayInHighlightedSeason(day)
-                    ? 'text-white'
-                    : isPastDay(day)
-                      ? 'text-gray-500'
-                      : isSameMonth(day, viewMonth)
-                        ? 'text-white'
-                        : 'text-gray-600',
-              ]"
-            >
-              {{ format(day, 'd') }}
+            <div class="relative mb-1 flex items-center justify-between gap-1">
+              <span
+                class="text-xs font-semibold"
+                :class="[
+                  isToday(day)
+                    ? 'text-gold-400'
+                    : isDayInHighlightedSeason(day)
+                      ? 'text-white'
+                      : isPastDay(day)
+                        ? 'text-gray-500'
+                        : isSameMonth(day, viewMonth)
+                          ? 'text-white'
+                          : 'text-gray-600',
+                ]"
+              >
+                {{ format(day, 'd') }}
+              </span>
+              <button
+                v-if="isSelectedDay(day)"
+                type="button"
+                class="flex h-4 w-4 items-center justify-center rounded-full bg-acid text-xs font-semibold leading-none text-charcoal hover:bg-acid-300"
+                :aria-expanded="dayAddMenuOpen"
+                :aria-label="language === 'es' ? 'Añadir en este día' : 'Add on this day'"
+                @click.stop="dayAddMenuOpen = !dayAddMenuOpen"
+                @keydown.enter.stop
+                @keydown.space.stop
+              >
+                {{ dayAddMenuOpen ? '×' : '+' }}
+              </button>
+              <div
+                v-if="isSelectedDay(day) && dayAddMenuOpen"
+                class="absolute right-0 top-5 z-[80] min-w-[7rem] overflow-hidden rounded-md border border-[#2C2C2C] bg-[#171717] py-0.5 text-left shadow-xl"
+                @click.stop
+              >
+                <button
+                  type="button"
+                  class="block w-full whitespace-nowrap px-2 py-1 text-left text-[11px] leading-tight text-[#E5E5E5] hover:bg-[#262626] hover:text-acid"
+                  @click="dayAddMenuOpen = false; openCreateForDay(day, 'program')"
+                >
+                  {{ language === 'es' ? 'Clase / Programa' : 'Class / Program' }}
+                </button>
+                <button
+                  type="button"
+                  class="block w-full whitespace-nowrap px-2 py-1 text-left text-[11px] leading-tight text-[#E5E5E5] hover:bg-[#262626] hover:text-acid"
+                  @click="dayAddMenuOpen = false; openCreateForDay(day, 'event')"
+                >
+                  {{ language === 'es' ? 'Evento' : 'Event' }}
+                </button>
+                <button
+                  type="button"
+                  class="block w-full whitespace-nowrap px-2 py-1 text-left text-[11px] leading-tight text-[#E5E5E5] hover:bg-[#262626] hover:text-acid"
+                  @click="dayAddMenuOpen = false; addSeasonOpen = true"
+                >
+                  {{ language === 'es' ? 'Temporada' : 'Season' }}
+                </button>
+              </div>
             </div>
             <div
               class="flex flex-col gap-1 max-h-[12.5rem] overflow-y-auto overscroll-contain"
@@ -3505,6 +3566,13 @@ const selectDay = (day: Date) => {
                     role="img"
                     :aria-label="classStaffWarning(ev)"
                   >!</span>
+                  <MemberSessionKindIcon
+                    v-if="ev.event_type === 'class_session' || ev.event_type === 'class_individual'"
+                    :kind="ev.event_type"
+                    small
+                    class="mr-0.5 align-middle"
+                    :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
+                  />
                   <span
                     v-if="isBlockedProgram(ev)"
                     class="inline-block mr-0.5 align-middle text-[11px] leading-none"
@@ -3948,8 +4016,8 @@ const selectDay = (day: Date) => {
                 :placeholder="
                   isProgramForm
                     ? language === 'es'
-                      ? 'Ej. Grupal Principiante · Grupo de edad: 5-7'
-                      : 'e.g. Group Beginner · Age group: 5-7'
+                      ? 'Ej. Grupal Principiante para 5-7'
+                      : 'e.g. Group Beginner for 5-7'
                     : language === 'es'
                       ? 'Nombre del evento'
                       : 'Enter event title'
@@ -4034,11 +4102,11 @@ const selectDay = (day: Date) => {
             </div>
 
             <div
-              :class="createMode === 'program' || isProgramForm
+              :class="(createMode === 'program' || isProgramForm) && sportChoices.length > 1
                 ? 'grid sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 items-start'
                 : ''"
             >
-            <div v-if="createMode === 'program' || isProgramForm">
+            <div v-if="(createMode === 'program' || isProgramForm) && sportChoices.length > 1">
               <label for="program-sport" class="block text-xs font-medium text-gray-400 mb-2">
                 {{ language === 'es' ? 'Deporte' : 'Sport' }} *
               </label>
@@ -4049,7 +4117,7 @@ const selectDay = (day: Date) => {
                 @change="pickProgramSport(($event.target as HTMLSelectElement).value)"
               >
                 <option
-                  v-for="sport in TRAINING_DISCIPLINES"
+                  v-for="sport in sportChoices"
                   :key="sport.id"
                   :value="sport.id"
                 >
@@ -4088,7 +4156,8 @@ const selectDay = (day: Date) => {
                   :aria-pressed="form.event_type === t"
                   @click="form.event_type = t"
                 >
-                  <span aria-hidden="true">{{ EVENT_META[t].emoji }}</span>
+                  <MemberSessionKindIcon v-if="t === 'class_session' || t === 'class_individual'" :kind="t" />
+                  <span v-else aria-hidden="true">{{ EVENT_META[t].emoji }}</span>
                   {{ tLabel(t) }}
                 </button>
               </div>
@@ -4105,7 +4174,8 @@ const selectDay = (day: Date) => {
                   "
                   @click="form.event_type = t"
                 >
-                  <span class="block mb-0.5">{{ EVENT_META[t].emoji }}</span>
+                  <MemberSessionKindIcon v-if="t === 'class_session' || t === 'class_individual'" :kind="t" class="mb-0.5" />
+                  <span v-else class="block mb-0.5">{{ EVENT_META[t].emoji }}</span>
                   {{ tLabel(t) }}
                 </button>
               </div>

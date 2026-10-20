@@ -61,10 +61,22 @@ export default defineEventHandler(async (event) => {
   }
 
   if (outcome === 'cancelled') {
-    if (eventIds.length !== 1) {
+    // Several at once only for record-keeping on classes already past, so families get no emails.
+    const notify = body?.notify !== false
+    if (notify && eventIds.length !== 1) {
       throw createError({ statusCode: 400, message: 'Cancel one class at a time' })
     }
-    const result = await cancelClassSessions(adminClient, eventIds, makeupNote, reason || 'clima')
+    if (!notify) {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Merida' })
+      const { data: dated } = await adminClient
+        .from('school_calendar_events')
+        .select('id, start_date')
+        .in('id', eventIds)
+      if ((dated || []).some(row => row.start_date >= today)) {
+        throw createError({ statusCode: 400, message: 'Silent cancel is only for past classes' })
+      }
+    }
+    const result = await cancelClassSessions(adminClient, eventIds, makeupNote, reason || 'clima', { notify })
     return { outcome: 'cancelled', ...result }
   }
 

@@ -9,6 +9,14 @@
 import { requireAdmin } from '~/server/utils/requireAdmin'
 import { ADMIN_COACH_EMAIL } from '~/composables/coachDirectory'
 import { coachMatchesFirstName, defaultBackupFirstName } from '~/utils/coachBackups'
+import {
+  audienceCategoryLabel,
+  isProgressionAudience,
+  parseAudienceCategories,
+  PROGRAM_AGE_BANDS,
+  skillTrackFromLevelId,
+  type ProgramSkillTrack,
+} from '~/types'
 
 export interface CoachActivityCoach {
   id: string
@@ -51,6 +59,8 @@ export interface CoachActivityClass {
   date: string
   time: string
   title: string
+  /** Short age band, such as 5-7 or 7-17. */
+  age: string
   coaches: string
   /** Who is taking the class. A cover shows that coach, not the person they replaced. */
   pills: Array<{ id: string; initials: string; name: string }>
@@ -86,6 +96,8 @@ export interface CoachActivityResponse {
     attendance_marked: number
     tricks_marked: number
   }
+  /** Classes in the period, split by the three calendar levels. */
+  classes_by_level: Array<{ id: ProgramSkillTrack; given: number; scheduled: number }>
   weekly: CoachActivityWeek[]
   /** Calendar classes from 7 days ago through 7 days ahead. */
   nearby: CoachActivityClass[]
@@ -113,6 +125,32 @@ const SLOT_FROM_START: Record<string, string> = {
   '17:30': 'early',
   '19:00': 'late',
   '09:00': 'summer',
+}
+
+function sportOf(ev: { discipline?: string | null; title?: string | null }) {
+  const id = typeof ev?.discipline === 'string' ? ev.discipline.trim() : ''
+  if (id === 'skateboarding' || id === 'scooter' || id === 'rollerblading' || id === 'bmx' || id === 'parkour') return id
+  const text = typeof ev?.title === 'string' ? ev.title.toLowerCase() : ''
+  if (text.includes('scooter')) return 'scooter'
+  if (text.includes('bmx')) return 'bmx'
+  if (text.includes('parkour')) return 'parkour'
+  if (text.includes('patinaje') || text.includes('roller') || text.includes('inline')) return 'rollerblading'
+  return 'skateboarding'
+}
+
+function classAgeLabel(ev: { title?: string | null; audience_categories?: string[] | null; audience_category?: string | null }) {
+  const cats = parseAudienceCategories(ev)
+  if (cats.length) {
+    if (isProgressionAudience(cats)) return '7-17'
+    return cats.map((id) => {
+      const band = PROGRAM_AGE_BANDS.find(row => row.id === id)
+      if (band) return band.label.es.replaceAll('–', '-')
+      const label = audienceCategoryLabel(id, 'es')
+      const match = label.match(/\d+\s*[–-]\s*\d+|\d+\+/)
+      return match ? match[0].replaceAll('–', '-').replace(/\s/g, '') : label
+    }).join(' · ')
+  }
+  return (ev.title || '').match(/(?:grupo de edad|age group)\s*:\s*([^·]+)/i)?.[1]?.trim().replaceAll('–', '-') || ''
 }
 
 function classTimeLabel(start: string | null) {
@@ -146,6 +184,7 @@ async function loadNearbyClasses(
   assignedOnly: boolean,
   todayKey: string,
   historyMonths: number,
+  sports: Set<string>,
 ): Promise<CoachActivityClass[]> {
   const thisMonday = (() => {
     const [y, m, d] = todayKey.split('-').map(Number)
@@ -159,7 +198,7 @@ async function loadNearbyClasses(
 
   const { data: events } = await adminClient
     .from('school_calendar_events')
-    .select('id, title, start_date, start_time, time_slot, session_outcome, cancelled_at')
+    .select('id, title, start_date, start_time, time_slot, session_outcome, cancelled_at, discipline, audience_category, audience_categories')
     .in('event_type', ['class_session', 'class_individual'])
     .gte('start_date', from)
     .lte('start_date', to)
@@ -174,11 +213,15 @@ async function loadNearbyClasses(
     time_slot: string | null
     session_outcome: string | null
     cancelled_at: string | null
+    discipline?: string | null
+    audience_category?: string | null
+    audience_categories?: string[] | null
   }>
-  if (!rows.length) return []
+  const visible = sports.size ? rows.filter(row => sports.has(sportOf(row))) : rows
+  if (!visible.length) return []
 
-  const eventIds = rows.map(row => row.id)
-  const dates = [...new Set(rows.map(row => row.start_date))]
+  const eventIds = visible.map(row => row.id)
+  const dates = [...new Set(visible.map(row => row.start_date))]
   let assigned: Array<{ calendar_event_id: string; coach_id: string; covering_for: string | null }> | null = null
   const [withCover, withBackup, { data: blockedRows }] = await Promise.all([
     adminClient
@@ -260,7 +303,7 @@ async function loadNearbyClasses(
 
   const allowed = new Set(coachIds)
   const classes: CoachActivityClass[] = []
-  for (const ev of rows) {
+  for (const ev of visible) {
     const coaches = byEvent.get(ev.id) || []
     if (assignedOnly && !coaches.some(coach => allowed.has(coach.id))) continue
     const slot = ev.time_slot || SLOT_FROM_START[ev.start_time?.slice(0, 5) || ''] || ''
@@ -307,6 +350,7 @@ async function loadNearbyClasses(
       date: ev.start_date,
       time: classTimeLabel(ev.start_time),
       title: ev.title,
+      age: classAgeLabel(ev),
       coaches: labels.join(' · '),
       pills,
       coachIds: [...new Set(payCoachIds)],
@@ -341,22 +385,28 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       ? query.from
       : ymd(new Date(Date.parse(to) - 27 * 86400000))
   const programFilter = typeof query.program === 'string' && query.program ? query.program : ''
+  const sportFilter = typeof query.sport === 'string' && query.sport ? query.sport : ''
+  const sportsRaw = typeof query.sports === 'string' ? query.sports : ''
+  const sportSet = new Set(
+    (sportsRaw ? sportsRaw.split(',') : sportFilter ? [sportFilter] : [])
+      .map(id => id.trim())
+      .filter(Boolean),
+  )
 
   // --- Roster: coaches plus the one admin who also teaches -------------------
-  const [{ data: coachRows }, { data: adminCoachRows }, { data: programLinks }] = await Promise.all([
-    adminClient
-      .from('profiles')
-      .select('id, full_name, email, title, is_active, is_head_coach, avatar_url')
-      .eq('role', 'coach'),
-    adminClient
-      .from('profiles')
-      .select('id, full_name, email, title, is_active, is_head_coach, avatar_url')
-      .eq('role', 'admin')
-      .ilike('email', ADMIN_COACH_EMAIL),
-    adminClient
-      .from('program_coaches')
-      .select('coach_id, program_id, programs(id, name)'),
+  const profileFields = 'id, full_name, email, title, is_active, is_head_coach, avatar_url, coach_discipline'
+  const plainFields = 'id, full_name, email, title, is_active, is_head_coach, avatar_url'
+  const [coachResult, adminResult, { data: programLinks }] = await Promise.all([
+    adminClient.from('profiles').select(profileFields).eq('role', 'coach'),
+    adminClient.from('profiles').select(profileFields).eq('role', 'admin').ilike('email', ADMIN_COACH_EMAIL),
+    adminClient.from('program_coaches').select('coach_id, program_id, programs(id, name)'),
   ])
+  const coachRows = coachResult.error
+    ? (await adminClient.from('profiles').select(plainFields).eq('role', 'coach')).data
+    : coachResult.data
+  const adminCoachRows = adminResult.error
+    ? (await adminClient.from('profiles').select(plainFields).eq('role', 'admin').ilike('email', ADMIN_COACH_EMAIL)).data
+    : adminResult.data
 
   const roster = new Map<string, CoachActivityCoach>()
   for (const p of [...(coachRows || []), ...(adminCoachRows || [])]) {
@@ -403,6 +453,19 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
     )
     for (const id of [...roster.keys()]) if (!keep.has(id)) roster.delete(id)
   }
+  if (sportSet.size) {
+    const covers = new Set(
+      [...(coachRows || []), ...(adminCoachRows || [])]
+        .filter(row => {
+          const sports = Array.isArray(row.coach_discipline) && row.coach_discipline.length
+            ? row.coach_discipline
+            : ['skateboarding']
+          return sports.some(id => sportSet.has(id))
+        })
+        .map(row => row.id),
+    )
+    for (const id of [...roster.keys()]) if (!covers.has(id)) roster.delete(id)
+  }
 
   const coachIds = [...roster.keys()]
   if (coachIds.length === 0) {
@@ -428,6 +491,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       },
       weekly: [],
       nearby: [],
+      classes_by_level: [],
       programs: [...programs].map(([id, name]) => ({ id, name })),
     }
   }
@@ -444,7 +508,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
     { data: sessionVideos, error: sessionVideoError },
     nearby,
     { data: periodSeatRows },
-    { data: periodEvents },
+    { data: classEvents },
     { data: reservations, error: reservationError },
     { data: purchases, error: purchaseError },
     { data: periodAssigned },
@@ -452,14 +516,14 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   ] = await Promise.all([
     adminClient
       .from('class_session_coaches')
-      .select('coach_id, notes, created_at, calendar_event_id, school_calendar_events!inner(id, start_date)')
+      .select('coach_id, notes, created_at, calendar_event_id, school_calendar_events!inner(id, start_date, title, discipline, session_outcome)')
       .in('coach_id', coachIds)
       .eq('delivered', true)
       .gte('school_calendar_events.start_date', from)
       .lte('school_calendar_events.start_date', to),
     adminClient
       .from('class_session_coaches')
-      .select('coach_id, school_calendar_events!inner(start_date, session_outcome)')
+      .select('coach_id, school_calendar_events!inner(start_date, session_outcome, title, discipline)')
       .in('coach_id', coachIds)
       .eq('school_calendar_events.session_outcome', 'cancelled')
       .gte('school_calendar_events.start_date', from)
@@ -500,7 +564,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       .in('owner_id', coachIds)
       .gte('created_at', mxDayStart(from))
       .lte('created_at', mxDayEnd(to)),
-    loadNearbyClasses(adminClient, coachIds, Boolean(programFilter), to, historyMonths),
+    loadNearbyClasses(adminClient, coachIds, Boolean(programFilter || sportSet.size), to, historyMonths, sportSet),
     adminClient
       .from('class_session_coaches')
       .select('coach_id, calendar_event_id, school_calendar_events!inner(start_date, event_type)')
@@ -508,14 +572,12 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       .gte('school_calendar_events.start_date', from)
       .lte('school_calendar_events.start_date', to)
       .in('school_calendar_events.event_type', ['class_session', 'class_individual']),
-    programFilter
-      ? Promise.resolve({ data: [] as Array<{ id: string }> })
-      : adminClient
-        .from('school_calendar_events')
-        .select('id')
-        .in('event_type', ['class_session', 'class_individual'])
-        .gte('start_date', from)
-        .lte('start_date', to),
+    adminClient
+      .from('school_calendar_events')
+      .select('id, title, skill_level, discipline, session_outcome, cancelled_at')
+      .in('event_type', ['class_session', 'class_individual'])
+      .gte('start_date', from)
+      .lte('start_date', to),
     adminClient
       .from('class_reservations')
       .select('user_id, status')
@@ -549,7 +611,8 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   for (const row of taught || []) {
     const coach = roster.get(row.coach_id)
     if (!coach) continue
-    const session = row.school_calendar_events as unknown as { start_date: string } | null
+    const session = row.school_calendar_events as unknown as { start_date: string; title?: string | null; discipline?: string | null } | null
+    if (sportSet.size && session && !sportSet.has(sportOf(session))) continue
     coach.classes_given += 1
     if (!row.notes?.trim()) coach.classes_without_notes += 1
     coach.last_active = laterOf(coach.last_active, session?.start_date)
@@ -563,18 +626,43 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   if (!cancelledErr) {
     for (const row of cancelledRows || []) {
       const coach = roster.get(row.coach_id)
+      const session = row.school_calendar_events as unknown as { title?: string | null; discipline?: string | null } | null
+      if (sportSet.size && session && !sportSet.has(sportOf(session))) continue
       if (coach) coach.classes_cancelled += 1
     }
   }
 
+  const coachesInPeriod = new Set<string>()
+  const coachEventIds = new Set<string>()
+  for (const row of periodSeatRows || []) {
+    if (row.coach_id) coachesInPeriod.add(row.coach_id)
+    if (row.calendar_event_id) coachEventIds.add(row.calendar_event_id)
+  }
+
+  const periodEventIds = programFilter
+    ? [...coachEventIds]
+    : ((classEvents || []) as Array<{ id: string }>).map(row => row.id)
+  const seatSlices: string[][] = []
+  for (let i = 0; i < periodEventIds.length; i += 200) seatSlices.push(periodEventIds.slice(i, i + 200))
+  const [{ data: enrolments }, seatResults] = await Promise.all([
+    eventIds.size > 0
+      ? adminClient
+        .from('class_session_enrollments')
+        .select('calendar_event_id, user_id, skater_profile_id, crew_member_id')
+        .in('calendar_event_id', [...eventIds])
+        .eq('status', 'confirmed')
+      : Promise.resolve({ data: [] as Array<{ calendar_event_id: string; user_id: string; skater_profile_id: string | null; crew_member_id: string | null }> }),
+    Promise.all(seatSlices.map(slice =>
+      adminClient
+        .from('class_session_enrollments')
+        .select('user_id, skater_profile_id')
+        .in('calendar_event_id', slice)
+        .neq('status', 'cancelled'),
+    )),
+  ])
+
   // --- Skaters in those classes ---------------------------------------------
   if (eventIds.size > 0) {
-    const { data: enrolments } = await adminClient
-      .from('class_session_enrollments')
-      .select('calendar_event_id, user_id, skater_profile_id, crew_member_id')
-      .in('calendar_event_id', [...eventIds])
-      .eq('status', 'confirmed')
-
     // An enrolment names the skater in one of three ways: a child in the
     // parent's crew, a skater with their own login, or the account holder.
     const skaterKey = (e: {
@@ -666,26 +754,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   const allProgressSkaters = new Set<string>()
   for (const set of progressSkaters.values()) for (const s of set) allProgressSkaters.add(s)
 
-  const coachesInPeriod = new Set<string>()
-  const coachEventIds = new Set<string>()
-  for (const row of periodSeatRows || []) {
-    if (row.coach_id) coachesInPeriod.add(row.coach_id)
-    if (row.calendar_event_id) coachEventIds.add(row.calendar_event_id)
-  }
-
   const periodSkaters = new Set<string>()
-  const periodEventIds = programFilter
-    ? [...coachEventIds]
-    : ((periodEvents || []) as Array<{ id: string }>).map(row => row.id)
-  const seatSlices: string[][] = []
-  for (let i = 0; i < periodEventIds.length; i += 200) seatSlices.push(periodEventIds.slice(i, i + 200))
-  const seatResults = await Promise.all(seatSlices.map(slice =>
-    adminClient
-      .from('class_session_enrollments')
-      .select('user_id, skater_profile_id')
-      .in('calendar_event_id', slice)
-      .neq('status', 'cancelled'),
-  ))
   for (const { data: seats } of seatResults) {
     for (const seat of seats || []) {
       const id = seat.skater_profile_id || seat.user_id
@@ -710,9 +779,45 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
   let progressInPeriod = 0
   for (const id of allProgressSkaters) if (periodSkaters.has(id)) progressInPeriod += 1
 
-  const classesInPeriod = programFilter
-    ? new Set(((periodAssigned || []) as Array<{ calendar_event_id: string }>).map(row => row.calendar_event_id)).size
-    : periodClassCount || 0
+  const levelOrder: ProgramSkillTrack[] = ['beginner', 'intermediate', 'advanced']
+  const buckets = new Map<ProgramSkillTrack, { id: ProgramSkillTrack; given: number; scheduled: number }>(
+    levelOrder.map(id => [id, { id, given: 0, scheduled: 0 }]),
+  )
+  const seen = new Set<string>()
+  for (const ev of classEvents || []) {
+    if (sportSet.size && !sportSet.has(sportOf(ev))) continue
+    if (ev.cancelled_at || ev.session_outcome === 'cancelled') continue
+    seen.add(ev.id)
+    const title = (ev.title || '').toLowerCase()
+    const levels: ProgramSkillTrack[] = []
+    if (title.includes('principiante') || title.includes('beginner')) levels.push('beginner')
+    if (title.includes('intermedio') || title.includes('intermediate')) levels.push('intermediate')
+    if (title.includes('avanzado') || title.includes('advanced')) levels.push('advanced')
+    const tracks = levels.length
+      ? levels
+      : (ev.skill_level ? [skillTrackFromLevelId(ev.skill_level)] : [])
+    const done = ev.session_outcome === 'done'
+    for (const track of tracks) {
+      const bucket = buckets.get(track)
+      if (!bucket) continue
+      bucket.scheduled += 1
+      if (done) bucket.given += 1
+    }
+  }
+  const classesByLevel = levelOrder.map(id => buckets.get(id)!)
+
+  const classesInPeriod = classEvents
+    ? seen.size
+    : programFilter
+      ? new Set(((periodAssigned || []) as Array<{ calendar_event_id: string }>).map(row => row.calendar_event_id)).size
+      : periodClassCount || 0
+  const classesGiven = classEvents
+    ? (classEvents || []).filter(ev => {
+        if (sportSet.size && !sportSet.has(sportOf(ev))) return false
+        if (ev.cancelled_at || ev.session_outcome === 'cancelled') return false
+        return ev.session_outcome === 'done'
+      }).length
+    : coaches.reduce((n, c) => n + c.classes_given, 0)
 
   const sum = (pick: (c: CoachActivityCoach) => number) =>
     coaches.reduce((n, c) => n + pick(c), 0)
@@ -722,7 +827,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
     to,
     coaches,
     totals: {
-      classes_given: sum(c => c.classes_given),
+      classes_given: classesGiven,
       classes_in_period: classesInPeriod,
       classes_cancelled: sum(c => c.classes_cancelled),
       videos: sum(c => c.videos),
@@ -741,6 +846,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       .map(([week_start, classes]) => ({ week_start, classes }))
       .sort((a, b) => a.week_start.localeCompare(b.week_start)),
     nearby,
+    classes_by_level: classesByLevel,
     programs: [...programs]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es')),

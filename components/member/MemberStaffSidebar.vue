@@ -17,7 +17,15 @@ const accountOpen = ref(false)
 const es = computed(() => language.value === 'es')
 
 const SESSIONS_PATH = '/member/staff/sessions'
-const { active: activeSession, clockLabel: activeClock, overtime: activeOvertime } = useActiveSession()
+const { active: activeSession, clockLabel: activeClock, overtime: activeOvertime, paused: activePaused } = useActiveSession()
+const sessionPillClass = computed(() => {
+  if (activePaused.value) return 'border-gray-600 text-gray-400'
+  return activeOvertime.value ? 'border-amber-400/60 text-amber-300' : 'border-acid/50 text-acid'
+})
+const sessionDotClass = computed(() => {
+  if (activePaused.value) return 'bg-gray-500'
+  return activeOvertime.value ? 'bg-amber-300 animate-pulse' : 'bg-acid animate-pulse'
+})
 const showSessionPill = (path: string) => path === SESSIONS_PATH && Boolean(activeSession.value)
 
 const initials = computed(() => {
@@ -169,6 +177,7 @@ function linkClass(active: boolean) {
       </div>
     </div>
     <nav class="flex-1 px-2 py-3">
+      <MemberSportPicker class="mb-3" />
       <NuxtLink
         :to="staffDashboardItem.path"
         class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors mb-2"
@@ -223,10 +232,10 @@ function linkClass(active: boolean) {
                 v-if="showSessionPill(item.path)"
                 to="/member/coach/plans"
                 class="absolute right-1 top-[5px] inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[10px] tabular-nums bg-charcoal-900"
-                :class="activeOvertime ? 'border-amber-400/60 text-amber-300' : 'border-acid/50 text-acid'"
+                :class="sessionPillClass"
                 :title="es ? 'Volver a la sesión en curso' : 'Back to the running session'"
               >
-                <span class="h-1.5 w-1.5 rounded-full animate-pulse" :class="activeOvertime ? 'bg-amber-300' : 'bg-acid'" aria-hidden="true" />
+                <span class="h-1.5 w-1.5 rounded-full" :class="sessionDotClass" aria-hidden="true" />
                 {{ activeClock }}
               </NuxtLink>
               <ul
@@ -338,6 +347,7 @@ function linkClass(active: boolean) {
           </div>
         </div>
         <nav class="px-2 py-3">
+          <MemberSportPicker class="mb-3" />
           <NuxtLink
             :to="staffDashboardItem.path"
             class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors mb-2"
@@ -392,9 +402,9 @@ function linkClass(active: boolean) {
                     v-if="showSessionPill(item.path)"
                     to="/member/coach/plans"
                     class="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[10px] tabular-nums bg-charcoal-900"
-                    :class="activeOvertime ? 'border-amber-400/60 text-amber-300' : 'border-acid/50 text-acid'"
+                    :class="sessionPillClass"
                   >
-                    <span class="h-1.5 w-1.5 rounded-full animate-pulse" :class="activeOvertime ? 'bg-amber-300' : 'bg-acid'" aria-hidden="true" />
+                    <span class="h-1.5 w-1.5 rounded-full" :class="sessionDotClass" aria-hidden="true" />
                     {{ activeClock }}
                   </NuxtLink>
                 </div>

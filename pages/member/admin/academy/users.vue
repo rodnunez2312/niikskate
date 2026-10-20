@@ -56,6 +56,7 @@ const kanbanAssignError = ref('')
 const movingStudentId = ref<string | null>(null)
 
 const UNASSIGNED_COLUMN = '__unassigned__'
+const unassignedOpen = ref(false)
 
 const expandedSkaterId = ref<string | null>(null)
 const skaterDraft = ref({
@@ -438,10 +439,6 @@ const adminSkaterCards = computed((): AdminSkaterCard[] => {
 })
 
 const skaterCount = computed(() => skaterProfileUsers.value.filter(onThisBoard).length)
-
-const inactiveSkaters = computed(() =>
-  users.value.filter(u => isSkaterProfile(u) && !u.is_active && onThisBoard(u)),
-)
 
 const columnItemCount = (col: KanbanColumn) => col.students.length
 
@@ -1366,29 +1363,6 @@ const scheduleSummary = (u: User) => {
         </div>
       </div>
 
-      <div
-        v-if="inactiveSkaters.length"
-        class="mb-4 rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3"
-      >
-        <p class="text-sm text-gray-300">
-          {{
-            language === 'es'
-              ? `${inactiveSkaters.length} patinador(es) inactivo(s) — no pueden iniciar sesión hasta activarlos.`
-              : `${inactiveSkaters.length} inactive skater(s) — cannot log in until activated.`
-          }}
-        </p>
-        <p class="text-xs text-gray-500 mt-1">
-          {{
-            language === 'es'
-              ? 'En la tarjeta del Kanban: icono de reloj → Activar (botón verde).'
-              : 'On their Kanban card: clock icon → Activate (green button).'
-          }}
-        </p>
-        <p class="text-xs text-gray-400 mt-2 truncate">
-          {{ inactiveSkaters.map(u => u.full_name).join(' · ') }}
-        </p>
-      </div>
-
       <!-- Loading -->
       <div v-if="loading" class="text-center py-12">
         <div class="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -1408,126 +1382,150 @@ const scheduleSummary = (u: User) => {
       </div>
 
       <!-- Kanban board -->
-      <div v-else class="overflow-x-auto pb-4 -mx-1 px-1">
-        <div class="flex gap-3 min-w-min">
+      <div v-else class="pb-4">
+        <div class="flex flex-wrap gap-3">
           <div
             v-for="col in activeKanbanColumns"
             :key="col.id"
-            class="w-[220px] shrink-0 flex flex-col max-h-[calc(100vh-220px)] rounded-xl transition-all duration-150"
-            :class="
+            class="flex flex-col rounded-xl transition-all duration-150"
+            :class="[
+              col.id === UNASSIGNED_COLUMN ? 'basis-full' : 'flex-1 min-w-[200px] max-h-[calc(100vh-220px)]',
               isColumnDropTarget(col.id)
                 ? 'ring-2 ring-gold-400/70 shadow-[0_0_20px_rgba(250,204,21,0.15)]'
-                : ''
-            "
+                : '',
+            ]"
             @dragenter.prevent="onColumnDragEnter(col.id)"
             @dragleave="onColumnDragLeave(col.id)"
             @dragover.prevent="onColumnDragOver"
             @drop.prevent="onDropColumn(col.id, $event)"
           >
             <div
-              class="rounded-t-xl px-3 py-2 border border-b-0 border-gray-800 bg-gray-900/90 sticky top-0 transition-colors"
-              :class="isColumnDropTarget(col.id) ? 'bg-gold-400/10 border-gold-400/40' : ''"
+              class="px-3 py-2 border border-charcoal-700 bg-cream sticky top-0 transition-colors"
+              :class="[
+                isColumnDropTarget(col.id) ? 'border-gold-400/40' : '',
+                col.id === UNASSIGNED_COLUMN && !unassignedOpen ? 'rounded-xl' : 'rounded-t-xl border-b-0',
+                col.id === UNASSIGNED_COLUMN ? 'cursor-pointer select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-600' : '',
+              ]"
               :style="col.color ? { borderTopColor: col.color, borderTopWidth: '3px' } : {}"
+              :role="col.id === UNASSIGNED_COLUMN ? 'button' : undefined"
+              :tabindex="col.id === UNASSIGNED_COLUMN ? 0 : undefined"
+              :aria-expanded="col.id === UNASSIGNED_COLUMN ? unassignedOpen : undefined"
+              @click="col.id === UNASSIGNED_COLUMN && (unassignedOpen = !unassignedOpen)"
+              @keydown.enter.prevent="col.id === UNASSIGNED_COLUMN && (unassignedOpen = !unassignedOpen)"
+              @keydown.space.prevent="col.id === UNASSIGNED_COLUMN && (unassignedOpen = !unassignedOpen)"
             >
-              <div class="flex items-start justify-between gap-2">
-                <p class="text-xs font-bold text-white truncate leading-tight">{{ col.title }}</p>
-                <span
-                  class="shrink-0 min-w-[1.25rem] text-center text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums"
-                  :class="
-                    columnItemCount(col) > 0
-                      ? 'bg-gold-400/20 text-gold-300'
-                      : 'bg-gray-800 text-gray-500'
-                  "
-                >
-                  {{ columnItemCount(col) }}
-                </span>
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs font-bold text-charcoal truncate leading-tight">{{ col.title }}</p>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span
+                    class="min-w-[1.25rem] text-center text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums"
+                    :class="
+                      columnItemCount(col) > 0
+                        ? 'bg-charcoal text-[#C9EF42]'
+                        : 'bg-cream-200 text-charcoal/50'
+                    "
+                  >
+                    {{ columnItemCount(col) }}
+                  </span>
+                  <span
+                    v-if="col.id === UNASSIGNED_COLUMN"
+                    class="w-3 text-center text-sm leading-none text-charcoal/50"
+                    aria-hidden="true"
+                  >{{ unassignedOpen ? '−' : '+' }}</span>
+                </div>
               </div>
             </div>
             <div
-              class="flex-1 overflow-y-auto rounded-b-xl border border-gray-800 p-2 space-y-1.5 min-h-[160px] transition-all duration-150"
-              :class="
+              v-show="col.id !== UNASSIGNED_COLUMN || unassignedOpen"
+              class="flex-1 overflow-y-auto rounded-b-xl border p-1.5 transition-all duration-150"
+              :class="[
+                col.id === UNASSIGNED_COLUMN
+                  ? 'flex flex-wrap content-start gap-1 min-h-[56px] max-h-[200px]'
+                  : 'space-y-1 min-h-[140px]',
                 isColumnDropTarget(col.id)
-                  ? 'bg-gold-400/15 border-gold-400/50 border-dashed'
+                  ? 'bg-charcoal-800 border-charcoal-600 border-dashed'
                   : draggingCardKey
-                    ? 'bg-black/30 border-gray-700'
-                    : 'bg-black/40'
-              "
+                    ? 'bg-charcoal-900 border-charcoal-700'
+                    : 'bg-charcoal border-charcoal-700',
+              ]"
             >
               <div
                 v-for="u in col.students"
                 :key="u.id"
                 draggable="true"
-                class="rounded-lg border border-gray-800 bg-gray-900 px-2 py-1.5 cursor-grab active:cursor-grabbing hover:border-gray-600 transition-all"
+                class="rounded-lg border border-charcoal-600 bg-charcoal-800 px-2 py-1 cursor-grab active:cursor-grabbing hover:border-gray-500 transition-all"
                 :class="{
+                  'w-[220px] shrink-0': col.id === UNASSIGNED_COLUMN,
                   'opacity-40': draggingCardKey === `profile:${u.id}`,
                   'ring-1 ring-gold-400/50': movingStudentId === u.id,
-                  'opacity-60 border-amber-500/30': !u.is_active,
+                  'opacity-60': !u.is_active,
                 }"
                 @dragstart="onDragStart(u.id, $event)"
                 @dragend="onDragEnd"
               >
-                <div class="flex items-center gap-2">
-                  <div class="w-7 h-7 rounded-full bg-glass-blue flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                <div class="flex items-start gap-2">
+                  <div class="mt-0.5 w-6 h-6 rounded-full bg-glass-blue flex items-center justify-center text-[9px] font-bold text-white shrink-0">
                     {{ skaterInitials(u.full_name) }}
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-[11px] font-semibold text-white truncate leading-tight">{{ u.full_name }}</p>
-                    <p v-if="seasonLabelFor(u)" class="text-[9px] text-gray-500 truncate">
-                      {{ seasonLabelFor(u) }}
-                    </p>
-                    <p v-if="kanbanMode === 'program' && skillBandLabelFor(u)" class="text-[9px] text-gray-500 truncate">
-                      {{ skillBandLabelFor(u) }}
-                    </p>
-                    <p v-else-if="kanbanMode === 'level' && programNameFor(u)" class="text-[9px] text-gray-500 truncate">
-                      {{ programNameFor(u) }}
-                    </p>
-                    <p v-if="familyNameFor(u.guardian_user_id)" class="text-[9px] text-gray-600 truncate">
-                      {{ familyNameFor(u.guardian_user_id) }}
-                    </p>
-                    <p v-if="!u.is_active" class="text-[9px] text-gray-500 uppercase tracking-wide mt-0.5">
-                      {{ language === 'es' ? 'Inactivo' : 'Inactive' }}
-                    </p>
-                  </div>
-                  <div class="flex flex-col gap-0.5 shrink-0">
-                    <NuxtLink
-                      :to="`/member/coach/students/${u.id}`"
-                      class="p-1 rounded text-gold-400 hover:bg-gray-800"
-                      :title="language === 'es' ? 'Perfil' : 'Profile'"
-                      @click.stop
+                    <div class="flex items-center gap-1">
+                      <p class="flex-1 min-w-0 text-[11px] font-semibold text-white truncate leading-6">{{ u.full_name }}</p>
+                      <div class="flex items-center shrink-0 -mr-1">
+                        <NuxtLink
+                          :to="`/member/coach/students/${u.id}`"
+                          class="p-0.5 rounded text-gold-400 hover:bg-white/10"
+                          :title="language === 'es' ? 'Perfil' : 'Profile'"
+                          @click.stop
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </NuxtLink>
+                        <button
+                          type="button"
+                          class="p-0.5 rounded text-gray-500 hover:text-white hover:bg-white/10"
+                          :title="language === 'es' ? 'Horario' : 'Schedule'"
+                          @click.stop="toggleSkaterPanel(u)"
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="p-0.5 rounded text-gray-600 hover:bg-red-950/50 hover:text-red-400 disabled:opacity-40"
+                          :disabled="deletingUserId === u.id"
+                          :title="language === 'es' ? `Eliminar ${u.full_name}` : `Delete ${u.full_name}`"
+                          :aria-label="language === 'es' ? `Eliminar ${u.full_name}` : `Delete ${u.full_name}`"
+                          @click.stop="deleteSkater(u)"
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <p
+                      v-if="seasonLabelFor(u) || (kanbanMode === 'level' && programNameFor(u)) || familyNameFor(u.guardian_user_id) || !u.is_active"
+                      class="-mt-0.5 text-[9px] text-gray-500 truncate leading-tight"
                     >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </NuxtLink>
-                    <button
-                      type="button"
-                      class="p-1 rounded text-gray-500 hover:text-white hover:bg-gray-800"
-                      :title="language === 'es' ? 'Horario' : 'Schedule'"
-                      @click.stop="toggleSkaterPanel(u)"
-                    >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      class="p-1 rounded text-gray-600 hover:bg-red-950/50 hover:text-red-400 disabled:opacity-40"
-                      :disabled="deletingUserId === u.id"
-                      :title="language === 'es' ? `Eliminar ${u.full_name}` : `Delete ${u.full_name}`"
-                      :aria-label="language === 'es' ? `Eliminar ${u.full_name}` : `Delete ${u.full_name}`"
-                      @click.stop="deleteSkater(u)"
-                    >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                      {{ [
+                        seasonLabelFor(u),
+                        kanbanMode === 'level' ? programNameFor(u) : '',
+                        familyNameFor(u.guardian_user_id),
+                        !u.is_active ? (language === 'es' ? 'Inactivo' : 'Inactive') : '',
+                      ].filter(Boolean).join(' · ') }}
+                    </p>
                   </div>
                 </div>
               </div>
               <p
                 v-if="!col.students.length"
-                class="text-[10px] text-center py-6 px-2 pointer-events-none"
-                :class="isColumnDropTarget(col.id) ? 'text-gold-300 font-semibold' : 'text-gray-600'"
+                class="text-[10px] text-center px-2 pointer-events-none"
+                :class="[
+                  col.id === UNASSIGNED_COLUMN ? 'w-full py-4' : 'py-6',
+                  isColumnDropTarget(col.id) ? 'text-gray-300 font-semibold' : 'text-gray-600',
+                ]"
               >
                 {{
                   isColumnDropTarget(col.id)

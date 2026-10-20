@@ -10,7 +10,7 @@ import {
   normalizeSkillGroupDisplayName,
   publicProgramLevelCopy,
 } from '~/utils/skillGroupLevels'
-import { TRAINING_DISCIPLINES, disciplineLabel } from '~/utils/trainingDisciplines'
+import { disciplineLabel } from '~/utils/trainingDisciplines'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -130,6 +130,8 @@ const dragOverId = ref<string | null>(null)
 const createModalOpen = ref(false)
 const newName = ref('')
 const newDescription = ref('')
+const { enabled: enabledSports, catalog: academySports } = useEnabledSports()
+const sportChoices = computed(() => academySports.filter(sport => enabledSports.value.includes(sport.id)))
 const newDiscipline = ref('skateboarding')
 const createSaving = ref(false)
 
@@ -390,7 +392,7 @@ async function deleteLevel(id: string, e?: Event) {
 function openCreateModal() {
   newName.value = ''
   newDescription.value = ''
-  newDiscipline.value = 'skateboarding'
+  newDiscipline.value = enabledSports.value[0] || 'skateboarding'
   createModalOpen.value = true
 }
 
@@ -1321,13 +1323,13 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
                 :placeholder="language === 'es' ? 'ej. Scooter principiantes' : 'e.g. Beginner scooter'"
               />
             </div>
-            <div>
+            <div v-if="sportChoices.length > 1">
               <label class="block text-sm font-medium text-gray-300 mb-1">
                 {{ language === 'es' ? 'Disciplina' : 'Discipline' }} *
               </label>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-for="sport in TRAINING_DISCIPLINES"
+                  v-for="sport in sportChoices"
                   :key="sport.id"
                   type="button"
                   class="px-3 py-1.5 rounded-lg text-xs font-semibold border"

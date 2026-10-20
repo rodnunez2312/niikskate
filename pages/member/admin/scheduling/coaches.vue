@@ -21,7 +21,7 @@ import {
   niikEmailLocalFromFullName,
 } from '~/utils/skaterNiikEmail'
 import { coachMatchesFirstName, defaultBackupFirstName } from '~/utils/coachBackups'
-import { TRAINING_DISCIPLINES, disciplineEmoji, isTrainingDiscipline, type TrainingDiscipline } from '~/utils/trainingDisciplines'
+import { disciplineEmoji, isTrainingDiscipline, type TrainingDiscipline } from '~/utils/trainingDisciplines'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -357,30 +357,19 @@ function availabilitySummary(coach: CoachUi): { on: number; total: number } {
   }
 }
 
-const sportFilter = ref<TrainingDiscipline | null>(null)
+const { enabled: enabledSports, catalog: academySports } = useEnabledSports()
+const sportChoices = computed(() => academySports.filter(sport => enabledSports.value.includes(sport.id)))
 
-/** Parkour only shows up once a coach teaches it. */
-const sportFilterOptions = computed(() =>
-  TRAINING_DISCIPLINES
-    .map(sport => ({
-      id: sport.id,
-      label: esLang.value ? sport.es : sport.en,
-      count: coaches.value.filter(coach => coach.disciplines.includes(sport.id)).length,
-    }))
-    .filter(sport => sport.id !== 'parkour' || sport.count > 0),
-)
-
-function setSportFilter(id: TrainingDiscipline | null) {
-  sportFilter.value = sportFilter.value === id ? null : id
+function allowedDisciplines(ids: TrainingDiscipline[]) {
+  const allowed = ids.filter(id => enabledSports.value.includes(id))
+  return allowed.length ? allowed : enabledSports.value.slice(0, 1)
 }
 
 const coachSections = computed(() =>
-  TRAINING_DISCIPLINES
-    .filter(sport => !sportFilter.value || sport.id === sportFilter.value)
-    .map(sport => ({
-      id: sport.id,
-      coaches: coaches.value.filter(coach => coach.disciplines.includes(sport.id)),
-    })),
+  sportChoices.value.map(sport => ({
+    id: sport.id,
+    coaches: coaches.value.filter(coach => coach.disciplines.includes(sport.id)),
+  })),
 )
 
 function coachSportList(raw: unknown): TrainingDiscipline[] {
@@ -628,7 +617,7 @@ const openEdit = async (coach: CoachUi, tab: 'details' | 'availability' = 'detai
     title: coach.title || '',
     is_head_coach: coach.is_head_coach,
     backup_coach_id: coach.backup_coach_id || '',
-    disciplines: [...coach.disciplines],
+    disciplines: allowedDisciplines([...coach.disciplines]),
     bio: coach.bio || '',
     experience: coach.experience || '',
     specialties: [...coach.specialties],
@@ -888,7 +877,13 @@ watch(() => newCoachForm.value.full_name, () => syncCoachEmailFromName())
 
 const openAddCoachModal = () => {
   coachEmailManual.value = false
-  newCoachForm.value = { email: '', password: DEFAULT_SKATER_PASSWORD, full_name: '', phone: '', disciplines: [] }
+  newCoachForm.value = {
+    email: '',
+    password: DEFAULT_SKATER_PASSWORD,
+    full_name: '',
+    phone: '',
+    disciplines: enabledSports.value.length === 1 ? [...enabledSports.value] : [],
+  }
   addCoachError.value = ''
   showAddCoachModal.value = true
 }
@@ -1059,38 +1054,6 @@ const submitAddCoach = async () => {
           </NuxtLink>
         </div>
       </section>
-
-      <!-- Sport filter -->
-      <div class="rounded-xl border border-gray-800 bg-gray-900 p-3">
-        <p class="px-1 mb-2 text-[11px] uppercase tracking-wider text-gray-500 font-medium">
-          {{ esLang ? 'Deportes' : 'Sports' }}
-        </p>
-        <div class="flex flex-wrap gap-2" role="group" :aria-label="esLang ? 'Filtrar por deporte' : 'Filter by sport'">
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors"
-            :class="!sportFilter ? 'border-acid bg-acid/10 text-white' : 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'"
-            :aria-pressed="!sportFilter"
-            @click="sportFilter = null"
-          >
-            {{ esLang ? 'Todos' : 'All' }}
-            <span class="text-xs text-gray-500">{{ coaches.length }}</span>
-          </button>
-          <button
-            v-for="sport in sportFilterOptions"
-            :key="sport.id"
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors"
-            :class="sportFilter === sport.id ? 'border-acid bg-acid/10 text-white' : 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'"
-            :aria-pressed="sportFilter === sport.id"
-            @click="setSportFilter(sport.id)"
-          >
-            <span aria-hidden="true">{{ disciplineEmoji(sport.id) }}</span>
-            {{ sport.label }}
-            <span class="text-xs text-gray-500">{{ sport.count }}</span>
-          </button>
-        </div>
-      </div>
 
       <p v-if="loadingCoaches" class="text-sm text-gray-500">{{ esLang ? 'Cargando…' : 'Loading…' }}</p>
 
@@ -1331,13 +1294,13 @@ const submitAddCoach = async () => {
             <div class="flex-1 overflow-y-auto px-5 py-4">
               <!-- Details -->
               <div v-show="editTab === 'details'" class="space-y-4">
-                <div>
+                <div v-if="sportChoices.length > 1">
                   <p class="text-xs font-medium text-gray-400 mb-2">
                     {{ esLang ? 'Deportes' : 'Sports' }}
                   </p>
                   <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                     <button
-                      v-for="sport in TRAINING_DISCIPLINES"
+                      v-for="sport in sportChoices"
                       :key="sport.id"
                       type="button"
                       class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"
@@ -1845,13 +1808,13 @@ const submitAddCoach = async () => {
               </button>
             </div>
             <form class="p-5 space-y-3" @submit.prevent="submitAddCoach">
-              <div>
+              <div v-if="sportChoices.length > 1">
                 <p class="text-xs font-medium text-gray-400 mb-2">
                   {{ esLang ? 'Deportes' : 'Sports' }} *
                 </p>
                 <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                   <button
-                    v-for="sport in TRAINING_DISCIPLINES"
+                    v-for="sport in sportChoices"
                     :key="sport.id"
                     type="button"
                     class="rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-all"

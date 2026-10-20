@@ -14,6 +14,7 @@ import {
   trickTaxonomySortIndex,
 } from '~/utils/skateTrickTaxonomy'
 import { hasEmbeddableVideoPreview, parseVideoUrl } from '~/utils/videoEmbed'
+import { TRICK_RARITIES, autoTrickRarity, isTrickRarityId, trickRarity } from '~/utils/skaterCareer'
 
 function tableDifficultyClass(difficulty?: string | null) {
   if (difficulty === 'intermediate') return 'bg-lime-200 text-gray-900'
@@ -209,6 +210,25 @@ onMounted(async () => {
     } catch { /* ignore */ }
   }
 })
+
+const savingRarityId = ref<string | null>(null)
+
+async function setTrickRarity(skill: any, value: string) {
+  const next = isTrickRarityId(value) ? value : null
+  const prev = skill.rarity ?? null
+  if (next === prev) return
+  skill.rarity = next
+  savingRarityId.value = skill.id
+  try {
+    const { error } = await client.from('skills_library').update({ rarity: next }).eq('id', skill.id)
+    if (error) throw error
+  } catch (e: any) {
+    skill.rarity = prev
+    alert(e?.message || (language.value === 'es' ? 'No se pudo guardar la rareza' : 'Could not save rarity'))
+  } finally {
+    savingRarityId.value = null
+  }
+}
 
 async function fetchSkills() {
   loading.value = true
@@ -673,6 +693,7 @@ function closeDetail() {
                   Type{{ sortIndicator('type') }}
                 </button>
               </th>
+              <th class="px-2 py-1.5">{{ language === 'es' ? 'Rareza' : 'Rarity' }}</th>
               <th class="px-2 py-1.5 text-center">Video</th>
             </tr>
           </thead>
@@ -713,6 +734,33 @@ function closeDetail() {
                 <td class="px-2 py-1 text-gray-900 text-xs whitespace-nowrap">
                   {{ skill.trick_type || '—' }}
                 </td>
+                <td class="px-2 py-1 whitespace-nowrap" @click.stop>
+                  <select
+                    v-if="(skill.trick_type || '').trim().toLowerCase() === 'trick'"
+                    :value="skill.rarity || ''"
+                    class="rounded-md border-0 py-0.5 pl-2 pr-7 text-xs font-semibold text-gray-900 disabled:opacity-50"
+                    :style="{
+                      color: '#151515',
+                      backgroundColor: `${trickRarity(skill).color}55`,
+                      boxShadow: `inset 0 0 0 1px ${trickRarity(skill).color}`,
+                      backgroundImage: `url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23151515' stroke-width='1.8'%3E%3Cpath d='M5 7.5 10 12.5 15 7.5'/%3E%3C/svg%3E&quot;)`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 0.4rem center',
+                      backgroundSize: '0.75rem',
+                    }"
+                    :disabled="savingRarityId === skill.id"
+                    :aria-label="language === 'es' ? 'Rareza' : 'Rarity'"
+                    @change="setTrickRarity(skill, ($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="">
+                      ◆ Auto ({{ language === 'es' ? autoTrickRarity(skill).labelEs : autoTrickRarity(skill).labelEn }})
+                    </option>
+                    <option v-for="r in TRICK_RARITIES" :key="r.id" :value="r.id">
+                      ◆ {{ language === 'es' ? r.labelEs : r.labelEn }}
+                    </option>
+                  </select>
+                  <span v-else class="text-gray-500 text-xs">—</span>
+                </td>
                 <td class="px-2 py-1" @click.stop>
                   <div v-if="trickVideoSources(skill).length" class="flex items-center justify-center gap-1">
                     <button
@@ -751,7 +799,7 @@ function closeDetail() {
               </tr>
             </template>
             <tr v-else>
-              <td :colspan="pickMode ? 8 : 7" class="px-4 py-12 text-center text-gray-500">
+              <td :colspan="pickMode ? 9 : 8" class="px-4 py-12 text-center text-gray-500">
                 {{ language === 'es' ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.' }}
               </td>
             </tr>

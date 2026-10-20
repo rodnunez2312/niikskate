@@ -17,7 +17,6 @@ import {
   type SkaterTrickBagStatus,
 } from '~/utils/skateTrickTaxonomy'
 import { computeSkaterProgramMilestones } from '~/utils/skaterProgramProgress'
-import { skaterRatingBubbleClass } from '~/utils/skaterRatingDots'
 import { computeAgeFromDob } from '~/utils/ageEligibility'
 import { normalizeSkillGroupDisplayName } from '~/utils/skillGroupLevels'
 import { disciplineFromJoin, skillLevelWithDiscipline } from '~/utils/trainingDisciplines'
@@ -26,6 +25,7 @@ import {
   SKATER_STANCE_OPTIONS,
   SKATER_STYLE_OPTIONS,
 } from '~/utils/skaterProfileFields'
+import { campaignChapterLabel, trickRarity } from '~/utils/skaterCareer'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -78,28 +78,6 @@ const programTrickIds = ref<string[]>([])
 const programDrillIds = ref<string[]>([])
 const individualProgramPct = ref(0)
 const groupAveragePct = ref(0)
-
-// Circular ratings (0–10 dots) for Skater Profile: Fundamentals, Skate IQ, Street, Vert, etc.
-const SKATER_RATING_ROWS = [
-  { key: 'rating_fundamentals', label: 'Fundamentals', labelEs: 'Fundamentos' },
-  { key: 'rating_skate_iq', label: 'Skate IQ', labelEs: 'Skate IQ' },
-  { key: 'rating_street', label: 'Street', labelEs: 'Street' },
-  { key: 'rating_vert', label: 'Vert', labelEs: 'Vert' },
-  { key: 'rating_speed_ollie', label: 'Speed ollie', labelEs: 'Speed ollie' },
-  { key: 'rating_fakie_switch', label: 'Fakie / Switch', labelEs: 'Fakie / Switch' },
-  { key: 'rating_slps', label: 'Slaps', labelEs: 'Slaps' },
-  { key: 'rating_rails', label: 'Rails', labelEs: 'Rails' },
-]
-
-const skillAttributeDots = computed(() =>
-  SKATER_RATING_ROWS.map(({ key, label, labelEs }) => {
-    const raw = student.value?.[key]
-    // Support both number and string (e.g. from Table Editor)
-    const num = typeof raw === 'number' ? raw : (typeof raw === 'string' ? parseInt(raw, 10) : NaN)
-    const value = Number.isFinite(num) && num >= 0 && num <= 10 ? num : 0
-    return { key, label, labelEs, filled: value, total: 10 }
-  })
-)
 
 const studentEmail = computed(() => {
   const email = student.value?.email?.trim()
@@ -224,6 +202,16 @@ const skaterInitial = computed(() =>
   (student.value?.full_name || '?').trim().charAt(0).toUpperCase(),
 )
 
+const { career, reload: reloadCareer, celebrations, dismissCelebration } = useSkaterCareer({
+  studentId,
+  skills,
+  progress: studentProgress,
+  programSkillIds: programTrickIds,
+  skatingStyle: computed(() => student.value?.skating_style ?? null),
+  ready: computed(() => !loading.value && !!student.value),
+})
+const programChapterLabel = computed(() => campaignChapterLabel(assignedProgramLabel.value))
+
 const learnedSkillIds = computed(() => new Set(studentProgress.value.map(p => p.skill_id)))
 
 const completedProgramTricks = computed(
@@ -242,65 +230,9 @@ const programDrillPct = computed(() =>
     ? Math.round((completedProgramDrills.value / programDrillIds.value.length) * 100)
     : 0,
 )
-const libraryTrickPct = computed(() =>
-  trickLibrary.value.length
-    ? Math.round((trickSlotsEarned.value / trickLibrary.value.length) * 100)
-    : 0,
-)
-const libraryDrillPct = computed(() =>
-  drillLibrary.value.length
-    ? Math.round((drillsCompleted.value / drillLibrary.value.length) * 100)
-    : 0,
-)
-
 const programMilestoneProgress = computed(() =>
   computeSkaterProgramMilestones(skills.value, learnedSkillIds.value),
 )
-
-const programTimelineFillWidth = computed(() => {
-  const pct = programMilestoneProgress.value.totalPct
-  // Track spans 10%–90% of container; fill proportional to overall progress.
-  return `${Math.max(0, Math.min(80, (pct / 100) * 80))}%`
-})
-
-const milestoneNodeClass = (m: { phase: string }) => {
-  if (m.phase === 'complete') {
-    return 'bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.35)]'
-  }
-  if (m.phase === 'active') {
-    return 'bg-amber-500/20 border-amber-400 text-amber-300 ring-2 ring-amber-400/25'
-  }
-  return 'bg-gray-800 border-gray-600 text-gray-500 opacity-70'
-}
-
-const milestoneStatusLabel = (
-  m: { phase: string; learned: number },
-  es: boolean,
-) => {
-  if (m.phase === 'complete') return es ? 'Hito' : 'Milestone'
-  if (m.phase === 'active') return es ? 'En curso' : 'In progress'
-  if (m.learned > 0) return es ? 'Extra' : 'Extra'
-  return es ? 'Pendiente' : 'Upcoming'
-}
-
-const milestoneCountLabel = (m: {
-  phase: string
-  learned: number
-  total: number
-}) => {
-  if (!m.total) return '—'
-  if (m.phase === 'locked') {
-    return m.learned > 0 ? `${m.learned}/${m.total}` : `0/${m.total}`
-  }
-  return `${m.learned}/${m.total}`
-}
-
-const milestoneCountClass = (m: { phase: string; learned: number }) => {
-  if (m.phase === 'complete') return 'text-emerald-400'
-  if (m.phase === 'active') return 'text-amber-400/90'
-  if (m.learned > 0) return 'text-gray-500'
-  return 'text-gray-600'
-}
 
 const saveSkaterProfileField = async (field: string, value: string | number | null) => {
   if (!canEditSkaterProfile.value || !studentId.value) return
@@ -321,41 +253,23 @@ const saveSkaterProfileField = async (field: string, value: string | number | nu
   }
 }
 
-const setSkaterRating = async (key: string, value: number) => {
-  if (!canEditSkaterProfile.value) return
-  const current = student.value?.[key]
-  const num = typeof current === 'number' ? current : parseInt(String(current ?? ''), 10)
-  const next = Number.isFinite(num) && num === value ? Math.max(0, value - 1) : value
-  await saveSkaterProfileField(key, next)
-}
-
 const setSkaterTrait = async (field: string, value: string | null) => {
   await saveSkaterProfileField(field, value)
 }
-
-// Achievements: trick slots = skills learned (challenge counts defined after unblockedTricks)
-
-/**
- * Drills are repetitions a skater performs, not tricks they land, so counting
- * them together made "Trucos aprendidos" measure two different things at once.
- */
-const trickLibrary = computed(() => skills.value.filter(isSkaterTrick))
-const drillLibrary = computed(() => skills.value.filter(isCoachDrill))
-
-const trickSlotsEarned = computed(
-  () => trickLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
-)
-const trickSlotsTotal = computed(() => Math.max(trickLibrary.value.length, 1))
-const drillsCompleted = computed(
-  () => drillLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
-)
-const drillsTotal = computed(() => drillLibrary.value.length)
 
 type ProfileModule = 'challenges' | 'tricks' | 'drills'
 const profileModule = ref<ProfileModule>('tricks')
 const challengeCounts = ref({ completed: 0, total: 0 })
 const challengeCard = ref<{ openForm: () => void } | null>(null)
 const bagIsDrills = computed(() => profileModule.value === 'drills')
+const masteredOpen = ref(false)
+const assignedOpen = ref(true)
+const assignPanelOpen = ref(false)
+
+function toggleAssignPanel() {
+  assignPanelOpen.value = !assignPanelOpen.value
+  if (assignPanelOpen.value) assignedOpen.value = true
+}
 
 const onChallengeCounts = (payload: { completed: number; total: number }) => {
   challengeCounts.value = payload
@@ -427,6 +341,7 @@ const loadStudent = async () => {
       .select('id', { count: 'exact', head: true })
       .eq('student_id', id)
     evidenceVideoCount.value = videoCount || 0
+    void reloadCareer()
   } catch (e) {
     console.error('Error loading student dashboard:', e)
   } finally {
@@ -1036,258 +951,86 @@ watch(studentId, () => loadStudent(), { immediate: false })
     </div>
 
     <div v-else-if="student" class="max-w-lg lg:max-w-6xl xl:max-w-7xl mx-auto w-full">
-      <!-- Hero: name banner + profile photo -->
-      <div class="relative px-4 pt-6 pb-4">
-        <div class="flex items-stretch gap-3">
-          <div
-            class="flex-1 min-w-0 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-xl px-5 py-4 shadow-lg transition-shadow"
-            :class="canEditSkaterProfile ? 'cursor-pointer hover:ring-2 hover:ring-white/25 active:scale-[0.995]' : ''"
-            :role="canEditSkaterProfile ? 'button' : undefined"
-            :tabindex="canEditSkaterProfile ? 0 : undefined"
-            @click="canEditSkaterProfile ? openProfileEditModal() : undefined"
-            @keydown.enter.prevent="canEditSkaterProfile ? openProfileEditModal() : undefined"
-            @keydown.space.prevent="canEditSkaterProfile ? openProfileEditModal() : undefined"
-          >
-            <div class="flex items-start justify-between gap-2">
-              <p class="text-xl font-black text-white uppercase tracking-tight truncate min-w-0">
-                {{ student.full_name || (language === 'es' ? 'Alumno' : 'Student') }}
-              </p>
-              <span
-                v-if="canEditSkaterProfile"
-                class="text-[9px] uppercase tracking-wide text-white/60 shrink-0 pt-0.5"
-              >
-                {{ language === 'es' ? 'Editar' : 'Edit' }}
-              </span>
-            </div>
-            <div v-if="studentEmail" class="mt-0.5 flex items-center gap-2 min-w-0">
-              <p class="text-sm text-white/90 truncate">{{ studentEmail }}</p>
+      <!-- Hero: skate career (XP, level, rank card) -->
+      <div class="relative px-4 pt-6 pb-4 space-y-3">
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/*"
+          class="hidden"
+          @change="onAvatarFileChange"
+        />
+        <MemberCareerSkaterCareerHero
+          :name="student.full_name || (language === 'es' ? 'Alumno' : 'Student')"
+          :career="career"
+          :es="language === 'es'"
+          :clickable="canEditSkaterProfile"
+          @open="openProfileEditModal()"
+        >
+          <template #badge>
+            <span v-if="canEditSkaterProfile" class="text-[9px] uppercase tracking-wide text-gray-500 shrink-0 pt-0.5">
+              {{ language === 'es' ? 'Editar' : 'Edit' }}
+            </span>
+          </template>
+          <div class="mt-3 pt-3 border-t border-gray-800 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+            <span v-if="studentEmail" class="flex items-center gap-1.5 min-w-0">
+              <span class="truncate text-gray-400">{{ studentEmail }}</span>
               <button
                 type="button"
-                class="shrink-0 rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white hover:bg-black/40"
+                class="shrink-0 rounded-full bg-gray-800 px-2 py-0.5 text-[10px] font-bold text-gray-300 hover:bg-gray-700"
                 @click.stop="copyStudentEmail"
               >
                 {{ emailCopied ? (language === 'es' ? 'Copiado' : 'Copied') : (language === 'es' ? 'Copiar' : 'Copy') }}
               </button>
-            </div>
-            <p v-else class="text-sm text-white/60 mt-0.5 italic">
-              {{ language === 'es' ? 'Sin email' : 'No email' }}
-            </p>
-            <p v-if="studentAgeDisplay" class="text-sm text-white/80 mt-0.5">{{ studentAgeDisplay }}</p>
-            <p v-else class="text-sm text-white/60 mt-0.5 italic">
-              {{ language === 'es' ? 'Sin edad' : 'No age' }}
-            </p>
-            <p class="text-sm text-white/90 mt-1">
-              {{ language === 'es' ? 'Videos subidos' : 'Videos uploaded' }}: {{ evidenceVideoCount }}
-            </p>
-            <p class="text-sm mt-2 flex items-center gap-1.5 flex-wrap">
-              <span class="text-white/75 shrink-0">
-                {{ language === 'es' ? 'Programa asignado:' : 'Assigned program:' }}
-              </span>
-              <NuxtLink
-                v-if="assignedProgramLabel && assignedProgramId"
-                :to="'/member/coach/library'"
-                class="font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white truncate"
-                @click.stop
-              >
-                {{ assignedProgramLabel }}
-              </NuxtLink>
-              <span v-else class="text-white/70 italic">
-                {{ language === 'es' ? 'Sin programa asignado' : 'No program assigned' }}
-              </span>
-            </p>
+            </span>
+            <span v-else class="italic">{{ language === 'es' ? 'Sin email' : 'No email' }}</span>
+            <span v-if="studentAgeDisplay">{{ studentAgeDisplay }}</span>
+            <NuxtLink
+              v-if="assignedProgramLabel && assignedProgramId"
+              :to="'/member/coach/library'"
+              class="text-[10px] font-black tracking-[0.15em] text-white hover:text-[#C9EF42] truncate"
+              @click.stop
+            >
+              {{ programChapterLabel }}
+            </NuxtLink>
+            <span v-else class="italic">{{ language === 'es' ? 'Sin programa asignado' : 'No program assigned' }}</span>
           </div>
-
-          <div class="shrink-0 flex flex-col items-center justify-center">
-            <input
-              ref="fileInputRef"
-              type="file"
-              accept="image/*"
-              class="hidden"
-              @change="onAvatarFileChange"
+          <template #rank>
+            <MemberCareerSkaterRankCard
+              :level="career.level"
+              :rank="career.rank"
+              :avatar-url="student.avatar_url"
+              :initial="skaterInitial"
+              :es="language === 'es'"
+              :editable="canEditSkaterProfile"
+              :uploading="uploadingAvatar"
+              @pick="openAvatarPicker()"
+              @remove="removeAvatar()"
             />
-            <button
-              type="button"
-              class="relative w-[88px] h-[88px] sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-gray-900 border-2 border-dashed border-white/30 flex items-center justify-center text-2xl transition-transform active:scale-[0.97] disabled:opacity-70"
-              :class="canEditSkaterProfile ? 'hover:border-white/60 cursor-pointer' : 'cursor-default'"
-              :disabled="uploadingAvatar || !canEditSkaterProfile"
-              :aria-label="language === 'es' ? 'Foto del patinador' : 'Skater photo'"
-              @click="canEditSkaterProfile ? openAvatarPicker() : undefined"
-            >
-              <img
-                v-if="student.avatar_url"
-                :src="student.avatar_url"
-                alt=""
-                class="w-full h-full object-cover"
-              />
-              <span v-else class="text-white/80 font-black text-3xl">{{ skaterInitial }}</span>
-              <div
-                v-if="uploadingAvatar"
-                class="absolute inset-0 bg-black/55 flex items-center justify-center"
-              >
-                <svg class="w-7 h-7 animate-spin text-amber-300" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              </div>
-              <span
-                v-else-if="canEditSkaterProfile"
-                class="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-black/70 text-xs flex items-center justify-center"
-              >
-                📷
-              </span>
-            </button>
-            <button
-              v-if="canEditSkaterProfile && student.avatar_url"
-              type="button"
-              class="text-[10px] text-red-300/90 hover:text-red-200 mt-1 underline"
-              :disabled="uploadingAvatar"
-              @click="removeAvatar"
-            >
-              {{ language === 'es' ? 'Quitar' : 'Remove' }}
-            </button>
-            <p
-              v-else-if="canEditSkaterProfile"
-              class="text-[10px] text-gray-500 mt-1 text-center max-w-[96px]"
-            >
-              {{ language === 'es' ? 'Subir foto' : 'Upload photo' }}
-            </p>
-          </div>
-        </div>
+          </template>
+        </MemberCareerSkaterCareerHero>
+
+        <MemberCareerSkaterWeeklyMission :mission="career.mission" :es="language === 'es'" />
+        <MemberCareerSkaterCelebration :items="celebrations" @dismiss="dismissCelebration" />
       </div>
 
       <div class="px-4 space-y-6">
         <!-- Program progress + habilidades + postura/estilo/empuje (single compact card) -->
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <div class="flex flex-col md:flex-row md:items-stretch gap-4 md:gap-0">
-            <!-- Left: assigned program progress (50%) -->
+            <!-- Left: accomplishments + XP feed (50%) -->
             <div
               class="md:w-1/2 md:min-w-0 md:border-r border-gray-800 md:pr-5 pb-4 md:pb-0 border-b md:border-b-0"
             >
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-base" aria-hidden="true">📈</span>
-                <h3 class="text-xs font-bold text-white uppercase tracking-wide leading-tight">
-                  {{ language === 'es' ? 'Progreso en programa asignado' : 'Assigned program progress' }}
-                </h3>
-              </div>
-
-              <template v-if="student.skill_group_id && assignedSkillGroup">
-                <p class="text-[10px] text-gray-500 mb-3 leading-snug">
-                  <span class="text-gray-300">{{ assignedProgramLabel || assignedSkillGroup.name }}</span>
-                  ·
-                  {{
-                    language === 'es'
-                      ? `${trickSlotsEarned} trucos · ${drillsCompleted} drills`
-                      : `${trickSlotsEarned} tricks · ${drillsCompleted} drills`
-                  }}
-                </p>
-                <div class="space-y-3">
-                  <div class="space-y-1">
-                    <div class="flex justify-between items-baseline gap-2">
-                      <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Trucos completados' : 'Completed tricks' }}</span>
-                      <span class="text-sm font-bold text-gray-200">
-                        {{ trickSlotsEarned }}/{{ trickSlotsTotal }} · {{ libraryTrickPct }}%
-                      </span>
-                    </div>
-                    <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                      <div
-                        class="h-full rounded-full bg-gray-200 transition-all"
-                        :style="{ width: `${libraryTrickPct}%` }"
-                      />
-                    </div>
-                  </div>
-                  <div class="space-y-1">
-                    <div class="flex justify-between items-baseline gap-2">
-                      <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Drills realizados' : 'Completed drills' }}</span>
-                      <span class="text-sm font-bold text-cyan-300">
-                        {{ drillsCompleted }}/{{ drillsTotal }} · {{ libraryDrillPct }}%
-                      </span>
-                    </div>
-                    <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                      <div
-                        class="h-full rounded-full bg-cyan-500 transition-all"
-                        :style="{ width: `${libraryDrillPct}%` }"
-                      />
-                    </div>
-                  </div>
-                  <div class="space-y-1">
-                    <div class="flex justify-between items-baseline gap-2">
-                      <span class="text-[10px] text-gray-500 leading-tight">
-                        {{ language === 'es' ? 'Promedio del grupo' : 'Group avg.' }}
-                      </span>
-                      <span class="text-sm font-bold text-indigo-300">{{ groupAveragePct }}%</span>
-                    </div>
-                    <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                      <div
-                        class="h-full bg-indigo-500/90 rounded-full transition-all"
-                        :style="{ width: `${groupAveragePct}%` }"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <p class="text-[9px] text-gray-600 mt-3 leading-snug">
-                  {{
-                    language === 'es'
-                      ? 'Cuenta cada truco y drill marcado como completado.'
-                      : 'Counts every trick and drill marked completed.'
-                  }}
-                </p>
-              </template>
-              <p v-else class="text-[11px] text-gray-500 leading-snug">
-                {{
-                  language === 'es'
-                    ? 'Sin programa asignado en Kanban. Arrastra al estudiante a un nivel en Estudiantes.'
-                    : 'No program assigned in Kanban. Drag the student to a level in Students.'
-                }}
-              </p>
+              <MemberCareerSkaterAccomplishments :career="career" :es="language === 'es'" />
             </div>
 
             <!-- Right: habilidades + postura / estilo / empuje (50%) -->
             <div class="md:w-1/2 md:min-w-0 md:pl-5">
-              <div class="flex items-center justify-between gap-2 mb-2">
-                <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-                  {{ language === 'es' ? 'Habilidades' : 'Skill attributes' }}
-                </h2>
-                <span
-                  v-if="canEditSkaterProfile"
-                  class="text-[10px] uppercase tracking-wide text-amber-400/80"
-                >
-                  {{ language === 'es' ? 'Clic para editar' : 'Click to edit' }}
-                </span>
-              </div>
-
-              <div class="space-y-1.5">
-                <div
-                  v-for="attr in skillAttributeDots"
-                  :key="attr.key"
-                  class="flex items-center justify-between gap-2"
-                >
-                  <span class="text-white text-xs font-medium w-[5rem] shrink-0 truncate">
-                    {{ language === 'es' ? attr.labelEs : attr.label }}
-                  </span>
-                  <div class="flex gap-0.5 flex-1 justify-end">
-                    <button
-                      v-for="i in 10"
-                      :key="i"
-                      type="button"
-                      class="w-2.5 h-2.5 rounded-full shrink-0 transition-all"
-                      :class="[
-                        skaterRatingBubbleClass(i - 1, attr.filled),
-                        canEditSkaterProfile ? 'hover:scale-125 cursor-pointer' : 'cursor-default',
-                        savingProfileField === attr.key ? 'opacity-50' : '',
-                      ]"
-                      :disabled="!canEditSkaterProfile || savingProfileField === attr.key"
-                      :title="
-                        canEditSkaterProfile
-                          ? language === 'es'
-                            ? `Nivel ${i}`
-                            : `Level ${i}`
-                          : undefined
-                      "
-                      @click="setSkaterRating(attr.key, i)"
-                    />
-                  </div>
-                </div>
-              </div>
+              <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Stats
+              </h2>
+              <MemberCareerSkaterThpsStats :stats="career.stats" :es="language === 'es'" />
 
               <div class="mt-3 pt-3 border-t border-gray-800">
                 <p v-if="profileSaveError" class="text-[10px] text-red-400 mb-2">{{ profileSaveError }}</p>
@@ -1325,172 +1068,26 @@ watch(studentId, () => loadStudent(), { immediate: false })
           </div>
         </div>
 
-        <!-- Curriculum progress (completed tricks only — independent of Kanban assignment) -->
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <div class="flex items-center justify-between gap-2 mb-1">
-            <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-              {{ language === 'es' ? 'Progreso del currículo' : 'Curriculum progress' }}
-            </h2>
-            <span class="text-lg font-bold text-amber-400">{{ programMilestoneProgress.totalPct }}%</span>
-          </div>
-          <p v-if="assignedProgramLabel" class="text-xs text-gray-400 mb-1">
-            {{ language === 'es' ? 'Programa asignado (Kanban):' : 'Assigned program (Kanban):' }}
-            <span class="text-gray-200 font-medium">{{ assignedProgramLabel }}</span>
-          </p>
-          <p class="text-xs text-gray-500 mb-5">
-            {{
-              language === 'es'
-                ? `Avance por trucos completados · fase ${programMilestoneProgress.activeLevelNum} de 5`
-                : `Based on completed tricks · phase ${programMilestoneProgress.activeLevelNum} of 5`
-            }}
-            <span class="block mt-0.5 text-gray-600">
-              {{
-                language === 'es'
-                  ? 'El programa asignado no implica que ya completó ese nivel.'
-                  : 'Assigned program does not mean that level is already completed.'
-              }}
-            </span>
-          </p>
-
-          <div class="relative px-1 pb-1 overflow-x-auto">
-            <!-- Timeline track -->
-            <div class="absolute left-[10%] right-[10%] top-[17px] h-0.5 bg-gray-700/80 rounded-full" aria-hidden="true" />
-            <div
-              class="absolute left-[10%] top-[17px] h-0.5 bg-gradient-to-r from-amber-500 via-orange-400 to-amber-500 rounded-full transition-all duration-700 ease-out"
-              :style="{ width: programTimelineFillWidth }"
-              aria-hidden="true"
-            />
-
-            <ol class="relative flex justify-between items-start min-w-[280px] list-none m-0 p-0">
-              <li
-                v-for="m in programMilestoneProgress.milestones"
-                :key="m.structure"
-                class="flex flex-col items-center flex-1 min-w-0 z-10"
-                :title="
-                  (language === 'es' ? m.labelEs : m.labelEn)
-                    + ' — '
-                    + (language === 'es' ? m.descriptionEs : m.descriptionEn)
-                "
-              >
-                <div
-                  class="w-9 h-9 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300"
-                  :class="milestoneNodeClass(m)"
-                >
-                  <svg
-                    v-if="m.phase === 'complete'"
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span v-else>{{ m.levelNum }}</span>
-                </div>
-
-                <p class="text-[10px] font-semibold text-gray-300 mt-2 text-center leading-tight px-0.5 max-w-[5rem]">
-                  {{ language === 'es' ? m.shortLabelEs : m.shortLabelEn }}
-                </p>
-                <p
-                  class="text-[10px] tabular-nums mt-0.5 font-medium"
-                  :class="milestoneCountClass(m)"
-                >
-                  {{ milestoneCountLabel(m) }}
-                </p>
-                <p
-                  class="text-[9px] uppercase tracking-wide mt-0.5"
-                  :class="
-                    m.phase === 'complete'
-                      ? 'text-emerald-500/80'
-                      : m.phase === 'active'
-                        ? 'text-amber-500/70'
-                        : m.learned > 0
-                          ? 'text-gray-500'
-                          : 'text-gray-600'
-                  "
-                >
-                  {{ milestoneStatusLabel(m, language === 'es') }}
-                </p>
-              </li>
-            </ol>
-          </div>
-
-          <p class="text-[11px] text-gray-500 mt-4 text-center">
-            {{
-              language === 'es'
-                ? 'Solo cuenta trucos/ejercicios marcados completados. Orden: Fundamentos → … → Avanzado.'
-                : 'Only marked completed tricks count. Order: Foundations → … → Advanced.'
-            }}
-          </p>
+        <!-- Curriculum progress (completed tricks only — independent of Kanban assignment) + achievements -->
+        <div class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-stretch">
+          <MemberCareerSkaterLevelMap
+            :milestones="programMilestoneProgress.milestones"
+            :xp="career.xp"
+            :es="language === 'es'"
+          />
+          <MemberCareerSkaterAchievements :achievements="career.achievements" :es="language === 'es'" />
         </div>
 
-        <div class="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left transition-colors"
-            :class="profileModule === 'tricks' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800 hover:border-gray-600'"
-            @click="profileModule = 'tricks'"
-          >
-            <p class="text-[11px] sm:text-sm text-gray-400 leading-tight">
-              {{ language === 'es' ? 'Trucos aprendidos' : 'Tricks learned' }}
-            </p>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
-              <div
-                class="h-full rounded-full bg-amber-500/80"
-                :style="{ width: `${Math.min(100, (trickSlotsEarned / trickSlotsTotal) * 100)}%` }"
-              />
-            </div>
-            <p class="mt-1 text-right text-sm font-bold text-white">{{ trickSlotsEarned }}/{{ trickSlotsTotal }}</p>
-          </button>
-
-          <button
-            type="button"
-            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left transition-colors"
-            :class="profileModule === 'drills' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800 hover:border-gray-600'"
-            @click="profileModule = 'drills'"
-          >
-            <p class="text-[11px] sm:text-sm text-gray-400 leading-tight">
-              {{ language === 'es' ? 'Drills completados' : 'Drills completed' }}
-            </p>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
-              <div
-                class="h-full rounded-full bg-amber-500/80"
-                :style="{ width: `${drillsTotal ? Math.min(100, (drillsCompleted / drillsTotal) * 100) : 0}%` }"
-              />
-            </div>
-            <p class="mt-1 text-right text-sm font-bold text-white">{{ drillsCompleted }}/{{ drillsTotal }}</p>
-          </button>
-
-          <button
-            type="button"
-            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left transition-colors"
-            :class="profileModule === 'challenges' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800 hover:border-gray-600'"
-            @click="profileModule = 'challenges'"
-          >
-            <div class="flex items-start justify-between gap-1">
-              <p class="text-[11px] sm:text-sm text-gray-400 leading-tight">
-                {{ language === 'es' ? 'Desafíos completados' : 'Challenges completed' }}
-              </p>
-              <span
-                v-if="canEditSkaterProfile"
-                class="shrink-0 rounded-lg bg-amber-500 px-2 py-1 text-[10px] font-bold text-black hover:bg-amber-400"
-                @click.stop="openChallengeForm"
-              >
-                {{ language === 'es' ? '+ Desafío' : '+ Challenge' }}
-              </span>
-            </div>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
-              <div
-                class="h-full rounded-full bg-amber-500/80"
-                :style="{ width: `${challengeCounts.total ? Math.round((challengeCounts.completed / challengeCounts.total) * 100) : 0}%` }"
-              />
-            </div>
-            <p class="mt-1 text-right text-sm font-bold text-white">
-              {{ challengeCounts.completed }}/{{ challengeCounts.total }}
-            </p>
-          </button>
-        </div>
+        <MemberCareerSkaterTrophyCards
+          :career="career"
+          :challenges-completed="challengeCounts.completed"
+          :challenges-total="challengeCounts.total"
+          :active="profileModule"
+          :es="language === 'es'"
+          :can-add-challenge="canEditSkaterProfile"
+          @select="profileModule = $event"
+          @add-challenge="openChallengeForm"
+        />
 
         <MemberSkaterChallengesCard
           v-show="profileModule === 'challenges'"
@@ -1609,15 +1206,23 @@ watch(studentId, () => loadStudent(), { immediate: false })
 
           <!-- Unlocked tricks / challenges -->
           <div class="hidden lg:block space-y-2 min-w-0">
-            <h4 class="text-sm font-semibold text-emerald-400">
-              {{
-                bagIsDrills
-                  ? (language === 'es' ? 'Drills realizados' : 'Completed drills')
-                  : (language === 'es' ? 'Trucos desbloqueados' : 'Unlocked tricks')
-              }}
-              <span class="text-gray-500 font-normal">({{ unblockedTricks.length }})</span>
-            </h4>
-            <div class="overflow-x-auto rounded-lg border border-gray-800">
+            <button
+              type="button"
+              class="w-full flex items-center justify-between gap-2 text-left"
+              :aria-expanded="masteredOpen"
+              @click="masteredOpen = !masteredOpen"
+            >
+              <h4 class="text-sm font-semibold text-emerald-400">
+                {{
+                  bagIsDrills
+                    ? (language === 'es' ? 'Drills realizados' : 'Completed drills')
+                    : (language === 'es' ? 'Trucos dominados' : 'Mastered tricks')
+                }}
+                <span class="text-gray-500 font-normal">({{ unblockedTricks.length }})</span>
+              </h4>
+              <span class="w-4 text-center text-base leading-none text-gray-500" aria-hidden="true">{{ masteredOpen ? '−' : '+' }}</span>
+            </button>
+            <div v-show="masteredOpen" class="overflow-x-auto rounded-lg border border-gray-800">
               <table class="w-full min-w-[640px] text-sm text-left">
                 <thead class="bg-gray-800/80 text-gray-400 text-xs uppercase tracking-wide">
                   <tr>
@@ -1664,6 +1269,13 @@ watch(studentId, () => loadStudent(), { immediate: false })
                     <td class="px-3 py-2 text-white font-medium max-w-[240px]">
                       <span class="block truncate">{{ language === 'es' ? row.skill?.name_es || row.skill?.name : row.skill?.name }}</span>
                       <div class="flex flex-wrap gap-1 mt-1">
+                        <span
+                          v-if="!bagIsDrills"
+                          class="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+                          :style="{ color: trickRarity(row.skill).color, backgroundColor: `${trickRarity(row.skill).color}1f`, boxShadow: `inset 0 0 0 1px ${trickRarity(row.skill).color}66` }"
+                        >
+                          ◆ {{ language === 'es' ? trickRarity(row.skill).labelEs : trickRarity(row.skill).labelEn }}
+                        </span>
                         <span v-if="row.skill?.area" class="px-1.5 py-0.5 rounded text-[10px]" :class="areaTagClass(row.skill.area)">{{ row.skill.area }}</span>
                         <span class="px-1.5 py-0.5 rounded text-[10px] capitalize" :class="difficultyTagClass(row.skill?.difficulty)">{{ row.skill?.difficulty }}</span>
                       </div>
@@ -1689,10 +1301,216 @@ watch(studentId, () => loadStudent(), { immediate: false })
 
           <!-- Assigned + in progress -->
           <div class="hidden lg:block space-y-3 min-w-0 border-t border-gray-800 pt-4">
-            <h4 class="text-sm font-semibold text-amber-400">
-              {{ language === 'es' ? 'Asignados y en progreso' : 'Assigned and in progress' }}
-              <span class="text-gray-500 font-normal">({{ activeTrickBag.length }})</span>
-            </h4>
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  class="text-left"
+                  :aria-expanded="assignedOpen"
+                  @click="assignedOpen = !assignedOpen"
+                >
+                  <h4 class="text-sm font-semibold text-amber-400">
+                    {{ language === 'es' ? 'Asignados y en progreso' : 'Assigned and in progress' }}
+                    <span class="text-gray-500 font-normal">({{ activeTrickBag.length }})</span>
+                  </h4>
+                </button>
+                <button
+                  type="button"
+                  class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white transition-transform hover:scale-110"
+                  :class="assignPanelOpen ? 'bg-gray-600 rotate-45' : 'bg-[#22C55E]'"
+                  :title="
+                    bagIsDrills
+                      ? (language === 'es' ? 'Asignar drill' : 'Assign drill')
+                      : (language === 'es' ? 'Asignar truco' : 'Assign trick')
+                  "
+                  :aria-label="
+                    bagIsDrills
+                      ? (language === 'es' ? 'Asignar drill' : 'Assign drill')
+                      : (language === 'es' ? 'Asignar truco' : 'Assign trick')
+                  "
+                  :aria-expanded="assignPanelOpen"
+                  @click="toggleAssignPanel"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 5v14m7-7H5" />
+                  </svg>
+                </button>
+              </div>
+              <button
+                type="button"
+                class="w-4 text-center text-base leading-none text-gray-500"
+                :aria-label="assignedOpen ? (language === 'es' ? 'Contraer' : 'Collapse') : (language === 'es' ? 'Expandir' : 'Expand')"
+                @click="assignedOpen = !assignedOpen"
+              >
+                {{ assignedOpen ? '−' : '+' }}
+              </button>
+            </div>
+
+            <div v-if="assignPanelOpen" class="space-y-2 rounded-xl border border-[#22C55E]/30 bg-gray-950/40 p-3">
+            <div class="flex items-center gap-2">
+              <input
+                v-model="assignSearch"
+                type="search"
+                class="min-w-0 flex-1 h-8 px-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
+                :placeholder="
+                  bagIsDrills
+                    ? (language === 'es' ? 'Buscar drill…' : 'Search drill…')
+                    : (language === 'es' ? 'Buscar truco…' : 'Search trick…')
+                "
+              />
+              <select
+                v-model="assignFilterStructure"
+                class="h-8 w-40 shrink-0 px-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
+              >
+                <option value="">{{ language === 'es' ? 'Programa' : 'Program' }}</option>
+                <option v-for="opt in assignStructureOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+              <select
+                v-model="assignFilterArea"
+                class="h-8 w-36 shrink-0 px-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
+              >
+                <option value="">{{ language === 'es' ? 'Área' : 'Area' }}</option>
+                <option v-for="opt in assignAreaOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+
+            <div
+              class="flex items-center gap-2 flex-wrap rounded-lg border px-3 py-2"
+              :class="
+                selectedAssignIds.length
+                  ? 'border-sky-500/40 bg-sky-500/10'
+                  : 'border-gray-800 bg-gray-950/40'
+              "
+            >
+              <span
+                class="text-xs font-semibold"
+                :class="selectedAssignIds.length ? 'text-sky-200' : 'text-gray-500'"
+              >
+                {{
+                  language === 'es'
+                    ? `${selectedAssignIds.length} seleccionados de ${assignTrickTableRows.length} visibles`
+                    : `${selectedAssignIds.length} selected of ${assignTrickTableRows.length} shown`
+                }}
+              </span>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-lg bg-sky-500 text-white text-xs font-bold disabled:opacity-40"
+                :disabled="bulkBusy || !selectedAssignIds.length"
+                @click="bulkAddSelected('assigned')"
+              >
+                {{ language === 'es' ? 'Asignar seleccionados' : 'Assign selected' }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold disabled:opacity-40"
+                :disabled="bulkBusy || !selectedAssignIds.length"
+                :title="
+                  language === 'es'
+                    ? 'Ya los sabe: van directo a completados'
+                    : 'Already landed: goes straight to completed'
+                "
+                @click="bulkAddSelected('done')"
+              >
+                {{ language === 'es' ? 'Marcar como ya dominados' : 'Mark as already landed' }}
+              </button>
+              <button
+                v-if="selectedAssignIds.length"
+                type="button"
+                class="ml-auto text-xs text-gray-400 hover:text-white"
+                @click="selectedAssignIds = []"
+              >
+                {{ language === 'es' ? 'Limpiar' : 'Clear' }}
+              </button>
+            </div>
+
+            <div class="overflow-x-auto overflow-y-auto max-h-[440px] rounded-lg border border-gray-800">
+              <table class="w-full min-w-[920px] text-sm text-left">
+                <thead class="sticky top-0 z-10 bg-gray-800/95 backdrop-blur-sm text-gray-400 text-xs uppercase tracking-wide">
+                  <tr>
+                    <th class="px-3 py-2 font-medium w-10">
+                      <input
+                        type="checkbox"
+                        class="w-4 h-4 accent-sky-500 cursor-pointer"
+                        :checked="allVisibleAssignSelected"
+                        :disabled="!assignTrickTableRows.length"
+                        :title="
+                          language === 'es'
+                            ? 'Seleccionar todo lo visible con estos filtros'
+                            : 'Select everything shown under these filters'
+                        "
+                        :aria-label="language === 'es' ? 'Seleccionar todos' : 'Select all'"
+                        @change="toggleAllVisibleAssign"
+                      />
+                    </th>
+                    <th class="px-3 py-2 font-medium w-12">#</th>
+                    <th
+                      class="px-3 py-2 font-medium w-32 cursor-help"
+                      :title="trickBagStatusFlowHint(language === 'es')"
+                    >
+                      {{ language === 'es' ? 'Estado' : 'Status' }}
+                    </th>
+                    <th class="px-3 py-2 font-medium">{{ bagIsDrills ? 'Drill' : (language === 'es' ? 'Truco' : 'Skill') }}</th>
+                    <th class="px-3 py-2 font-medium">Program</th>
+                    <th class="px-3 py-2 font-medium">Area</th>
+                  </tr>
+                </thead>
+                <tbody v-if="assignTrickTableRows.length" class="divide-y divide-gray-800">
+                  <tr
+                    v-for="row in assignTrickTableRows"
+                    :key="row.skill.id"
+                    class="hover:bg-gray-800/40"
+                    :class="selectedAssignSet.has(row.skill.id) ? 'bg-sky-500/5' : ''"
+                  >
+                    <td class="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        class="w-4 h-4 accent-sky-500 cursor-pointer"
+                        :checked="selectedAssignSet.has(row.skill.id)"
+                        :aria-label="language === 'es' ? 'Seleccionar truco' : 'Select trick'"
+                        @change="toggleAssignSelection(row.skill.id)"
+                      />
+                    </td>
+                    <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ trickManualLabel(row.skill) || '—' }}</td>
+                    <td class="px-3 py-2">
+                      <button
+                        type="button"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-sky-400/60 text-sky-400 hover:bg-sky-500/20 transition-colors disabled:opacity-40"
+                        :disabled="assigningSkillId === row.skill.id"
+                        :title="trickBagStatusNextHint(null, language === 'es')"
+                        @click="assignTrickById(row.skill.id)"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    </td>
+                    <td class="px-3 py-2 text-white font-medium max-w-[200px]">
+                      <span class="block truncate">{{ language === 'es' ? row.skill.name_es || row.skill.name : row.skill.name }}</span>
+                    </td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.area || '—' }}</td>
+                  </tr>
+                </tbody>
+                <tbody v-else>
+                  <tr>
+                    <td colspan="6" class="px-3 py-8 text-center text-gray-500 text-sm">
+                      {{
+                        assignablePool.length === 0
+                          ? (bagIsDrills
+                            ? (language === 'es' ? 'No hay drills disponibles para asignar.' : 'No drills available to assign.')
+                            : (language === 'es' ? 'No hay trucos disponibles para asignar.' : 'No tricks available to assign.'))
+                          : (bagIsDrills
+                            ? (language === 'es' ? 'Sin drills con estos filtros.' : 'No drills match these filters.')
+                            : (language === 'es' ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.'))
+                      }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            </div>
+
+            <div v-show="assignedOpen" class="space-y-3">
             <div
               v-if="selectedFocusIds.length"
               class="flex items-center gap-2 flex-wrap rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
@@ -1866,180 +1684,10 @@ watch(studentId, () => loadStudent(), { immediate: false })
                 </tbody>
               </table>
             </div>
+            </div>
           </div>
 
-          <!-- Assign trick table -->
-          <div class="hidden lg:block space-y-2 min-w-0 border-t border-gray-800 pt-3">
-            <h4 class="text-xs font-semibold text-amber-400">
-              {{
-                bagIsDrills
-                  ? (language === 'es' ? 'Asignar drill' : 'Assign drill')
-                  : (language === 'es' ? 'Asignar truco' : 'Assign trick')
-              }}
-            </h4>
-            <div class="flex items-center gap-2">
-              <input
-                v-model="assignSearch"
-                type="search"
-                class="min-w-0 flex-1 h-8 px-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
-                :placeholder="
-                  bagIsDrills
-                    ? (language === 'es' ? 'Buscar drill…' : 'Search drill…')
-                    : (language === 'es' ? 'Buscar truco…' : 'Search trick…')
-                "
-              />
-              <select
-                v-model="assignFilterStructure"
-                class="h-8 w-40 shrink-0 px-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
-              >
-                <option value="">{{ language === 'es' ? 'Programa' : 'Program' }}</option>
-                <option v-for="opt in assignStructureOptions" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-              <select
-                v-model="assignFilterArea"
-                class="h-8 w-36 shrink-0 px-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-xs"
-              >
-                <option value="">{{ language === 'es' ? 'Área' : 'Area' }}</option>
-                <option v-for="opt in assignAreaOptions" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-            </div>
-
-            <div
-              class="flex items-center gap-2 flex-wrap rounded-lg border px-3 py-2"
-              :class="
-                selectedAssignIds.length
-                  ? 'border-sky-500/40 bg-sky-500/10'
-                  : 'border-gray-800 bg-gray-950/40'
-              "
-            >
-              <span
-                class="text-xs font-semibold"
-                :class="selectedAssignIds.length ? 'text-sky-200' : 'text-gray-500'"
-              >
-                {{
-                  language === 'es'
-                    ? `${selectedAssignIds.length} seleccionados de ${assignTrickTableRows.length} visibles`
-                    : `${selectedAssignIds.length} selected of ${assignTrickTableRows.length} shown`
-                }}
-              </span>
-              <button
-                type="button"
-                class="px-3 py-1.5 rounded-lg bg-sky-500 text-white text-xs font-bold disabled:opacity-40"
-                :disabled="bulkBusy || !selectedAssignIds.length"
-                @click="bulkAddSelected('assigned')"
-              >
-                {{ language === 'es' ? 'Asignar seleccionados' : 'Assign selected' }}
-              </button>
-              <button
-                type="button"
-                class="px-3 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold disabled:opacity-40"
-                :disabled="bulkBusy || !selectedAssignIds.length"
-                :title="
-                  language === 'es'
-                    ? 'Ya los sabe: van directo a completados'
-                    : 'Already landed: goes straight to completed'
-                "
-                @click="bulkAddSelected('done')"
-              >
-                {{ language === 'es' ? 'Marcar como ya dominados' : 'Mark as already landed' }}
-              </button>
-              <button
-                v-if="selectedAssignIds.length"
-                type="button"
-                class="ml-auto text-xs text-gray-400 hover:text-white"
-                @click="selectedAssignIds = []"
-              >
-                {{ language === 'es' ? 'Limpiar' : 'Clear' }}
-              </button>
-            </div>
-
-            <div class="overflow-x-auto overflow-y-auto max-h-[440px] rounded-lg border border-gray-800">
-              <table class="w-full min-w-[920px] text-sm text-left">
-                <thead class="sticky top-0 z-10 bg-gray-800/95 backdrop-blur-sm text-gray-400 text-xs uppercase tracking-wide">
-                  <tr>
-                    <th class="px-3 py-2 font-medium w-10">
-                      <input
-                        type="checkbox"
-                        class="w-4 h-4 accent-sky-500 cursor-pointer"
-                        :checked="allVisibleAssignSelected"
-                        :disabled="!assignTrickTableRows.length"
-                        :title="
-                          language === 'es'
-                            ? 'Seleccionar todo lo visible con estos filtros'
-                            : 'Select everything shown under these filters'
-                        "
-                        :aria-label="language === 'es' ? 'Seleccionar todos' : 'Select all'"
-                        @change="toggleAllVisibleAssign"
-                      />
-                    </th>
-                    <th class="px-3 py-2 font-medium w-12">#</th>
-                    <th
-                      class="px-3 py-2 font-medium w-32 cursor-help"
-                      :title="trickBagStatusFlowHint(language === 'es')"
-                    >
-                      {{ language === 'es' ? 'Estado' : 'Status' }}
-                    </th>
-                    <th class="px-3 py-2 font-medium">{{ bagIsDrills ? 'Drill' : (language === 'es' ? 'Truco' : 'Skill') }}</th>
-                    <th class="px-3 py-2 font-medium">Program</th>
-                    <th class="px-3 py-2 font-medium">Area</th>
-                  </tr>
-                </thead>
-                <tbody v-if="assignTrickTableRows.length" class="divide-y divide-gray-800">
-                  <tr
-                    v-for="row in assignTrickTableRows"
-                    :key="row.skill.id"
-                    class="hover:bg-gray-800/40"
-                    :class="selectedAssignSet.has(row.skill.id) ? 'bg-sky-500/5' : ''"
-                  >
-                    <td class="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        class="w-4 h-4 accent-sky-500 cursor-pointer"
-                        :checked="selectedAssignSet.has(row.skill.id)"
-                        :aria-label="language === 'es' ? 'Seleccionar truco' : 'Select trick'"
-                        @change="toggleAssignSelection(row.skill.id)"
-                      />
-                    </td>
-                    <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ trickManualLabel(row.skill) || '—' }}</td>
-                    <td class="px-3 py-2">
-                      <button
-                        type="button"
-                        class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-sky-400/60 text-sky-400 hover:bg-sky-500/20 transition-colors disabled:opacity-40"
-                        :disabled="assigningSkillId === row.skill.id"
-                        :title="trickBagStatusNextHint(null, language === 'es')"
-                        @click="assignTrickById(row.skill.id)"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    </td>
-                    <td class="px-3 py-2 text-white font-medium max-w-[200px]">
-                      <span class="block truncate">{{ language === 'es' ? row.skill.name_es || row.skill.name : row.skill.name }}</span>
-                    </td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ skillStructure(row.skill) || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-300 whitespace-nowrap">{{ row.skill.area || '—' }}</td>
-                  </tr>
-                </tbody>
-                <tbody v-else>
-                  <tr>
-                    <td colspan="6" class="px-3 py-8 text-center text-gray-500 text-sm">
-                      {{
-                        assignablePool.length === 0
-                          ? (bagIsDrills
-                            ? (language === 'es' ? 'No hay drills disponibles para asignar.' : 'No drills available to assign.')
-                            : (language === 'es' ? 'No hay trucos disponibles para asignar.' : 'No tricks available to assign.'))
-                          : (bagIsDrills
-                            ? (language === 'es' ? 'Sin drills con estos filtros.' : 'No drills match these filters.')
-                            : (language === 'es' ? 'Sin trucos con estos filtros.' : 'No tricks match these filters.'))
-                      }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p v-if="focusError" class="text-sm text-flame-500">{{ focusError }}</p>
-          </div>
+          <p v-if="focusError" class="hidden lg:block text-sm text-flame-500">{{ focusError }}</p>
         </div>
 
         <!-- Preferred schedule (set by admin) -->

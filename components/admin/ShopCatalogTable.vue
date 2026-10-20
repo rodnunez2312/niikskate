@@ -33,7 +33,7 @@ const COLUMNS = [
   { id: 'proveedor', es: 'Proveedor', en: 'Supplier' },
   { id: 'description', es: 'Descripción', en: 'Description' },
   { id: 'comentarios', es: 'Notas', en: 'Notes' },
-  { id: 'is_active', es: 'En tienda', en: 'Live' },
+  { id: 'is_active', es: 'Visible', en: 'Visible' },
   { id: 'is_featured', es: 'Destacado', en: 'Featured' },
 ] as const
 
@@ -85,6 +85,27 @@ watch(visible, (value) => {
 }, { deep: true })
 
 const shownColumns = computed(() => COLUMNS.filter(column => visible.value[column.id]))
+
+function columnClass(id: ColumnId) {
+  const centered = id === 'sku' || id === 'price' || id === 'stock_quantity' || id === 'size'
+  const align = centered ? 'text-center' : ''
+  if (id === 'name' || id === 'description') return 'w-[50ch] max-w-[50ch]'
+  if (id === 'size') return 'w-[10ch] max-w-[10ch] text-center'
+  if (id === 'sku' || id === 'brand' || id === 'category' || id === 'price' || id === 'stock_quantity' || id === 'size') {
+    return ['w-px whitespace-nowrap', align].filter(Boolean).join(' ')
+  }
+  return align
+}
+
+function fieldClass(id: ColumnId) {
+  if (id === 'name') return 'w-full max-w-[50ch] bg-transparent px-1 py-0.5 text-xs text-gray-900'
+  if (id === 'size') return 'w-full max-w-[10ch] bg-transparent px-1 py-0.5 text-center text-xs text-gray-900'
+  if (id === 'sku' || id === 'price' || id === 'stock_quantity') {
+    return 'w-auto min-w-[2.5rem] bg-transparent px-1 py-0.5 text-center text-xs text-gray-900 [field-sizing:content]'
+  }
+  if (id === 'brand') return 'w-auto min-w-[2.5rem] bg-transparent px-1 py-0.5 text-xs text-gray-900 [field-sizing:content]'
+  return 'w-full min-w-[5rem] bg-transparent px-1 py-0.5 text-xs text-gray-900'
+}
 
 const brands = computed(() => {
   const names = new Set<string>()
@@ -170,7 +191,11 @@ function onText(product: any, column: ColumnId, event: Event) {
   const current = String(cellValue(product, column) ?? '')
   if (value === current) return
   const patch: Record<string, unknown> = {}
-  if (column === 'price' || column === 'stock_quantity') patch[column] = Number(value) || 0
+  if (column === 'price' || column === 'stock_quantity') {
+    const raw = value.replace(/[^0-9.]/g, '')
+    patch[column] = Number(raw) || 0
+  } else if (column === 'name' || column === 'description') patch[column] = value.slice(0, 50)
+  else if (column === 'size') patch[column] = value.slice(0, 10)
   else patch[column] = value
   void savePatch(product, patch)
 }
@@ -301,8 +326,8 @@ function exportCsv() {
         <option v-for="name in brands" :key="name" :value="name">{{ name }}</option>
       </select>
       <select v-model="status" class="px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-sm">
-        <option value="all">{{ es ? 'En tienda y ocultos' : 'Live and hidden' }}</option>
-        <option value="live">{{ es ? 'En tienda' : 'Live' }}</option>
+        <option value="all">{{ es ? 'Visibles y ocultos' : 'Visible and hidden' }}</option>
+        <option value="live">{{ es ? 'Visible' : 'Visible' }}</option>
         <option value="hidden">{{ es ? 'Ocultos' : 'Hidden' }}</option>
       </select>
       <select v-model="featured" class="px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-sm">
@@ -329,7 +354,12 @@ function exportCsv() {
       <table class="min-w-[960px] w-full text-sm border-collapse text-gray-900">
         <thead class="bg-gray-100 text-left text-[11px] uppercase tracking-wide text-gray-900">
           <tr>
-            <th v-for="column in shownColumns" :key="column.id" class="px-2 py-1 font-bold border-b border-gray-200">
+            <th
+              v-for="column in shownColumns"
+              :key="column.id"
+              class="px-2 py-1 font-bold border-b border-gray-200"
+              :class="columnClass(column.id)"
+            >
               {{ es ? column.es : column.en }}
             </th>
             <th class="px-2 py-1 border-b border-gray-200" />
@@ -337,11 +367,11 @@ function exportCsv() {
         </thead>
         <tbody>
           <tr v-if="draft" class="bg-gray-100">
-            <td v-for="column in shownColumns" :key="column.id" class="px-1 py-0.5 border-b border-gray-200 align-middle">
+            <td v-for="column in shownColumns" :key="column.id" class="px-1 py-0.5 border-b border-gray-200 align-middle" :class="columnClass(column.id)">
               <select
                 v-if="column.id === 'category'"
                 v-model="draft.category"
-                class="w-full px-2 py-1 rounded-lg bg-white border border-gray-300 text-gray-900 text-xs"
+                class="w-max px-2 py-1 rounded-lg bg-white border border-gray-300 text-gray-900 text-xs"
               >
                 <option v-for="option in categories" :key="option.id" :value="option.id">{{ es ? option.name.es : option.name.en }}</option>
               </select>
@@ -351,12 +381,23 @@ function exportCsv() {
                 type="checkbox"
                 class="accent-acid"
               >
-              <input
-                v-else
-                v-model="draft[column.id]"
-                :type="column.id === 'price' || column.id === 'stock_quantity' ? 'number' : 'text'"
-                class="w-full min-w-[6rem] px-2 py-1 rounded-lg bg-white border border-gray-300 text-gray-900 text-xs"
-              >
+              <span v-else class="inline-flex items-center justify-center gap-0.5 text-xs text-gray-900">
+                <span v-if="column.id === 'price'" aria-hidden="true">$</span>
+                <input
+                  v-model="draft[column.id]"
+                  :type="column.id === 'stock_quantity' ? 'number' : 'text'"
+                  :class="column.id === 'name'
+                    ? 'w-full max-w-[50ch] px-2 py-1 rounded-lg bg-white border border-gray-300 text-gray-900 text-xs'
+                    : column.id === 'size'
+                      ? 'w-full max-w-[10ch] px-2 py-1 rounded-lg bg-white border border-gray-300 text-center text-gray-900 text-xs'
+                      : column.id === 'sku' || column.id === 'price' || column.id === 'stock_quantity'
+                      ? 'w-auto min-w-[2.5rem] px-2 py-1 rounded-lg bg-white border border-gray-300 text-center text-gray-900 text-xs [field-sizing:content]'
+                      : column.id === 'brand'
+                        ? 'w-auto min-w-[2.5rem] px-2 py-1 rounded-lg bg-white border border-gray-300 text-gray-900 text-xs [field-sizing:content]'
+                        : 'w-full min-w-[6rem] px-2 py-1 rounded-lg bg-white border border-gray-300 text-gray-900 text-xs'"
+                  :maxlength="column.id === 'name' || column.id === 'description' ? 50 : column.id === 'size' ? 10 : undefined"
+                >
+              </span>
             </td>
             <td class="px-2 py-1 border-b border-gray-200 whitespace-nowrap">
               <button type="button" class="text-xs font-bold text-acid mr-2" :disabled="savingId === 'draft'" @click="saveDraft">
@@ -366,10 +407,10 @@ function exportCsv() {
             </td>
           </tr>
           <tr v-for="product in rows" :key="product.id" class="odd:bg-white even:bg-gray-100 hover:bg-gray-200/70">
-            <td v-for="column in shownColumns" :key="column.id" class="px-1 py-0.5 border-b border-gray-200 align-middle">
+            <td v-for="column in shownColumns" :key="column.id" class="px-1 py-0.5 border-b border-gray-200 align-middle" :class="columnClass(column.id)">
               <select
                 v-if="column.id === 'category'"
-                class="w-full bg-transparent px-1 py-0.5 text-xs text-gray-900"
+                class="w-max max-w-none bg-transparent px-1 py-0.5 text-xs text-gray-900"
                 :value="product.category"
                 @change="savePatch(product, { category: ($event.target as HTMLSelectElement).value })"
               >
@@ -384,15 +425,27 @@ function exportCsv() {
               >
               <textarea
                 v-else-if="column.id === 'description' || column.id === 'comentarios'"
-                class="w-full min-w-[12rem] bg-transparent px-1 py-0.5 text-xs text-gray-900 resize-y"
+                class="w-full max-w-[50ch] bg-transparent px-1 py-0.5 text-xs text-gray-900 resize-y"
                 rows="1"
+                maxlength="50"
                 :value="cellValue(product, column.id)"
                 @blur="onText(product, column.id, $event)"
               />
+              <span v-else-if="column.id === 'price'" class="inline-flex items-center justify-center gap-0.5 text-xs text-gray-900">
+                <span aria-hidden="true">$</span>
+                <input
+                  class="w-auto min-w-[2.5rem] bg-transparent px-1 py-0.5 text-center text-xs text-gray-900 [field-sizing:content]"
+                  type="text"
+                  inputmode="decimal"
+                  :value="cellValue(product, column.id)"
+                  @blur="onText(product, column.id, $event)"
+                >
+              </span>
               <input
                 v-else
-                class="w-full min-w-[5rem] bg-transparent px-1 py-0.5 text-xs text-gray-900"
-                :type="column.id === 'price' || column.id === 'stock_quantity' ? 'number' : 'text'"
+                :class="fieldClass(column.id)"
+                :type="column.id === 'stock_quantity' ? 'number' : 'text'"
+                :maxlength="column.id === 'name' ? 50 : column.id === 'size' ? 10 : undefined"
                 :value="cellValue(product, column.id)"
                 @blur="onText(product, column.id, $event)"
               >

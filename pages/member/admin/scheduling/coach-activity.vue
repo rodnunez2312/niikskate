@@ -2,6 +2,7 @@
 import { format, startOfWeek, endOfWeek, addWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { CoachActivityCoach, CoachActivityResponse } from '~/server/api/admin/coach-activity.get'
+import { PROGRAM_SKILL_TRACKS, type ProgramSkillTrack } from '~/types'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -20,8 +21,11 @@ const loading = ref(false)
 const loadError = ref('')
 const data = ref<CoachActivityResponse | null>(null)
 
-const tab = ref<'overview' | 'scorecard'>('overview')
-const programFilter = ref('')
+const progressInfoOpen = ref(false)
+const levelsInfoOpen = ref(false)
+const videosInfoOpen = ref(false)
+const { enabled: enabledSports } = useEnabledSports()
+const sportsQuery = computed(() => enabledSports.value.join(','))
 const periodKey = ref<'week' | 'month' | 'quarter'>('week')
 /** 0 is the current week, month, or quarter. Arrows move this. */
 const periodOffset = ref(0)
@@ -58,24 +62,38 @@ const PERIOD_KINDS = [
   { key: 'quarter' as const, es: '3 meses', en: '3 months' },
 ]
 
-const periodLabel = computed(() => {
-  const locale = esLang.value ? es : undefined
-  const { from, to } = rangeFor(periodKey.value, periodOffset.value)
-  if (periodKey.value === 'month') {
-    const label = format(from, 'MMMM yyyy', { locale })
-    return label.charAt(0).toUpperCase() + label.slice(1)
-  }
-  if (periodKey.value === 'quarter') {
-    return `${format(from, 'MMM', { locale })} – ${format(to, 'MMM yyyy', { locale })}`
-  }
-  const sameMonth = from.getMonth() === to.getMonth()
-  return sameMonth
-    ? `${format(from, 'd', { locale })} – ${format(to, 'd MMM yyyy', { locale })}`
-    : `${format(from, 'd MMM', { locale })} – ${format(to, 'd MMM yyyy', { locale })}`
-})
+/** Responses by period and filter, so stepping between weeks shows the last result at once. */
+const activityCache = new Map<string, { at: number; request: Promise<CoachActivityResponse> }>()
+const CACHE_FRESH_MS = 30_000
 
-function shiftPeriod(delta: number) {
-  periodOffset.value += delta
+const activityKey = (from: string, to: string, months: number) => `${from}|${to}|${sportsQuery.value}|${months}`
+
+function fetchActivity(from: string, to: string, months: number, maxAge = CACHE_FRESH_MS) {
+  const key = activityKey(from, to, months)
+  const cached = activityCache.get(key)
+  if (cached && Date.now() - cached.at < maxAge) return cached.request
+  const request = (async () => {
+    const { data: session } = await client.auth.getSession()
+    const token = session.session?.access_token
+    if (!token) throw new Error(esLang.value ? 'Sesión expirada' : 'Session expired')
+    return $fetch<CoachActivityResponse>('/api/admin/coach-activity', {
+      headers: { Authorization: `Bearer ${token}` },
+      query: { from, to, sports: sportsQuery.value, historyMonths: months },
+    })
+  })()
+  const entry = { at: Date.now(), request }
+  activityCache.set(key, entry)
+  request.catch(() => {
+    if (activityCache.get(key) === entry) activityCache.delete(key)
+  })
+  return request
+}
+
+function prefetchNeighbours() {
+  for (const offset of [periodOffset.value - 1, periodOffset.value + 1]) {
+    const range = rangeFor(periodKey.value, offset)
+    fetchActivity(ymd(range.from), ymd(range.to), 0, Infinity).catch(() => {})
+  }
 }
 
 let loadSeq = 0
@@ -84,23 +102,19 @@ const load = async () => {
   loading.value = true
   loadError.value = ''
   try {
-    const { data: session } = await client.auth.getSession()
-    const token = session.session?.access_token
-    if (!token) throw new Error(esLang.value ? 'Sesión expirada' : 'Session expired')
-
-    const next = await $fetch<CoachActivityResponse>('/api/admin/coach-activity', {
-      headers: { Authorization: `Bearer ${token}` },
-      query: {
-        from: period.value.from,
-        to: period.value.to,
-        program: programFilter.value || undefined,
-        historyMonths: historyMonths.value,
-      },
-    })
+    const { from, to } = period.value
+    const hit = activityCache.get(activityKey(from, to, historyMonths.value))
+    if (hit) {
+      const early = await hit.request.catch(() => null)
+      if (seq !== loadSeq) return
+      if (early) data.value = early
+    }
+    const next = await fetchActivity(from, to, historyMonths.value)
     if (seq !== loadSeq) return
     data.value = next
-    if (!selectedCoachId.value && next.coaches.length) {
-      selectedCoachId.value = next.coaches[0].id
+    prefetchNeighbours()
+    if (selectedCoachId.value && !next.coaches.some(coach => coach.id === selectedCoachId.value)) {
+      selectedCoachId.value = ''
     }
   } catch (e: any) {
     if (seq === loadSeq) loadError.value = e?.data?.message || e?.message || 'Error'
@@ -110,25 +124,35 @@ const load = async () => {
 }
 
 onMounted(async () => {
-  if (!user.value) {
-    router.push('/auth/login?redirect=/member/admin/scheduling/coach-activity')
-    return
+  try {
+    if (!user.value) {
+      await router.push('/auth/login?redirect=/member/admin/scheduling/coach-activity')
+      return
+    }
+    // The API checks the admin role itself, so the data request does not wait on this lookup.
+    const firstLoad = load()
+    const { data: profile, error } = await client.from('profiles').select('role').eq('id', user.value.id).single()
+    if (error) throw error
+    if (profile?.role !== 'admin') {
+      await router.push('/')
+      return
+    }
+    isAdmin.value = true
+    checkingRole.value = false
+    await firstLoad
+  } catch (e: any) {
+    loadError.value = e?.data?.message || e?.message || (esLang.value ? 'No se pudo abrir Actividad' : 'Could not open Activity')
+    isAdmin.value = true
+  } finally {
+    checkingRole.value = false
   }
-  const { data: profile } = await client.from('profiles').select('role').eq('id', user.value.id).single()
-  if (profile?.role !== 'admin') {
-    router.push('/')
-    return
-  }
-  isAdmin.value = true
-  checkingRole.value = false
-  await load()
 })
 
 watch(periodKey, () => {
   if (periodOffset.value !== 0) periodOffset.value = 0
 })
 
-watch([periodKey, programFilter, periodOffset], () => {
+watch([periodKey, sportsQuery, periodOffset], () => {
   historyMonths.value = 0
   load()
 })
@@ -148,7 +172,7 @@ async function loadOlderMonth() {
       query: {
         from: period.value.from,
         to: period.value.to,
-        program: programFilter.value || undefined,
+        sports: sportsQuery.value,
         historyMonths: nextMonths,
       },
     })
@@ -167,6 +191,34 @@ async function loadOlderMonth() {
 
 const coaches = computed(() => data.value?.coaches ?? [])
 const totals = computed(() => data.value?.totals)
+
+function levelStat(id: ProgramSkillTrack) {
+  if (!selectedCoachId.value) {
+    return data.value?.classes_by_level?.find(row => row.id === id) || { given: 0, scheduled: 0 }
+  }
+  const words = id === 'beginner'
+    ? ['principiante', 'beginner']
+    : id === 'intermediate'
+      ? ['intermedio', 'intermediate']
+      : ['avanzado', 'advanced']
+  let given = 0
+  let scheduled = 0
+  for (const row of coachPeriodClasses.value) {
+    const title = (row.title || '').toLowerCase()
+    if (!words.some(word => title.includes(word))) continue
+    if (row.status === 'cancelled') continue
+    scheduled += 1
+    if (row.status === 'done') given += 1
+  }
+  return { given, scheduled }
+}
+
+function shortDate(key: string) {
+  const [y, m, d] = key.split('-')
+  return `${d}/${m}/${y.slice(2)}`
+}
+
+const periodRangeLabel = computed(() => `${shortDate(period.value.from)} – ${shortDate(period.value.to)}`)
 
 const contributionTotals = computed(() => [
   { key: 'evaluations' as const, value: totals.value?.evaluations ?? 0, label: esLang.value ? 'Evaluaciones completadas' : 'Assessments completed' },
@@ -196,6 +248,49 @@ const contributors = computed(() => {
 const selectedCoach = computed(
   () => coaches.value.find(c => c.id === selectedCoachId.value) ?? null,
 )
+
+function classMatchesCoach(row: { coachIds: string[]; pills: Array<{ id: string }> }, id: string) {
+  return row.coachIds.includes(id) || row.pills.some(pill => pill.id === id)
+}
+
+function toggleSelectedCoach(id: string) {
+  selectedCoachId.value = selectedCoachId.value === id ? '' : id
+}
+
+const coachPeriodClasses = computed(() => {
+  const id = selectedCoachId.value
+  if (!id) return []
+  const { from, to } = period.value
+  return nearby.value.filter(row => row.date >= from && row.date <= to && classMatchesCoach(row, id))
+})
+
+const boardStats = computed(() => {
+  const team = totals.value
+  const coach = selectedCoach.value
+  if (!team) return null
+  if (!coach) {
+    return {
+      classesGiven: team.classes_given,
+      classesInPeriod: team.classes_in_period as number | null,
+      cancelled: team.classes_cancelled,
+      videos: team.videos,
+      sessionVideos: team.session_videos,
+      evalVideos: team.evaluation_videos,
+      progress: team.athletes_with_progress,
+      active: team.active_skaters,
+    }
+  }
+  return {
+    classesGiven: coach.classes_given,
+    classesInPeriod: null,
+    cancelled: coach.classes_cancelled,
+    videos: coach.videos,
+    sessionVideos: coach.session_videos,
+    evalVideos: coach.evaluation_videos,
+    progress: coach.athletes_with_progress,
+    active: coach.athletes_taught,
+  }
+})
 
 const nearby = computed(() => data.value?.nearby ?? [])
 const PILL_COLORS = ['bg-violet-500', 'bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-orange-500']
@@ -236,6 +331,7 @@ const weekColumns = computed(() => {
   const lastMonday = shiftKey(thisMonday, -7)
   if (lastMonday >= oldest) starts.add(lastMonday)
   for (const row of nearby.value) {
+    if (selectedCoachId.value && !classMatchesCoach(row, selectedCoachId.value)) continue
     if (row.weekStart >= oldest) starts.add(row.weekStart)
   }
   const ordered = [...starts].sort((a, b) => {
@@ -244,7 +340,7 @@ const weekColumns = computed(() => {
     return b.localeCompare(a)
   })
   return ordered.map(start => {
-    const rows = nearby.value.filter(row => row.weekStart === start)
+    const rows = nearby.value.filter(row => row.weekStart === start && (!selectedCoachId.value || classMatchesCoach(row, selectedCoachId.value)))
     const byDate = new Map<string, typeof rows>()
     for (const row of rows) {
       const list = byDate.get(row.date) || []
@@ -278,13 +374,78 @@ const weekColumns = computed(() => {
   })
 })
 
-function chipClass(status: 'done' | 'cancelled' | 'open' | 'upcoming', currentWeek = false) {
-  if (status === 'done') return 'bg-acid text-charcoal'
-  if (currentWeek && status !== 'cancelled') return 'bg-transparent text-gray-200 border border-gray-700'
-  if (status === 'open') return 'bg-gray-500 text-white'
-  if (status === 'cancelled') return 'bg-transparent text-gray-500 line-through border border-gray-700'
-  return 'bg-gray-800 text-gray-300 border border-gray-700'
+const expandedClassId = ref('')
+
+function statusAccent(status: 'done' | 'cancelled' | 'open' | 'upcoming') {
+  if (status === 'done') return '#A3FF12'
+  if (status === 'upcoming') return '#4C9AFF'
+  if (status === 'cancelled') return '#FF4D4D'
+  return '#FFB547'
 }
+
+function toggleClassRow(id: string) {
+  expandedClassId.value = expandedClassId.value === id ? '' : id
+}
+
+function levelMarks(title: string) {
+  const text = title.toLowerCase()
+  const marks: Array<{ emoji: string; label: string }> = []
+  if (text.includes('principiante') || text.includes('beginner')) marks.push({ emoji: '🌱', label: esLang.value ? 'Principiante' : 'Beginner' })
+  if (text.includes('intermedio') || text.includes('intermediate')) marks.push({ emoji: '🚀', label: esLang.value ? 'Intermedio' : 'Intermediate' })
+  if (text.includes('avanzado') || text.includes('advanced')) marks.push({ emoji: '🏆', label: esLang.value ? 'Avanzado' : 'Advanced' })
+  return marks
+}
+
+function classLine(row: { title: string; time: string; age?: string; pills: Array<{ id: string; initials: string; name: string }> }) {
+  const title = row.title || ''
+  const text = title.toLowerCase()
+  const individual = text.includes('individual')
+  const grouped = !individual && (text.includes('grupal') || /\bgroup\b/.test(text))
+  const marks = levelMarks(title)
+  return {
+    fallback: marks.length ? '' : title,
+    age: row.age || title.match(/(?:grupo de edad|age group)\s*:\s*([^·]+)/i)?.[1]?.trim() || '',
+    time: row.time,
+    marks,
+    kind: individual ? 'individual' : grouped ? 'group' : '',
+    kindLabel: individual
+      ? (esLang.value ? 'Clase individual' : 'Individual class')
+      : grouped
+        ? (esLang.value ? 'Clase grupal' : 'Group class')
+        : '',
+    coaches: row.pills.filter(pill => pill.initials),
+  }
+}
+
+const periodJump = computed(() => {
+  if (periodKey.value === 'month') {
+    return {
+      prev: esLang.value ? 'Mes pasado' : 'Last month',
+      current: esLang.value ? 'Mes actual' : 'This month',
+      next: esLang.value ? 'Mes siguiente' : 'Next month',
+    }
+  }
+  if (periodKey.value === 'quarter') {
+    return {
+      prev: esLang.value ? 'Trimestre pasado' : 'Last quarter',
+      current: esLang.value ? 'Trimestre actual' : 'This quarter',
+      next: esLang.value ? 'Trimestre siguiente' : 'Next quarter',
+    }
+  }
+  return {
+    prev: esLang.value ? 'Semana pasada' : 'Last week',
+    current: esLang.value ? 'Semana actual' : 'This week',
+    next: esLang.value ? 'Semana siguiente' : 'Next week',
+  }
+})
+
+function jumpStyle(offset: number) {
+  return periodOffset.value === offset
+    ? { background: '#A3FF12', color: '#000', fontWeight: '600' }
+    : { background: 'transparent', color: '#999' }
+}
+
+const MEDALS = ['🥇', '🥈', '🥉']
 
 const needsFollowThrough = computed(() =>
   coaches.value.filter(c => c.classes_without_notes > 0),
@@ -297,13 +458,6 @@ const idleCoaches = computed(() =>
       c.classes_given + c.evaluations + c.videos + c.class_plans + c.tricks_marked === 0,
   ),
 )
-
-function lastActiveLabel(c: CoachActivityCoach): string {
-  if (!c.last_active) return esLang.value ? 'Sin actividad' : 'No activity'
-  return format(new Date(`${c.last_active}T00:00:00`), 'd MMM yyyy', {
-    locale: esLang.value ? es : undefined,
-  })
-}
 
 function initials(name: string): string {
   return name
@@ -388,7 +542,6 @@ function exportCsv() {
     <template v-else-if="isAdmin">
     <MemberStaffPageHeader
       :title="esLang ? 'Actividad' : 'Activity'"
-      :subtitle="esLang ? 'Mira el trabajo, reconoce el esfuerzo y sabe dónde ayudar.' : 'See the work, recognize the effort, and know where to help.'"
     >
       <template #actions>
         <button
@@ -402,84 +555,52 @@ function exportCsv() {
     </MemberStaffPageHeader>
     <div class="px-4 py-6 max-w-5xl mx-auto space-y-5 pb-16">
 
-      <!-- Tabs + filters -->
-      <div class="flex items-center justify-between gap-3 flex-wrap">
-        <div class="inline-flex rounded-xl border border-gray-800 bg-gray-900 p-0.5">
-          <button
-            type="button"
-            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-            :class="tab === 'overview' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'"
-            @click="tab = 'overview'"
-          >
-            {{ esLang ? 'Vista del equipo' : 'Team overview' }}
-          </button>
-          <button
-            type="button"
-            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-            :class="tab === 'scorecard' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'"
-            @click="tab = 'scorecard'"
-          >
-            {{ esLang ? 'Ficha por coach' : 'Coach scorecard' }}
-          </button>
+      <!-- Filters. Equal side columns keep the period slider on the same center as the date. -->
+      <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div class="justify-self-start">
+          <div class="inline-flex items-center rounded-lg border border-gray-800 bg-gray-900">
+            <button
+              v-for="kind in PERIOD_KINDS"
+              :key="kind.key"
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              :class="periodKey === kind.key ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'"
+              @click="periodKey = kind.key"
+            >
+              {{ esLang ? kind.es : kind.en }}
+            </button>
+          </div>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap">
-          <select
-            v-model="programFilter"
-            class="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm outline-none focus:border-teal-500"
-          >
-            <option value="">{{ esLang ? 'Todos los programas' : 'All programs' }}</option>
-            <option v-for="p in data?.programs || []" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3 flex-wrap -mt-1">
-        <div class="inline-flex rounded-lg border border-gray-800 p-0.5">
+        <div class="inline-flex items-center justify-center rounded-lg border border-gray-800 bg-gray-900 justify-self-center">
           <button
-            v-for="kind in PERIOD_KINDS"
-            :key="kind.key"
             type="button"
-            class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
-            :class="periodKey === kind.key ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'"
-            @click="periodKey = kind.key"
+            class="px-3 py-1.5 rounded-lg text-sm"
+            :style="jumpStyle(-1)"
+            @click="periodOffset = -1"
           >
-            {{ esLang ? kind.es : kind.en }}
+            ← {{ periodJump.prev }}
           </button>
-        </div>
-
-        <div class="flex items-center gap-1">
+          <span class="px-1 text-[#666]" aria-hidden="true">|</span>
           <button
             type="button"
-            class="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/5"
-            :aria-label="esLang ? 'Periodo anterior' : 'Previous period'"
-            @click="shiftPeriod(-1)"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <p class="min-w-[11rem] text-center text-sm font-semibold text-white tabular-nums">{{ periodLabel }}</p>
-          <button
-            type="button"
-            class="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/5"
-            :aria-label="esLang ? 'Periodo siguiente' : 'Next period'"
-            @click="shiftPeriod(1)"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-          <button
-            v-if="periodOffset !== 0"
-            type="button"
-            class="ml-1 text-xs text-gray-500 hover:text-white"
+            class="px-3 py-1.5 rounded-lg text-sm"
+            :style="jumpStyle(0)"
             @click="periodOffset = 0"
           >
-            {{ esLang ? 'Hoy' : 'Today' }}
+            {{ periodJump.current }}
           </button>
-          <span v-if="loading && totals" class="ml-2 text-xs text-gray-600">{{ esLang ? 'Actualizando…' : 'Updating…' }}</span>
+          <span class="px-1 text-[#666]" aria-hidden="true">|</span>
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-lg text-sm"
+            :style="jumpStyle(1)"
+            @click="periodOffset = 1"
+          >
+            {{ periodJump.next }} →
+          </button>
         </div>
+        <div class="hidden sm:block" aria-hidden="true" />
       </div>
 
       <p v-if="loadError" class="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-300">
@@ -491,46 +612,114 @@ function exportCsv() {
       </div>
 
       <template v-else-if="totals">
-        <!-- Team overview -->
-        <div v-show="tab === 'overview'" class="space-y-4">
+        <div class="text-center">
+          <p class="h-4 text-[11px] leading-4 text-gray-500" aria-live="polite">
+            <template v-if="loading">{{ esLang ? 'Actualizando…' : 'Updating…' }}</template>
+          </p>
+          <p class="text-sm font-semibold tabular-nums text-white">{{ periodRangeLabel }}</p>
+        </div>
+        <div class="space-y-4">
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <p class="text-xs text-gray-400">{{ esLang ? 'Clases dadas' : 'Classes given' }}</p>
-              <p class="text-3xl font-bold text-white mt-1">
-                {{ totals.classes_given }}<span class="text-gray-600 text-xl"> / {{ totals.classes_in_period }}</span>
-              </p>
-              <p class="text-[11px] text-acid mt-1">
-                {{ totals.classes_cancelled }} {{ esLang ? 'canceladas' : 'cancelled' }}
-              </p>
-              <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang ? 'Marcadas hechas por el coach' : 'Marked done by the coach' }}
+            <div class="relative rounded-xl border border-gray-800 bg-gray-900 px-3 py-2.5">
+              <div
+                class="absolute right-2.5 top-2.5 z-10"
+                @mouseenter="levelsInfoOpen = true"
+                @mouseleave="levelsInfoOpen = false"
+              >
+                <button
+                  type="button"
+                  class="flex h-5 w-5 items-center justify-center rounded-full border border-gray-600 text-[11px] font-semibold text-gray-300 hover:border-acid hover:text-acid"
+                  :aria-label="esLang ? 'Clases por nivel' : 'Classes by level'"
+                  :aria-expanded="levelsInfoOpen"
+                >
+                  i
+                </button>
+                <div v-show="levelsInfoOpen" class="absolute right-0 top-6 w-44 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 shadow-lg">
+                  <p
+                    v-for="track in PROGRAM_SKILL_TRACKS"
+                    :key="track.id"
+                    class="flex items-center justify-between gap-2 py-0.5 text-[11px] text-gray-300"
+                  >
+                    <span class="flex items-center gap-1 min-w-0">
+                      <span aria-hidden="true">{{ track.emoji }}</span>
+                      <span class="truncate">{{ esLang ? track.label.es : track.label.en }}</span>
+                    </span>
+                    <span class="shrink-0 tabular-nums text-white">{{ levelStat(track.id).given }}/{{ levelStat(track.id).scheduled }}</span>
+                  </p>
+                </div>
+              </div>
+              <p class="pr-6 text-xs text-gray-400">{{ esLang ? 'Clases dadas' : 'Classes given' }}</p>
+              <div class="mt-0.5 flex items-end justify-between gap-2">
+                <p class="text-3xl font-bold leading-none text-white">
+                  {{ boardStats?.classesGiven }}<span v-if="boardStats?.classesInPeriod != null" class="text-gray-600 text-xl"> / {{ boardStats.classesInPeriod }}</span>
+                </p>
+                <p class="pb-0.5 text-[11px] text-acid">
+                  {{ boardStats?.cancelled }} {{ esLang ? 'canceladas' : 'cancelled' }}
+                </p>
+              </div>
+            </div>
+            <div class="relative rounded-xl border border-gray-800 bg-gray-900 px-3 py-2.5">
+              <div
+                class="absolute right-2.5 top-2.5 z-10"
+                @mouseenter="videosInfoOpen = true"
+                @mouseleave="videosInfoOpen = false"
+              >
+                <button
+                  type="button"
+                  class="flex h-5 w-5 items-center justify-center rounded-full border border-gray-600 text-[11px] font-semibold text-gray-300 hover:border-acid hover:text-acid"
+                  :aria-label="esLang ? 'Videos por tipo' : 'Videos by type'"
+                  :aria-expanded="videosInfoOpen"
+                >
+                  i
+                </button>
+                <div v-show="videosInfoOpen" class="absolute right-0 top-6 w-44 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 shadow-lg">
+                  <p class="flex items-center justify-between gap-2 py-0.5 text-[11px] text-gray-300">
+                    <span>{{ esLang ? 'Sesión' : 'Session' }}</span>
+                    <span class="shrink-0 tabular-nums text-white">{{ boardStats?.sessionVideos }}</span>
+                  </p>
+                  <p class="flex items-center justify-between gap-2 py-0.5 text-[11px] text-gray-300">
+                    <span>{{ esLang ? 'Evaluaciones' : 'Evaluations' }}</span>
+                    <span class="shrink-0 tabular-nums text-white">{{ boardStats?.evalVideos }}</span>
+                  </p>
+                </div>
+              </div>
+              <p class="pr-6 text-xs text-gray-400">{{ esLang ? 'Videos subidos' : 'Videos uploaded' }}</p>
+              <p class="text-3xl font-bold leading-none text-white mt-0.5">{{ boardStats?.videos }}</p>
+            </div>
+            <div class="relative rounded-xl border border-gray-800 bg-gray-900 px-3 py-2.5">
+              <div
+                class="absolute right-2.5 top-2.5 z-10"
+                @mouseenter="progressInfoOpen = true"
+                @mouseleave="progressInfoOpen = false"
+              >
+                <button
+                  type="button"
+                  class="flex h-5 w-5 items-center justify-center rounded-full border border-gray-600 text-[11px] font-semibold text-gray-300 hover:border-acid hover:text-acid"
+                  :aria-label="esLang ? 'Qué cuenta aquí' : 'What this counts'"
+                  :aria-expanded="progressInfoOpen"
+                >
+                  i
+                </button>
+                <div v-show="progressInfoOpen" class="absolute right-0 top-6 w-52 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 shadow-lg">
+                  <p class="flex items-center justify-between gap-2 py-0.5 text-[11px] text-gray-300">
+                    <span>{{ esLang ? 'Clase' : 'Class' }}</span>
+                    <span class="shrink-0 text-right text-white">{{ esLang ? 'en el período' : 'in the period' }}</span>
+                  </p>
+                  <p class="flex items-center justify-between gap-2 py-0.5 text-[11px] text-gray-300">
+                    <span>{{ esLang ? 'Truco' : 'Trick' }}</span>
+                    <span class="shrink-0 text-right text-white">{{ esLang ? 'al menos uno' : 'at least one' }}</span>
+                  </p>
+                </div>
+              </div>
+              <p class="pr-6 text-xs text-gray-400">{{ esLang ? 'Skaters con progreso' : 'Athletes with progress' }}</p>
+              <p class="text-3xl font-bold leading-none text-white mt-0.5">
+                {{ boardStats?.progress }}<span class="text-gray-600 text-xl"> / {{ boardStats?.active }}</span>
               </p>
             </div>
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <p class="text-xs text-gray-400">{{ esLang ? 'Videos subidos' : 'Videos uploaded' }}</p>
-              <p class="text-3xl font-bold text-white mt-1">{{ totals.videos }}</p>
-              <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang
-                  ? `${totals.session_videos} de sesión · ${totals.evaluation_videos} de evaluaciones`
-                  : `${totals.session_videos} from sessions · ${totals.evaluation_videos} from evaluations` }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <p class="text-xs text-gray-400">{{ esLang ? 'Skaters con progreso' : 'Athletes with progress' }}</p>
-              <p class="text-3xl font-bold text-white mt-1">
-                {{ totals.athletes_with_progress }}<span class="text-gray-600 text-xl"> / {{ totals.active_skaters }}</span>
-              </p>
-              <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang ? 'Con clase comprada o asignada en el período, y al menos un truco marcado' : 'With a class bought or assigned in this period, and at least one trick marked' }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
+            <div class="rounded-xl border border-gray-800 bg-gray-900 px-3 py-2.5">
               <p class="text-xs text-gray-400">{{ esLang ? 'Coaches activos' : 'Coaches contributing' }}</p>
-              <p class="text-3xl font-bold text-white mt-1">
+              <p class="text-3xl font-bold leading-none text-white mt-0.5">
                 {{ totals.coaches_contributing }}<span class="text-gray-600 text-xl"> / {{ totals.coaches_total }}</span>
-              </p>
-              <p class="text-[11px] text-gray-600 mt-1">
-                {{ esLang ? 'Asignados a una clase en el período, con trabajo registrado' : 'Assigned to a class in this period, with recorded work' }}
               </p>
             </div>
           </div>
@@ -578,11 +767,13 @@ function exportCsv() {
 
               <ul v-else class="space-y-2">
                 <li
-                  v-for="row in contributors"
+                  v-for="(row, index) in contributors"
                   :key="row.coach.id"
-                  class="flex items-center gap-3"
+                  class="flex items-center gap-2"
                 >
+                  <span v-if="index < 3 && row.value > 0" class="w-6 text-center text-base shrink-0" aria-hidden="true">{{ MEDALS[index] }}</span>
                   <span
+                    v-else
                     class="w-7 h-7 rounded-full text-[11px] font-bold text-white flex items-center justify-center shrink-0"
                     :class="pillColor(row.coach.id)"
                   >
@@ -590,14 +781,21 @@ function exportCsv() {
                   </span>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between gap-2">
-                      <p class="text-sm text-white truncate">{{ row.coach.name }}</p>
+                      <button
+                        type="button"
+                        class="min-w-0 truncate text-left text-sm"
+                        :style="selectedCoachId === row.coach.id ? { color: '#A3FF12', fontWeight: '600' } : { color: '#fff' }"
+                        :aria-pressed="selectedCoachId === row.coach.id"
+                        @click="toggleSelectedCoach(row.coach.id)"
+                      >
+                        {{ row.coach.name }}
+                      </button>
                       <span class="text-sm font-semibold text-white shrink-0">{{ row.value }}</span>
                     </div>
                     <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
                       <div
                         class="h-full rounded-full transition-all"
-                        :class="row.value > 0 ? 'bg-teal-500' : 'bg-gray-700'"
-                        :style="{ width: `${Math.max(row.pct, row.value > 0 ? 6 : 2)}%` }"
+                        :style="{ width: `${Math.max(row.pct, row.value > 0 ? 8 : 2)}%`, background: row.value > 0 ? '#A3FF12' : '#444' }"
                       />
                     </div>
                   </div>
@@ -612,14 +810,12 @@ function exportCsv() {
                   {{ esLang ? 'Clases por semana' : 'Classes by week' }}
                 </h2>
                 <p class="text-xs text-gray-500 mt-0.5 mb-3">
-                  {{ esLang
-                    ? 'Gris sin marcar · verde hecha, cuenta para el pago · neutro si aún está programada.'
-                    : 'Gray is unmarked · lime is done and counts for pay · neutral is still scheduled.' }}
+                  {{ esLang ? 'Toca una clase para ver el título y abrirla.' : 'Tap a class to see the title and open it.' }}
                 </p>
 
                 <div class="week-board">
-                  <div class="flex gap-3 items-start min-w-max pr-1">
-                    <div v-for="week in weekColumns" :key="week.id" class="w-64 shrink-0">
+                  <div class="flex gap-2 items-start min-w-max pr-1">
+                    <div v-for="week in weekColumns" :key="week.id" class="w-52 shrink-0">
                       <div class="sticky top-0 z-10 bg-gray-900 pb-1">
                         <div class="flex items-center justify-between gap-2">
                           <p class="text-[11px] font-bold uppercase tracking-wide text-gray-400">
@@ -640,26 +836,52 @@ function exportCsv() {
                       <div v-for="day in week.days" :key="day.date" class="mb-2">
                         <p class="text-[10px] uppercase text-gray-500 mb-1">{{ day.label }}</p>
                         <div class="space-y-1">
-                          <NuxtLink
+                          <div
                             v-for="row in day.classes"
                             :key="row.id"
-                            :to="`/member/staff/sessions/${row.id}`"
-                            class="block w-full rounded px-1.5 py-1 text-left"
-                            :class="chipClass(row.status, week.current)"
-                            :title="row.title"
+                            class="rounded-md bg-gray-950 text-left"
+                            :style="{ borderLeft: `4px solid ${statusAccent(row.status)}` }"
                           >
-                            <span class="flex items-center gap-1 text-[10px] font-semibold leading-tight">
-                              <span>{{ row.time }}</span>
+                            <button
+                              type="button"
+                              class="block w-full px-2 py-1.5 text-left"
+                              :aria-expanded="expandedClassId === row.id"
+                              @click="toggleClassRow(row.id)"
+                            >
                               <span
-                                v-for="pill in row.pills"
-                                :key="pill.id"
-                                class="inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
-                                :class="pillColor(pill.id, pill.name)"
-                                :title="pill.name"
-                              >{{ pill.initials }}</span>
-                            </span>
-                            <span class="block text-[10px] leading-tight truncate opacity-80">{{ row.title }}</span>
-                          </NuxtLink>
+                                class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-tight"
+                                :class="row.status === 'cancelled' ? 'line-through text-gray-400' : 'text-gray-300'"
+                              >
+                                <MemberSessionKindIcon
+                                  v-if="classLine(row).kind"
+                                  :kind="classLine(row).kind"
+                                  :title="classLine(row).kindLabel"
+                                  :aria-label="classLine(row).kindLabel"
+                                />
+                                <span v-if="classLine(row).marks.length" class="inline-flex items-center gap-0.5 text-sm leading-none">
+                                  <span v-for="mark in classLine(row).marks" :key="mark.label" :title="mark.label" :aria-label="mark.label">{{ mark.emoji }}</span>
+                                </span>
+                                <span v-else class="font-semibold" :class="row.status === 'cancelled' ? '' : 'text-white'">{{ classLine(row).fallback }}</span>
+                                <span v-if="classLine(row).age">{{ classLine(row).age }}</span>
+                                <span v-if="classLine(row).time">&#128336; {{ classLine(row).time }}</span>
+                                <span v-if="classLine(row).coaches.length" class="inline-flex items-center gap-1">
+                                  <span
+                                    v-for="pill in classLine(row).coaches"
+                                    :key="pill.id"
+                                    class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+                                    :class="pillColor(pill.id, pill.name)"
+                                    :title="pill.name"
+                                  >{{ pill.initials }}</span>
+                                </span>
+                              </span>
+                            </button>
+                            <div v-if="expandedClassId === row.id" class="px-2 pb-2 space-y-0.5 text-[10px] text-gray-300">
+                              <p>{{ row.title }}</p>
+                              <NuxtLink :to="`/member/staff/sessions/${row.id}`" class="inline-block pt-1 font-semibold text-[#A3FF12]">
+                                {{ esLang ? 'Abrir sesión' : 'Open session' }}
+                              </NuxtLink>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -727,125 +949,6 @@ function exportCsv() {
 
         </div>
 
-        <!-- Per-coach scorecard -->
-        <div v-show="tab === 'scorecard'" class="space-y-4">
-          <div class="flex flex-wrap gap-1.5">
-            <button
-              v-for="c in coaches"
-              :key="c.id"
-              type="button"
-              class="px-3 py-1.5 rounded-full text-sm border transition-colors"
-              :class="selectedCoachId === c.id
-                ? 'border-teal-500/50 bg-teal-500/15 text-teal-300'
-                : 'border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'"
-              @click="selectedCoachId = c.id"
-            >
-              {{ c.name }}
-            </button>
-          </div>
-
-          <p v-if="!selectedCoach" class="text-sm text-gray-500">
-            {{ esLang ? 'Elige un coach para ver su ficha.' : 'Pick a coach to see their scorecard.' }}
-          </p>
-
-          <template v-else>
-            <section class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-              <div class="flex items-start gap-3 flex-wrap">
-                <img
-                  v-if="selectedCoach.avatar_url"
-                  :src="selectedCoach.avatar_url"
-                  :alt="selectedCoach.name"
-                  class="w-11 h-11 rounded-xl object-cover shrink-0"
-                >
-                <span
-                  v-else
-                  class="w-11 h-11 rounded-xl bg-gray-800 text-sm font-semibold text-gray-200 flex items-center justify-center shrink-0"
-                >
-                  {{ initials(selectedCoach.name) }}
-                </span>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <h2 class="text-lg font-semibold text-white">{{ selectedCoach.name }}</h2>
-                    <span
-                      v-if="selectedCoach.is_head_coach"
-                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400"
-                    >
-                      ★ Head
-                    </span>
-                    <span
-                      v-if="!selectedCoach.is_active"
-                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-800 text-gray-500"
-                    >
-                      {{ esLang ? 'Inactivo' : 'Inactive' }}
-                    </span>
-                  </div>
-                  <p class="text-xs text-gray-400">
-                    {{ selectedCoach.title || (esLang ? 'Coach' : 'Coach') }} · {{ selectedCoach.email }}
-                  </p>
-                  <div v-if="selectedCoach.programs.length" class="flex flex-wrap gap-1.5 mt-2">
-                    <span
-                      v-for="p in selectedCoach.programs"
-                      :key="p"
-                      class="px-2 py-0.5 rounded-full text-[11px] border border-teal-500/30 bg-teal-500/10 text-teal-300"
-                    >
-                      {{ p }}
-                    </span>
-                  </div>
-                </div>
-                <div class="text-right shrink-0">
-                  <p class="text-[11px] text-gray-500">{{ esLang ? 'Última actividad' : 'Last active' }}</p>
-                  <p class="text-sm text-gray-300">{{ lastActiveLabel(selectedCoach) }}</p>
-                </div>
-              </div>
-            </section>
-
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p class="text-2xl font-bold text-white">{{ selectedCoach.classes_given }}</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Clases dadas' : 'Classes given' }}</p>
-                <p class="text-[11px] text-acid">{{ selectedCoach.classes_cancelled }} {{ esLang ? 'canceladas' : 'cancelled' }}</p>
-              </div>
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p class="text-2xl font-bold text-white">{{ selectedCoach.athletes_taught }}</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Skaters atendidos' : 'Athletes taught' }}</p>
-              </div>
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p class="text-2xl font-bold text-white">{{ selectedCoach.evaluations }}</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Evaluaciones' : 'Evaluations' }}</p>
-              </div>
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p class="text-2xl font-bold text-white">{{ selectedCoach.videos }}</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Videos subidos' : 'Videos uploaded' }}</p>
-                <p class="text-[11px] text-gray-600">
-                  {{ esLang
-                    ? `${selectedCoach.session_videos} de sesión · ${selectedCoach.evaluation_videos} de evaluaciones`
-                    : `${selectedCoach.session_videos} from sessions · ${selectedCoach.evaluation_videos} from evaluations` }}
-                </p>
-              </div>
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p class="text-2xl font-bold text-white">{{ selectedCoach.class_plans }}</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Planes de clase' : 'Class plans' }}</p>
-              </div>
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p class="text-2xl font-bold text-white">{{ selectedCoach.tricks_marked }}</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Trucos marcados' : 'Tricks marked' }}</p>
-              </div>
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p class="text-2xl font-bold text-white">{{ selectedCoach.attendance_marked }}</p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Asistencias marcadas' : 'Attendance marked' }}</p>
-              </div>
-              <div class="rounded-xl border border-gray-800 bg-gray-900 p-4">
-                <p
-                  class="text-2xl font-bold"
-                  :class="selectedCoach.classes_without_notes > 0 ? 'text-amber-400' : 'text-white'"
-                >
-                  {{ selectedCoach.classes_without_notes }}
-                </p>
-                <p class="text-[11px] text-gray-500 mt-0.5">{{ esLang ? 'Clases sin nota' : 'Classes without notes' }}</p>
-              </div>
-            </div>
-          </template>
-        </div>
       </template>
 
       <p class="text-[11px] text-gray-600 leading-relaxed pt-2 border-t border-gray-900">

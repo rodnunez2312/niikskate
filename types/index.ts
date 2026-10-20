@@ -953,6 +953,8 @@ export interface Skill {
   area?: string
   structure?: string
   trick_type?: string
+  /** Collectible tier; null = automatic from program level. */
+  rarity?: 'bronze' | 'silver' | 'gold' | 'platinum' | null
   sort_order: number
   is_active: boolean
   created_at: string

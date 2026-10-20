@@ -2,13 +2,14 @@
 import { format, startOfWeek, endOfWeek, subDays, subMonths, parseISO } from 'date-fns'
 import { es as esLocale } from 'date-fns/locale'
 import { TIME_SLOT_LABELS, type TimeSlot } from '~/types'
-
+import { sessionProgramTitle } from '~/utils/sessionProgramTitle'
 definePageMeta({ middleware: ['auth', 'member'], layout: 'member' })
 
 type TodaySession = {
   id: string
   title: string
   event_type: string
+  discipline: string | null
   start_time: string | null
   time_slot: TimeSlot | null
   skatepark: string | null
@@ -19,6 +20,8 @@ type PastStatus = 'done' | 'cancelled' | 'open'
 type PastSession = {
   id: string
   title: string
+  event_type: string
+  discipline: string | null
   start_date: string
   start_time: string | null
   end_time: string | null
@@ -42,9 +45,9 @@ type HighlightItem = {
 }
 
 const client = useSupabaseClient()
+const { selected: selectedSport, matchesSport } = useEnabledSports()
 const { fullName, isAdmin } = useSiteProfile()
 const { language } = useI18n()
-
 const es = computed(() => language.value === 'es')
 const loading = ref(true)
 
@@ -121,7 +124,7 @@ async function loadPastSessions() {
     const today = format(new Date(), 'yyyy-MM-dd')
     const { data } = await client
       .from('school_calendar_events')
-      .select('id, title, start_date, start_time, end_time, time_slot, session_outcome, cancelled_at')
+      .select('id, title, event_type, discipline, start_date, start_time, end_time, time_slot, session_outcome, cancelled_at')
       .gte('start_date', pastFromDate())
       .lte('start_date', today)
       .in('event_type', PAST_CLASS_TYPES)
@@ -129,6 +132,7 @@ async function loadPastSessions() {
       .order('start_time', { ascending: false })
     const nowHm = format(new Date(), 'HH:mm')
     pastSessions.value = ((data || []) as PastSession[]).filter(s => {
+      if (!matchesSport(s)) return false
       if (s.start_date < today) return true
       const ends = (s.end_time || s.start_time)?.slice(0, 5)
       return Boolean(ends && ends <= nowHm)
@@ -192,12 +196,19 @@ async function showMorePast() {
 
 /** Upcoming classes with nobody whose role is coach or admin on the roster. */
 async function countClassesWithoutCoach(today: string) {
-  type ClassRow = { id: string; session_outcome: string | null; cancelled_at: string | null }
+  type ClassRow = {
+    id: string
+    title: string | null
+    event_type: string
+    discipline: string | null
+    session_outcome: string | null
+    cancelled_at: string | null
+  }
   const open: ClassRow[] = []
   for (let from = 0; from < 5000; from += 1000) {
     const { data, error } = await client
       .from('school_calendar_events')
-      .select('id, session_outcome, cancelled_at')
+      .select('id, title, event_type, discipline, session_outcome, cancelled_at')
       .gte('start_date', today)
       .in('event_type', ['class_session', 'class_individual'])
       .order('start_date', { ascending: true })
@@ -205,6 +216,7 @@ async function countClassesWithoutCoach(today: string) {
     if (error || !data?.length) break
     for (const row of data as ClassRow[]) {
       if (row.session_outcome === 'cancelled' || row.cancelled_at) continue
+      if (!matchesSport(row)) continue
       open.push(row)
     }
     if (data.length < 1000) break
@@ -253,12 +265,12 @@ async function loadDashboard() {
     ] = await Promise.all([
       client
         .from('school_calendar_events')
-        .select('id, title, event_type, start_time, time_slot, skatepark')
+        .select('id, title, event_type, discipline, start_time, time_slot, skatepark')
         .eq('start_date', today)
         .order('start_time', { ascending: true }),
       client
         .from('school_calendar_events')
-        .select('id', { count: 'exact', head: true })
+        .select('id, title, event_type, discipline')
         .gte('start_date', weekStart)
         .lte('start_date', weekEnd)
         .in('event_type', ['class_session', 'class_individual', 'practice']),
@@ -281,11 +293,12 @@ async function loadDashboard() {
         .limit(5),
     ])
 
-    todaySessions.value = (sessionsRes.data || []) as TodaySession[]
+    todaySessions.value = ((sessionsRes.data || []) as TodaySession[]).filter(matchesSport)
     snapshot.value = {
       athletes: athletesRes.count || 0,
       coaches: coachesCount,
-      sessionsThisWeek: weekSessionsRes.count || 0,
+      sessionsThisWeek: ((weekSessionsRes.data || []) as Array<{ title: string | null; event_type: string; discipline: string | null }>)
+        .filter(matchesSport).length,
       attendancePct: null,
     }
 
@@ -346,6 +359,12 @@ async function loadDashboard() {
 }
 
 onMounted(() => {
+  loadDashboard()
+  loadPastSessions()
+})
+
+watch(selectedSport, () => {
+  pastVisibleCount.value = RECENT_PAST_COUNT
   loadDashboard()
   loadPastSessions()
 })
@@ -436,10 +455,11 @@ const quickActions = computed(() => {
                 class="flex items-start justify-between gap-3 rounded-xl bg-gray-950 border border-gray-800 px-4 py-3 hover:border-gray-600"
               >
               <div class="min-w-0">
-                <p class="font-semibold text-white truncate">{{ session.title }}</p>
-                <p class="text-xs text-gray-500 mt-0.5">
-                  {{ sessionTypeLabel(session.event_type) }}
-                  <span v-if="session.skatepark"> · {{ session.skatepark }}</span>
+                <p class="font-semibold text-white truncate">{{ sessionProgramTitle(session.title) }}</p>
+                <p class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
+                  <MemberSessionKindIcon v-if="session.event_type === 'class_session' || session.event_type === 'class_individual'" :kind="session.event_type" />
+                  <span v-else>{{ sessionTypeLabel(session.event_type) }}</span>
+                  <span v-if="session.skatepark" class="truncate">· {{ session.skatepark }}</span>
                 </p>
               </div>
               <span v-if="formatSessionTime(session)" class="text-sm font-mono text-gray-400 shrink-0">
@@ -484,7 +504,7 @@ const quickActions = computed(() => {
                     class="flex items-center justify-between gap-3 rounded-xl bg-gray-950 border border-gray-800 px-4 py-2.5 hover:border-gray-600"
                   >
                     <div class="min-w-0">
-                      <p class="text-sm font-semibold text-white truncate">{{ s.title }}</p>
+                      <p class="text-sm font-semibold text-white truncate">{{ sessionProgramTitle(s.title) }}</p>
                       <p class="text-xs text-gray-500 mt-0.5">
                         {{ format(parseISO(s.start_date), 'EEE d MMM', { locale: es ? esLocale : undefined }) }}
                         <span v-if="pastTime(s)"> · {{ pastTime(s) }}</span>

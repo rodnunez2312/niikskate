@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Skill, StudentProgress } from '~/types'
 import type { CrewParticipant } from '~/composables/useCrew'
-import { skaterRatingBubbleClass } from '~/utils/skaterRatingDots'
 import { computeSkaterProgramMilestones } from '~/utils/skaterProgramProgress'
 import { normalizeSkillGroupDisplayName } from '~/utils/skillGroupLevels'
 import { disciplineFromJoin, skillLevelWithDiscipline } from '~/utils/trainingDisciplines'
@@ -10,6 +9,7 @@ import {
   SKATER_STANCE_OPTIONS,
   SKATER_STYLE_OPTIONS,
 } from '~/utils/skaterProfileFields'
+import { campaignChapterLabel, trickRarity } from '~/utils/skaterCareer'
 import {
   SKATE_TRICK_AREAS,
   compareSkillsByManualId,
@@ -85,55 +85,9 @@ const trickLibrary = computed(() => skills.value.filter(isSkaterTrick))
 
 const learnedSkillIds = computed(() => new Set(progress.value.map(p => p.skill_id)))
 
-const tricksLearned = computed(
-  () => trickLibrary.value.filter(s => learnedSkillIds.value.has(s.id)).length,
-)
-const drillsDone = computed(
-  () => drills.value.filter(d => learnedSkillIds.value.has(d.id)).length,
-)
-const libraryTrickPct = computed(() =>
-  trickLibrary.value.length ? Math.round((tricksLearned.value / trickLibrary.value.length) * 100) : 0,
-)
-const libraryDrillPct = computed(() =>
-  drills.value.length ? Math.round((drillsDone.value / drills.value.length) * 100) : 0,
-)
-
 const programMilestoneProgress = computed(() =>
   computeSkaterProgramMilestones([...skills.value, ...drills.value], learnedSkillIds.value),
 )
-const programTimelineFillWidth = computed(() => {
-  const pct = programMilestoneProgress.value.totalPct
-  return `${Math.max(0, Math.min(80, (pct / 100) * 80))}%`
-})
-const milestoneNodeClass = (phase: string) => {
-  if (phase === 'complete') return 'bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.35)]'
-  if (phase === 'active') return 'bg-amber-500/20 border-amber-400 text-amber-300 ring-2 ring-amber-400/25'
-  return 'bg-gray-800 border-gray-600 text-gray-500 opacity-70'
-}
-const milestoneStatusLabel = (phase: string, learned: number) => {
-  if (phase === 'complete') return language.value === 'es' ? 'Hito' : 'Milestone'
-  if (phase === 'active') return language.value === 'es' ? 'En curso' : 'In progress'
-  if (learned > 0) return 'Extra'
-  return language.value === 'es' ? 'Pendiente' : 'Upcoming'
-}
-const milestoneCountClass = (phase: string, learned: number) => {
-  if (phase === 'complete') return 'text-emerald-400'
-  if (phase === 'active') return 'text-amber-400/90'
-  if (learned > 0) return 'text-gray-500'
-  return 'text-gray-600'
-}
-
-const SKATER_RATING_ROWS = [
-  { key: 'rating_fundamentals', label: 'Fundamentals', labelEs: 'Fundamentos' },
-  { key: 'rating_skate_iq', label: 'Skate IQ', labelEs: 'Skate IQ' },
-  { key: 'rating_street', label: 'Street', labelEs: 'Street' },
-  { key: 'rating_vert', label: 'Vert', labelEs: 'Vert' },
-  { key: 'rating_speed_ollie', label: 'Speed ollie', labelEs: 'Speed ollie' },
-  { key: 'rating_fakie_switch', label: 'Fakie / Switch', labelEs: 'Fakie / Switch' },
-  { key: 'rating_slps', label: 'Slaps', labelEs: 'Slaps' },
-  { key: 'rating_rails', label: 'Rails', labelEs: 'Rails' },
-] as const
-
 type SkaterProfileBits = {
   email: string | null
   skill_group_id: string | null
@@ -151,6 +105,15 @@ type SkaterProfileBits = {
 }
 
 const profileBits = ref<SkaterProfileBits | null>(null)
+
+const { career, reload: reloadCareer, celebrations, dismissCelebration } = useSkaterCareer({
+  studentId: toRef(props, 'studentId'),
+  skills: computed(() => [...skills.value, ...drills.value]),
+  progress,
+  skatingStyle: computed(() => profileBits.value?.skating_style ?? null),
+  ready: computed(() => !loading.value),
+})
+
 const assignedSkillGroup = ref<{ id: string; name: string; discipline?: string | null } | null>(null)
 const groupAveragePct = ref(0)
 const emailCopied = ref(false)
@@ -165,15 +128,6 @@ const assignedProgramLabel = computed(() => {
     language.value === 'es',
   )
 })
-
-const skillAttributeDots = computed(() =>
-  SKATER_RATING_ROWS.map(({ key, label, labelEs }) => {
-    const raw = profileBits.value?.[key]
-    const num = typeof raw === 'number' ? raw : NaN
-    const value = Number.isFinite(num) && num >= 0 && num <= 10 ? num : 0
-    return { key, label, labelEs, filled: value }
-  }),
-)
 
 const profileEmail = computed(() => profileBits.value?.email?.trim() || null)
 
@@ -191,33 +145,6 @@ async function copyProfileEmail() {
     emailCopied.value = false
   }
 }
-
-const milestones = computed(() => [
-  {
-    icon: '🛹',
-    title: language.value === 'es' ? 'Trucos aprendidos' : 'Tricks learned',
-    value: `${tricksLearned.value} / ${trickLibrary.value.length}`,
-    done: tricksLearned.value > 0,
-  },
-  {
-    icon: '🎯',
-    title: language.value === 'es' ? 'Drills realizados' : 'Drills performed',
-    value: `${drillsDone.value} / ${drills.value.length}`,
-    done: drillsDone.value > 0,
-  },
-  {
-    icon: '📋',
-    title: language.value === 'es' ? 'Evaluaciones' : 'Evaluations',
-    value: String(evaluationCount.value),
-    done: evaluationCount.value > 0,
-  },
-  {
-    icon: '✅',
-    title: language.value === 'es' ? 'Clases asistidas' : 'Classes attended',
-    value: String(classesAttended.value),
-    done: classesAttended.value > 0,
-  },
-])
 
 function skillName(skill: Skill) {
   return language.value === 'es' ? skill.name_es || skill.name : skill.name
@@ -347,6 +274,7 @@ async function uploadEvidence(row: FocusRow, event: Event) {
     })
     if (error) throw error
     videoCount.value += 1
+    void reloadCareer()
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : ''
     focusError.value = message || (language.value === 'es' ? 'No se pudo subir el video' : 'Could not upload the video')
@@ -461,199 +389,81 @@ watch(() => props.studentId, loadData, { immediate: true })
 
 <template>
   <section class="space-y-4">
-    <div class="flex items-stretch gap-3">
-      <div class="flex-1 min-w-0 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-xl px-4 py-3 shadow-lg">
-        <div class="flex items-center gap-2 min-w-0">
-          <h2 class="text-lg font-black text-white uppercase tracking-tight truncate min-w-0">
-            {{ participant.displayName }}
-          </h2>
-          <span
-            v-if="participant.isYou"
-            class="shrink-0 px-2 py-0.5 bg-black/25 text-white text-[10px] font-bold rounded uppercase"
-          >
-            {{ language === 'es' ? 'Tú' : 'You' }}
-          </span>
-        </div>
-        <div v-if="profileEmail" class="mt-0.5 flex items-center gap-2 min-w-0">
-          <p class="text-sm text-white/90 truncate">{{ profileEmail }}</p>
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept="image/*"
+      class="hidden"
+      @change="onAvatarFileChange"
+    />
+    <MemberCareerSkaterCareerHero
+      :name="participant.displayName"
+      :career="career"
+      :es="language === 'es'"
+    >
+      <template #badge>
+        <span
+          v-if="participant.isYou"
+          class="shrink-0 px-2 py-0.5 bg-gray-800 text-gray-300 text-[10px] font-bold rounded uppercase"
+        >
+          {{ language === 'es' ? 'Tú' : 'You' }}
+        </span>
+      </template>
+      <div class="mt-3 pt-3 border-t border-gray-800 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+        <span v-if="profileEmail" class="flex items-center gap-1.5 min-w-0">
+          <span class="truncate text-gray-400">{{ profileEmail }}</span>
           <button
             type="button"
-            class="shrink-0 rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white"
+            class="shrink-0 rounded-full bg-gray-800 px-2 py-0.5 text-[10px] font-bold text-gray-300 hover:bg-gray-700"
             @click="copyProfileEmail"
           >
             {{ emailCopied ? (language === 'es' ? 'Copiado' : 'Copied') : (language === 'es' ? 'Copiar' : 'Copy') }}
           </button>
-        </div>
-        <p v-if="participant.age != null" class="text-sm text-white/80 mt-0.5">
+        </span>
+        <span v-if="participant.age != null">
           {{ language === 'es' ? `${participant.age} años` : `${participant.age} years old` }}
-        </p>
-        <p v-if="studentId" class="text-sm text-white/90 mt-1">
-          {{ language === 'es' ? 'Videos subidos' : 'Videos uploaded' }}: {{ videoCount }}
-        </p>
-        <p v-if="studentId" class="text-sm mt-1.5 flex items-center gap-1.5 flex-wrap">
-          <span class="text-white/75 shrink-0">
-            {{ language === 'es' ? 'Programa asignado:' : 'Assigned program:' }}
+        </span>
+        <template v-if="studentId">
+          <span v-if="assignedProgramLabel" class="text-[10px] font-black tracking-[0.15em] text-white truncate">
+            {{ campaignChapterLabel(assignedProgramLabel) }}
           </span>
-          <span v-if="assignedProgramLabel" class="font-semibold text-white truncate">
-            {{ assignedProgramLabel }}
-          </span>
-          <span v-else class="text-white/70 italic">
-            {{ language === 'es' ? 'Sin programa asignado' : 'No program assigned' }}
-          </span>
-        </p>
-        <p v-if="!studentId" class="text-sm text-white/80 mt-2">
+          <span v-else class="italic">{{ language === 'es' ? 'Sin programa asignado' : 'No program assigned' }}</span>
+        </template>
+        <span v-else>
           {{
             language === 'es'
               ? 'El coach registrará el progreso cuando asista a clases.'
               : 'Coach will log progress when they attend classes.'
           }}
-        </p>
+        </span>
       </div>
-
-      <div class="shrink-0 flex flex-col items-center justify-center">
-        <input
-          ref="fileInputRef"
-          type="file"
-          accept="image/*"
-          class="hidden"
-          @change="onAvatarFileChange"
+      <template #rank>
+        <MemberCareerSkaterRankCard
+          :level="career.level"
+          :rank="career.rank"
+          :avatar-url="avatarUrl"
+          :initial="participant.displayName.charAt(0)?.toUpperCase() || '?'"
+          :es="language === 'es'"
+          :editable="canEditAvatar"
+          :uploading="uploadingAvatar"
+          @pick="openAvatarPicker()"
+          @remove="removeAvatar()"
         />
-        <button
-          type="button"
-          class="relative w-32 h-32 rounded-xl overflow-hidden bg-gray-900 border-2 border-dashed border-white/30 flex items-center justify-center text-4xl transition-transform active:scale-[0.97] disabled:opacity-70"
-          :disabled="uploadingAvatar || !canEditAvatar"
-          :aria-label="language === 'es' ? 'Cambiar foto' : 'Change photo'"
-          @click="openAvatarPicker"
-        >
-          <img
-            v-if="avatarUrl"
-            :src="avatarUrl"
-            alt=""
-            class="w-full h-full object-cover"
-          />
-          <span v-else class="text-white font-black">
-            {{ participant.displayName.charAt(0)?.toUpperCase() || '🛹' }}
-          </span>
-          <div
-            v-if="uploadingAvatar"
-            class="absolute inset-0 bg-black/55 flex items-center justify-center"
-          >
-            <svg class="w-6 h-6 animate-spin text-gold-300" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-          </div>
-          <span
-            v-else-if="canEditAvatar"
-            class="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-black/70 text-xs flex items-center justify-center"
-          >
-            📷
-          </span>
-        </button>
-        <button
-          v-if="avatarUrl && canEditAvatar"
-          type="button"
-          class="text-[10px] text-red-300/90 hover:text-red-200 mt-1 underline"
-          :disabled="uploadingAvatar"
-          @click="removeAvatar"
-        >
-          {{ language === 'es' ? 'Quitar' : 'Remove' }}
-        </button>
-      </div>
-    </div>
+      </template>
+    </MemberCareerSkaterCareerHero>
+
+    <MemberCareerSkaterWeeklyMission v-if="studentId" :mission="career.mission" :es="language === 'es'" />
+    <MemberCareerSkaterCelebration :items="celebrations" @dismiss="dismissCelebration" />
 
     <div v-if="studentId" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
       <div class="flex flex-col md:flex-row md:items-stretch gap-4 md:gap-0">
         <div class="md:w-1/2 md:min-w-0 md:border-r border-gray-800 md:pr-5 pb-4 md:pb-0 border-b md:border-b-0">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-base" aria-hidden="true">📈</span>
-            <h3 class="text-xs font-bold text-white uppercase tracking-wide leading-tight">
-              {{ language === 'es' ? 'Progreso en programa asignado' : 'Assigned program progress' }}
-            </h3>
-          </div>
-          <template v-if="assignedSkillGroup">
-            <p class="text-[10px] text-gray-500 mb-3 leading-snug">
-              <span class="text-gray-300">{{ assignedProgramLabel }}</span>
-              ·
-              {{
-                language === 'es'
-                  ? `${tricksLearned} trucos · ${drillsDone} drills`
-                  : `${tricksLearned} tricks · ${drillsDone} drills`
-              }}
-            </p>
-            <div class="space-y-3">
-              <div class="space-y-1">
-                <div class="flex justify-between items-baseline gap-2">
-                  <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Trucos completados' : 'Completed tricks' }}</span>
-                  <span class="text-sm font-bold text-gray-200">
-                    {{ tricksLearned }}/{{ trickLibrary.length }} · {{ libraryTrickPct }}%
-                  </span>
-                </div>
-                <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                  <div class="h-full rounded-full bg-gray-200 transition-all" :style="{ width: `${libraryTrickPct}%` }" />
-                </div>
-              </div>
-              <div class="space-y-1">
-                <div class="flex justify-between items-baseline gap-2">
-                  <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Drills realizados' : 'Completed drills' }}</span>
-                  <span class="text-sm font-bold text-cyan-300">
-                    {{ drillsDone }}/{{ drills.length }} · {{ libraryDrillPct }}%
-                  </span>
-                </div>
-                <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                  <div class="h-full rounded-full bg-cyan-500 transition-all" :style="{ width: `${libraryDrillPct}%` }" />
-                </div>
-              </div>
-              <div class="space-y-1">
-                <div class="flex justify-between items-baseline gap-2">
-                  <span class="text-[10px] text-gray-500">{{ language === 'es' ? 'Promedio del grupo' : 'Group avg.' }}</span>
-                  <span class="text-sm font-bold text-indigo-300">{{ groupAveragePct }}%</span>
-                </div>
-                <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                  <div class="h-full bg-indigo-500/90 rounded-full transition-all" :style="{ width: `${groupAveragePct}%` }" />
-                </div>
-              </div>
-            </div>
-            <p class="text-[9px] text-gray-600 mt-3 leading-snug">
-              {{
-                language === 'es'
-                  ? 'Cuenta cada truco y drill marcado como completado.'
-                  : 'Counts every trick and drill marked completed.'
-              }}
-            </p>
-          </template>
-          <p v-else class="text-[11px] text-gray-500 leading-snug">
-            {{
-              language === 'es'
-                ? 'Sin programa asignado todavía.'
-                : 'No program assigned yet.'
-            }}
-          </p>
+          <MemberCareerSkaterAccomplishments :career="career" :es="language === 'es'" />
         </div>
 
         <div class="md:w-1/2 md:min-w-0 md:pl-5">
-          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            {{ language === 'es' ? 'Habilidades' : 'Skill attributes' }}
-          </h2>
-          <div class="space-y-1.5">
-            <div
-              v-for="attr in skillAttributeDots"
-              :key="attr.key"
-              class="flex items-center justify-between gap-2"
-            >
-              <span class="text-white text-xs font-medium w-[5rem] shrink-0 truncate">
-                {{ language === 'es' ? attr.labelEs : attr.label }}
-              </span>
-              <div class="flex gap-0.5 flex-1 justify-end">
-                <span
-                  v-for="i in 10"
-                  :key="i"
-                  class="w-2.5 h-2.5 rounded-full shrink-0"
-                  :class="skaterRatingBubbleClass(i - 1, attr.filled)"
-                />
-              </div>
-            </div>
-          </div>
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Stats</h2>
+          <MemberCareerSkaterThpsStats :stats="career.stats" :es="language === 'es'" />
           <div class="mt-3 pt-3 border-t border-gray-800">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <SkaterTraitPickerGroup
@@ -685,164 +495,30 @@ watch(() => props.studentId, loadData, { immediate: true })
 
     <!-- Achievements -->
     <div>
-      <h2 class="text-sm font-bold text-gold-400 uppercase tracking-wide mb-3">
-        {{ language === 'es' ? 'Logros' : 'Achievements' }}
-      </h2>
-
       <div v-if="loading" class="flex justify-center py-8">
         <div class="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
       </div>
 
       <template v-else>
-        <div class="grid grid-cols-4 gap-2">
-          <div
-            v-for="m in milestones"
-            :key="m.title"
-            class="min-w-0 rounded-xl border px-2 py-2"
-            :class="m.done ? 'border-gold-400/40 bg-gold-400/10' : 'border-gray-800 bg-gray-900/50'"
-          >
-            <div class="flex items-center gap-1">
-              <span class="text-sm leading-none">{{ m.icon }}</span>
-              <p class="text-[10px] text-gray-400 leading-tight">{{ m.title }}</p>
-            </div>
-            <p class="text-sm font-bold text-white mt-1 truncate">{{ m.value }}</p>
-          </div>
+        <div v-if="studentId" class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 items-stretch">
+          <MemberCareerSkaterLevelMap
+            :milestones="programMilestoneProgress.milestones"
+            :xp="career.xp"
+            :es="language === 'es'"
+          />
+          <MemberCareerSkaterAchievements :achievements="career.achievements" :es="language === 'es'" />
         </div>
 
-        <div v-if="studentId" class="mt-4 bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <div class="flex items-center justify-between gap-2 mb-1">
-            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-              {{ language === 'es' ? 'Progreso del currículo' : 'Curriculum progress' }}
-            </h3>
-            <span class="text-lg font-bold text-amber-400">{{ programMilestoneProgress.totalPct }}%</span>
-          </div>
-          <p v-if="assignedProgramLabel" class="text-xs text-gray-400 mb-1">
-            {{ language === 'es' ? 'Programa asignado:' : 'Assigned program:' }}
-            <span class="text-gray-200 font-medium">{{ assignedProgramLabel }}</span>
-          </p>
-          <p class="text-xs text-gray-500 mb-5">
-            {{
-              language === 'es'
-                ? `Avance por trucos completados · fase ${programMilestoneProgress.activeLevelNum} de 5`
-                : `Based on completed tricks · phase ${programMilestoneProgress.activeLevelNum} of 5`
-            }}
-            <span class="block mt-0.5 text-gray-600">
-              {{
-                language === 'es'
-                  ? 'El programa asignado no implica que ya completó ese nivel.'
-                  : 'Assigned program does not mean that level is already completed.'
-              }}
-            </span>
-          </p>
-          <div class="relative px-1 pb-1 overflow-x-auto">
-            <div class="absolute left-[10%] right-[10%] top-[17px] h-0.5 bg-gray-700/80 rounded-full" aria-hidden="true" />
-            <div
-              class="absolute left-[10%] top-[17px] h-0.5 bg-gradient-to-r from-amber-500 via-orange-400 to-amber-500 rounded-full transition-all duration-700 ease-out"
-              :style="{ width: programTimelineFillWidth }"
-              aria-hidden="true"
-            />
-            <ol class="relative flex justify-between items-start min-w-[280px] list-none m-0 p-0">
-              <li
-                v-for="m in programMilestoneProgress.milestones"
-                :key="m.structure"
-                class="flex flex-col items-center flex-1 min-w-0 z-10"
-                :title="(language === 'es' ? m.labelEs : m.labelEn) + ' — ' + (language === 'es' ? m.descriptionEs : m.descriptionEn)"
-              >
-                <div
-                  class="w-9 h-9 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300"
-                  :class="milestoneNodeClass(m.phase)"
-                >
-                  <svg
-                    v-if="m.phase === 'complete'"
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span v-else>{{ m.levelNum }}</span>
-                </div>
-                <p class="text-[10px] font-semibold text-gray-300 mt-2 text-center leading-tight px-0.5 max-w-[5rem]">
-                  {{ language === 'es' ? m.shortLabelEs : m.shortLabelEn }}
-                </p>
-                <p class="text-[10px] tabular-nums mt-0.5 font-medium" :class="milestoneCountClass(m.phase, m.learned)">
-                  {{ m.total ? `${m.learned}/${m.total}` : '—' }}
-                </p>
-                <p
-                  class="text-[9px] uppercase tracking-wide mt-0.5"
-                  :class="
-                    m.phase === 'complete'
-                      ? 'text-emerald-500/80'
-                      : m.phase === 'active'
-                        ? 'text-amber-500/70'
-                        : m.learned > 0
-                          ? 'text-gray-500'
-                          : 'text-gray-600'
-                  "
-                >
-                  {{ milestoneStatusLabel(m.phase, m.learned) }}
-                </p>
-              </li>
-            </ol>
-          </div>
-          <p class="text-[11px] text-gray-500 mt-4 text-center">
-            {{
-              language === 'es'
-                ? 'Solo cuenta trucos y drills marcados como completados. Orden: Fundamentos → … → Avanzado.'
-                : 'Only marked completed tricks and drills count. Order: Foundations → … → Advanced.'
-            }}
-          </p>
-        </div>
-
-        <div v-if="studentId" class="mt-4 grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left"
-            :class="progressModule === 'tricks' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800'"
-            @click="progressModule = 'tricks'"
-          >
-            <p class="text-[11px] text-gray-400 leading-tight">{{ language === 'es' ? 'Trucos aprendidos' : 'Tricks learned' }}</p>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
-              <div
-                class="h-full rounded-full bg-amber-500/80"
-                :style="{ width: `${trickLibrary.length ? Math.min(100, (tricksLearned / trickLibrary.length) * 100) : 0}%` }"
-              />
-            </div>
-            <p class="mt-1 text-right text-sm font-bold text-white">{{ tricksLearned }}/{{ trickLibrary.length }}</p>
-          </button>
-          <button
-            type="button"
-            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left"
-            :class="progressModule === 'drills' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800'"
-            @click="progressModule = 'drills'"
-          >
-            <p class="text-[11px] text-gray-400 leading-tight">{{ language === 'es' ? 'Drills completados' : 'Drills completed' }}</p>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
-              <div
-                class="h-full rounded-full bg-amber-500/80"
-                :style="{ width: `${drills.length ? Math.min(100, (drillsDone / drills.length) * 100) : 0}%` }"
-              />
-            </div>
-            <p class="mt-1 text-right text-sm font-bold text-white">{{ drillsDone }}/{{ drills.length }}</p>
-          </button>
-          <button
-            type="button"
-            class="min-w-0 rounded-xl border bg-gray-900 p-3 text-left"
-            :class="progressModule === 'challenges' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-gray-800'"
-            @click="progressModule = 'challenges'"
-          >
-            <p class="text-[11px] text-gray-400 leading-tight">{{ language === 'es' ? 'Desafíos completados' : 'Challenges completed' }}</p>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-800">
-              <div
-                class="h-full rounded-full bg-amber-500/80"
-                :style="{ width: `${challengeCounts.total ? Math.min(100, (challengeCounts.completed / challengeCounts.total) * 100) : 0}%` }"
-              />
-            </div>
-            <p class="mt-1 text-right text-sm font-bold text-white">{{ challengeCounts.completed }}/{{ challengeCounts.total }}</p>
-          </button>
-        </div>
+        <MemberCareerSkaterTrophyCards
+          v-if="studentId"
+          class="mt-4"
+          :career="career"
+          :challenges-completed="challengeCounts.completed"
+          :challenges-total="challengeCounts.total"
+          :active="progressModule"
+          :es="language === 'es'"
+          @select="progressModule = $event"
+        />
 
         <MemberSkaterChallengesCard
           v-if="studentId"
@@ -997,12 +673,24 @@ watch(() => props.studentId, loadData, { immediate: true })
                 <li
                   v-for="item in completedBag"
                   :key="item.id"
-                  class="rounded-xl bg-gray-900 border border-emerald-500/30 px-4 py-3 space-y-1"
+                  class="rounded-xl bg-gray-900 border px-4 py-3 space-y-1"
+                  :class="progressModule === 'drills' ? 'border-emerald-500/30' : ''"
+                  :style="progressModule === 'drills' ? undefined : {
+                    borderColor: `${trickRarity(item.skill).color}80`,
+                    boxShadow: `inset 3px 0 0 ${trickRarity(item.skill).color}, 0 0 14px ${trickRarity(item.skill).color}1a`,
+                  }"
                 >
                   <div class="flex items-start justify-between gap-2">
                     <p class="text-white font-medium text-sm">{{ skillName(item.skill) }}</p>
-                    <span class="text-[10px] text-emerald-300 shrink-0">{{ formatUnlockDate(item.at) }}</span>
+                    <span class="text-[10px] text-gray-400 shrink-0">{{ formatUnlockDate(item.at) }}</span>
                   </div>
+                  <p
+                    v-if="progressModule !== 'drills'"
+                    class="text-[10px] font-black uppercase tracking-[0.2em]"
+                    :style="{ color: trickRarity(item.skill).color }"
+                  >
+                    ◆ {{ language === 'es' ? trickRarity(item.skill).labelEs : trickRarity(item.skill).labelEn }}
+                  </p>
                   <p class="text-[10px] text-gray-500">{{ skillDetail(item.skill) }}</p>
                   <p v-if="item.skill.description || item.skill.description_es" class="text-xs text-gray-400 leading-snug">
                     {{ language === 'es' ? item.skill.description_es || item.skill.description : item.skill.description }}

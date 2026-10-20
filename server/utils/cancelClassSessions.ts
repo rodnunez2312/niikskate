@@ -35,7 +35,9 @@ export async function cancelClassSessions(
   eventIds: string[],
   makeupNote: string,
   reason = 'weather',
+  options: { notify?: boolean } = {},
 ) {
+  const notify = options.notify !== false
   const { data: events, error: evErr } = await adminClient
     .from('school_calendar_events')
     .select('id, title, start_date, start_time, skatepark, location, cancelled_at')
@@ -90,6 +92,10 @@ export async function cancelClassSessions(
     .from('class_session_coaches')
     .update({ delivered: false })
     .in('calendar_event_id', pendingIds)
+
+  if (!notify) {
+    return { cancelled: pendingIds.length, emailed: 0, skipped: 0, already: rows.length - pending.length, recipients: 0 }
+  }
 
   const { data: enrollments, error: enErr } = await adminClient
     .from('class_session_enrollments')

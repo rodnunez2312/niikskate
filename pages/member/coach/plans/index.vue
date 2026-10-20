@@ -426,7 +426,31 @@ async function ensureQuickCalendarEvent(planDate: string, timeSlot: string) {
 
 const sessionStartedAt = ref<number | null>(null)
 let keepAliveAudio: HTMLAudioElement | null = null
-const { active: storedSession, loadStoredSession, saveActiveSession, clearActiveSession } = useActiveSession()
+const {
+  active: storedSession,
+  paused: sessionPaused,
+  boardOpen,
+  loadStoredSession,
+  saveActiveSession,
+  clearActiveSession,
+  pauseActiveSession,
+  resumeActiveSession,
+} = useActiveSession()
+
+onMounted(() => { boardOpen.value = true })
+onUnmounted(() => { boardOpen.value = false })
+
+function liveElapsedSeconds() {
+  const snap = storedSession.value
+  if (snap) return Math.floor(sessionElapsedMs(snap, Date.now()) / 1000)
+  return sessionStartedAt.value ? Math.floor((Date.now() - sessionStartedAt.value) / 1000) : 0
+}
+
+function togglePause() {
+  if (sessionPaused.value) resumeActiveSession()
+  else pauseActiveSession()
+  elapsed.value = liveElapsedSeconds()
+}
 
 /** Keeps the live session in the browser so leaving this page does not lose it. */
 function rememberLiveSession() {
@@ -438,6 +462,8 @@ function rememberLiveSession() {
     title: sessionTitle.value,
     programName: selectedProgram.value?.name || '',
     skaterCount: skaterIds.value.length,
+    pausedAt: storedSession.value?.pausedAt ?? null,
+    pausedMs: storedSession.value?.pausedMs ?? 0,
     state: {
       programId: programId.value,
       skaterIds: [...skaterIds.value],
@@ -480,7 +506,7 @@ function resumeStoredSession() {
   sessionAlerted.value = false
   step.value = 6
   phase.value = 'live'
-  elapsed.value = Math.floor((Date.now() - snap.startedAt) / 1000)
+  elapsed.value = Math.floor(sessionElapsedMs(snap, Date.now()) / 1000)
   startTicker(snap.startedAt)
 }
 
@@ -569,7 +595,8 @@ function startTicker(startedAt?: number) {
   const limit = totalMinutes.value * 60
   ticker = setInterval(() => {
     if (!running.value || sessionDone.value || !sessionStartedAt.value) return
-    elapsed.value = Math.floor((Date.now() - sessionStartedAt.value) / 1000)
+    if (sessionPaused.value) return
+    elapsed.value = liveElapsedSeconds()
     publishSessionClock()
     if (elapsed.value < limit || sessionAlerted.value) return
     sessionAlerted.value = true
@@ -924,9 +951,24 @@ onMounted(async () => {
       ].filter(Boolean).join(' · ')"
     >
       <template #actions>
-        <span class="text-lg font-bold text-white tabular-nums" :title="totalLabel">
+        <span
+          class="text-lg font-bold tabular-nums"
+          :class="sessionPaused ? 'text-gray-500' : 'text-white'"
+          :title="totalLabel"
+        >
           {{ formatClock(elapsed) }}
         </span>
+        <button
+          v-if="!sessionDone"
+          type="button"
+          class="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-700 text-white hover:border-gray-500"
+          :aria-label="sessionPaused ? (es ? 'Reanudar sesión' : 'Resume session') : (es ? 'Pausar sesión' : 'Pause session')"
+          :title="sessionPaused ? (es ? 'Reanudar' : 'Resume') : (es ? 'Pausar' : 'Pause')"
+          @click="togglePause"
+        >
+          <svg v-if="sessionPaused" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+          <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" /></svg>
+        </button>
         <button
           type="button"
           class="px-3 py-2 rounded-xl border border-gray-700 text-white text-sm font-semibold"

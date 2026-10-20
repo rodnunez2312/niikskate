@@ -19,6 +19,7 @@ type CalendarEvent = {
   location: string | null
   session_outcome: string | null
   cancelled_at: string | null
+  cancellation_reason?: string | null
 }
 
 type VideoRow = {
@@ -99,11 +100,42 @@ function startSessionTo() {
 }
 const upcoming = computed(() => Boolean(event.value && event.value.start_date > today))
 
+const REASON_LABELS: Record<string, { es: string; en: string }> = {
+  clima: { es: 'clima', en: 'weather' },
+  weather: { es: 'clima', en: 'weather' },
+  asistencia: { es: 'asistencia', en: 'attendance' },
+  attendance: { es: 'asistencia', en: 'attendance' },
+  coach: { es: 'coach', en: 'coach' },
+}
+
+function reasonLabel(raw: string | null | undefined) {
+  const text = (raw || '').trim()
+  if (!text) return ''
+  const known = REASON_LABELS[text.toLowerCase()]
+  if (known) return es.value ? known.es : known.en
+  return text
+}
+
+const cancelReasonText = computed(() => reasonLabel(event.value?.cancellation_reason))
+
 const heading = computed(() => {
-  if (cancelled.value) return es.value ? 'Sesión cancelada' : 'Session cancelled'
+  if (cancelled.value) {
+    const reason = cancelReasonText.value
+    return reason
+      ? (es.value ? `Sesión cancelada por ${reason}` : `Session cancelled for ${reason}`)
+      : (es.value ? 'Sesión cancelada' : 'Session cancelled')
+  }
   if (complete.value) return es.value ? 'Sesión completa' : 'Session complete'
   if (upcoming.value) return es.value ? 'Sesión próxima' : 'Upcoming session'
   return es.value ? 'Sesión programada' : 'Scheduled session'
+})
+
+const statusTone = computed(() => {
+  if (cancelled.value) return { color: '#9A9A9A', glow: 'rgba(154,154,154,0.45)' }
+  if (complete.value) return { color: '#A3FF12', glow: 'rgba(163,255,18,0.28)' }
+  if (upcoming.value) return { color: '#4C9AFF', glow: 'rgba(76,154,255,0.32)' }
+  if (event.value && event.value.start_date < today) return { color: '#FFB547', glow: 'rgba(255,181,71,0.32)' }
+  return { color: '#A3FF12', glow: 'rgba(163,255,18,0.28)' }
 })
 
 const typeLabel = computed(() => {
@@ -209,7 +241,7 @@ async function load() {
   missing.value = false
   const { data, error } = await client
     .from('school_calendar_events')
-    .select('id, title, event_type, start_date, start_time, end_time, time_slot, skatepark, location, session_outcome, cancelled_at')
+    .select('id, title, event_type, start_date, start_time, end_time, time_slot, skatepark, location, session_outcome, cancelled_at, cancellation_reason')
     .eq('id', eventId.value)
     .maybeSingle()
   if (error || !data) {
@@ -759,15 +791,23 @@ onMounted(load)
       <template v-else-if="event">
         <section class="relative overflow-hidden rounded-2xl border border-white/10 bg-gray-950">
           <div class="exec-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-          <div class="pointer-events-none absolute -top-28 -right-20 w-72 h-72 rounded-full bg-acid/10 blur-3xl" aria-hidden="true" />
+          <div
+            class="pointer-events-none absolute -top-28 -right-20 w-72 h-72 rounded-full blur-3xl"
+            :style="{ background: statusTone.glow }"
+            aria-hidden="true"
+          />
 
           <div class="relative p-5 sm:p-6 space-y-5">
             <!-- Eyebrow + readiness -->
             <div class="flex items-center justify-between gap-3">
               <p class="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-gray-400">
                 <span class="relative flex h-2 w-2" aria-hidden="true">
-                  <span class="absolute inline-flex h-full w-full rounded-full bg-acid opacity-60 animate-ping" />
-                  <span class="relative inline-flex h-2 w-2 rounded-full bg-acid" />
+                  <span
+                    v-if="!cancelled"
+                    class="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping"
+                    :style="{ background: statusTone.color }"
+                  />
+                  <span class="relative inline-flex h-2 w-2 rounded-full" :style="{ background: statusTone.color }" />
                 </span>
                 {{ es ? 'Resumen ejecutivo' : 'Executive summary' }}
               </p>
@@ -938,7 +978,6 @@ onMounted(load)
                         ×
                       </button>
                     </span>
-                    <span v-else-if="!focusPickerOpen" class="text-gray-600">{{ es ? 'Sin enfoque definido' : 'No focus set' }}</span>
                     <button
                       v-if="!focusPickerOpen"
                       type="button"

@@ -14,7 +14,7 @@ defineProps<{
           <slot name="subtitle">{{ subtitle }}</slot>
         </p>
       </div>
-      <div v-if="$slots.actions" class="shrink-0 flex items-center gap-2">
+      <div v-if="$slots.actions" class="staff-header-actions shrink-0 flex items-center gap-2">
         <slot name="actions" />
       </div>
     </div>
@@ -23,3 +23,29 @@ defineProps<{
     </div>
   </header>
 </template>
+
+<style scoped>
+/* Match the yellow header button: text-sm with py-2.5, about 40px tall. */
+.staff-header-actions :deep(a),
+.staff-header-actions :deep(button) {
+  box-sizing: border-box;
+  height: 2.5rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.staff-header-actions :deep(.absolute button) {
+  height: auto;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  display: block;
+  justify-content: flex-start;
+}
+.staff-header-actions :deep(button.h-9),
+.staff-header-actions :deep(a.h-9) {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+</style>
