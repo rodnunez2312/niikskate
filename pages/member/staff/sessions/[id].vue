@@ -608,12 +608,16 @@ async function addSkater(skaterId: string) {
   await load()
 }
 
+/** A delete blocked by row security returns no error and no rows, so count what actually went. */
 async function dropEnrollmentRows(ids: string[]) {
   if (!ids.length) return
-  const removed = await client.from('class_session_enrollments').delete().in('id', ids)
-  if (!removed.error) return
-  const cancelled = await client.from('class_session_enrollments').update({ status: 'cancelled' }).in('id', ids)
-  if (cancelled.error) throw removed.error
+  const removed = await client.from('class_session_enrollments').delete().in('id', ids).select('id')
+  const gone = new Set((removed.data || []).map(row => row.id))
+  const left = ids.filter(id => !gone.has(id))
+  if (!left.length) return
+  const cancelled = await client.from('class_session_enrollments').update({ status: 'cancelled' }).in('id', left).select('id')
+  if (cancelled.error) throw cancelled.error
+  if ((cancelled.data || []).length < left.length) throw removed.error || new Error('blocked')
 }
 
 async function removeAthlete(athlete: AthleteRow) {
@@ -632,6 +636,15 @@ async function removeAthlete(athlete: AthleteRow) {
         : row.skater_profile_id === athlete.id || row.user_id === athlete.id)
       .map(row => row.id)
     await dropEnrollmentRows(seatIds)
+    // A skater profile left on the coach roster is listed here too, so clear that seat as well.
+    if (athlete.kind === 'profile' && !assignedCoaches.value.some(coach => coach.id === athlete.id)) {
+      const { error: seatErr } = await client
+        .from('class_session_coaches')
+        .delete()
+        .eq('calendar_event_id', event.value.id)
+        .eq('coach_id', athlete.id)
+      if (seatErr) throw seatErr
+    }
     await load()
     if (athletes.value.some(row => row.kind === athlete.kind && row.id === athlete.id)) {
       editError.value = es.value
