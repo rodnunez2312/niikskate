@@ -121,7 +121,7 @@ const formatDate = (date: string) => {
   <div class="min-h-screen bg-black">
     <!-- Header -->
     <MemberStaffPageHeader
-      :title="language === 'es' ? 'Panel academia' : 'Academy dashboard'"
+      title="Admin console"
       subtitle="NiikSkate Academy"
     />
 
@@ -220,14 +220,14 @@ const formatDate = (date: string) => {
 
           <!-- Finance -->
           <NuxtLink 
-            to="/member/admin/finance"
+            to="/member/admin/finance/students"
             class="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-700 transition-all"
           >
             <div class="w-12 h-12 rounded-xl bg-gold-400/20 flex items-center justify-center text-2xl">
               💵
             </div>
             <div class="flex-1">
-              <p class="font-semibold text-white">{{ language === 'es' ? 'Finanzas' : 'Finance' }}</p>
+              <p class="font-semibold text-white">Admin</p>
               <p class="text-sm text-gray-400">
                 {{ language === 'es'
                   ? 'Ingresos, gastos, precios y punto de equilibrio'

@@ -17,7 +17,7 @@ const MIGRATION_HINT =
 
 function friendlyError(message: string): string {
   if (
-    /finance_(price_list|payments|expenses|settings|student_enrollments|enrollment_session_marks)|does not exist|schema cache/i
+    /finance_(price_list|payments|expenses|settings|student_enrollments|enrollment_session_marks)|skater_tokens|does not exist|schema cache/i
       .test(message)
   ) {
     return `${message} — ${MIGRATION_HINT}`
@@ -352,6 +352,27 @@ export function useFinance() {
     return enrollments.value
   }
 
+  async function syncClassTokens(enrollmentId: string, previousSessionsPaid: number) {
+    const { data: sessionData } = await client.auth.getSession()
+    const token = sessionData.session?.access_token
+    if (!token) throw new Error('Session expired')
+    try {
+      await $fetch('/api/staff/class-tokens', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: { enrollmentId, previousSessionsPaid },
+      })
+    } catch (err) {
+      const data = (err as { data?: { message?: string }; message?: string })
+      throw new Error(data?.data?.message || data?.message || 'Could not mint tokens')
+    }
+  }
+
+  function tokensNotReady(error: unknown) {
+    const message = (error as { message?: string })?.message || ''
+    return /add_skater_tokens|skater_tokens|schema cache/i.test(message)
+  }
+
   const addEnrollment = async (row: Partial<FinanceEnrollmentRow>): Promise<MutationResult> => {
     saving.value = true
     error.value = null
@@ -393,6 +414,13 @@ export function useFinance() {
       if (e) throw new Error(e.message)
       // Re-read so remaining_sessions reflects the new attendance figures.
       if (index >= 0) enrollments.value[index] = data as unknown as FinanceEnrollmentRow
+      if (previous && patch.sessions_paid != null && Number(patch.sessions_paid) !== Number(previous.sessions_paid)) {
+        try {
+          await syncClassTokens(id, Number(previous.sessions_paid || 0))
+        } catch (syncError) {
+          if (!tokensNotReady(syncError)) return fail(syncError, 'updateEnrollment failed')
+        }
+      }
       return { ok: true }
     } catch (e) {
       if (previous && index >= 0) enrollments.value[index] = previous

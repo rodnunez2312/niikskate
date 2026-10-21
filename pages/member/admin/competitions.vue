@@ -5,6 +5,7 @@ import type { CompetitionEvent } from '~/composables/useCompetitionEvents'
 
 const { language } = useI18n()
 const { fetchCompetitions, splitUpcomingPast } = useCompetitionEvents()
+const { selected: selectedSport, matchesSport } = useEnabledSports()
 
 const loading = ref(true)
 const loadError = ref<string | null>(null)
@@ -18,7 +19,7 @@ async function loadCompetitions() {
   try {
     const { events, error } = await fetchCompetitions({ includePast: true })
     if (error) throw error
-    const split = splitUpcomingPast(events)
+    const split = splitUpcomingPast(events.filter(matchesSport))
     upcoming.value = split.upcoming
     past.value = split.past
   } catch (e: unknown) {
@@ -32,6 +33,7 @@ async function loadCompetitions() {
 
 onMounted(loadCompetitions)
 onActivated(loadCompetitions)
+watch(selectedSport, loadCompetitions)
 </script>
 
 <template>

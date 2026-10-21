@@ -21,6 +21,8 @@ export interface User {
   is_active: boolean
   created_at: string
   updated_at: string
+  /** Sports this person belongs to. At least one. */
+  sports?: string[] | null
   /** Assigned skate program (skill_groups Level 1–5). */
   skill_group_id?: string | null
   /** Skater band: foundation | beginner | intermediate | advanced */

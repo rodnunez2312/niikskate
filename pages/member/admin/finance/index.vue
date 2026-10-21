@@ -7,17 +7,14 @@
  */
 import {
   FINANCE_COACH_TIERS,
-  aggregateStudents,
   academyPerUnitMxn,
   coachTierSheetLabel,
   computeBreakEven,
-  daysSinceDate,
   effectivePriceMxn,
   expenseCategoryLabel,
   formatMoneyMxn,
   formatPct,
   monthlyFixedCostMxn,
-  paymentToneForDays,
   sortPriceRows,
   summarizeExpenses,
   summarizePayments,
@@ -37,7 +34,6 @@ const {
   payments,
   expenses,
   priceRows,
-  enrollments,
   settings,
   loading,
   saving,
@@ -45,7 +41,6 @@ const {
   loadPayments,
   loadExpenses,
   loadPriceRows,
-  loadEnrollments,
   loadSettings,
   saveSettings,
 } = useFinance()
@@ -58,7 +53,7 @@ async function reload() {
 }
 
 onMounted(async () => {
-  await Promise.all([reload(), loadPriceRows(), loadEnrollments(), loadSettings()])
+  await Promise.all([reload(), loadPriceRows(), loadSettings()])
 })
 
 watch(monthKey, reload)
@@ -101,16 +96,6 @@ const progressPct = computed(() => {
 const gapToTarget = computed(() =>
   Math.max(0, breakEven.value.minimumViableIncome - income.value.academyNet),
 )
-
-const students = computed(() => {
-  const rows = aggregateStudents(enrollments.value)
-  return {
-    count: rows.length,
-    remaining: rows.reduce((n, row) => n + row.remaining, 0),
-    outOfClasses: rows.filter(row => row.remaining <= 0).length,
-    overdue: rows.filter(row => paymentToneForDays(daysSinceDate(row.lastPaymentOn)) === 'bad').length,
-  }
-})
 
 const expenseBreakdown = computed(() =>
   totalsByCategory(
@@ -477,68 +462,6 @@ async function persistSettings() {
         </div>
       </section>
 
-      <!-- Student tracker -->
-      <section v-if="students.count" class="space-y-2">
-        <h2 class="text-base font-bold text-white">
-          🛹 {{ es ? 'Control de alumnos' : 'Student tracker' }}
-        </h2>
-        <NuxtLink
-          to="/member/admin/finance/students"
-          class="block rounded-xl border border-gray-800 bg-gray-900/40 p-3 hover:border-gray-700 transition-colors"
-        >
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">
-                {{ es ? 'Alumnos' : 'Students' }}
-              </p>
-              <p class="text-lg font-bold text-white tabular-nums">{{ students.count }}</p>
-            </div>
-            <div>
-              <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">
-                {{ es ? 'Clases restantes' : 'Classes left' }}
-              </p>
-              <p class="text-lg font-bold text-white tabular-nums">{{ students.remaining }}</p>
-            </div>
-            <div>
-              <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">
-                {{ es ? 'Sin clases' : 'Out of classes' }}
-              </p>
-              <p
-                class="text-lg font-bold tabular-nums"
-                :class="students.outOfClasses ? 'text-red-400' : 'text-glass-green'"
-              >
-                {{ students.outOfClasses }}
-              </p>
-            </div>
-            <div>
-              <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">
-                {{ es ? 'Pago atrasado' : 'Overdue' }}
-              </p>
-              <p
-                class="text-lg font-bold tabular-nums"
-                :class="students.overdue ? 'text-amber-300' : 'text-glass-green'"
-              >
-                {{ students.overdue }}
-              </p>
-            </div>
-          </div>
-        </NuxtLink>
-      </section>
-
-      <NuxtLink
-        to="/member/admin/finance/prices"
-        class="block rounded-xl border border-gray-800 bg-gray-900/40 p-3 hover:border-gray-700 transition-colors"
-      >
-        <p class="text-sm text-white font-semibold">
-          🏷️ {{ es ? 'Lista de precios' : 'Price list' }}
-        </p>
-        <p class="text-[11px] text-gray-500">
-          {{ priceRows.length }}
-          {{ es
-            ? 'paquetes · edita precios, descuentos y el % de academia'
-            : 'packages · edit prices, discounts and the academy share' }}
-        </p>
-      </NuxtLink>
     </div>
   </div>
 </template>

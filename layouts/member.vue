@@ -41,6 +41,7 @@ onBeforeUnmount(() => {
         </svg>
       </button>
       <MemberTopBar v-else-if="!roleResolving" />
+      <MemberOfflineBanner />
 
       <main :class="usesStaffSidebar ? 'flex-1 pb-8 pt-14 lg:pt-0' : 'pb-20'">
         <slot />

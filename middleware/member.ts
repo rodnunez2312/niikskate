@@ -12,6 +12,8 @@ export default defineNuxtRouteMiddleware(async to => {
     .select('role, guardian_user_id')
     .eq('id', user.value.id)
     .single()
+  // Offline with no cached profile: let the page open from cache instead of bouncing.
+  if (!data && !navigator.onLine) return
   const role = data?.role
 
   // Assigning a skater to a family moves them onto the family login. Catches

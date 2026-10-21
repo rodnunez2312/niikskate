@@ -148,6 +148,24 @@ export function skillStructure(skill?: TrickTaxonomySortable | null): string {
   return normalizeStructureValue(skill?.structure || skill?.categoria)
 }
 
+/** Warmup and strength work is shared. Every other library row is a sport's tricks. */
+export function isSharedTrainingSkill(skill?: {
+  area?: string | null
+  structure?: string | null
+  categoria?: string | null
+  program?: string | null
+  discipline?: string | null
+} | null): boolean {
+  if ((skill?.discipline || '').trim() === 'shared') return true
+  const area = (skill?.area || '').trim().toLowerCase()
+  const structure = skillStructure(skill).toLowerCase()
+  const program = (skill?.program || '').trim().toLowerCase()
+  return area === 'warmup'
+    || structure.includes('warmup')
+    || structure.includes('strength')
+    || program === 'strength training'
+}
+
 export function compareSkillsByTaxonomy(a: TrickTaxonomySortable, b: TrickTaxonomySortable): number {
   const structA = skillStructure(a)
   const structB = skillStructure(b)
@@ -166,9 +184,10 @@ export type TrickManualSortable = TrickTaxonomySortable & {
 }
 
 /** Primary sort: Excel # column (manual_id), then sort_order fallback. */
+/** Library order as arranged in Bolsa de trucos; the Excel row number is the fallback. */
 export function compareSkillsByManualId(a: TrickManualSortable, b: TrickManualSortable): number {
-  const idA = a.manual_id ?? a.sort_order ?? 999999
-  const idB = b.manual_id ?? b.sort_order ?? 999999
+  const idA = a.sort_order ?? a.manual_id ?? 999999
+  const idB = b.sort_order ?? b.manual_id ?? 999999
   if (idA !== idB) return idA - idB
   return compareSkillsByTaxonomy(a, b)
 }
@@ -200,7 +219,7 @@ export function typeTagClass(trickType?: string | null): string {
 }
 
 export function trickManualLabel(skill?: TrickManualSortable | null): string {
-  const n = skill?.manual_id ?? skill?.sort_order
+  const n = skill?.sort_order ?? skill?.manual_id
   return n != null && n > 0 ? `#${n}` : ''
 }
 

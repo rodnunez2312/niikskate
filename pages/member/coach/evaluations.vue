@@ -14,6 +14,7 @@ const route = useRoute()
 const user = useSupabaseUser()
 const client = useSupabaseClient()
 const { language } = useI18n()
+const { selected: selectedSport } = useEnabledSports()
 
 // State
 const isCoach = ref(false)
@@ -106,6 +107,10 @@ onMounted(() => {
   }
 })
 
+watch(selectedSport, () => {
+  if (isCoach.value) loadData()
+})
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -117,7 +122,13 @@ const loadData = async () => {
       .eq('is_active', true)
       .order('full_name')
 
-    students.value = studentsData || []
+    // Existing students are all skate; other sports only list who is booked into their classes.
+    if (selectedSport.value === 'skateboarding') {
+      students.value = studentsData || []
+    } else {
+      const inSport = await sportStudentIds(client, selectedSport.value)
+      students.value = (studentsData || []).filter((s: any) => inSport.has(s.id))
+    }
 
     const studentId = route.query.student as string | undefined
 
@@ -147,7 +158,10 @@ const loadData = async () => {
           .limit(20)
         evalsData = data || []
       }
-      evaluations.value = evalsData
+      const visibleIds = new Set(students.value.map((s: any) => s.id))
+      evaluations.value = selectedSport.value === 'skateboarding'
+        ? evalsData
+        : evalsData.filter(row => visibleIds.has(row.student_id))
     } catch (evalError) {
       console.warn('student_evaluations table may not exist yet:', evalError)
       evaluations.value = []

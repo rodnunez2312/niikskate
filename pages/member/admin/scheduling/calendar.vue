@@ -1342,6 +1342,24 @@ const eventTimeGroups = (day: Date) => {
   return groups
 }
 
+const eventIsAdultClass = (ev: SchoolCalendarRow) => {
+  const cats = parseAudienceCategories(ev)
+  const youth = ['tots_5_7', 'kids_7_12', 'teens_13_17']
+  if (cats.includes('adults_18_plus') && !cats.some(id => youth.includes(id))) return true
+  if (ev.min_age != null && ev.min_age >= 18) return true
+  return /18\s*\+/.test(ev.title || '')
+}
+
+/** Age mark only. An 18+ class is just the fist, same as the sessions list. */
+const eventMarkEmojis = (ev: SchoolCalendarRow) => {
+  if (!isProgramType(ev.event_type)) return [] as string[]
+  if (eventIsAdultClass(ev)) return ['👊']
+  const ages = eventAgeEmojis(ev)
+  if (ages.length) return ages
+  const track = PROGRAM_SKILL_TRACKS.find(row => row.id === skillTrackFromLevelId(ev.skill_level))
+  return track ? [track.emoji] : []
+}
+
 const eventAgeEmojis = (ev: SchoolCalendarRow) => {
   if (!isProgramType(ev.event_type)) return [] as string[]
   const cats = parseAudienceCategories(ev)
@@ -2890,6 +2908,7 @@ const resolveEventSeasonSlug = (ev: SchoolCalendarRow): string => {
 const programSeriesSummaries = computed((): ProgramSeriesSummary[] => {
   const groups = new Map<string, SchoolCalendarRow[]>()
   for (const ev of events.value) {
+    if (!matchesSport(ev)) continue
     if (!isProgramType(ev.event_type)) continue
     const key = ev.program_series_id || ev.id
     const list = groups.get(key) || []
@@ -3364,7 +3383,7 @@ const selectDay = (day: Date) => {
           />
           <p class="text-base font-semibold text-white flex items-center gap-2">
             <MemberSessionKindIcon v-if="ev.event_type === 'class_session' || ev.event_type === 'class_individual'" :kind="ev.event_type" />
-            <span class="leading-none" aria-hidden="true">{{ eventSportEmoji(ev) }}{{ eventAgeEmojis(ev).join('') || eventChipEmoji(ev) }}</span>
+            <span v-if="eventMarkEmojis(ev).length" class="leading-none" aria-hidden="true">{{ eventMarkEmojis(ev).join('') }}</span>
             <span class="truncate">{{ eventChipLabel(ev) }}</span>
           </p>
           <p v-if="ev.season_slug" class="text-xs text-gray-400 mt-0.5">
@@ -3579,17 +3598,11 @@ const selectDay = (day: Date) => {
                     :aria-label="blockedProgramTitle(ev)"
                   >🚫</span>
                   <span
-                    v-else-if="eventAgeEmojis(ev).length"
+                    v-else-if="eventMarkEmojis(ev).length"
                     class="inline-block mr-0.5 align-middle text-[11px] leading-none"
                     :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
                     aria-hidden="true"
-                  >{{ eventSportEmoji(ev) }}{{ eventAgeEmojis(ev).join('') }}</span>
-                  <span
-                    v-else-if="isProgramType(ev.event_type)"
-                    class="inline-block mr-0.5 align-middle text-[11px] leading-none"
-                    :class="!isProgramChipTinted(ev) && isPastDay(day) ? 'grayscale' : ''"
-                    aria-hidden="true"
-                  >{{ eventSportEmoji(ev) || eventChipEmoji(ev) }}</span>
+                  >{{ eventMarkEmojis(ev).join('') }}</span>
                   <span
                     v-else
                     class="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle"
@@ -3665,7 +3678,7 @@ const selectDay = (day: Date) => {
                 />
                 <span class="min-w-0">
                   <span class="block truncate text-sm font-semibold text-white">
-                    <span class="mr-1" aria-hidden="true">{{ eventSportEmoji(ev) }}<span v-if="eventAgeEmojis(ev).length">{{ eventAgeEmojis(ev).join('') }}</span></span>{{ ev.title }}
+                    <span v-if="eventMarkEmojis(ev).length" class="mr-1" aria-hidden="true">{{ eventMarkEmojis(ev).join('') }}</span>{{ ev.title }}
                     <span
                       v-if="ev.session_outcome === 'done'"
                       class="ml-1 text-emerald-400"
@@ -3830,7 +3843,7 @@ const selectDay = (day: Date) => {
                     }"
                     aria-hidden="true"
                   />
-                  <span class="text-base leading-none" aria-hidden="true">{{ eventSportEmoji(program.representative) }}{{ eventChipEmoji(program.representative) }}</span>
+                  <span v-if="eventMarkEmojis(program.representative).length" class="text-base leading-none" aria-hidden="true">{{ eventMarkEmojis(program.representative).join('') }}</span>
                   <span class="line-clamp-2">{{ programIdentityLabel(program) }}</span>
                 </p>
                 <p class="text-xs text-gray-400 mt-0.5">

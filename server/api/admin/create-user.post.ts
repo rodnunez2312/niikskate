@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const { adminClient: supabase } = await requireAdmin(event)
 
   const body = await readBody(event)
-  const { email, password, full_name, role, phone, date_of_birth, customer_kind, guardian_user_id, disciplines, discipline } = body || {}
+  const { email, password, full_name, role, phone, date_of_birth, customer_kind, guardian_user_id, disciplines, discipline, sports } = body || {}
 
   if (!email || typeof email !== 'string' || !email.trim()) {
     throw createError({
@@ -126,14 +126,24 @@ export default defineEventHandler(async (event) => {
       { onConflict: 'id' }
     )
 
+  const memberSports = (Array.isArray(sports) ? sports : [])
+    .filter((id: unknown): id is string => isTrainingDiscipline(typeof id === 'string' ? id : null))
+  const assignedSports = memberSports.length ? memberSports : ['skateboarding']
+
   if (profileError) {
     console.error('Profile upsert after create user:', profileError)
   } else if (role === 'coach') {
     const { error: sportError } = await supabase
       .from('profiles')
-      .update({ coach_discipline: coachSports })
+      .update({ coach_discipline: coachSports, sports: assignedSports })
       .eq('id', userId)
     if (sportError) console.error('Coach sport:', sportError)
+  } else {
+    const { error: sportError } = await supabase
+      .from('profiles')
+      .update({ sports: assignedSports })
+      .eq('id', userId)
+    if (sportError) console.error('Member sports:', sportError)
   }
 
   return {

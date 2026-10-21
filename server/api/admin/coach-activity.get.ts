@@ -58,6 +58,8 @@ export interface CoachActivityClass {
   id: string
   date: string
   time: string
+  /** End time label; empty when the class has no end time. */
+  endTime: string
   title: string
   /** Short age band, such as 5-7 or 7-17. */
   age: string
@@ -185,7 +187,9 @@ async function loadNearbyClasses(
   todayKey: string,
   historyMonths: number,
   sports: Set<string>,
+  periodFrom: string,
 ): Promise<CoachActivityClass[]> {
+  const nowKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
   const thisMonday = (() => {
     const [y, m, d] = todayKey.split('-').map(Number)
     const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
@@ -193,12 +197,13 @@ async function loadNearbyClasses(
   })()
   const [year, month] = todayKey.split('-').map(Number)
   const monthStart = new Date(Date.UTC(year, month - 1 - historyMonths, 1)).toISOString().slice(0, 10)
-  const from = monthStart
+  // The whole selected period, so a month or 3-month view lists every class in it.
+  const from = periodFrom && periodFrom < monthStart ? periodFrom : monthStart
   const to = shiftYmd(thisMonday, 6)
 
   const { data: events } = await adminClient
     .from('school_calendar_events')
-    .select('id, title, start_date, start_time, time_slot, session_outcome, cancelled_at, discipline, audience_category, audience_categories')
+    .select('id, title, start_date, start_time, end_time, time_slot, session_outcome, cancelled_at, discipline, audience_category, audience_categories')
     .in('event_type', ['class_session', 'class_individual'])
     .gte('start_date', from)
     .lte('start_date', to)
@@ -210,6 +215,7 @@ async function loadNearbyClasses(
     title: string
     start_date: string
     start_time: string | null
+    end_time: string | null
     time_slot: string | null
     session_outcome: string | null
     cancelled_at: string | null
@@ -342,13 +348,14 @@ async function loadNearbyClasses(
       ? 'cancelled'
       : ev.session_outcome === 'done'
         ? 'done'
-        : ev.start_date < todayKey
+        : ev.start_date < nowKey
           ? 'open'
           : 'upcoming'
     classes.push({
       id: ev.id,
       date: ev.start_date,
       time: classTimeLabel(ev.start_time),
+      endTime: ev.end_time ? classTimeLabel(ev.end_time) : '',
       title: ev.title,
       age: classAgeLabel(ev),
       coaches: labels.join(' · '),
@@ -564,7 +571,7 @@ export default defineEventHandler(async (event): Promise<CoachActivityResponse> 
       .in('owner_id', coachIds)
       .gte('created_at', mxDayStart(from))
       .lte('created_at', mxDayEnd(to)),
-    loadNearbyClasses(adminClient, coachIds, Boolean(programFilter || sportSet.size), to, historyMonths, sportSet),
+    loadNearbyClasses(adminClient, coachIds, Boolean(programFilter || sportSet.size), to, historyMonths, sportSet, from),
     adminClient
       .from('class_session_coaches')
       .select('coach_id, calendar_event_id, school_calendar_events!inner(start_date, event_type)')

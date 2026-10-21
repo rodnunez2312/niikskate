@@ -53,6 +53,29 @@ const loading = ref(true)
 
 const todaySessions = ref<TodaySession[]>([])
 const attentionItems = ref<AttentionItem[]>([])
+const { itemsFor: setupItemsFor, refresh: refreshSetup } = useSportSetup()
+const { isRead: isWarningRead, isDeleted: isWarningDeleted, toggleRead: toggleWarningRead, remove: removeWarning } = useWarningState()
+
+/** A warning's id includes its text, so a new count brings a deleted warning back. */
+const warningKey = (item: AttentionItem) => `${item.id}:${item.label}`
+
+type WarningRow = AttentionItem & { key: string; required: boolean }
+const warningRows = computed<WarningRow[]>(() => [
+  ...setupItemsFor(selectedSport.value).map(item => ({
+    id: item.id,
+    key: item.id,
+    area: es.value ? 'Requisito mínimo' : 'Minimum setup',
+    where: '',
+    label: es.value ? item.es : item.en,
+    href: item.to,
+    required: true,
+  })),
+  ...attentionItems.value
+    .map(item => ({ ...item, key: warningKey(item), required: false }))
+    .filter(item => !isWarningDeleted(item.key)),
+])
+const unreadWarnings = computed(() => warningRows.value.filter(row => !isWarningRead(row.key)).length)
+onMounted(refreshSetup)
 const highlights = ref<HighlightItem[]>([])
 const snapshot = ref({
   athletes: 0,
@@ -319,7 +342,7 @@ async function loadDashboard() {
     if (pendingPay > 0 && isAdmin.value) {
       attention.push({
         id: 'payments',
-        area: es.value ? 'Finanzas' : 'Finance',
+        area: 'Admin',
         where: es.value ? 'Ingresos' : 'Income',
         label: es.value
           ? `${pendingPay} reserva${pendingPay === 1 ? '' : 's'} con pago pendiente`
@@ -549,18 +572,49 @@ const quickActions = computed(() => {
                 {{ es ? 'Requiere atención' : 'Needs attention' }}
               </p>
               <span
-                v-if="attentionItems.length"
+                v-if="unreadWarnings"
                 class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-amber-500/15 text-[11px] font-bold text-amber-400"
               >
-                {{ attentionItems.length }}
+                {{ unreadWarnings }}
               </span>
             </div>
-            <ul v-if="attentionItems.length" class="space-y-3 text-sm">
-              <li v-for="item in attentionItems" :key="item.id">
-                <NuxtLink :to="item.href" class="block rounded-xl border border-gray-800 bg-gray-950 px-3 py-2.5 hover:border-amber-500/40">
-                  <p class="text-[11px] font-semibold text-amber-400">{{ item.area }} → {{ item.where }}</p>
+            <ul v-if="warningRows.length" class="space-y-3 text-sm">
+              <li
+                v-for="item in warningRows"
+                :key="item.key"
+                class="flex items-stretch rounded-xl border bg-gray-950 transition-opacity"
+                :class="[
+                  item.required ? 'border-[#C9EF42]/40' : 'border-gray-800',
+                  isWarningRead(item.key) ? 'opacity-50' : '',
+                ]"
+              >
+                <NuxtLink :to="item.href" class="block min-w-0 flex-1 px-3 py-2.5 hover:text-white">
+                  <p class="text-[11px] font-semibold" :class="item.required ? 'text-[#C9EF42]' : 'text-amber-400'">
+                    {{ item.area }}<template v-if="item.where"> → {{ item.where }}</template>
+                  </p>
                   <p class="mt-0.5 text-gray-200">{{ item.label }}</p>
                 </NuxtLink>
+                <div class="flex shrink-0 flex-col justify-center gap-1 pr-2">
+                  <button
+                    type="button"
+                    class="flex h-6 w-6 items-center justify-center rounded-md text-xs text-gray-500 hover:bg-gray-800 hover:text-white"
+                    :title="isWarningRead(item.key) ? (es ? 'Marcar como no leído' : 'Mark as unread') : (es ? 'Marcar como leído' : 'Mark as read')"
+                    :aria-label="isWarningRead(item.key) ? (es ? 'Marcar como no leído' : 'Mark as unread') : (es ? 'Marcar como leído' : 'Mark as read')"
+                    @click="toggleWarningRead(item.key)"
+                  >{{ isWarningRead(item.key) ? '↺' : '✓' }}</button>
+                  <button
+                    v-if="!item.required"
+                    type="button"
+                    class="flex h-6 w-6 items-center justify-center rounded-md text-xs text-gray-500 hover:bg-gray-800 hover:text-red-400"
+                    :title="es ? 'Eliminar' : 'Delete'"
+                    :aria-label="es ? 'Eliminar' : 'Delete'"
+                    @click="removeWarning(item.key)"
+                  >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                    </svg>
+                  </button>
+                </div>
               </li>
             </ul>
             <p v-else class="text-sm text-gray-500">

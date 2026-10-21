@@ -23,6 +23,7 @@ import {
   NIIK_SKATE_EMAIL_DOMAIN,
 } from '~/utils/skaterNiikEmail'
 import { getProgramSeasonBySlug } from '~/utils/programSeasons'
+import { TRAINING_DISCIPLINES, disciplineLabel, isTrainingDiscipline, type TrainingDiscipline } from '~/utils/trainingDisciplines'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -34,6 +35,7 @@ const user = useSupabaseUser()
 const client = useSupabaseClient()
 const { language } = useI18n()
 const { seasons: programSeasons } = useProgramSeasons()
+const { selected: selectedSport } = useEnabledSports()
 
 // State
 const isAdmin = ref(false)
@@ -44,9 +46,6 @@ const searchQuery = ref('')
 const { programs: loadedSkillGroups, load: loadSkillGroups, optionLabel } = useSkillGroupPrograms()
 const skillGroupsList = loadedSkillGroups
 const trainingBoards = ref<Array<{ id: string; name: string; discipline: string }>>([])
-const boardIndex = ref(0)
-const boardIndexReady = ref(false)
-const currentBoard = computed(() => trainingBoards.value[boardIndex.value] || null)
 
 const kanbanMode = ref<'program' | 'level'>('program')
 const draggingCardKey = ref<string | null>(null)
@@ -110,6 +109,7 @@ type CrewMemberAdminRow = {
   full_name: string | null
   date_of_birth: string | null
   age: number | null
+  sports?: string[] | null
 }
 
 const crewMembers = ref<CrewMemberAdminRow[]>([])
@@ -197,10 +197,18 @@ onMounted(async () => {
 
 const loadCrewMembers = async () => {
   try {
-    const { data, error } = await client
+    let { data, error } = await client
       .from('crew_members')
-      .select('id, guardian_user_id, first_name, last_name, full_name, date_of_birth, age')
+      .select('id, guardian_user_id, first_name, last_name, full_name, date_of_birth, age, sports')
       .order('sort_order')
+    if (error && /sports/i.test(error.message)) {
+      const fallback = await client
+        .from('crew_members')
+        .select('id, guardian_user_id, first_name, last_name, full_name, date_of_birth, age')
+        .order('sort_order')
+      data = fallback.data
+      error = fallback.error
+    }
     if (error) throw error
     crewMembers.value = (data || []) as CrewMemberAdminRow[]
   } catch (e) {
@@ -232,61 +240,38 @@ const loadSkaterMeta = async () => {
       }
       trainingBoards.value = [...seen.values()]
     }
-    if (!boardIndexReady.value) {
-      const skate = trainingBoards.value.findIndex(board => board.discipline === 'skateboarding')
-      boardIndex.value = skate >= 0 ? skate : 0
-      boardIndexReady.value = true
-    }
-    if (boardIndex.value >= trainingBoards.value.length) boardIndex.value = 0
   } catch (e) {
     console.error('loadSkaterMeta:', e)
   }
 }
 
-function shiftBoard(delta: number) {
-  const count = trainingBoards.value.length
-  if (count < 2) return
-  boardIndex.value = (boardIndex.value + delta + count) % count
+/** Until the sports column is filled, a person belongs to skateboarding. */
+function memberSports(row: { sports?: string[] | null }): TrainingDiscipline[] {
+  const list = (row.sports || []).filter(isTrainingDiscipline)
+  return list.length ? list : ['skateboarding']
 }
 
-function scrollProgramChip(index: number) {
-  if (!import.meta.client) return
-  document.getElementById(`program-chip-${index}`)?.scrollIntoView({
-    behavior: 'smooth',
-    inline: 'center',
-    block: 'nearest',
-  })
-}
-
-watch(boardIndex, index => scrollProgramChip(index))
-
-let boardTouchX = 0
-function onBoardTouchStart(event: TouchEvent) {
-  boardTouchX = event.changedTouches[0]?.clientX ?? 0
-}
-function onBoardTouchEnd(event: TouchEvent) {
-  const x = event.changedTouches[0]?.clientX ?? 0
-  const delta = x - boardTouchX
-  if (Math.abs(delta) < 48) return
-  shiftBoard(delta < 0 ? 1 : -1)
+function inSelectedSport(row: { sports?: string[] | null }) {
+  return isTrainingDiscipline(selectedSport.value) && memberSports(row).includes(selectedSport.value)
 }
 
 const boardLevelIds = computed(() => {
-  const programId = currentBoard.value?.id
-  if (!programId || !skillGroupsList.value.some(group => group.programId)) return null
+  if (!isTrainingDiscipline(selectedSport.value)) return new Set<string>()
+  if (!skillGroupsList.value.some(group => group.programId)) return null
+  const programIds = new Set(
+    trainingBoards.value
+      .filter(board => (board.discipline || 'skateboarding') === selectedSport.value)
+      .map(board => board.id),
+  )
   return new Set(
     assignableSkillGroups(skillGroupsList.value)
-      .filter(group => group.programId === programId)
+      .filter(group => group.programId && programIds.has(group.programId))
       .map(group => group.id),
   )
 })
 
-function onThisBoard(student: { skill_group_id?: string | null }) {
-  const ids = boardLevelIds.value
-  if (!ids) return true
-  const levelId = effectiveSkaterLevelId(student.skill_group_id, skillGroupsList.value)
-  if (!levelId) return true
-  return ids.has(levelId)
+function onThisBoard(student: { sports?: string[] | null }) {
+  return inSelectedSport(student)
 }
 
 const loadUsers = async () => {
@@ -356,7 +341,7 @@ const searchHits = computed(() => {
   if (query.length < 1) return []
   return users.value
     .filter(student => {
-      if (!isSkaterProfile(student)) return false
+      if (!isSkaterProfile(student) || !inSelectedSport(student)) return false
       const name = (student.full_name || '').toLowerCase()
       const email = (student.email || '').toLowerCase()
       return name.includes(query) || email.includes(query)
@@ -374,26 +359,8 @@ const searchHits = computed(() => {
     })
 })
 
-watch(searchHits, (hits) => {
-  if (!hits.length) return
-  const here = currentBoard.value?.id
-  if (hits.some(hit => !hit.programId || hit.programId === here)) return
-  const index = trainingBoards.value.findIndex(board => board.id === hits[0]?.programId)
-  if (index >= 0) boardIndex.value = index
-})
-
 function openStudentProgram(hit: { programId: string | null; name: string }) {
-  const index = trainingBoards.value.findIndex(board => board.id === hit.programId)
-  if (index >= 0) boardIndex.value = index
   searchQuery.value = hit.name
-}
-
-function disciplineIcon(discipline: string | undefined) {
-  if (discipline === 'scooter') return '🛴'
-  if (discipline === 'rollerblading') return '🛼'
-  if (discipline === 'bmx') return '🚲'
-  if (discipline === 'parkour') return '🤸'
-  return '🛹'
 }
 
 const skillBandLabelFor = (u: User) =>
@@ -424,7 +391,7 @@ const adminSkaterCards = computed((): AdminSkaterCard[] => {
     })
   }
   const q = searchQuery.value.trim().toLowerCase()
-  for (const c of crewMembers.value) {
+  for (const c of crewMembers.value.filter(inSelectedSport)) {
     const name = c.full_name || [c.first_name, c.last_name].filter(Boolean).join(' ')
     if (q && !name.toLowerCase().includes(q)) continue
     cards.push({
@@ -462,9 +429,11 @@ const programKanbanColumns = computed((): KanbanColumn[] => {
   ]
   for (const col of cols) {
     if (col.id === UNASSIGNED_COLUMN) {
-      col.students = pool.filter(
-        u => !effectiveSkaterLevelId(u.skill_group_id, skillGroupsList.value),
-      )
+      col.students = pool.filter(u => {
+        const levelId = effectiveSkaterLevelId(u.skill_group_id, skillGroupsList.value)
+        if (!levelId) return true
+        return !levels.some(group => group.id === levelId)
+      })
     } else {
       col.students = pool.filter(
         u => effectiveSkaterLevelId(u.skill_group_id, skillGroupsList.value) === col.id,
@@ -644,10 +613,22 @@ const skaterInitials = (name: string) => {
 }
 
 // Open edit modal
+const editingSports = ref<TrainingDiscipline[]>(['skateboarding'])
+
 const openEditModal = (userToEdit: User) => {
   editingUser.value = userToEdit
   newRole.value = userToEdit.role as any
+  editingSports.value = memberSports(userToEdit)
   showEditModal.value = true
+}
+
+function toggleEditingSport(id: TrainingDiscipline) {
+  if (editingSports.value.includes(id)) {
+    if (editingSports.value.length === 1) return
+    editingSports.value = editingSports.value.filter(sport => sport !== id)
+    return
+  }
+  editingSports.value = [...editingSports.value, id]
 }
 
 // Save user role
@@ -666,9 +647,11 @@ const saveUserRole = async () => {
 
   saving.value = true
   try {
+    const patch: { role: string; sports?: TrainingDiscipline[] } = { role: newRole.value }
+    if (newRole.value === 'customer') patch.sports = editingSports.value
     const { error } = await client
       .from('profiles')
-      .update({ role: newRole.value })
+      .update(patch)
       .eq('id', editingUser.value.id)
 
     if (error) throw error
@@ -977,6 +960,7 @@ const submitAddSkater = async () => {
         role: 'customer',
         customer_kind: 'skater',
         guardian_user_id: newSkaterForm.value.guardian_user_id || undefined,
+        sports: [isTrainingDiscipline(selectedSport.value) ? selectedSport.value : 'skateboarding'],
       },
     })
     closeAddSkaterModal()
@@ -1209,50 +1193,6 @@ const scheduleSummary = (u: User) => {
               + {{ language === 'es' ? 'Estudiante' : 'Student' }}
             </button>
       </template>
-      <div
-        class="flex items-center gap-1 min-w-0"
-        @touchstart.passive="onBoardTouchStart"
-        @touchend.passive="onBoardTouchEnd"
-      >
-            <button
-              type="button"
-              class="p-2 text-white flex-shrink-0 disabled:opacity-30"
-              :disabled="trainingBoards.length < 2"
-              :title="language === 'es' ? 'Programa anterior' : 'Previous program'"
-              @click="shiftBoard(-1)"
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div class="min-w-0 flex-1 overflow-x-auto flex items-center gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button
-                v-for="(board, index) in trainingBoards"
-                :id="`program-chip-${index}`"
-                :key="board.id"
-                type="button"
-                class="shrink-0 px-3 py-1.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors"
-                :class="index === boardIndex
-                  ? 'border-gold-400 bg-gold-400/15 text-white'
-                  : 'border-gray-700 text-gray-400 hover:border-gray-500'"
-                @click="boardIndex = index"
-              >
-                <span class="text-base leading-none" aria-hidden="true">{{ disciplineIcon(board.discipline) }}</span>
-                <span class="whitespace-nowrap">{{ board.name }}</span>
-              </button>
-            </div>
-            <button
-              type="button"
-              class="p-2 text-white flex-shrink-0 disabled:opacity-30"
-              :disabled="trainingBoards.length < 2"
-              :title="language === 'es' ? 'Programa siguiente' : 'Next program'"
-              @click="shiftBoard(1)"
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
-              </svg>
-            </button>
-      </div>
     </MemberStaffPageHeader>
 
     <!-- Content -->
@@ -1267,7 +1207,7 @@ const scheduleSummary = (u: User) => {
             <input
               v-model="searchQuery"
               type="text"
-              :placeholder="language === 'es' ? 'Buscar en todos los programas...' : 'Search every program...'"
+              :placeholder="language === 'es' ? 'Buscar estudiantes...' : 'Search students...'"
               class="w-full pl-12 pr-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-500 focus:border-gold-400 outline-none"
             />
           </div>
@@ -1698,6 +1638,27 @@ const scheduleSummary = (u: User) => {
                 <span class="text-xs">Coach</span>
               </button>
             </div>
+          </div>
+
+          <div v-if="newRole === 'customer'" class="mb-4">
+            <label class="block text-sm font-medium text-gray-300 mb-2">
+              {{ language === 'es' ? 'Deportes' : 'Sports' }}
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="sport in TRAINING_DISCIPLINES"
+                :key="sport.id"
+                type="button"
+                class="px-3 py-1.5 rounded-lg border text-xs font-semibold"
+                :class="editingSports.includes(sport.id) ? 'border-acid bg-acid text-charcoal' : 'border-gray-700 text-gray-300'"
+                @click="toggleEditingSport(sport.id)"
+              >
+                {{ disciplineLabel(sport.id, language === 'es') }}
+              </button>
+            </div>
+            <p class="mt-2 text-xs text-gray-500">
+              {{ language === 'es' ? 'Debe pertenecer al menos a un deporte.' : 'They must belong to at least one sport.' }}
+            </p>
           </div>
 
           <div class="flex gap-3">

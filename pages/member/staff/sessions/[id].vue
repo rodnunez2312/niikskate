@@ -4,6 +4,7 @@ import { es as esLocale } from 'date-fns/locale'
 import { TIME_SLOT_LABELS, type TimeSlot } from '~/types'
 import { fetchCoachDirectoryProfiles } from '~/composables/coachDirectory'
 import { coachPillClass, withCoachLabels } from '~/utils/coachInitials'
+import { tokenLabel, type TokenKind } from '~/utils/classTokens'
 
 definePageMeta({ middleware: ['auth', 'member'], layout: 'member' })
 
@@ -59,6 +60,7 @@ const trickOptions = ref<NamedRow[]>([])
 const trickQuery = ref('')
 const focusPickerOpen = ref(false)
 const editError = ref('')
+const rosterNotice = ref('')
 const editingRoster = ref(false)
 const assignedCoaches = ref<{ id: string; name: string }[]>([])
 const coachNames = computed(() => assignedCoaches.value.map(coach => coach.name))
@@ -237,7 +239,8 @@ const statCards = computed(() => [
 ])
 
 async function load() {
-  loading.value = true
+  // Only the first load blanks the page; later refreshes update in place.
+  if (!event.value) loading.value = true
   missing.value = false
   const { data, error } = await client
     .from('school_calendar_events')
@@ -251,6 +254,67 @@ async function load() {
   }
   event.value = data as CalendarEvent
 
+  await loadRoster()
+
+  focusLabel.value = ''
+  focusSetup.value = ''
+  trickNames.value = []
+  trickItems.value = []
+  timeBlocks.value = ''
+  planNotes.value = {}
+  planCoachId.value = ''
+  planSlot.value = data.time_slot || ''
+  const { data: plans } = await client
+    .from('class_plans')
+    .select('coach_id, notes, planned_skills, warmup_notes, main_activity_notes, cooldown_notes, time_slot')
+    .eq('plan_date', data.start_date)
+  const plan = (plans || []).find(row => row.time_slot === data.time_slot) || plans?.[0]
+  if (plan) {
+    planCoachId.value = plan.coach_id || ''
+    planSlot.value = plan.time_slot || planSlot.value
+    let parsed: Record<string, unknown> = {}
+    try { parsed = JSON.parse(plan.notes || '{}') } catch { parsed = {} }
+    planNotes.value = parsed
+    focusSetup.value = parsed.setup === 'learning' || parsed.setup === 'performance' ? parsed.setup : ''
+    const setup = focusSetup.value === 'learning' ? (es.value ? 'Aprendizaje' : 'Learning') : focusSetup.value === 'performance' ? 'Performance' : ''
+    const placeLabel = typeof parsed.place_label === 'string' ? parsed.place_label : ''
+    focusLabel.value = [setup, placeLabel].filter(Boolean).join(' · ')
+    const skillIds = Array.isArray(plan.planned_skills) ? plan.planned_skills.filter((id: unknown) => typeof id === 'string') : []
+    if (skillIds.length) {
+      const { data: skills } = await client.from('skills_library').select('id, name, name_es').in('id', skillIds)
+      trickItems.value = (skills || []).map(skill => ({
+        id: skill.id,
+        name: (es.value ? skill.name_es || skill.name : skill.name) || skill.name,
+      })).filter(skill => skill.name)
+      trickNames.value = trickItems.value.map(skill => skill.name)
+    }
+    timeBlocks.value = [plan.warmup_notes, plan.main_activity_notes, plan.cooldown_notes].filter(Boolean).join(' · ')
+  }
+
+  const { data: report } = await client
+    .from('session_reports')
+    .select('coach_notes, total_missed, successful_lands, skills_mastered')
+    .eq('calendar_event_id', eventId.value)
+    .maybeSingle()
+  notes.value = report?.coach_notes || ''
+  savedNotes.value = notes.value
+  metrics.value = {
+    missed: report?.total_missed || 0,
+    lands: report?.successful_lands || 0,
+    skills: report?.skills_mastered || 0,
+  }
+
+  const { data: videoRows } = await client
+    .from('session_videos')
+    .select('id, title, public_url, owner_id')
+    .eq('calendar_event_id', eventId.value)
+    .order('created_at', { ascending: false })
+  videos.value = await withCoachLabels(client, (videoRows || []) as Array<{ id: string; title: string; public_url: string; owner_id?: string | null }>)
+  loading.value = false
+}
+
+/** Inscritos and assigned coaches only — used after adding or removing a skater. */
+async function loadRoster() {
   const { data: seats } = await client
     .from('class_session_enrollments')
     .select('user_id, skater_profile_id, crew_member_id')
@@ -297,65 +361,9 @@ async function load() {
   }
   assignedCoaches.value = staff
 
-  focusLabel.value = ''
-  focusSetup.value = ''
-  trickNames.value = []
-  trickItems.value = []
-  timeBlocks.value = ''
-  planNotes.value = {}
-  planCoachId.value = ''
-  planSlot.value = data.time_slot || ''
-  const { data: plans } = await client
-    .from('class_plans')
-    .select('coach_id, notes, planned_skills, warmup_notes, main_activity_notes, cooldown_notes, time_slot')
-    .eq('plan_date', data.start_date)
-  const plan = (plans || []).find(row => row.time_slot === data.time_slot) || plans?.[0]
-  if (plan) {
-    planCoachId.value = plan.coach_id || ''
-    planSlot.value = plan.time_slot || planSlot.value
-    let parsed: Record<string, unknown> = {}
-    try { parsed = JSON.parse(plan.notes || '{}') } catch { parsed = {} }
-    planNotes.value = parsed
-    focusSetup.value = parsed.setup === 'learning' || parsed.setup === 'performance' ? parsed.setup : ''
-    const setup = focusSetup.value === 'learning' ? (es.value ? 'Aprendizaje' : 'Learning') : focusSetup.value === 'performance' ? 'Performance' : ''
-    const placeLabel = typeof parsed.place_label === 'string' ? parsed.place_label : ''
-    focusLabel.value = [setup, placeLabel].filter(Boolean).join(' · ')
-    const skillIds = Array.isArray(plan.planned_skills) ? plan.planned_skills.filter((id: unknown) => typeof id === 'string') : []
-    if (skillIds.length) {
-      const { data: skills } = await client.from('skills_library').select('id, name, name_es').in('id', skillIds)
-      trickItems.value = (skills || []).map(skill => ({
-        id: skill.id,
-        name: (es.value ? skill.name_es || skill.name : skill.name) || skill.name,
-      })).filter(skill => skill.name)
-      trickNames.value = trickItems.value.map(skill => skill.name)
-    }
-    timeBlocks.value = [plan.warmup_notes, plan.main_activity_notes, plan.cooldown_notes].filter(Boolean).join(' · ')
-  }
-
   athletes.value = roster.sort((a, b) => a.name.localeCompare(b.name, 'es'))
   athleteNames.value = athletes.value.map(row => row.name)
   athleteCount.value = athletes.value.length
-
-  const { data: report } = await client
-    .from('session_reports')
-    .select('coach_notes, total_missed, successful_lands, skills_mastered')
-    .eq('calendar_event_id', eventId.value)
-    .maybeSingle()
-  notes.value = report?.coach_notes || ''
-  savedNotes.value = notes.value
-  metrics.value = {
-    missed: report?.total_missed || 0,
-    lands: report?.successful_lands || 0,
-    skills: report?.skills_mastered || 0,
-  }
-
-  const { data: videoRows } = await client
-    .from('session_videos')
-    .select('id, title, public_url, owner_id')
-    .eq('calendar_event_id', eventId.value)
-    .order('created_at', { ascending: false })
-  videos.value = await withCoachLabels(client, (videoRows || []) as Array<{ id: string; title: string; public_url: string; owner_id?: string | null }>)
-  loading.value = false
 }
 
 async function saveNotes() {
@@ -580,79 +588,90 @@ async function toggleSkaterPicker() {
   skaterOptions.value = (data || []).map(row => ({ id: row.id, name: (row.full_name || '').trim() })).filter(row => row.name)
 }
 
+async function staffToken() {
+  const { data: session } = await client.auth.getSession()
+  const token = session.session?.access_token
+  if (!token) throw new Error(es.value ? 'Sesión expirada' : 'Session expired')
+  return token
+}
+
 async function addSkater(skaterId: string) {
   if (!event.value || editingRoster.value) return
   editingRoster.value = true
   editError.value = ''
-  const row = {
-    calendar_event_id: event.value.id,
-    user_id: skaterId,
-    skater_profile_id: skaterId,
-    status: 'confirmed',
-  }
-  let { error } = await client.from('class_session_enrollments').insert(row)
-  if (error && /skater_profile_id|schema cache|column/i.test(error.message || '')) {
-    ;({ error } = await client.from('class_session_enrollments').insert({
-      calendar_event_id: row.calendar_event_id,
-      user_id: row.user_id,
-      status: 'confirmed',
-    }))
-  }
-  if (error) {
+  rosterNotice.value = ''
+  try {
+    const result = await $fetch<{ restored: boolean; charged: 'balance' | 'due' | null; tokenKind: TokenKind | null; already?: boolean }>('/api/staff/session-roster', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await staffToken()}` },
+      body: { action: 'add', eventId: event.value.id, skaterId, kind: 'profile' },
+    })
+    skaterQuery.value = ''
+    skaterPickerOpen.value = false
+    await loadRoster()
+    if (result.already) return
+    const name = skaterOptions.value.find(row => row.id === skaterId)?.name || ''
+    rosterNotice.value = es.value
+      ? `Cupo reservado${name ? ` para ${name}` : ''}. El token se usa al marcar asistencia.`
+      : `Seat reserved${name ? ` for ${name}` : ''}. The token is used when attendance is marked.`
+  } catch (e: any) {
+    editError.value = e?.data?.message || e?.message || (es.value ? 'No se pudo agregar al patinador.' : 'Could not add the skater.')
+  } finally {
     editingRoster.value = false
-    editError.value = error.message
-    return
   }
-  skaterPickerOpen.value = false
-  editingRoster.value = false
-  await load()
-}
-
-/** A delete blocked by row security returns no error and no rows, so count what actually went. */
-async function dropEnrollmentRows(ids: string[]) {
-  if (!ids.length) return
-  const removed = await client.from('class_session_enrollments').delete().in('id', ids).select('id')
-  const gone = new Set((removed.data || []).map(row => row.id))
-  const left = ids.filter(id => !gone.has(id))
-  if (!left.length) return
-  const cancelled = await client.from('class_session_enrollments').update({ status: 'cancelled' }).in('id', left).select('id')
-  if (cancelled.error) throw cancelled.error
-  if ((cancelled.data || []).length < left.length) throw removed.error || new Error('blocked')
 }
 
 async function removeAthlete(athlete: AthleteRow) {
   if (!event.value || editingRoster.value) return
+  const confirmed = window.confirm(
+    es.value
+      ? `Quitar a ${athlete.name}. Se devuelve 1 clase a su saldo.`
+      : `Remove ${athlete.name}. One class goes back to their balance.`,
+  )
+  if (!confirmed) return
   editingRoster.value = true
   editError.value = ''
+  rosterNotice.value = ''
   try {
-    const { data: seats, error: readErr } = await client
-      .from('class_session_enrollments')
-      .select('id, user_id, skater_profile_id, crew_member_id')
-      .eq('calendar_event_id', event.value.id)
-    if (readErr) throw readErr
-    const seatIds = (seats || [])
-      .filter(row => athlete.kind === 'crew'
-        ? row.crew_member_id === athlete.id
-        : row.skater_profile_id === athlete.id || row.user_id === athlete.id)
-      .map(row => row.id)
-    await dropEnrollmentRows(seatIds)
-    // A skater profile left on the coach roster is listed here too, so clear that seat as well.
+    const result = await $fetch<{ returned: boolean; voided?: boolean; tokenKind: TokenKind | null }>('/api/staff/session-roster', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await staffToken()}` },
+      body: {
+        action: 'remove',
+        eventId: event.value.id,
+        skaterId: athlete.id,
+        kind: athlete.kind,
+      },
+    })
+    const label = result.tokenKind ? tokenLabel(result.tokenKind, es.value).toLowerCase() : ''
+    rosterNotice.value = result.voided
+      ? (es.value ? `Se canceló 1 clase ${label} por pagar de ${athlete.name}.` : `${athlete.name} no longer owes 1 ${label} class.`)
+      : result.returned
+        ? (es.value ? `1 token ${label} devuelto al saldo de ${athlete.name}.` : `1 ${label} token returned to ${athlete.name}'s balance.`)
+        : (es.value ? 'Se liberó el cupo. Los tokens no cambian.' : 'The seat was freed. Tokens stay the same.')
     if (athlete.kind === 'profile' && !assignedCoaches.value.some(coach => coach.id === athlete.id)) {
+      await client
+        .from('class_session_coaches')
+        .delete()
+        .eq('calendar_event_id', event.value.id)
+        .eq('coach_id', athlete.id)
+    }
+    await loadRoster()
+  } catch (e: any) {
+    const message = e?.data?.message || e?.message || ''
+    const missing = /not enrolled/i.test(message)
+    if (missing && athlete.kind === 'profile') {
       const { error: seatErr } = await client
         .from('class_session_coaches')
         .delete()
         .eq('calendar_event_id', event.value.id)
         .eq('coach_id', athlete.id)
-      if (seatErr) throw seatErr
+      if (!seatErr) {
+        await loadRoster()
+        return
+      }
     }
-    await load()
-    if (athletes.value.some(row => row.kind === athlete.kind && row.id === athlete.id)) {
-      editError.value = es.value
-        ? 'No se pudo quitar al patinador de esta clase.'
-        : 'Could not remove this skater from the class.'
-    }
-  } catch (e: any) {
-    editError.value = e?.message || (es.value ? 'No se pudo quitar al patinador.' : 'Could not remove the skater.')
+    editError.value = message || (es.value ? 'No se pudo quitar al patinador.' : 'Could not remove the skater.')
   } finally {
     editingRoster.value = false
   }
@@ -936,8 +955,11 @@ onMounted(load)
                 </dd>
               </div>
               <div class="grid grid-cols-[6.5rem_1fr] gap-3 py-2.5">
-                <dt class="font-mono text-[10px] uppercase tracking-wider text-gray-500 pt-0.5">{{ es ? 'Inscritos' : 'Roster' }}</dt>
-                <dd class="min-w-0">
+                <dt class="font-mono text-[10px] uppercase tracking-wider text-gray-500 pt-0.5">
+                  {{ es ? 'Inscritos' : 'Roster' }}
+                  <span v-if="editingRoster" class="mt-1 block normal-case tracking-normal text-gray-500">{{ es ? 'Actualizando…' : 'Updating…' }}</span>
+                </dt>
+                <dd class="min-w-0 transition-opacity" :class="editingRoster ? 'opacity-60' : ''">
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span
                       v-for="athlete in athletes"
@@ -963,6 +985,7 @@ onMounted(load)
                       +
                     </button>
                   </div>
+                  <p v-if="rosterNotice" class="mt-1 text-xs text-acid">{{ rosterNotice }}</p>
                   <div v-if="skaterPickerOpen" class="mt-2 space-y-2">
                     <input
                       v-model="skaterQuery"

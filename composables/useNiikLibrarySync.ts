@@ -65,6 +65,7 @@ function buildRow(t: NiikTrick) {
     motor_skills: t.motor_skills || [],
     is_active: true,
     program: t.program || null,
+    discipline: 'skateboarding',
   }
 }
 
@@ -121,13 +122,27 @@ export function useNiikLibrarySync() {
       const existingManualIds = new Set((beforeRows || []).map(r => Number(r.manual_id)))
 
       const chunkSize = 50
+      let disciplineReady = true
       for (let i = 0; i < rows.length; i += chunkSize) {
-        const chunk = rows.slice(i, i + chunkSize)
-        const { error } = await client
+        const source = rows.slice(i, i + chunkSize)
+        const chunk = disciplineReady
+          ? source
+          : source.map(({ discipline: _discipline, ...rest }) => rest)
+        let { error } = await client
           .from('skills_library')
           .upsert(chunk, { onConflict: 'manual_id' })
+        if (error && disciplineReady && /discipline|schema cache/i.test(error.message || '')) {
+          disciplineReady = false
+          const plain = source.map(({ discipline: _discipline, ...rest }) => rest)
+          ;({ error } = await client.from('skills_library').upsert(plain, { onConflict: 'manual_id' }))
+        }
         if (error) {
           const msg = error.message || ''
+          if (/discipline/i.test(msg)) {
+            throw new Error(
+              `Upsert failed: run supabase/migrations/add_skills_library_discipline.sql in Supabase SQL Editor, then sync again. (${msg})`,
+            )
+          }
           if (/row-level security|violates row/i.test(msg)) {
             throw new Error(
               `Upsert failed: run supabase/migrations/fix_skills_library_sync_rls_and_restore.sql in Supabase SQL Editor, then sync again. (${msg})`,
@@ -147,21 +162,39 @@ export function useNiikLibrarySync() {
 
       // Retire only what left the sheet. Deactivating everything up front would
       // leave the library dark if the upsert above failed partway.
-      const { data: staleRows, error: staleError } = await client
+      // Only the skateboarding sheet retires skate rows. Other sports stay active.
+      let stale = await client
         .from('skills_library')
         .update({ is_active: false })
         .eq('is_active', true)
+        .eq('discipline', 'skateboarding')
         .not('manual_id', 'in', `(${[...manualIds].join(',')})`)
         .select('id')
-      if (staleError) {
-        throw new Error(`Retiring removed tricks failed: ${staleError.message}`)
+      if (stale.error && /discipline|schema cache/i.test(stale.error.message || '')) {
+        stale = await client
+          .from('skills_library')
+          .update({ is_active: false })
+          .eq('is_active', true)
+          .not('manual_id', 'in', `(${[...manualIds].join(',')})`)
+          .select('id')
       }
-      result.deactivated = staleRows?.length ?? 0
+      if (stale.error) {
+        throw new Error(`Retiring removed tricks failed: ${stale.error.message}`)
+      }
+      result.deactivated = stale.data?.length ?? 0
 
-      const { count, error: countError } = await client
+      let counted = await client
         .from('skills_library')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true)
+        .eq('discipline', 'skateboarding')
+      if (counted.error && /discipline|schema cache/i.test(counted.error.message || '')) {
+        counted = await client
+          .from('skills_library')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true)
+      }
+      const { count, error: countError } = counted
       if (countError) throw new Error(countError.message)
       result.activeCount = count ?? 0
 

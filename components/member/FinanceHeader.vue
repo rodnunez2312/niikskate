@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Shared chrome for the Finanzas section: title, tab bar, and a slot for page actions. */
+/** Shared chrome for the Admin section: title, tab bar, and a slot for page actions. */
 
 defineProps<{ subtitle?: string }>()
 
@@ -8,8 +8,8 @@ const { language } = useI18n()
 const es = computed(() => language.value === 'es')
 
 const tabs = computed(() => [
-  { path: '/member/admin/finance', emoji: '📊', label: es.value ? 'Resumen' : 'Overview' },
   { path: '/member/admin/finance/students', emoji: '🛹', label: es.value ? 'Alumnos' : 'Students' },
+  { path: '/member/admin/finance', emoji: '📊', label: es.value ? 'Resumen' : 'Overview' },
   { path: '/member/admin/finance/prices', emoji: '🏷️', label: es.value ? 'Precios' : 'Prices' },
   { path: '/member/admin/finance/coupons', emoji: '🎟️', label: es.value ? 'Cupones' : 'Coupons' },
   { path: '/member/admin/finance/income', emoji: '💰', label: es.value ? 'Ingresos' : 'Income' },
@@ -26,7 +26,7 @@ const isActive = (path: string) =>
       <div class="flex items-center justify-between gap-4">
         <div class="min-w-0">
           <h1 class="text-2xl font-bold text-white truncate">
-            {{ es ? 'Finanzas' : 'Finance' }}
+            Admin
           </h1>
           <p v-if="subtitle" class="text-sm text-gray-500 truncate">{{ subtitle }}</p>
         </div>

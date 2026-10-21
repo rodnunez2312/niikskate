@@ -152,6 +152,14 @@ function linkClass(active: boolean) {
             <p class="text-[11px] text-cream/50 truncate">{{ user?.email }}</p>
           </div>
           <NuxtLink
+            v-if="isAdmin"
+            to="/member/admin/academy/dashboard"
+            class="block px-3 py-2 text-sm text-cream/80 hover:bg-charcoal-700 hover:text-cream"
+            @click="accountOpen = false"
+          >
+            Admin console
+          </NuxtLink>
+          <NuxtLink
             to="/member/coach/profile"
             class="block px-3 py-2 text-sm text-cream/80 hover:bg-charcoal-700 hover:text-cream"
             @click="accountOpen = false"
@@ -321,6 +329,14 @@ function linkClass(active: boolean) {
                 <p class="text-sm font-semibold text-cream truncate">{{ fullName }}</p>
                 <p class="text-[11px] text-cream/50 truncate">{{ user?.email }}</p>
               </div>
+              <NuxtLink
+                v-if="isAdmin"
+                to="/member/admin/academy/dashboard"
+                class="block px-3 py-2 text-sm text-cream/80 hover:bg-charcoal-700 hover:text-cream"
+                @click="accountOpen = false"
+              >
+                Admin console
+              </NuxtLink>
               <NuxtLink
                 to="/member/coach/profile"
                 class="block px-3 py-2 text-sm text-cream/80 hover:bg-charcoal-700 hover:text-cream"

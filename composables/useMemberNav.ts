@@ -114,8 +114,8 @@ export function useMemberNav() {
       icon: 'calendar',
     },
     {
-      name: es.value ? 'Finanzas' : 'Finance',
-      path: '/member/admin/finance',
+      name: 'Admin',
+      path: '/member/admin/finance/students',
       icon: 'chart',
     },
     {
@@ -171,6 +171,13 @@ export function useMemberNav() {
             name: es.value ? 'Sesiones' : 'Sessions',
             path: '/member/staff/sessions',
             icon: 'clipboard',
+            children: [
+              {
+                name: es.value ? 'Evaluación' : 'Evaluation',
+                path: '/member/coach/evaluations',
+                icon: 'check',
+              },
+            ],
           },
         ],
       },
@@ -213,26 +220,15 @@ export function useMemberNav() {
             adminOnly: true,
           },
           {
-            name: es.value ? 'Panel academia' : 'Academy dashboard',
-            path: '/member/admin/academy/dashboard',
-            icon: 'star',
-            adminOnly: true,
-          },
-          {
             name: es.value ? 'Estudiantes' : 'Students',
             path: skatersPath,
             icon: 'users',
           },
           {
-            name: es.value ? 'Finanzas' : 'Finance',
-            path: '/member/admin/finance',
+            name: 'Admin',
+            path: '/member/admin/finance/students',
             icon: 'chart',
             adminOnly: true,
-          },
-          {
-            name: es.value ? 'Evaluación' : 'Evaluation',
-            path: '/member/coach/evaluations',
-            icon: 'clipboard',
           },
           {
             name: es.value ? 'Noticias' : 'News',
@@ -327,6 +323,7 @@ export function useMemberNav() {
     if (path === '/member/coach/profile' && route.path.startsWith('/member/coach/profile')) return true
     if (path === '/coach/availability' && route.path.startsWith('/coach/availability')) return true
     if (path === '/member/admin/academy/dashboard' && route.path.startsWith('/member/admin/academy/dashboard')) return true
+    if (path === '/member/admin/finance/students' && route.path.startsWith('/member/admin/finance')) return true
     if (path === '/member/admin/academy/users' && route.path.startsWith('/member/admin/academy/users')) return true
     if (path === '/member/admin/skate-products' && (route.path.startsWith('/member/admin/skate-products') || route.path.startsWith('/dashboard/store'))) return true
     if (path === '/member/admin/skateramps' && route.path.startsWith('/member/admin/skateramps')) return true

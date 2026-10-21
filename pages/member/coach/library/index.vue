@@ -10,7 +10,7 @@ import {
   normalizeSkillGroupDisplayName,
   publicProgramLevelCopy,
 } from '~/utils/skillGroupLevels'
-import { disciplineLabel } from '~/utils/trainingDisciplines'
+import { disciplineLabel, isTrainingDiscipline } from '~/utils/trainingDisciplines'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -130,7 +130,7 @@ const dragOverId = ref<string | null>(null)
 const createModalOpen = ref(false)
 const newName = ref('')
 const newDescription = ref('')
-const { enabled: enabledSports, catalog: academySports } = useEnabledSports()
+const { selected: selectedSport, enabled: enabledSports, catalog: academySports } = useEnabledSports()
 const sportChoices = computed(() => academySports.filter(sport => enabledSports.value.includes(sport.id)))
 const newDiscipline = ref('skateboarding')
 const createSaving = ref(false)
@@ -326,9 +326,9 @@ async function fetchPrograms(quiet = false) {
     }
 
     programs.value = rows
-    if (!rows.some(row => row.id === expandedId.value)) {
-      const skate = rows.find(row => row.discipline === 'skateboarding')
-      expandedId.value = skate?.id || rows[0]?.id || null
+    const visible = rows.filter(row => programMatchesSport(row))
+    if (!visible.some(row => row.id === expandedId.value)) {
+      expandedId.value = visible[0]?.id || null
     }
   } catch (e) {
     console.error('Error fetching programs:', e)
@@ -395,6 +395,16 @@ function openCreateModal() {
   newDiscipline.value = enabledSports.value[0] || 'skateboarding'
   createModalOpen.value = true
 }
+
+/** ?create=1 (from the sport picker's to-do list) opens the new-program form. */
+const route = useRoute()
+function openCreateFromLink() {
+  if (route.query.create !== '1') return
+  openCreateModal()
+  router.replace({ query: { ...route.query, create: undefined } })
+}
+watch(() => route.query.create, openCreateFromLink)
+onMounted(openCreateFromLink)
 
 function closeCreateModal() {
   createModalOpen.value = false
@@ -808,6 +818,16 @@ function subgroupsOn(program: ProgramRow) {
   )
 }
 
+function programMatchesSport(program: { discipline?: string | null }) {
+  return isTrainingDiscipline(selectedSport.value) && (program.discipline || 'skateboarding') === selectedSport.value
+}
+
+const visiblePrograms = computed(() => programs.value.filter(programMatchesSport))
+
+watch(visiblePrograms, (rows) => {
+  if (!rows.some(row => row.id === expandedId.value)) expandedId.value = rows[0]?.id || null
+})
+
 async function persistOrder() {
   const ids = programs.value.map(program => program.id)
   writeLocalIds(ORDER_KEY, ids)
@@ -817,14 +837,26 @@ async function persistOrder() {
   ))
 }
 
-async function moveProgram(index: number, delta: number) {
-  const next = index + delta
-  if (next < 0 || next >= programs.value.length) return
+function writeVisibleOrder(visible: ProgramRow[]) {
+  const slots = programs.value
+    .map((program, index) => (programMatchesSport(program) ? index : -1))
+    .filter(index => index >= 0)
   const list = [...programs.value]
-  const [item] = list.splice(index, 1)
-  if (!item) return
-  list.splice(next, 0, item)
+  slots.forEach((slot, index) => {
+    const next = visible[index]
+    if (next) list[slot] = next
+  })
   programs.value = list
+}
+
+async function moveProgram(index: number, delta: number) {
+  const visible = [...visiblePrograms.value]
+  const next = index + delta
+  if (next < 0 || next >= visible.length) return
+  const [item] = visible.splice(index, 1)
+  if (!item) return
+  visible.splice(next, 0, item)
+  writeVisibleOrder(visible)
   await persistOrder()
 }
 
@@ -841,14 +873,14 @@ async function onDrop(targetId: string) {
   draggingId.value = null
   dragOverId.value = null
   if (!fromId || fromId === targetId) return
-  const list = [...programs.value]
-  const from = list.findIndex(program => program.id === fromId)
-  const to = list.findIndex(program => program.id === targetId)
+  const visible = [...visiblePrograms.value]
+  const from = visible.findIndex(program => program.id === fromId)
+  const to = visible.findIndex(program => program.id === targetId)
   if (from < 0 || to < 0) return
-  const [item] = list.splice(from, 1)
+  const [item] = visible.splice(from, 1)
   if (!item) return
-  list.splice(to, 0, item)
-  programs.value = list
+  visible.splice(to, 0, item)
+  writeVisibleOrder(visible)
   await persistOrder()
 }
 
@@ -906,7 +938,7 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
         <div class="animate-spin w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full mx-auto" />
       </div>
 
-      <div v-else-if="!programs.length && !schemaMissing" class="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+      <div v-else-if="!visiblePrograms.length && !schemaMissing" class="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
         <p class="text-gray-400">
           {{ language === 'es' ? 'No hay programas. Añade uno para empezar.' : 'No programs yet. Add one to get started.' }}
         </p>
@@ -914,7 +946,7 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
 
       <div v-else class="space-y-3">
         <div
-          v-for="(p, index) in programs"
+          v-for="(p, index) in visiblePrograms"
           :key="p.id"
           class="bg-gray-900 border rounded-xl overflow-hidden"
           :class="dragOverId === p.id ? 'border-amber-400' : 'border-gray-800'"
@@ -995,7 +1027,7 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
               <button
                 type="button"
                 class="p-1 text-gray-500 hover:text-white disabled:opacity-30"
-                :disabled="index === programs.length - 1"
+                :disabled="index === visiblePrograms.length - 1"
                 :title="language === 'es' ? 'Bajar' : 'Move down'"
                 @click="moveProgram(index, 1)"
               >
