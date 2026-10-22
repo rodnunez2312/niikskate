@@ -41,50 +41,51 @@ function classesLink(offering: (typeof offerings)[number]) {
 </script>
 
 <template>
-  <div class="space-y-16 sm:space-y-20">
-    <section class="text-center max-w-3xl mx-auto">
-      <p class="t-eyebrow text-sage-700 mb-4 inline-flex flex-wrap items-center justify-center gap-2">
-        <span>{{ language === 'es' ? 'Programas de' : 'Programs by' }}</span>
-        <span class="inline-flex rounded-md bg-charcoal px-2.5 py-1 font-display text-base font-black normal-case tracking-tight">
-          <span class="text-acid">Niik</span><span class="text-cream">Skate</span>
-        </span>
-      </p>
-      <h1 class="t-h2 mb-5">
-        {{
-          language === 'es'
-            ? 'Clases para cada edad y nivel'
-            : 'Classes for every age and level'
-        }}
-      </h1>
-      <p class="t-lead text-charcoal/75">
-        {{
-          language === 'es'
-            ? 'Elige por edad y habilidad. Cada programa tiene un propósito claro — no solo un rango de edades.'
-            : 'Choose by age and skill. Each program has a clear purpose — not just an age range.'
-        }}
-      </p>
-    </section>
+  <div>
+  <div class="relative mt-3 overflow-hidden">
+    <video
+      ref="seasonsVideo"
+      class="absolute inset-0 h-full w-full object-cover object-center"
+      src="/videos/temporadas.mp4"
+      poster="/videos/temporadas-poster.webp"
+      autoplay
+      muted
+      loop
+      playsinline
+      preload="metadata"
+      aria-hidden="true"
+    />
+    <div class="absolute inset-0 bg-charcoal/35" aria-hidden="true" />
+    <div class="relative px-5 sm:px-6 pt-10 pb-16 sm:pt-14 sm:pb-20">
+      <section class="text-center max-w-3xl mx-auto">
+        <p class="t-eyebrow text-cream mb-4 inline-flex flex-wrap items-center justify-center gap-2 [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
+          <span>{{ language === 'es' ? 'Programas de' : 'Programs by' }}</span>
+          <span class="inline-flex rounded-md bg-charcoal px-2.5 py-1 font-display text-base font-black normal-case tracking-tight [text-shadow:none]">
+            <span class="text-acid">Niik</span><span class="text-cream">Skate</span>
+          </span>
+        </p>
+        <h1 class="t-h2 mb-5 text-cream [text-shadow:0_2px_12px_rgb(0_0_0/0.55)]">
+          {{
+            language === 'es'
+              ? 'Clases para cada edad y nivel'
+              : 'Classes for every age and level'
+          }}
+        </h1>
+        <p class="t-lead text-cream/90 [text-shadow:0_1px_6px_rgb(0_0_0/0.6)]">
+          {{
+            language === 'es'
+              ? 'Elige por edad y habilidad. Cada programa tiene un propósito claro — no solo un rango de edades.'
+              : 'Choose by age and skill. Each program has a clear purpose — not just an age range.'
+          }}
+        </p>
+      </section>
 
-    <div class="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden !mt-8">
-      <video
-        ref="seasonsVideo"
-        class="absolute inset-0 h-full w-full object-cover"
-        src="/videos/temporadas.mp4"
-        poster="/videos/temporadas-poster.webp"
-        autoplay
-        muted
-        loop
-        playsinline
-        preload="metadata"
-        aria-hidden="true"
-      />
-      <div class="absolute inset-0 bg-charcoal/20" aria-hidden="true" />
-      <div class="relative px-5 sm:px-6 py-16 sm:py-20">
-        <PublicProgramSeasonsList class="max-w-6xl mx-auto" />
-      </div>
+      <PublicProgramSeasonsList class="mt-10 sm:mt-12 max-w-6xl mx-auto" />
     </div>
+  </div>
 
-    <PublicMemberAppCta class="!mt-6" />
+  <div class="max-w-6xl mx-auto px-5 sm:px-6 pt-6 pb-16 sm:pb-24 space-y-16 sm:space-y-20">
+    <PublicMemberAppCta />
 
     <!-- How we group classes: age left, skill levels explained on the right -->
     <section class="max-w-6xl mx-auto grid lg:grid-cols-[16rem_minmax(0,1fr)] gap-4 items-start">
@@ -221,5 +222,6 @@ function classesLink(offering: (typeof offerings)[number]) {
         {{ language === 'es' ? 'Ir a clases' : 'Go to classes' }}
       </NuxtLink>
     </section>
+  </div>
   </div>
 </template>
