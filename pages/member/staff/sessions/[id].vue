@@ -268,7 +268,7 @@ async function load() {
     .from('class_plans')
     .select('coach_id, notes, planned_skills, warmup_notes, main_activity_notes, cooldown_notes, time_slot')
     .eq('plan_date', data.start_date)
-  const plan = (plans || []).find(row => row.time_slot === data.time_slot) || plans?.[0]
+  const plan = (plans || []).find(row => row.time_slot === data.time_slot) || (data.time_slot ? undefined : plans?.[0])
   if (plan) {
     planCoachId.value = plan.coach_id || ''
     planSlot.value = plan.time_slot || planSlot.value
@@ -279,7 +279,15 @@ async function load() {
     const setup = focusSetup.value === 'learning' ? (es.value ? 'Aprendizaje' : 'Learning') : focusSetup.value === 'performance' ? 'Performance' : ''
     const placeLabel = typeof parsed.place_label === 'string' ? parsed.place_label : ''
     focusLabel.value = [setup, placeLabel].filter(Boolean).join(' · ')
-    const skillIds = Array.isArray(plan.planned_skills) ? plan.planned_skills.filter((id: unknown) => typeof id === 'string') : []
+    // Several classes can share one plan row (same coach, date and slot), so each class keeps its own list.
+    const eventSkills = parsed.event_skills && typeof parsed.event_skills === 'object'
+      ? parsed.event_skills as Record<string, unknown>
+      : null
+    const ownSkills = eventSkills?.[eventId.value]
+    const rawSkills = Array.isArray(ownSkills)
+      ? ownSkills
+      : eventSkills && Object.keys(eventSkills).length ? [] : plan.planned_skills
+    const skillIds = Array.isArray(rawSkills) ? rawSkills.filter((id: unknown): id is string => typeof id === 'string') : []
     if (skillIds.length) {
       const { data: skills } = await client.from('skills_library').select('id, name, name_es').in('id', skillIds)
       trickItems.value = (skills || []).map(skill => ({
@@ -499,8 +507,15 @@ async function savePlan(notesPatch: Record<string, unknown>, skillIds?: string[]
   if (!user.value || !event.value) return
   const coachId = planCoachId.value || assignedCoaches.value[0]?.id || user.value.id
   const slot = planSlot.value || event.value.time_slot || 'early'
-  const notes = { ...planNotes.value, ...notesPatch }
   const planned = skillIds ?? trickItems.value.map(trick => trick.id)
+  const eventSkills = planNotes.value.event_skills && typeof planNotes.value.event_skills === 'object'
+    ? planNotes.value.event_skills as Record<string, string[]>
+    : {}
+  const notes = {
+    ...planNotes.value,
+    ...notesPatch,
+    event_skills: { ...eventSkills, [event.value.id]: planned },
+  }
   const payload = {
     planned_skills: planned,
     notes: JSON.stringify(notes),

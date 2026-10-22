@@ -11,6 +11,8 @@ import {
   publicProgramLevelCopy,
 } from '~/utils/skillGroupLevels'
 import { disciplineLabel, isTrainingDiscipline } from '~/utils/trainingDisciplines'
+import { coachInitials, coachPillClass } from '~/utils/coachInitials'
+import { NIIK_SKATE_EMAIL_DOMAIN } from '~/utils/skaterNiikEmail'
 
 definePageMeta({
   middleware: ['auth', 'member'],
@@ -88,7 +90,24 @@ const { language } = useI18n()
 const userRole = ref<'coach' | 'admin' | null>(null)
 const loading = ref(true)
 const schemaMissing = ref(false)
-type RosterStudent = { id: string; full_name: string | null; skill_group_id: string | null }
+type RosterStudent = { id: string; full_name: string | null; skill_group_id: string | null; avatar_url?: string | null }
+
+type SkaterKindFields = {
+  customer_kind?: string | null
+  guardian_user_id?: string | null
+  email?: string | null
+  date_of_birth?: string | null
+}
+
+/** Same rule as Estudiantes: parent/family accounts are customers too but never skate in a level. */
+function isSkaterRow(row: SkaterKindFields & { skill_group_id: string | null }) {
+  if (row.skill_group_id) return true
+  if (row.customer_kind === 'skater') return true
+  if (row.customer_kind === 'guardian') return false
+  if (row.customer_kind === undefined) return true
+  return Boolean(row.guardian_user_id)
+    || (Boolean(row.email?.toLowerCase().endsWith(NIIK_SKATE_EMAIL_DOMAIN)) && Boolean(row.date_of_birth))
+}
 
 const programs = ref<ProgramRow[]>([])
 const roster = ref<RosterStudent[]>([])
@@ -219,16 +238,20 @@ async function fetchPrograms(quiet = false) {
       ? ((await client.from('area_skills').select('id, area_id, skill_id, variant, skill:skills_library(name, name_es)')).data || [])
           .map(row => ({ ...row, subgroup_id: null as string | null }))
       : (skillsJoined.data || [])
-    const { data: skaterRows } = await client
+    const customers = await client
       .from('profiles')
-      .select('id, full_name, skill_group_id')
+      .select('id, full_name, skill_group_id, avatar_url, customer_kind, guardian_user_id, email, date_of_birth')
       .eq('role', 'customer')
       .order('full_name')
+    const skaterRows = customers.error
+      ? (await client.from('profiles').select('id, full_name, skill_group_id, avatar_url').eq('role', 'customer').order('full_name')).data
+      : customers.data
 
-    roster.value = ((skaterRows || []) as RosterStudent[]).map(row => ({
+    roster.value = ((skaterRows || []) as Array<RosterStudent & SkaterKindFields>).filter(isSkaterRow).map(row => ({
       id: row.id,
       full_name: row.full_name,
       skill_group_id: row.skill_group_id,
+      avatar_url: row.avatar_url || null,
     }))
     const studentsByGroup: Record<string, number> = {}
     for (const row of roster.value) {
@@ -501,6 +524,12 @@ const rosterCandidates = computed(() => {
   const ids = new Set(assignableLevels(program).map(level => level.id))
   return roster.value.filter(student => !student.skill_group_id || !ids.has(student.skill_group_id))
 })
+
+function studentsInLevel(levelId: string) {
+  return roster.value.filter(student => student.skill_group_id === levelId)
+}
+
+const unassignedStudents = computed(() => roster.value.filter(student => !student.skill_group_id))
 
 function openRoster(program: ProgramRow, event?: Event) {
   event?.stopPropagation()
@@ -991,7 +1020,7 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
                 </p>
                 <p v-if="p.description" class="text-sm text-gray-500 truncate">{{ p.description }}</p>
               </button>
-              <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div class="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <button
                   type="button"
                   class="rounded-lg bg-black/40 border border-gray-800 px-3 py-2 text-left hover:border-gold-400/50"
@@ -1012,6 +1041,16 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
                   <div class="text-lg font-bold text-violet-300">{{ subgroupsOn(p) }}</div>
                   <div class="text-[11px] text-gray-500">{{ language === 'es' ? 'Subgrupos' : 'Subgroups' }}</div>
                 </div>
+                <button
+                  type="button"
+                  class="rounded-lg bg-black/40 border px-3 py-2 text-left hover:border-orange-400/50"
+                  :class="unassignedStudents.length ? 'border-orange-400/30' : 'border-gray-800'"
+                  :title="unassignedStudents.map(student => student.full_name || '?').join(', ')"
+                  @click="openRoster(p, $event)"
+                >
+                  <div class="text-lg font-bold" :class="unassignedStudents.length ? 'text-orange-300' : 'text-gray-500'">{{ unassignedStudents.length }}</div>
+                  <div class="text-[11px] text-gray-500">{{ language === 'es' ? 'Sin programa' : 'No program' }}</div>
+                </button>
               </div>
             </div>
             <div class="flex flex-col items-center gap-1">
@@ -1058,7 +1097,7 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
                 <span v-else class="w-3 h-3 rounded-full shrink-0 bg-acid" />
                 <span class="min-w-0 flex-1">
                   <span class="block text-sm font-bold text-cream">
-                    {{ publicProgramLevelCopy(level.name, language === 'es')?.title || normalizeSkillGroupDisplayName(level.name) }}
+                    {{ normalizeSkillGroupDisplayName(level.name) }}
                     <span
                       v-if="isPlanningSkillGroupName(level.name)"
                       class="ml-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-cream/10 text-cream/70"
@@ -1072,9 +1111,20 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
                   <span v-if="publicProgramLevelCopy(level.name, language === 'es')" class="block text-xs leading-relaxed text-cream/70 mt-0.5">
                     {{ publicProgramLevelCopy(level.name, language === 'es')?.description }}
                   </span>
-                  <span v-if="!isPlanningSkillGroupName(level.name)" class="block text-xs text-cream/50 mt-0.5">
-                    {{ level.students_count }} {{ language === 'es' ? 'estudiantes' : 'students' }}
-                    · {{ level.areas.length }} {{ language === 'es' ? 'áreas' : 'areas' }}
+                  <span v-if="!isPlanningSkillGroupName(level.name)" class="mt-1.5 flex flex-wrap items-center gap-1">
+                    <span class="mr-0.5 text-xs text-cream/50">{{ language === 'es' ? 'Estudiantes:' : 'Students:' }}</span>
+                    <span
+                      v-for="student in studentsInLevel(level.id)"
+                      :key="student.id"
+                      class="inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full text-[9px] font-bold text-white"
+                      :class="student.avatar_url ? 'bg-charcoal-700' : coachPillClass(student.id)"
+                      :title="student.full_name || ''"
+                    >
+                      <img v-if="student.avatar_url" :src="student.avatar_url" :alt="student.full_name || ''" class="h-full w-full object-cover">
+                      <template v-else>{{ coachInitials(student.full_name || '?') }}</template>
+                    </span>
+                    <span v-if="!studentsInLevel(level.id).length" class="text-xs text-cream/40">{{ language === 'es' ? 'ninguno' : 'none' }}</span>
+                    <span class="ml-1 text-xs text-cream/50">· {{ level.areas.length }} {{ language === 'es' ? 'áreas' : 'areas' }}</span>
                   </span>
                 </span>
                 </button>

@@ -13,7 +13,7 @@ import { es as esLocale } from 'date-fns/locale'
 import { getDay } from 'date-fns'
 import { PROGRAM_AGE_BANDS, TIME_SLOT_NAMES, type TimeSlot } from '~/types'
 import { computeAgeFromDob, isAgeEligibleForSession, sessionAgeBounds } from '~/utils/ageEligibility'
-import { disciplineFromJoin, isTrainingDiscipline, skillLevelWithDiscipline, type TrainingDiscipline } from '~/utils/trainingDisciplines'
+import { isTrainingDiscipline, type TrainingDiscipline } from '~/utils/trainingDisciplines'
 import {
   couponCoversScope,
   couponDiscountSummary,
@@ -76,6 +76,8 @@ type PurchasePerson = {
   programLevel: number | null
   programName: string | null
   sports: TrainingDiscipline[]
+  /** Skater login or crew kid. Guardian accounts stay off this list. */
+  isSkater: boolean
 }
 
 type UpcomingClass = {
@@ -89,7 +91,7 @@ const people = ref<PurchasePerson[]>([])
 const futureBookings = ref<Record<string, number>>({})
 const upcomingByStudent = ref<Record<string, UpcomingClass[]>>({})
 const search = ref('')
-const filter = ref<'all' | 'healthy' | 'low' | 'zero' | 'inactive' | 'pending'>('all')
+const filter = ref<'all' | 'available' | 'healthy' | 'low' | 'zero' | 'inactive' | 'pending'>('all')
 const mobileFilters = [
   { id: 'all', es: 'Todos', en: 'All students' },
   { id: 'low', es: 'Saldo bajo', en: 'Low balance' },
@@ -103,10 +105,15 @@ const showInactive = ref(false)
 const selectedKeys = ref<string[]>([])
 const drawerKey = ref<string | null>(null)
 const drawerTab = ref<'tokens' | 'attendance' | 'profile'>('tokens')
-const periodFrom = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
-const periodTo = ref(new Date().toISOString().slice(0, 10))
 const purchaseKey = ref('')
 const purchaseNotice = ref('')
+const freeRulesOpen = ref(false)
+const freeRulesPos = ref({ top: 0, left: 0 })
+function showFreeRules(event: MouseEvent) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  freeRulesPos.value = { top: rect.bottom + 8, left: Math.max(8, rect.right - 260) }
+  freeRulesOpen.value = true
+}
 
 async function loadFutureBookings() {
   const today = new Date().toISOString().slice(0, 10)
@@ -155,9 +162,61 @@ function personFor(key: string) {
   return people.value.find(person => person.key === key) ?? null
 }
 
+/** Deep shades of each token color so white counts stay readable. */
+const TOKEN_DARK: Record<TokenKind, string> = {
+  group: '#155E75',
+  individual: '#6B21A8',
+  pro: '#6B7280',
+  free: '#B45309',
+}
+
+const PRO_HOLO = 'linear-gradient(135deg, #3f4451 0%, #8a93a6 28%, #b9a8d6 44%, #9fc7d4 56%, #7c8496 74%, #3f4451 100%)'
+
+/** All coach assigned tokens share one slot so every row keeps the same column positions. */
+function assignedTokens(student: { wallet: Record<TokenKind, { owed: number }> }) {
+  const kinds = CLASS_TOKENS.filter(token => student.wallet[token.id].owed > 0)
+  const total = kinds.reduce((sum, token) => sum + student.wallet[token.id].owed, 0)
+  const title = kinds
+    .map(token => `${es.value ? token.es : token.en}: ${student.wallet[token.id].owed}`)
+    .join(' · ')
+  return {
+    total,
+    color: kinds.length === 1 ? TOKEN_DARK[kinds[0].id] : '#9CA3AF',
+    title: `${es.value ? 'Asignado por coach' : 'Coach assigned'} · ${title}`,
+  }
+}
+
+function tokenShortLabel(kind: TokenKind) {
+  if (kind === 'pro') return 'Pro'
+  if (kind === 'individual') return 'Indiv.'
+  if (kind === 'group') return es.value ? 'Grupal' : 'Group'
+  return es.value ? 'Libre' : 'Free'
+}
+
+function tokenFill(kind: TokenKind) {
+  return kind === 'pro'
+    ? { backgroundImage: PRO_HOLO, backgroundSize: '200% 200%', textShadow: '0 1px 2px rgba(0,0,0,.7)' }
+    : { background: TOKEN_DARK[kind] }
+}
+
+/** full_name and first/last can disagree (e.g. only a surname in one); show the more complete one. */
+function profileDisplayName(p: { full_name: string | null; first_name?: string | null; last_name?: string | null }) {
+  const full = (p.full_name || '').trim()
+  const split = [p.first_name, p.last_name].map(part => (part || '').trim()).filter(Boolean).join(' ')
+  return (split.length > full.length ? split : full) || '—'
+}
+
 function sportsOf(row: { sports?: string[] | null }): TrainingDiscipline[] {
   const list = (row.sports || []).filter(isTrainingDiscipline)
   return list.length ? list : ['skateboarding']
+}
+
+/** Same rule as the Estudiantes board: a skater login, not the parent account. */
+function isSkaterAccount(row: { customer_kind?: string | null; guardian_user_id?: string | null; email?: string | null; date_of_birth?: string | null }) {
+  if (row.customer_kind === 'skater') return true
+  if (row.customer_kind === 'guardian') return false
+  const email = (row.email || '').toLowerCase()
+  return Boolean(row.guardian_user_id) || (email.endsWith('@niikskate.com') && Boolean(row.date_of_birth))
 }
 
 function personInSport(key: string) {
@@ -191,16 +250,19 @@ onMounted(async () => {
   ])
   await loadAttendanceMarks(enrollments.value.map(r => r.id))
   let [{ data: profileRows, error: profileError }, { data: crewRows, error: crewError }, { data: seasonRows }] = await Promise.all([
-    client.from('profiles').select('id, full_name, guardian_user_id, date_of_birth, age, skill_group_id, sports').eq('role', 'customer').order('full_name'),
-    client.from('crew_members').select('id, first_name, last_name, guardian_user_id, date_of_birth, age, sports').order('first_name'),
+    client.from('profiles').select('id, full_name, first_name, last_name, email, customer_kind, guardian_user_id, date_of_birth, age, skill_group_id, sports').eq('role', 'customer').order('full_name'),
+    client.from('crew_members').select('id, first_name, last_name, full_name, guardian_user_id, date_of_birth, age, sports').order('first_name'),
     client.from('program_seasons').select('slug, name_es, name_en, start_date, end_date, status, icon'),
   ])
-  if (profileError && /sports/i.test(profileError.message)) {
-    const fallback = await client.from('profiles').select('id, full_name, guardian_user_id, date_of_birth, age, skill_group_id').eq('role', 'customer').order('full_name')
+  if (profileError) {
+    let fallback = await client.from('profiles').select('id, full_name, first_name, last_name, guardian_user_id, date_of_birth, age, skill_group_id').eq('role', 'customer').order('full_name')
+    if (fallback.error) {
+      fallback = await client.from('profiles').select('id, full_name, guardian_user_id, date_of_birth, age, skill_group_id').eq('role', 'customer').order('full_name') as typeof fallback
+    }
     profileRows = fallback.data
   }
   if (crewError && /sports/i.test(crewError.message)) {
-    const fallback = await client.from('crew_members').select('id, first_name, last_name, guardian_user_id, date_of_birth, age').order('first_name')
+    const fallback = await client.from('crew_members').select('id, first_name, last_name, full_name, guardian_user_id, date_of_birth, age').order('first_name')
     crewRows = fallback.data
   }
   const skillGroupsJoined = await client.from('skill_groups').select('id, name, training_programs(discipline)')
@@ -216,13 +278,14 @@ onMounted(async () => {
   const nameByGroup = new Map(
     ((skillGroups || []) as Array<{ id: string; name: string; training_programs?: { discipline?: string | null } | { discipline?: string | null }[] | null }>).map(group => [
       group.id,
-      skillLevelWithDiscipline(group.name, disciplineFromJoin(group), language.value === 'es'),
+      // The sport picker already scopes this page, so the discipline prefix is noise here.
+      group.name,
     ]),
   )
   people.value = [
-    ...((profileRows || []) as Array<{ id: string; full_name: string; guardian_user_id: string | null; date_of_birth: string | null; age: number | null; skill_group_id: string | null; sports?: string[] | null }>).map(p => ({
+    ...((profileRows || []) as Array<{ id: string; full_name: string; first_name?: string | null; last_name?: string | null; email?: string | null; customer_kind?: string | null; guardian_user_id: string | null; date_of_birth: string | null; age: number | null; skill_group_id: string | null; sports?: string[] | null }>).map(p => ({
       key: `profile:${p.id}`,
-      name: p.full_name || '—',
+      name: profileDisplayName(p),
       kind: 'profile' as const,
       userId: p.guardian_user_id || p.id,
       skaterProfileId: p.guardian_user_id ? p.id : null,
@@ -231,10 +294,11 @@ onMounted(async () => {
       programLevel: p.skill_group_id ? levelByGroup.get(p.skill_group_id) ?? null : null,
       programName: p.skill_group_id ? nameByGroup.get(p.skill_group_id) ?? null : null,
       sports: sportsOf(p),
+      isSkater: isSkaterAccount(p),
     })),
-    ...((crewRows || []) as Array<{ id: string; first_name: string; last_name: string; guardian_user_id: string; date_of_birth: string | null; age: number | null; sports?: string[] | null }>).map(c => ({
+    ...((crewRows || []) as Array<{ id: string; first_name: string; last_name: string; full_name?: string | null; guardian_user_id: string; date_of_birth: string | null; age: number | null; sports?: string[] | null }>).map(c => ({
       key: `crew:${c.id}`,
-      name: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || '—',
+      name: profileDisplayName({ full_name: c.full_name ?? null, first_name: c.first_name, last_name: c.last_name }),
       kind: 'crew' as const,
       userId: c.guardian_user_id,
       skaterProfileId: null,
@@ -243,6 +307,7 @@ onMounted(async () => {
       programLevel: null,
       programName: null,
       sports: sportsOf(c),
+      isSkater: true,
     })),
   ]
   const extra = ((seasonRows || []) as Array<{
@@ -322,7 +387,33 @@ async function loadWallet() {
 
 const summaries = computed(() => {
   const counted = showInactive.value ? enrollments.value : enrollments.value.filter(r => r.is_active)
-  return aggregateStudents(counted, futureBookings.value).map(student => {
+  const grouped = aggregateStudents(counted, futureBookings.value)
+  const seen = new Set(grouped.map(student => student.key))
+  const seenNames = new Set(grouped.map(student => student.studentName.trim().toLocaleLowerCase().replace(/\s+/g, ' ')))
+  for (const person of people.value) {
+    if (!person.isSkater || seen.has(person.key)) continue
+    const nameKey = person.name.trim().toLocaleLowerCase().replace(/\s+/g, ' ')
+    if (nameKey && seenNames.has(nameKey)) continue
+    const history = enrollments.value.filter(row => enrollmentStudentKey(row) === person.key)
+    if (history.length && !showInactive.value) continue
+    seen.add(person.key)
+    if (nameKey) seenNames.add(nameKey)
+    grouped.push({
+      key: person.key,
+      studentName: person.name,
+      skaterId: person.skaterProfileId,
+      crewMemberId: person.crewMemberId,
+      enrollments: [],
+      sessionsPaid: 0,
+      attended: 0,
+      absences: 0,
+      remaining: 0,
+      amountPaidMxn: 0,
+      lastPaymentOn: null,
+      futureBookedClasses: futureBookings.value[person.key] ?? 0,
+    })
+  }
+  return grouped.map(student => {
     const wallet = countsFor(student.key)
     const classesLeft = tokensReady.value
       ? TOKEN_KINDS.reduce((sum, kind) => sum + wallet[kind].available, 0)
@@ -339,7 +430,7 @@ const summaries = computed(() => {
       .filter((value): value is string => Boolean(value))
       .sort()
       .pop()?.slice(0, 10) || null
-    const active = student.enrollments.some(row => row.is_active)
+    const active = student.enrollments.some(row => row.is_active) || student.enrollments.length === 0
     return {
       ...student,
       wallet,
@@ -400,13 +491,19 @@ const pendingKeys = computed(() => {
   return keys
 })
 
-const filtered = computed(() => {
+const roster = computed(() => {
   const q = search.value.trim().toLocaleLowerCase()
-  const rows = summaries.value.filter(s => {
+  return summaries.value.filter(s => {
     if (!personInSport(s.key)) return false
     if (q && !s.studentName.toLocaleLowerCase().includes(q)) return false
     if (programFilter.value !== 'all' && programFor(s.key) !== programFilter.value) return false
     if (ageFilter.value !== 'all' && ageGroupFor(s.key) !== ageFilter.value) return false
+    return true
+  })
+})
+const filtered = computed(() => {
+  const rows = roster.value.filter(s => {
+    if (filter.value === 'available' && s.classesLeft <= 0) return false
     if (filter.value === 'healthy' && s.balanceStatus !== 'healthy') return false
     if (filter.value === 'low' && s.balanceStatus !== 'low') return false
     if (filter.value === 'zero' && s.balanceStatus !== 'zero') return false
@@ -420,27 +517,18 @@ const filtered = computed(() => {
     return a.studentName.localeCompare(b.studentName)
   })
 })
-const periodConsumed = computed(() => walletTokens.value.filter(token => {
-  if (token.status !== 'spent' || !token.spent_at) return false
-  const owner = tokenOwnerKey(token)
-  if (!owner || !personInSport(owner)) return false
-  const day = token.spent_at.slice(0, 10)
-  return day >= periodFrom.value && day <= periodTo.value
-}).length)
-const periodRevenue = computed(() => enrollments.value.reduce((sum, row) => {
-  if (!personInSport(enrollmentStudentKey(row))) return sum
-  const day = row.last_payment_on || ''
-  if (!day || day < periodFrom.value || day > periodTo.value) return sum
-  return sum + Number(row.amount_paid_mxn || 0)
-}, 0))
 const kpis = computed(() => ({
-  students: filtered.value.length,
-  available: filtered.value.reduce((n, s) => n + s.classesLeft, 0),
-  low: filtered.value.filter(s => s.balanceStatus === 'low').length,
-  zero: filtered.value.filter(s => s.balanceStatus === 'zero').length,
-  consumed: periodConsumed.value,
-  revenue: periodRevenue.value,
+  students: roster.value.length,
+  available: roster.value.reduce((n, s) => n + s.classesLeft, 0),
+  low: roster.value.filter(s => s.balanceStatus === 'low').length,
+  zero: roster.value.filter(s => s.balanceStatus === 'zero').length,
 }))
+function selectKpi(next: 'all' | 'available' | 'low' | 'zero') {
+  filter.value = next
+}
+function kpiSelected(next: 'all' | 'available' | 'low' | 'zero') {
+  return filter.value === next
+}
 
 function daysSince(date: string | null) {
   if (!date) return null
@@ -955,9 +1043,6 @@ const purchaseIssues = computed(() => {
   if (!form.value.person_key) issues.push(es.value ? 'Elige un alumno.' : 'Choose a student.')
   if (!sessionsNeeded.value) issues.push(es.value ? 'Elige un paquete con al menos 1 token.' : 'Choose a package with at least 1 token.')
   if (Number(discountMxn.value) > summarySubtotal.value) issues.push(es.value ? 'El descuento no puede ser mayor al precio.' : 'The discount cannot be higher than the price.')
-  if (form.value.payment_status === 'paid' && selectedClassIds.value.length !== sessionsNeeded.value) {
-    issues.push(es.value ? `Asigna ${sessionsNeeded.value} clases de la temporada.` : `Assign ${sessionsNeeded.value} season classes.`)
-  }
   return issues
 })
 
@@ -1003,11 +1088,7 @@ function openPurchaseForm(student?: FinanceStudentSummary) {
     form.value.person_key = student.key
     onSkaterPicked(student.key)
   }
-  const season = pickDefaultProgramSeason(seasonCatalog.value)
   showForm.value = true
-  if (!season) return
-  form.value.season_slug = season.slug
-  void loadSeasonClasses(season.slug)
 }
 function applyPriceRow(id: string) {
   form.value.coupon_id = ''
@@ -1097,35 +1178,9 @@ async function submitPurchase() {
     return
   }
   const paidNow = form.value.payment_status === 'paid'
-  const season = selectedSeason.value
-  if (paidNow && !season) {
-    formError.value = es.value ? 'Elige la temporada.' : 'Choose the season.'
-    return
-  }
   const needed = sessionsNeeded.value
   if (!needed) {
-    formError.value = es.value ? 'El paquete debe incluir al menos una clase.' : 'The package must include at least one class.'
-    return
-  }
-  const chosen = selectedClassIds.value
-    .map(id => seasonClasses.value.find(row => row.id === id))
-    .filter((row): row is SeasonClass => Boolean(row))
-  if (paidNow && (
-    person.age == null
-    || chosen.some(row =>
-      !classMatchesAge(person.age as number, row)
-      || !classMatchesProgram(person.programLevel, row),
-    )
-  )) {
-    formError.value = es.value
-      ? 'Elige un programa que corresponda a la edad y nivel del patinador.'
-      : 'Choose a program that matches the skater’s age and level.'
-    return
-  }
-  if (paidNow && season && (chosen.length !== needed || chosen.some(row => !classBelongsToSeason(row, season) || row.start_date < todayKey()))) {
-    formError.value = es.value
-      ? `Asigna exactamente ${needed} clases que existan en ${season.name.es}.`
-      : `Assign exactly ${needed} classes that exist in ${season.name.en}.`
+    formError.value = es.value ? 'El paquete debe incluir al menos un token.' : 'The package must include at least one token.'
     return
   }
 
@@ -1144,7 +1199,7 @@ async function submitPurchase() {
     amount_paid_mxn: paidNow ? (Number(form.value.amount_paid_mxn) || 0) : 0,
     sessions_paid: needed,
     last_payment_on: form.value.last_payment_on || null,
-    season_slug: season?.slug || null,
+    season_slug: null,
     attend_weekdays: form.value.attend_weekdays,
     attended: 0, absences: 0, notes: form.value.notes || null, is_active: true,
   })
@@ -1187,24 +1242,7 @@ async function submitPurchase() {
     return
   }
 
-  const rows = chosen.map(row => ({
-    calendar_event_id: row.id,
-    user_id: person.userId,
-    crew_member_id: person.crewMemberId,
-    skater_profile_id: person.skaterProfileId,
-    status: 'confirmed',
-  }))
-  const { data: bookingRows, error: enrollError } = await client
-    .from('class_session_enrollments')
-    .insert(rows)
-    .select('id')
-  if (enrollError) {
-    await deleteEnrollment(result.id)
-    formError.value = es.value
-      ? `No se pudieron asignar las clases de la temporada: ${enrollError.message}`
-      : `Could not assign the season classes: ${enrollError.message}`
-    return
-  }
+  const bookingRows: { id: string }[] = []
 
   if (couponValidation.value) {
     const { data: sessionData } = await client.auth.getSession()
@@ -1261,39 +1299,23 @@ async function submitPurchase() {
     </MemberFinanceHeader>
 
     <main class="px-4 py-4 max-w-[1400px] mx-auto space-y-4">
-      <div class="grid grid-cols-2 lg:grid-cols-6 gap-2">
-        <button type="button" class="rounded-2xl border border-white/10 bg-[#141414] p-3 text-left" @click="filter = 'all'">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <button type="button" class="rounded-2xl border-2 p-3 text-left" :style="kpiSelected('all') ? { borderColor: '#C9EF42', background: '#1a2410' } : { borderColor: 'rgba(255,255,255,0.1)', background: '#141414' }" @click="selectKpi('all')">
           <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">{{ es ? 'Alumnos' : 'Students' }}</p>
           <p class="text-xl font-bold text-white tabular-nums">{{ kpis.students }}</p>
         </button>
-        <button type="button" class="rounded-2xl border border-white/10 bg-[#141414] p-3 text-left" @click="filter = 'all'">
+        <button type="button" class="rounded-2xl border-2 p-3 text-left" :style="kpiSelected('available') ? { borderColor: '#C9EF42', background: '#1a2410' } : { borderColor: 'rgba(255,255,255,0.1)', background: '#141414' }" @click="selectKpi('available')">
           <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">{{ es ? 'Tokens disponibles' : 'Available tokens' }}</p>
           <p class="text-xl font-bold tabular-nums" style="color:#C9EF42">{{ kpis.available }}</p>
         </button>
-        <button type="button" class="rounded-2xl border border-white/10 bg-[#141414] p-3 text-left" @click="filter = 'low'">
+        <button type="button" class="rounded-2xl border-2 p-3 text-left" :style="kpiSelected('low') ? { borderColor: '#C9EF42', background: '#1a2410' } : { borderColor: 'rgba(255,255,255,0.1)', background: '#141414' }" @click="selectKpi('low')">
           <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">{{ es ? 'Saldo bajo' : 'Low balance' }}</p>
           <p class="text-xl font-bold tabular-nums" style="color:#F59E0B">{{ kpis.low }}</p>
         </button>
-        <button type="button" class="rounded-2xl border border-white/10 bg-[#141414] p-3 text-left" @click="filter = 'zero'">
+        <button type="button" class="rounded-2xl border-2 p-3 text-left" :style="kpiSelected('zero') ? { borderColor: '#C9EF42', background: '#1a2410' } : { borderColor: 'rgba(255,255,255,0.1)', background: '#141414' }" @click="selectKpi('zero')">
           <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">{{ es ? 'Sin tokens' : 'Zero tokens' }}</p>
           <p class="text-xl font-bold tabular-nums" style="color:#F87171">{{ kpis.zero }}</p>
         </button>
-        <div class="rounded-2xl border border-white/10 bg-[#141414] p-3">
-          <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">{{ es ? 'Consumidos' : 'Consumed' }}</p>
-          <p class="text-xl font-bold text-white tabular-nums">{{ kpis.consumed }}</p>
-        </div>
-        <div class="rounded-2xl border border-white/10 bg-[#141414] p-3">
-          <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold">{{ es ? 'Cobrado' : 'Collected' }}</p>
-          <p class="text-xl font-bold text-white tabular-nums">{{ formatMoneyMxn(kpis.revenue) }}</p>
-        </div>
-      </div>
-      <div class="flex flex-wrap gap-2 items-center">
-        <label class="text-[10px] uppercase text-gray-500 font-bold">{{ es ? 'Periodo' : 'Period' }}
-          <input v-model="periodFrom" type="date" class="mt-1 block px-2 py-1.5 rounded-lg bg-[#141414] border border-white/10 text-white text-xs" />
-        </label>
-        <label class="text-[10px] uppercase text-gray-500 font-bold">{{ es ? 'Hasta' : 'To' }}
-          <input v-model="periodTo" type="date" class="mt-1 block px-2 py-1.5 rounded-lg bg-[#141414] border border-white/10 text-white text-xs" />
-        </label>
       </div>
       <p v-if="purchaseNotice" class="text-xs rounded-lg border border-white/10 bg-[#141414] text-gray-200 p-3">{{ purchaseNotice }}</p>
       <p v-if="tokenTransactions.some(tx => tx.payment_status === 'pending' || tx.payment_status === 'failed')" class="text-xs rounded-lg border border-white/10 bg-[#141414] text-gray-300 p-3">
@@ -1306,6 +1328,7 @@ async function submitPurchase() {
         <input v-model="search" :placeholder="es ? 'Buscar alumno…' : 'Search student…'" class="flex-1 min-w-[12rem] px-3 py-2 rounded-xl bg-[#141414] border border-white/10 text-white text-sm" />
         <select v-model="filter" class="hidden lg:block px-3 py-2 rounded-xl bg-[#141414] border border-white/10 text-gray-300 text-xs">
           <option value="all">{{ es ? 'Todos' : 'All' }}</option>
+          <option value="available">{{ es ? 'Con tokens' : 'Has tokens' }}</option>
           <option value="healthy">{{ es ? 'Saldo saludable' : 'Healthy balance' }}</option>
           <option value="low">{{ es ? 'Saldo bajo' : 'Low balance' }}</option>
           <option value="zero">{{ es ? 'Sin tokens' : 'Zero tokens' }}</option>
@@ -1367,16 +1390,53 @@ async function submitPurchase() {
       </div>
 
       <div class="hidden lg:block overflow-x-auto rounded-2xl border border-white/10 bg-[#101010]">
-        <div class="grid min-w-[1100px] grid-cols-[28px_1.6fr_1.3fr_1.2fr_0.7fr_0.7fr_0.9fr_0.8fr_auto] gap-3 px-3 py-2 text-[10px] uppercase font-bold text-gray-500">
+        <div class="grid min-w-[1100px] grid-cols-[28px_1.6fr_1.3fr_1.5fr_0.6fr_0.6fr_0.9fr_0.8fr] items-end gap-2 px-3 py-2 text-[10px] uppercase font-bold text-gray-500">
           <span />
           <span>{{ es ? 'Alumno' : 'Student' }}</span>
           <span>{{ es ? 'Programa' : 'Program' }}</span>
-          <span>{{ es ? 'Disponibles' : 'Available' }}</span>
+          <div>
+            <span>Tokens</span>
+            <div v-if="tokensReady" class="mt-1 flex items-start gap-1.5 normal-case tracking-normal">
+              <span
+                v-for="token in CLASS_TOKENS"
+                :key="`legend-${token.id}`"
+                class="relative flex w-7 flex-col items-center gap-0.5"
+                :title="token.id === 'pro' ? 'Pro coach' : es ? token.es : token.en"
+              >
+                <span class="relative h-2.5 w-2.5">
+                  <span
+                    class="block h-2.5 w-2.5 rounded-full"
+                    :class="token.id === 'pro' ? 'token-holo' : ''"
+                    :style="tokenFill(token.id)"
+                  />
+                  <button
+                    v-if="token.id === 'free'"
+                    type="button"
+                    class="absolute -right-2 -top-2 z-10 inline-flex h-3 w-3 items-center justify-center rounded-full border border-[#F6C453] bg-[#101010] text-[8px] font-black leading-none text-[#F6C453]"
+                    :aria-label="es ? 'Reglas del token libre' : 'Free token rules'"
+                    @mouseenter="showFreeRules"
+                    @mouseleave="freeRulesOpen = false"
+                  >i</button>
+                </span>
+                <span class="text-[8px] font-semibold leading-none text-gray-400">{{ tokenShortLabel(token.id) }}</span>
+              </span>
+              <span
+                class="flex w-7 flex-col items-center gap-0.5"
+                :title="es ? 'Token asignado por coach' : 'Coach assigned token'"
+              >
+                <span class="h-2.5 w-2.5 rounded-full border border-dashed border-gray-400" />
+                <span class="text-[8px] font-semibold leading-none text-gray-400">{{ es ? 'Asig.' : 'Coach' }}</span>
+              </span>
+              <span class="flex w-7 flex-col items-center gap-0.5" :title="es ? 'Agregar tokens' : 'Add tokens'">
+                <span class="flex h-2.5 w-2.5 items-center justify-center rounded-full bg-acid text-[8px] font-black leading-none text-charcoal">+</span>
+                <span class="text-[8px] font-semibold leading-none text-gray-400">{{ es ? 'Agregar' : 'Add' }}</span>
+              </span>
+            </div>
+          </div>
           <span>{{ es ? 'Comprados' : 'Purchased' }}</span>
           <span>{{ es ? 'Consumidos' : 'Consumed' }}</span>
           <span>{{ es ? 'Última asistencia' : 'Last attendance' }}</span>
           <span>{{ es ? 'Estado' : 'Status' }}</span>
-          <span />
         </div>
         <div v-if="!filtered.length" class="p-10 text-center text-sm text-gray-500">{{ loading ? (es ? 'Cargando…' : 'Loading…') : (es ? 'No hay alumnos con este filtro.' : 'No students match this filter.') }}</div>
         <article
@@ -1384,32 +1444,62 @@ async function submitPurchase() {
           :key="student.key"
           class="min-w-[1100px] border-t border-white/10"
         >
-          <div class="grid w-full grid-cols-[28px_1.6fr_1.3fr_1.2fr_0.7fr_0.7fr_0.9fr_0.8fr_auto] items-center gap-2 px-3 py-2">
+          <div class="grid w-full grid-cols-[28px_1.6fr_1.3fr_1.5fr_0.6fr_0.6fr_0.9fr_0.8fr] items-center gap-2 px-3 py-2">
             <input type="checkbox" class="justify-self-center" :checked="selectedKeys.includes(student.key)" @change="toggleKey(student.key)" />
             <button type="button" class="col-span-1 text-left" @click="drawerKey = student.key; drawerTab = 'tokens'">
               <span class="block text-sm font-bold text-white">{{ student.studentName }}</span>
             </button>
-            <span class="text-xs text-gray-300">{{ programFor(student.key) }} · {{ ageGroupFor(student.key) }}</span>
-            <div>
-              <p class="text-sm font-bold text-white tabular-nums">{{ student.classesLeft }}</p>
-              <div v-if="tokensReady" class="mt-1 flex flex-wrap gap-1">
-                <span v-for="token in CLASS_TOKENS" :key="`${student.key}-${token.id}`" class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none" :style="{ background: token.color, color: '#171717' }">{{ student.wallet[token.id].available }}</span>
-                <span v-for="token in CLASS_TOKENS.filter(item => student.wallet[item.id].owed > 0)" :key="`${student.key}-${token.id}-owed`" class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none" :style="{ color: token.color, border: `1px solid ${token.color}` }">{{ student.wallet[token.id].owed }}</span>
-              </div>
+            <span
+              class="min-w-0 truncate whitespace-nowrap text-xs text-gray-300"
+              :title="`${programFor(student.key)} · ${ageGroupFor(student.key)}`"
+            >{{ programFor(student.key) }} · {{ ageGroupFor(student.key) }}</span>
+            <div class="flex items-center gap-1.5">
+              <template v-if="tokensReady">
+                <span
+                  v-for="token in CLASS_TOKENS"
+                  :key="`${student.key}-${token.id}`"
+                  class="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white tabular-nums"
+                  :class="token.id === 'pro' ? 'token-holo' : ''"
+                  :style="{ ...tokenFill(token.id), boxShadow: `inset 0 0 0 1px ${token.id === 'pro' ? '#ffffff40' : `${token.color}55`}` }"
+                  :title="`${es ? token.es : token.en}: ${student.wallet[token.id].available}`"
+                >{{ student.wallet[token.id].available }}</span>
+                <span
+                  v-if="assignedTokens(student).total"
+                  class="inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed text-xs font-bold text-white tabular-nums"
+                  :style="{ borderColor: assignedTokens(student).color }"
+                  :title="assignedTokens(student).title"
+                >{{ assignedTokens(student).total }}</span>
+                <span v-else class="h-7 w-7 shrink-0" aria-hidden="true" />
+              </template>
+              <span v-else class="text-sm font-bold text-white tabular-nums">{{ student.classesLeft }}</span>
+              <button
+                type="button"
+                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-acid text-sm font-black text-charcoal"
+                :aria-label="es ? `Agregar tokens a ${student.studentName}` : `Add tokens for ${student.studentName}`"
+                @click="openPurchaseForm(student)"
+              >+</button>
             </div>
-            <span class="text-sm text-gray-200 tabular-nums">
-              {{ student.purchased }}
-              <span v-if="purchaseBatches(student)[0]" class="mt-0.5 block text-[10px] font-normal text-gray-500">{{ formatWhen(purchaseBatches(student)[0].at, purchaseBatches(student)[0].hasTime) }}</span>
-            </span>
+            <span class="text-sm text-gray-200 tabular-nums">{{ student.purchased }}</span>
             <span class="text-sm text-gray-200 tabular-nums">{{ student.consumed }}</span>
             <span class="text-xs text-gray-400">{{ student.lastAttendance ? formatDateEs(student.lastAttendance) : '—' }}</span>
             <span class="inline-flex w-fit rounded-full px-2 py-0.5 text-[10px] font-bold" :style="statusStyle(student.balanceStatus)">{{ statusText(student.balanceStatus) }}</span>
-            <button type="button" class="h-7 rounded-full bg-acid px-2 text-[11px] font-black text-charcoal" @click="openPurchaseForm(student)">+</button>
           </div>
         </article>
       </div>
       <p class="text-[11px] text-gray-500">{{ es ? 'Presente y falta usan 1 token del color de la clase. Un saldo en cero no es un pago atrasado.' : 'Present and absent use 1 token of that class color. A zero balance is not an overdue payment.' }}</p>
     </main>
+
+    <Teleport to="body">
+      <div
+        v-if="freeRulesOpen"
+        class="pointer-events-none fixed z-[60] w-64 rounded-xl border border-[#F6C453]/40 bg-[#141414] p-3 text-[11px] leading-snug text-gray-200 shadow-xl"
+        :style="{ top: `${freeRulesPos.top}px`, left: `${freeRulesPos.left}px` }"
+      >
+        {{ es
+          ? '1 token libre al subir de nivel de XP. No se da por asistir ni por comprar clases. Paga cualquier clase.'
+          : '1 free token on each XP level-up. Not given for attending or buying classes. Pays for any class.' }}
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div v-if="drawerStudent" class="fixed inset-0 z-40 flex justify-end">
@@ -1605,82 +1695,6 @@ async function submitPurchase() {
               </dl>
             </section>
 
-            <div v-if="form.payment_status === 'paid'" class="rounded-2xl border border-white/10 bg-[#0c0c0c] p-3 space-y-3">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <p class="text-sm font-bold text-white">{{ es ? 'Clases de la temporada' : 'Season classes' }} *</p>
-                  <p class="text-[11px] text-gray-500">{{ es ? 'Solo puedes asignar clases que ya existen en una temporada.' : 'You can only assign classes that already exist in a season.' }}</p>
-                </div>
-                <p class="text-sm font-bold tabular-nums" :class="selectedClassIds.length === sessionsNeeded && sessionsNeeded > 0 ? 'text-emerald-300' : 'text-amber-300'">
-                  {{ selectedClassIds.length }}/{{ sessionsNeeded }}
-                </p>
-              </div>
-              <div class="grid sm:grid-cols-2 gap-3">
-                <label class="block text-xs text-gray-400">{{ es ? 'Temporada' : 'Season' }} *
-                  <select v-model="form.season_slug" required class="mt-1 w-full input-finance" @change="form.program_key = ''; loadSeasonClasses(form.season_slug)">
-                    <option value="">{{ es ? '— Elige temporada —' : '— Choose season —' }}</option>
-                    <option v-for="season in seasonCatalog" :key="season.slug" :value="season.slug">
-                      {{ es ? season.name.es : season.name.en }} · {{ season.startDate }} – {{ season.endDate }}
-                    </option>
-                  </select>
-                </label>
-                <label class="block text-xs text-gray-400">{{ es ? 'Programa' : 'Program' }}
-                  <select v-model="form.program_key" class="mt-1 w-full input-finance" :disabled="!upcomingClasses.length">
-                    <option value="">{{ es ? 'Programas de su edad y nivel' : 'Programs for their age and level' }}</option>
-                    <option v-for="program in programOptions" :key="program.key" :value="program.key">{{ program.title }} · {{ program.time }} · {{ program.count }}</option>
-                  </select>
-                </label>
-              </div>
-              <button type="button" class="text-xs font-bold text-cyan-300 disabled:opacity-40" :disabled="!selectedSeason || !sessionsNeeded || !visibleClasses.length" @click="assignNextClasses">
-                {{ es ? 'Asignar las próximas clases del programa' : 'Assign the next classes in this program' }}
-              </button>
-              <p v-if="classesLoading" class="text-xs text-gray-500">{{ es ? 'Cargando clases…' : 'Loading classes…' }}</p>
-              <p v-else-if="selectedSeason && form.person_key && selectedSkater?.age == null" class="text-xs text-amber-300">
-                {{ es ? 'Este patinador no tiene edad. Agrégala para ver solo sus programas.' : 'This skater has no age. Add it to see only their programs.' }}
-              </p>
-              <p v-else-if="selectedSeason && !form.person_key" class="text-xs text-gray-500">
-                {{ es ? 'Elige al patinador para ver los programas de su edad.' : 'Choose the skater to see programs for their age.' }}
-              </p>
-              <p v-else-if="selectedSeason && !ageMatchedClasses.length" class="text-xs text-amber-300">
-                {{ es ? 'No hay programas de esta temporada para la edad y nivel del patinador.' : 'No programs in this season match the skater’s age and level.' }}
-              </p>
-              <p v-else-if="selectedSeason && !upcomingClasses.length" class="text-xs text-amber-300">
-                {{ es ? 'No quedan clases por venir en esta temporada. Las fechas que ya pasaron no se asignan.' : 'No upcoming classes left in this season. Dates that already passed are not assigned.' }}
-              </p>
-              <div v-else-if="selectedSeason">
-                <div class="flex items-center justify-between mb-2">
-                  <button type="button" class="px-2 py-1 text-xs text-gray-300" @click="shiftCalendar(-1)">‹</button>
-                  <p class="text-xs font-bold uppercase tracking-wide text-gray-300">{{ calendarLabel }}</p>
-                  <button type="button" class="px-2 py-1 text-xs text-gray-300" @click="shiftCalendar(1)">›</button>
-                </div>
-                <div class="grid grid-cols-7 gap-1 text-[10px] text-center text-gray-500 mb-1">
-                  <span v-for="(label, index) in (es ? ['L','M','M','J','V','S','D'] : ['M','T','W','T','F','S','S'])" :key="index">{{ label }}</span>
-                </div>
-                <div class="grid grid-cols-7 gap-1">
-                  <div
-                    v-for="day in calendarDays"
-                    :key="format(day, 'yyyy-MM-dd')"
-                    class="min-h-[4.5rem] rounded-lg border p-1"
-                    :class="isSameMonth(day, calendarMonth) ? 'border-gray-800 bg-gray-900' : 'border-transparent opacity-40'"
-                  >
-                    <p class="text-[10px] text-gray-500">{{ format(day, 'd') }}</p>
-                    <button
-                      v-for="row in classesByDate.get(format(day, 'yyyy-MM-dd')) || []"
-                      :key="row.id"
-                      type="button"
-                      class="mt-1 w-full truncate rounded px-1 py-0.5 text-left text-[9px] font-semibold"
-                      :class="isClassSelected(row.id) ? 'bg-acid text-charcoal' : 'bg-white/10 text-gray-100'"
-                      :title="row.title"
-                      @click="toggleClass(row.id)"
-                    >
-                      {{ classTimeLabel(row) }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div><p class="text-xs text-gray-400 mb-2">{{ es ? 'Días habituales' : 'Usual days' }}</p><div class="flex gap-1"><button v-for="day in ATTEND_WEEKDAYS" :key="day.value" type="button" class="flex-1 h-10 rounded-lg border text-xs font-bold" :class="form.attend_weekdays.includes(day.value) ? 'border-acid bg-acid/20 text-white' : 'border-white/10 text-gray-500'" @click="toggleFormDay(day.value)">{{ day.initial }}</button></div></div>
             <p v-if="formError" class="text-xs text-red-300">{{ formError }}</p>
             <p v-else-if="purchaseIssues.length" class="text-xs text-amber-200">{{ purchaseIssues[0] }}</p>
             <div class="flex gap-2">
@@ -1704,4 +1718,12 @@ async function submitPurchase() {
 
 <style scoped>
 .input-finance { @apply px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm; }
+.token-holo { animation: token-holo-shift 6s ease-in-out infinite; }
+@keyframes token-holo-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .token-holo { animation: none; }
+}
 </style>

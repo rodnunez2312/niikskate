@@ -365,7 +365,7 @@ function levelMarks(title: string) {
   const marks: Array<{ emoji: string; label: string }> = []
   if (text.includes('principiante') || text.includes('beginner')) marks.push({ emoji: '🌱', label: esLang.value ? 'Principiante' : 'Beginner' })
   if (text.includes('intermedio') || text.includes('intermediate')) marks.push({ emoji: '🚀', label: esLang.value ? 'Intermedio' : 'Intermediate' })
-  if (text.includes('avanzado') || text.includes('advanced')) marks.push({ emoji: '🏆', label: esLang.value ? 'Avanzado' : 'Advanced' })
+  if (text.includes('avanzado') || text.includes('advanced')) marks.push({ emoji: '⚡', label: esLang.value ? 'Avanzado' : 'Advanced' })
   return marks
 }
 

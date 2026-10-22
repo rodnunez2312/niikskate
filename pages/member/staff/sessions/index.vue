@@ -4,6 +4,7 @@ import { es as esLocale } from 'date-fns/locale'
 import { TIME_SLOT_LABELS, type TimeSlot } from '~/types'
 import { sessionProgramTitle } from '~/utils/sessionProgramTitle'
 import { coachPillClass, withCoachLabels } from '~/utils/coachInitials'
+import { isSummerCourseSeason } from '~/utils/programSeasons'
 
 definePageMeta({ middleware: ['auth', 'member'], layout: 'member' })
 
@@ -175,12 +176,33 @@ function statusClass(status: string) {
 
 const today = format(new Date(), 'yyyy-MM-dd')
 
+const { seasons } = useProgramSeasons()
+
+/** Regular seasons that have started, most recent (the current one) first. */
+const pastSeasons = computed(() =>
+  seasons.value
+    .filter(season => !isSummerCourseSeason(season.slug) && season.startDate < today)
+    .sort((a, b) => b.startDate.localeCompare(a.startDate)),
+)
+const seasonsShown = ref(1)
+const shownSeasons = computed(() => pastSeasons.value.slice(0, seasonsShown.value))
+const pastFrom = computed(() => shownSeasons.value[shownSeasons.value.length - 1]?.startDate || '')
+
+function seasonOf(date: string) {
+  return shownSeasons.value.find(season => date >= season.startDate && date <= season.endDate)
+}
+
+function isShownPast(row: SessionRow) {
+  return row.start_date < today && row.start_date >= pastFrom.value
+}
+
 const visible = computed(() => {
-  const rows = sessions.value.filter(row => (tab.value === 'upcoming' ? row.start_date >= today : row.start_date < today))
-  const dir = tab.value === 'upcoming' ? 1 : -1
+  const rows = sessions.value.filter(row => (tab.value === 'upcoming' ? row.start_date >= today : isShownPast(row)))
+  // Days run newest-first in Pasadas, but within a day classes always go morning to evening.
+  const dayDir = tab.value === 'upcoming' ? 1 : -1
   return [...rows].sort((a, b) =>
-    a.start_date.localeCompare(b.start_date) * dir
-    || (a.start_time || '').localeCompare(b.start_time || '') * dir,
+    a.start_date.localeCompare(b.start_date) * dayDir
+    || (a.start_time || '').localeCompare(b.start_time || ''),
   )
 })
 
@@ -196,7 +218,11 @@ const visibleGroups = computed(() => {
     else groups.push({ date: row.start_date, rows: [row] })
   }
   let colorIndex = 0
+  let lastSeasonSlug = ''
   return groups.map((group) => {
+    const season = tab.value === 'past' ? seasonOf(group.date) : undefined
+    const seasonHeading = season && season.slug !== lastSeasonSlug ? season : undefined
+    if (season) lastSeasonSlug = season.slug
     const color = group.rows.length > 1 ? DAY_NEONS[colorIndex++ % DAY_NEONS.length] : ''
     const slots: Array<{ key: string; label: string; rows: SessionRow[] }> = []
     for (const row of group.rows) {
@@ -207,6 +233,7 @@ const visibleGroups = computed(() => {
     }
     return {
       ...group,
+      seasonHeading,
       slots,
       color,
       style: color ? { borderColor: `${color}99`, boxShadow: `0 0 14px ${color}1F` } : undefined,
@@ -306,7 +333,7 @@ async function bulkUpdate(outcome: 'done' | 'cancelled') {
 
 const counts = computed(() => ({
   upcoming: sessions.value.filter(row => row.start_date >= today).length,
-  past: sessions.value.filter(row => row.start_date < today).length,
+  past: sessions.value.filter(isShownPast).length,
 }))
 
 async function load() {
@@ -355,8 +382,8 @@ watch(selectedSport, load)
       </template>
     </MemberStaffPageHeader>
 
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 grid lg:grid-cols-[minmax(0,1fr)_20rem] gap-5">
-      <section class="rounded-2xl bg-gray-900 border border-gray-800 p-5">
+    <div class="max-w-6xl mx-auto px-3 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-5">
+      <section class="min-w-0 rounded-2xl bg-gray-900 border border-gray-800 p-3 sm:p-5">
         <div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
           <div class="flex gap-2">
             <button
@@ -455,6 +482,48 @@ watch(selectedSport, load)
         </div>
         <p v-if="bulkError" class="mb-3 text-sm text-amber-200">{{ bulkError }}</p>
 
+        <div
+          v-if="tab === 'past' && pastSeasons.length"
+          class="mb-4 flex items-center gap-2 rounded-xl border border-gray-800 bg-gray-950 px-3 py-2"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">{{ es ? 'Temporada' : 'Season' }}</p>
+            <div class="mt-1 flex flex-wrap gap-1.5">
+              <button
+                v-for="(season, index) in pastSeasons"
+                :key="season.slug"
+                type="button"
+                class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors"
+                :class="index < seasonsShown
+                  ? 'bg-white/10 text-white'
+                  : 'border border-dashed border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'"
+                :title="es ? season.dates.es : season.dates.en"
+                @click="seasonsShown = index + 1"
+              >
+                {{ es ? season.name.es : season.name.en }}
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-700 text-lg font-bold text-gray-200 hover:border-gray-500 disabled:opacity-30"
+            :disabled="seasonsShown <= 1"
+            :aria-label="es ? 'Mostrar menos temporadas' : 'Show fewer seasons'"
+            @click="seasonsShown--"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-acid text-lg font-bold text-charcoal disabled:opacity-30"
+            :disabled="seasonsShown >= pastSeasons.length"
+            :aria-label="es ? 'Mostrar temporada anterior' : 'Show previous season'"
+            @click="seasonsShown++"
+          >
+            +
+          </button>
+        </div>
+
         <p v-if="loading" class="text-sm text-gray-500 py-8 text-center">{{ es ? 'Cargando…' : 'Loading…' }}</p>
         <p v-else-if="error" class="text-sm text-amber-200">{{ error }}</p>
         <p v-else-if="!visible.length" class="text-sm text-gray-500 py-10 text-center">
@@ -462,10 +531,16 @@ watch(selectedSport, load)
             ? (es ? 'No hay sesiones próximas.' : 'No upcoming sessions.')
             : (es ? 'No hay sesiones pasadas.' : 'No past sessions.') }}
         </p>
-        <div v-else class="space-y-2 max-h-[42.5rem] overflow-y-auto pr-1 overscroll-contain">
+        <div v-else class="space-y-2 max-h-[42.5rem] overflow-y-auto overflow-x-hidden pr-1 overscroll-contain">
+          <template v-for="group in visibleGroups" :key="group.date">
+          <p
+            v-if="group.seasonHeading && shownSeasons.length > 1"
+            class="pt-2 text-[11px] font-bold uppercase tracking-[0.18em] text-acid"
+          >
+            {{ group.seasonHeading.icon }} {{ es ? group.seasonHeading.name.es : group.seasonHeading.name.en }}
+            <span class="font-normal normal-case tracking-normal text-gray-500">· {{ es ? group.seasonHeading.dates.es : group.seasonHeading.dates.en }}</span>
+          </p>
           <div
-            v-for="group in visibleGroups"
-            :key="group.date"
             class="space-y-3"
             :class="group.rows.length > 1 ? 'rounded-2xl border p-2' : ''"
             :style="group.style"
@@ -521,10 +596,11 @@ watch(selectedSport, load)
           </ul>
           </div>
           </div>
+          </template>
         </div>
       </section>
 
-      <div class="space-y-5 h-fit">
+      <div class="min-w-0 space-y-5 h-fit">
       <section id="activas" class="scroll-mt-6 rounded-2xl bg-gray-900 border border-gray-800 p-5">
         <div class="flex items-center justify-between gap-2">
           <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">

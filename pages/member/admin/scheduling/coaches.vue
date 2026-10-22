@@ -1067,11 +1067,11 @@ const submitAddCoach = async () => {
           {{ esLang ? 'Sin coaches' : 'No coaches' }}
         </p>
 
-        <div v-else class="grid gap-3 sm:grid-cols-2">
+        <div v-else class="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           <article
             v-for="coach in section.coaches"
             :key="coach.id"
-            class="rounded-2xl border bg-gray-900 p-4 transition-colors cursor-pointer"
+            class="flex min-w-0 flex-col rounded-2xl border bg-gray-900 p-4 transition-colors cursor-pointer"
             :class="coach.is_active ? 'border-gray-800 hover:border-gray-700' : 'border-gray-800/60 opacity-70'"
             @click="openEdit(coach)"
           >
@@ -1156,14 +1156,14 @@ const submitAddCoach = async () => {
               </div>
             </div>
 
-            <p class="mt-3 text-xs text-gray-500 truncate flex items-center gap-1.5">
+            <p class="mt-3 mb-3 min-w-0 text-xs text-gray-500 flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              {{ coach.email }}
+              <span class="truncate" :title="coach.email">{{ coach.email }}</span>
             </p>
 
-            <div class="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between gap-2">
+            <div class="mt-auto pt-3 border-t border-gray-800 flex items-center justify-between gap-2">
               <span
                 class="px-2 py-0.5 rounded-full text-[11px] font-medium"
                 :class="coach.is_active ? 'bg-glass-green/15 text-glass-green' : 'bg-gray-800 text-gray-500'"

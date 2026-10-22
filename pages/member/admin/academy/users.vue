@@ -2,19 +2,15 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { TimeSlot, User } from '~/types'
-import { TIME_SLOT_LABELS } from '~/types'
+import { PROGRAM_AGE_BANDS, TIME_SLOT_LABELS } from '~/types'
 import { computeAgeFromDob } from '~/utils/ageEligibility'
+import { computeSkaterCareer, type CareerSkill } from '~/utils/skaterCareer'
 import {
   assignableSkillGroups,
   effectiveSkaterLevelId,
   isPlanningSkillGroupId,
   normalizeSkillGroupDisplayName,
 } from '~/utils/skillGroupLevels'
-import {
-  normalizeSkaterSkillLevel,
-  SKATER_KANBAN_SKILL_LEVELS,
-  skaterSkillLevelLabel,
-} from '~/utils/skaterSkillLevels'
 import {
   buildNiikSkaterEmail,
   DEFAULT_SKATER_PASSWORD,
@@ -47,7 +43,7 @@ const { programs: loadedSkillGroups, load: loadSkillGroups, optionLabel } = useS
 const skillGroupsList = loadedSkillGroups
 const trainingBoards = ref<Array<{ id: string; name: string; discipline: string }>>([])
 
-const kanbanMode = ref<'program' | 'level'>('program')
+const kanbanMode = ref<'program' | 'age'>('program')
 const draggingCardKey = ref<string | null>(null)
 const dragOverColumnId = ref<string | null>(null)
 const dragOverDepth = ref<Record<string, number>>({})
@@ -192,8 +188,106 @@ onMounted(async () => {
   }
 
   isAdmin.value = true
-  await Promise.all([loadUsers(), loadSkaterMeta(), loadCrewMembers()])
+  await loadUsers()
+  await Promise.all([loadSkaterMeta(), loadCrewMembers(), loadSkaterXp()])
 })
+
+const xpByStudent = ref<Record<string, number>>({})
+
+/** PostgREST returns at most 1000 rows. An unfiltered scan misses later skaters and every card shows 0. */
+async function rowsForStudents<T extends { student_id: string }>(
+  table: string,
+  columns: string,
+  ids: string[],
+  attendedOnly = false,
+): Promise<T[]> {
+  const out: T[] = []
+  const chunkSize = 40
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize)
+    const pageSize = 1000
+    for (let from = 0; ; from += pageSize) {
+      let query = client.from(table).select(columns).in('student_id', chunk)
+      if (attendedOnly) query = query.eq('attended', true)
+      const { data, error } = await query.range(from, from + pageSize - 1)
+      if (error) {
+        console.error(`XP load ${table}`, error.message)
+        break
+      }
+      const batch = (data || []) as T[]
+      out.push(...batch)
+      if (batch.length < pageSize) break
+    }
+  }
+  return out
+}
+
+async function loadSkaterXp() {
+  const ids = users.value.map(u => u.id).filter(Boolean)
+  if (!ids.length) {
+    xpByStudent.value = {}
+    return
+  }
+  const skills: CareerSkill[] = []
+  const pageSize = 1000
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client
+      .from('skills_library')
+      .select('*')
+      .eq('is_active', true)
+      .range(from, from + pageSize - 1)
+    if (error) {
+      console.error('XP load skills', error.message)
+      break
+    }
+    skills.push(...((data || []) as CareerSkill[]))
+    if (!data || data.length < pageSize) break
+  }
+  const [progressRows, attendRows, videoRows, evalRows] = await Promise.all([
+    rowsForStudents<{ student_id: string; skill_id: string; learned_at?: string | null; created_at?: string | null }>(
+      'student_progress',
+      'student_id, skill_id, learned_at, created_at',
+      ids,
+    ),
+    rowsForStudents<{ student_id: string; class_date: string }>('attendance', 'student_id, class_date', ids, true),
+    rowsForStudents<{ student_id: string; created_at: string }>('trick_evidence_videos', 'student_id, created_at', ids),
+    rowsForStudents<{ student_id: string; evaluation_date: string }>('student_evaluations', 'student_id, evaluation_date', ids),
+  ])
+  const grouped = <T extends { student_id: string }>(rows: T[]) => {
+    const map = new Map<string, T[]>()
+    for (const row of rows) {
+      const list = map.get(row.student_id) || []
+      list.push(row)
+      map.set(row.student_id, list)
+    }
+    return map
+  }
+  const progress = grouped(progressRows)
+  const attendance = grouped(attendRows)
+  const videos = grouped(videoRows)
+  const evaluations = grouped(evalRows)
+  const next: Record<string, number> = {}
+  for (const id of ids) {
+    try {
+      next[id] = computeSkaterCareer({
+        skills,
+        progress: progress.get(id) || [],
+        attendance: (attendance.get(id) || []).map(row => ({ class_date: row.class_date, attended: true })),
+        videos: (videos.get(id) || []).map(row => ({ created_at: row.created_at })),
+        evaluations: (evaluations.get(id) || []).map(row => ({ evaluation_date: row.evaluation_date })),
+        es: false,
+      }).xp
+    } catch (e) {
+      console.error('XP load', id, e)
+      next[id] = 0
+    }
+  }
+  xpByStudent.value = next
+}
+
+function xpFor(studentId: string) {
+  return xpByStudent.value[studentId] ?? 0
+}
 
 const loadCrewMembers = async () => {
   try {
@@ -330,6 +424,31 @@ const programNameFor = (u: User) => {
   return group ? optionLabel(group) : null
 }
 
+function studentAge(student: { date_of_birth?: string | null; age?: number | null }) {
+  return computeAgeFromDob(student.date_of_birth, student.age)
+}
+
+function ageBandIdFor(student: { date_of_birth?: string | null; age?: number | null }) {
+  const age = studentAge(student)
+  if (age == null) return UNASSIGNED_COLUMN
+  const band = [...PROGRAM_AGE_BANDS].reverse().find(row =>
+    age >= row.minAge && (row.maxAge == null || age <= row.maxAge),
+  )
+  return band?.id || UNASSIGNED_COLUMN
+}
+
+function cardName(fullName: string | null | undefined) {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 2) return parts.join(' ')
+  return `${parts[0]} ${parts[1]}`
+}
+
+function compareStudentsByAge(a: User, b: User) {
+  const ageDiff = (studentAge(a) ?? 999) - (studentAge(b) ?? 999)
+  if (ageDiff) return ageDiff
+  return (a.full_name || '').localeCompare(b.full_name || '')
+}
+
 function programIdForStudent(student: { skill_group_id?: string | null }) {
   const levelId = effectiveSkaterLevelId(student.skill_group_id, skillGroupsList.value)
   if (!levelId) return null
@@ -362,9 +481,6 @@ const searchHits = computed(() => {
 function openStudentProgram(hit: { programId: string | null; name: string }) {
   searchQuery.value = hit.name
 }
-
-const skillBandLabelFor = (u: User) =>
-  skaterSkillLevelLabel(u.skill_level, language.value === 'es')
 
 const assignablePrograms = computed(() => assignableSkillGroups(skillGroupsList.value))
 
@@ -409,68 +525,53 @@ const skaterCount = computed(() => skaterProfileUsers.value.filter(onThisBoard).
 
 const columnItemCount = (col: KanbanColumn) => col.students.length
 
+function studentLacksProgram(student: User, levels: { id: string }[]) {
+  const levelId = effectiveSkaterLevelId(student.skill_group_id, skillGroupsList.value)
+  if (!levelId) return true
+  return !levels.some(group => group.id === levelId)
+}
+
+const boardPrograms = computed(() =>
+  boardLevelIds.value
+    ? assignablePrograms.value.filter(group => boardLevelIds.value!.has(group.id))
+    : assignablePrograms.value,
+)
+
+const unassignedStudents = computed(() => {
+  const pool = skaterProfileUsers.value.filter(onThisBoard)
+  return pool.filter(student => studentLacksProgram(student, boardPrograms.value)).sort(compareStudentsByAge)
+})
+
 const programKanbanColumns = computed((): KanbanColumn[] => {
   const pool = skaterProfileUsers.value.filter(onThisBoard)
-  const levels = boardLevelIds.value
-    ? assignablePrograms.value.filter(group => boardLevelIds.value!.has(group.id))
-    : assignablePrograms.value
-  const cols: KanbanColumn[] = [
-    {
-      id: UNASSIGNED_COLUMN,
-      title: language.value === 'es' ? 'Sin programa' : 'No program',
-      students: [] as User[],
-    },
-    ...levels.map(g => ({
-      id: g.id,
-      title: normalizeSkillGroupDisplayName(g.name),
-      color: g.color,
-      students: [] as User[],
-    })),
-  ]
+  const cols: KanbanColumn[] = boardPrograms.value.map(group => ({
+    id: group.id,
+    title: normalizeSkillGroupDisplayName(group.name),
+    color: group.color,
+    students: [] as User[],
+  }))
   for (const col of cols) {
-    if (col.id === UNASSIGNED_COLUMN) {
-      col.students = pool.filter(u => {
-        const levelId = effectiveSkaterLevelId(u.skill_group_id, skillGroupsList.value)
-        if (!levelId) return true
-        return !levels.some(group => group.id === levelId)
-      })
-    } else {
-      col.students = pool.filter(
-        u => effectiveSkaterLevelId(u.skill_group_id, skillGroupsList.value) === col.id,
-      )
-    }
+    col.students = pool
+      .filter(student => effectiveSkaterLevelId(student.skill_group_id, skillGroupsList.value) === col.id)
+      .sort(compareStudentsByAge)
   }
   return cols
 })
 
-const levelKanbanColumns = computed((): KanbanColumn[] => {
+const ageKanbanColumns = computed((): KanbanColumn[] => {
   const pool = skaterProfileUsers.value.filter(onThisBoard)
   const es = language.value === 'es'
-  const cols: KanbanColumn[] = [
-    {
-      id: UNASSIGNED_COLUMN,
-      title: es ? 'Sin nivel' : 'No level',
-      students: [] as User[],
-    },
-    ...SKATER_KANBAN_SKILL_LEVELS.map(l => ({
-      id: l.id,
-      title: es ? l.label.es : l.label.en,
-      color: l.color,
-      students: [] as User[],
-    })),
-  ]
-  for (const col of cols) {
-    if (col.id === UNASSIGNED_COLUMN) {
-      col.students = pool.filter(u => !normalizeSkaterSkillLevel(u.skill_level))
-    } else {
-      col.students = pool.filter(u => normalizeSkaterSkillLevel(u.skill_level) === col.id)
-    }
-  }
-  return cols
+  return PROGRAM_AGE_BANDS.map(band => ({
+    id: band.id,
+    title: `${band.emoji} ${es ? band.label.es : band.label.en}`,
+    students: pool
+      .filter(student => ageBandIdFor(student) === band.id)
+      .sort(compareStudentsByAge),
+  }))
 })
 
 const activeKanbanColumns = computed(() =>
-  kanbanMode.value === 'program' ? programKanbanColumns.value : levelKanbanColumns.value,
+  kanbanMode.value === 'program' ? programKanbanColumns.value : ageKanbanColumns.value,
 )
 
 const onCardDragStart = (cardKey: string, e: DragEvent) => {
@@ -528,11 +629,19 @@ const onDropColumn = async (columnId: string, e: DragEvent) => {
   if (!cardKey?.startsWith('profile:')) return
   const studentId = cardKey.slice('profile:'.length)
 
-  if (kanbanMode.value === 'program') {
-    await assignStudentToProgram(studentId, columnId)
-  } else {
-    await assignStudentToSkillBand(studentId, columnId)
-  }
+  if (kanbanMode.value !== 'program') return
+  await assignStudentToProgram(studentId, columnId)
+}
+
+const onDropProgram = async (programId: string, e: DragEvent) => {
+  e.preventDefault()
+  clearDragOverState()
+  const cardKey = e.dataTransfer?.getData('text/plain') || draggingCardKey.value
+  draggingCardKey.value = null
+  if (!cardKey?.startsWith('profile:')) return
+  const studentId = cardKey.slice('profile:'.length)
+  if (!unassignedStudents.value.some(student => student.id === studentId)) return
+  await assignStudentToProgram(studentId, programId)
 }
 
 const isColumnDropTarget = (columnId: string) =>
@@ -577,30 +686,6 @@ const assignStudentToProgram = async (studentId: string, columnId: string) => {
       e?.message ||
       (language.value === 'es' ? 'No se pudo asignar el programa' : 'Could not assign program')
     console.error('assignStudentToProgram:', e)
-  } finally {
-    movingStudentId.value = null
-  }
-}
-
-const assignStudentToSkillBand = async (studentId: string, columnId: string) => {
-  const u = users.value.find(x => x.id === studentId)
-  if (!u) return
-  const nextLevel = columnId === UNASSIGNED_COLUMN ? null : columnId
-  if (nextLevel && !SKATER_KANBAN_SKILL_LEVELS.some(l => l.id === nextLevel)) return
-
-  const current = normalizeSkaterSkillLevel(u.skill_level)
-  if (current === nextLevel) return
-
-  movingStudentId.value = studentId
-  try {
-    const { error } = await client
-      .from('profiles')
-      .update({ skill_level: nextLevel })
-      .eq('id', studentId)
-    if (error) throw error
-    u.skill_level = nextLevel
-  } catch (e) {
-    console.error('assignStudentToSkillBand:', e)
   } finally {
     movingStudentId.value = null
   }
@@ -1197,8 +1282,9 @@ const scheduleSummary = (u: User) => {
 
     <!-- Content -->
     <div v-if="isAdmin" class="px-4 py-6 max-w-[1400px] mx-auto">
-      <!-- Search + kanban mode -->
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+      <div class="flex flex-col lg:flex-row lg:items-start gap-3 mb-4">
+        <div class="relative flex-1 min-w-0 w-full space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3">
         <div class="relative flex-1">
           <div class="relative">
             <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1239,25 +1325,35 @@ const scheduleSummary = (u: User) => {
           <button
             type="button"
             class="px-4 py-2 text-xs font-semibold transition-colors border-l border-gray-800"
-            :class="kanbanMode === 'level' ? 'bg-gold-400 text-black' : 'bg-gray-900 text-gray-400'"
-            @click="kanbanMode = 'level'"
+            :class="kanbanMode === 'age' ? 'bg-gold-400 text-black' : 'bg-gray-900 text-gray-400'"
+            @click="kanbanMode = 'age'"
           >
-            {{ language === 'es' ? 'Por nivel' : 'By level' }}
+            {{ language === 'es' ? 'Por edad' : 'By age' }}
           </button>
         </div>
       </div>
-
-      <p class="text-sm text-gray-400 mb-2">
-        {{ skaterCount }} {{ language === 'es' ? 'estudiantes' : 'students' }}
-        <span class="text-gray-600">·</span>
-        <span class="text-gray-500 text-xs">
-          {{ language === 'es' ? 'Arrastra las tarjetas entre columnas' : 'Drag cards between columns' }}
-        </span>
-      </p>
-      <p v-if="kanbanAssignError" class="text-sm text-red-400 mb-3">{{ kanbanAssignError }}</p>
-      <p v-if="skaterSaveMessage" class="text-sm text-emerald-400 mb-3">{{ skaterSaveMessage }}</p>
-
-      <div v-if="familyAccounts.length" class="mb-4 rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3">
+          <div v-if="unassignedStudents.length" class="rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              {{ language === 'es' ? 'Sin programa' : 'No program' }}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="student in unassignedStudents"
+                :key="student.id"
+                type="button"
+                draggable="true"
+                class="inline-flex items-center rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-200 cursor-grab active:cursor-grabbing"
+                :class="{ 'opacity-40': draggingCardKey === `profile:${student.id}` }"
+                :title="student.full_name"
+                @dragstart="onDragStart(student.id, $event)"
+                @dragend="onDragEnd"
+              >
+                {{ cardName(student.full_name) }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div v-if="familyAccounts.length" class="w-full lg:w-[440px] shrink-0 rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3">
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
           {{ language === 'es' ? 'Familias' : 'Families' }}
         </p>
@@ -1301,6 +1397,39 @@ const scheduleSummary = (u: User) => {
             </button>
           </div>
         </div>
+        </div>
+      </div>
+
+      <p class="text-sm text-gray-400 mb-2">
+        {{ skaterCount }} {{ language === 'es' ? 'estudiantes' : 'students' }}
+        <span class="text-gray-600">·</span>
+        <span class="text-gray-500 text-xs">
+          {{ kanbanMode === 'age'
+            ? (language === 'es' ? 'La edad no se arrastra. Sin programa sí se puede soltar en un programa.' : 'Age columns do not move. Students without a program can still be dropped onto a program.')
+            : (language === 'es' ? 'Arrastra entre programas. El orden dentro de la columna sigue la edad.' : 'Drag between programs. Inside a column the order follows age.') }}
+        </span>
+      </p>
+      <p v-if="kanbanAssignError" class="text-sm text-red-400 mb-3">{{ kanbanAssignError }}</p>
+      <p v-if="skaterSaveMessage" class="text-sm text-emerald-400 mb-3">{{ skaterSaveMessage }}</p>
+
+      <div v-if="kanbanMode === 'age'" class="mb-4 rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-3">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          {{ language === 'es' ? 'Soltar en un programa' : 'Drop onto a program' }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <div
+            v-for="col in programKanbanColumns"
+            :key="`drop-${col.id}`"
+            class="rounded-lg border px-3 py-1.5 text-xs font-semibold text-gray-200"
+            :class="isColumnDropTarget(col.id) ? 'border-[#C9EF42] bg-[#1a2410]' : 'border-gray-700 bg-gray-800'"
+            @dragenter.prevent="onColumnDragEnter(col.id)"
+            @dragleave="onColumnDragLeave(col.id)"
+            @dragover.prevent="onColumnDragOver"
+            @drop.prevent="onDropProgram(col.id, $event)"
+          >
+            {{ col.title }}
+          </div>
+        </div>
       </div>
 
       <!-- Loading -->
@@ -1334,10 +1463,10 @@ const scheduleSummary = (u: User) => {
                 ? 'ring-2 ring-gold-400/70 shadow-[0_0_20px_rgba(250,204,21,0.15)]'
                 : '',
             ]"
-            @dragenter.prevent="onColumnDragEnter(col.id)"
-            @dragleave="onColumnDragLeave(col.id)"
-            @dragover.prevent="onColumnDragOver"
-            @drop.prevent="onDropColumn(col.id, $event)"
+            @dragenter.prevent="kanbanMode === 'program' && onColumnDragEnter(col.id)"
+            @dragleave="kanbanMode === 'program' && onColumnDragLeave(col.id)"
+            @dragover.prevent="kanbanMode === 'program' && onColumnDragOver($event)"
+            @drop.prevent="kanbanMode === 'program' && onDropColumn(col.id, $event)"
           >
             <div
               class="px-3 py-2 border border-charcoal-700 bg-cream sticky top-0 transition-colors"
@@ -1392,9 +1521,10 @@ const scheduleSummary = (u: User) => {
               <div
                 v-for="u in col.students"
                 :key="u.id"
-                draggable="true"
-                class="rounded-lg border border-charcoal-600 bg-charcoal-800 px-2 py-1 cursor-grab active:cursor-grabbing hover:border-gray-500 transition-all"
+                :draggable="kanbanMode === 'program'"
+                class="rounded-lg border border-charcoal-600 bg-charcoal-800 px-2 py-1 hover:border-gray-500 transition-all"
                 :class="{
+                  'cursor-grab active:cursor-grabbing': kanbanMode === 'program',
                   'w-[220px] shrink-0': col.id === UNASSIGNED_COLUMN,
                   'opacity-40': draggingCardKey === `profile:${u.id}`,
                   'ring-1 ring-gold-400/50': movingStudentId === u.id,
@@ -1409,7 +1539,7 @@ const scheduleSummary = (u: User) => {
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-1">
-                      <p class="flex-1 min-w-0 text-[11px] font-semibold text-white truncate leading-6">{{ u.full_name }}</p>
+                      <p class="flex-1 min-w-0 text-[11px] font-semibold text-white truncate leading-6" :title="u.full_name">{{ cardName(u.full_name) }}</p>
                       <div class="flex items-center shrink-0 -mr-1">
                         <NuxtLink
                           :to="`/member/coach/students/${u.id}`"
@@ -1445,14 +1575,12 @@ const scheduleSummary = (u: User) => {
                         </button>
                       </div>
                     </div>
-                    <p
-                      v-if="seasonLabelFor(u) || (kanbanMode === 'level' && programNameFor(u)) || familyNameFor(u.guardian_user_id) || !u.is_active"
-                      class="-mt-0.5 text-[9px] text-gray-500 truncate leading-tight"
-                    >
+                    <p class="-mt-0.5 text-[9px] text-gray-500 truncate leading-tight">
                       {{ [
-                        seasonLabelFor(u),
-                        kanbanMode === 'level' ? programNameFor(u) : '',
+                        `${xpFor(u.id)} XP`,
+                        studentAge(u) != null ? String(studentAge(u)) : '',
                         familyNameFor(u.guardian_user_id),
+                        seasonLabelFor(u),
                         !u.is_active ? (language === 'es' ? 'Inactivo' : 'Inactive') : '',
                       ].filter(Boolean).join(' · ') }}
                     </p>

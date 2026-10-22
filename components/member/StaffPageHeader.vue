@@ -7,7 +7,7 @@ defineProps<{
 
 <template>
   <header class="border-b border-gray-800 bg-gray-950">
-    <div class="px-4 py-5 max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <div class="px-4 py-5 max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div class="min-w-0">
         <h1 class="text-2xl font-bold text-white truncate">{{ title }}</h1>
         <p v-if="subtitle || $slots.subtitle" class="text-sm text-gray-500 truncate">

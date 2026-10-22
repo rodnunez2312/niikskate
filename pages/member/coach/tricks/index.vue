@@ -2,7 +2,6 @@
 import {
   SKATE_TRICK_AREAS,
   SKATE_TRICK_STRUCTURES,
-  SKATE_TRICK_PROGRAMS,
   categoryFromTrickMeta,
   difficultyFromStructure,
   difficultyTagClass,
@@ -65,7 +64,6 @@ const searchQuery = ref('')
 const filterStructure = ref('')
 const filterArea = ref('')
 const filterType = ref('')
-const filterProgram = ref('')
 const selectedDifficulty = ref('')
 
 const pickedIds = ref<string[]>([])
@@ -106,7 +104,7 @@ const editForm = ref({
   habilidadMotriz: '',
 })
 
-type SortKey = 'manual_id' | 'name' | 'structure' | 'area' | 'type' | 'program' | 'difficulty'
+type SortKey = 'manual_id' | 'name' | 'structure' | 'area' | 'type' | 'difficulty'
 type SortRule = { key: SortKey; asc: boolean }
 const sortRules = ref<SortRule[]>([{ key: 'manual_id', asc: true }])
 
@@ -748,11 +746,6 @@ function difficultySortIndex(d?: string | null): number {
   return 0
 }
 
-function programSortIndex(p?: string | null): number {
-  const i = SKATE_TRICK_PROGRAMS.indexOf((p || '') as (typeof SKATE_TRICK_PROGRAMS)[number])
-  return i >= 0 ? i : 999
-}
-
 function compareByKey(a: any, b: any, key: SortKey): number {
   switch (key) {
     case 'manual_id':
@@ -766,8 +759,6 @@ function compareByKey(a: any, b: any, key: SortKey): number {
       return trickTaxonomySortIndex('area', a.area) - trickTaxonomySortIndex('area', b.area)
     case 'type':
       return trickTaxonomySortIndex('type', a.trick_type) - trickTaxonomySortIndex('type', b.trick_type)
-    case 'program':
-      return programSortIndex(a.program) - programSortIndex(b.program)
     case 'difficulty':
       return difficultySortIndex(a.difficulty) - difficultySortIndex(b.difficulty)
   }
@@ -788,7 +779,6 @@ const filteredSkills = computed(() =>
       if (filterStructure.value && skillStructure(sk) !== filterStructure.value) return false
       if (filterArea.value && sk.area !== filterArea.value) return false
       if (filterType.value && sk.trick_type !== filterType.value) return false
-      if (filterProgram.value && (sk.program || '').trim() !== filterProgram.value) return false
       if (selectedDifficulty.value && sk.difficulty !== selectedDifficulty.value) return false
       if (searchQuery.value) {
         const q = searchQuery.value.toLowerCase()
@@ -811,7 +801,6 @@ function clearFilters() {
   filterStructure.value = ''
   filterArea.value = ''
   filterType.value = ''
-  filterProgram.value = ''
   selectedDifficulty.value = ''
 }
 
@@ -835,8 +824,8 @@ async function saveNewTrick() {
     alert(language.value === 'es' ? 'Escribe el nombre del truco.' : 'Enter the trick name.')
     return
   }
-  if (!n.area || !n.structure || !n.tipo || !n.program) {
-    alert(language.value === 'es' ? 'Completa Área, Estructura, Tipo y Programa.' : 'Fill Area, Structure, Type, and Program.')
+  if (!n.area || !n.structure || !n.tipo) {
+    alert(language.value === 'es' ? 'Completa Área, Estructura y Tipo.' : 'Fill Area, Structure, and Type.')
     return
   }
   addTrickSaving.value = true
@@ -860,7 +849,7 @@ async function saveNewTrick() {
       structure: n.structure,
       trick_type: n.tipo,
       video_url: n.url?.trim() || null,
-      program: n.program,
+      program: n.program || null,
       motor_skills: motorSkills,
       sort_order: nextSortOrder,
       is_active: true,
@@ -985,8 +974,8 @@ async function saveDetailEdit() {
     alert(language.value === 'es' ? 'Escribe el nombre del truco.' : 'Enter the trick name.')
     return
   }
-  if (!n.area || !n.structure || !n.tipo || !n.program) {
-    alert(language.value === 'es' ? 'Completa Área, Estructura, Tipo y Programa.' : 'Fill Area, Structure, Type, and Program.')
+  if (!n.area || !n.structure || !n.tipo) {
+    alert(language.value === 'es' ? 'Completa Área, Estructura y Tipo.' : 'Fill Area, Structure, and Type.')
     return
   }
   editSaving.value = true
@@ -1005,7 +994,7 @@ async function saveDetailEdit() {
       structure: n.structure,
       trick_type: n.tipo,
       video_url: n.url?.trim() || null,
-      program: n.program,
+      program: n.program || null,
       motor_skills: motorSkills,
     }
     const { data, error } = await client.from('skills_library').update(payload).eq('id', skill.id).select('*').single()
@@ -1189,10 +1178,6 @@ function closeDetail() {
           <div class="min-w-0 px-1 py-1 rounded-lg bg-gray-800/80 border border-gray-700 flex items-center">
             <MemberTrickTypePicker v-model="filterType" allow-empty size="sm" :options="filterTypeOptions" />
           </div>
-          <select v-model="filterProgram" class="min-w-0 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm">
-            <option value="">Program</option>
-            <option v-for="opt in SKATE_TRICK_PROGRAMS" :key="opt" :value="opt">{{ opt }}</option>
-          </select>
           <select v-model="selectedDifficulty" class="min-w-0 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm">
             <option value="">{{ language === 'es' ? 'Dificultad' : 'Difficulty' }}</option>
             <option value="beginner">{{ language === 'es' ? 'Principiante' : 'Beginner' }}</option>
@@ -1238,11 +1223,6 @@ function closeDetail() {
               <th class="px-2 py-1.5">
                 <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('area', $event)">
                   Area{{ sortIndicator('area') }}
-                </button>
-              </th>
-              <th class="px-2 py-1.5">
-                <button type="button" class="hover:text-gray-900 transition-colors" @click="toggleSort('program', $event)">
-                  Program{{ sortIndicator('program') }}
                 </button>
               </th>
               <th class="px-2 py-1.5">
@@ -1305,7 +1285,6 @@ function closeDetail() {
                   <span v-if="skill.area" class="px-2 py-0.5 rounded text-xs" :class="tableAreaClass(skill.area)">{{ skill.area }}</span>
                   <span v-else class="text-gray-500 text-xs">—</span>
                 </td>
-                <td class="px-2 py-1 text-gray-900 text-xs whitespace-nowrap">{{ skill.program || '—' }}</td>
                 <td class="px-2 py-1 text-gray-900 text-xs whitespace-nowrap">
                   {{ skill.trick_type || '—' }}
                 </td>
@@ -1373,8 +1352,8 @@ function closeDetail() {
               </tr>
             </template>
             <tr v-else>
-              <td :colspan="pickMode ? 10 : 9" class="px-4 py-12 text-center text-gray-500">
-                <template v-if="selectedSport !== 'skateboarding' && !searchQuery && !filterStructure && !filterArea && !filterType && !filterProgram && !selectedDifficulty">
+              <td :colspan="pickMode ? 9 : 8" class="px-4 py-12 text-center text-gray-500">
+                <template v-if="selectedSport !== 'skateboarding' && !searchQuery && !filterStructure && !filterArea && !filterType && !selectedDifficulty">
                   {{ language === 'es'
                     ? `Todavía no hay trucos de ${sportLabel}. Usa Importar / Exportar, descarga la plantilla CSV y súbela.`
                     : `No ${sportLabel} tricks yet. Use Import / Export, download the CSV template, and upload it.` }}
@@ -1509,13 +1488,6 @@ function closeDetail() {
             <MemberTrickTypePicker v-model="newTrick.tipo" />
           </div>
           <div>
-            <label class="block text-gray-400 mb-1">Program *</label>
-            <select v-model="newTrick.program" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
-              <option value="">—</option>
-              <option v-for="opt in SKATE_TRICK_PROGRAMS" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
-          </div>
-          <div>
             <label class="block text-gray-400 mb-1">{{ language === 'es' ? 'Comentarios' : 'Comments' }}</label>
             <textarea v-model="newTrick.comentarios" rows="2" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white" />
           </div>
@@ -1582,7 +1554,6 @@ function closeDetail() {
             <span v-if="trickDetailSkill.trick_type" class="px-2 py-0.5 rounded text-xs inline-block font-medium" :class="typeTagClass(trickDetailSkill.trick_type)">{{ trickDetailSkill.trick_type }}</span>
             <span v-else>—</span>
           </dd></div>
-          <div><dt class="text-gray-500">Program</dt><dd class="text-gray-200">{{ trickDetailSkill.program || '—' }}</dd></div>
           <div>
             <dt class="text-gray-500">{{ language === 'es' ? 'Comentarios' : 'Comments' }}</dt>
             <dd class="text-gray-200 whitespace-pre-wrap">{{ trickDetailComments(trickDetailSkill) || '—' }}</dd>
@@ -1619,13 +1590,6 @@ function closeDetail() {
           <div>
             <label class="block text-gray-400 mb-1">Type *</label>
             <MemberTrickTypePicker v-model="editForm.tipo" />
-          </div>
-          <div>
-            <label class="block text-gray-400 mb-1">Program *</label>
-            <select v-model="editForm.program" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white">
-              <option value="">—</option>
-              <option v-for="opt in SKATE_TRICK_PROGRAMS" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
           </div>
           <div>
             <label class="block text-gray-400 mb-1">{{ language === 'es' ? 'Comentarios' : 'Comments' }}</label>

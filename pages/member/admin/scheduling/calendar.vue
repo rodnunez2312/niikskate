@@ -284,10 +284,12 @@ const formSeason = computed(() => {
   return seasonBySlug(slug) || getProgramSeasonBySlug(slug)
 })
 
+/** Regular programs may run into the next temporada; only the summer course is held to its season. */
 const programOccurrenceEndDate = (): string | null => {
-  const seasonEnd = formSeason.value?.endDate || null
   const formEnd = form.value.end_date || null
-  const raw = isSummerCourseForm.value ? (formEnd || seasonEnd) : (seasonEnd || formEnd)
+  if (!isSummerCourseForm.value) return formEnd
+  const seasonEnd = formSeason.value?.endDate || null
+  const raw = formEnd || seasonEnd
   if (seasonEnd && raw && raw > seasonEnd) return seasonEnd
   return raw
 }
@@ -825,7 +827,7 @@ const previewHolidayClashes = computed(() => {
 })
 
 const programFitsSeason = computed(() => {
-  if (editingId.value || !formSeason.value) return true
+  if (editingId.value || !formSeason.value || !isSummerCourseForm.value) return true
   const needed = Math.max(1, Number(form.value.recurring_class_count) || PROGRAM_TOTAL_CLASSES)
   return previewBookable.value.length >= needed
 })
@@ -841,7 +843,10 @@ const applyProgramDateSync = (opts?: { syncStart?: boolean }) => {
     const season = formSeason.value
     const seasonStart = season?.startDate || null
     const seasonEnd = season?.endDate || null
-    const from = seasonStart ? parseYmd(seasonStart) : new Date()
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const seasonRunning = Boolean(seasonStart && seasonEnd && today >= seasonStart && today <= seasonEnd)
+    // Running season starts today; future or past seasons start on their first day.
+    const from = parseYmd(seasonRunning || !seasonStart ? today : seasonStart)
     const slots = programSlotsForGenerate()
 
     if (isSummerCourseForm.value) {
@@ -866,7 +871,6 @@ const applyProgramDateSync = (opts?: { syncStart?: boolean }) => {
         weekdays: form.value.recurring_weekdays,
         slots,
         maxClasses,
-        endCap: seasonEnd,
         allowListedSlots: true,
       })
       form.value.start_date = startDate
@@ -881,7 +885,6 @@ const applyProgramDateSync = (opts?: { syncStart?: boolean }) => {
         weekdays: form.value.recurring_weekdays,
         slots,
         maxClasses,
-        endCap: seasonEnd,
         allowListedSlots: true,
       })
     }
@@ -2425,13 +2428,24 @@ const submitEvent = async () => {
     const season = formSeason.value
     const start = form.value.start_date
     const end = form.value.end_date?.trim() || start
-    if (start < season.startDate || start > season.endDate || end < season.startDate || end > season.endDate) {
-      formError.value =
-        language.value === 'es'
+    const endOutside = isSummerCourseForm.value && (end < season.startDate || end > season.endDate)
+    if (start < season.startDate || start > season.endDate || endOutside) {
+      formError.value = isSummerCourseForm.value
+        ? language.value === 'es'
           ? `Las fechas deben quedar dentro de la temporada (${season.startDate} – ${season.endDate}).`
           : `Dates must stay inside the season (${season.startDate} – ${season.endDate}).`
+        : language.value === 'es'
+          ? `El programa debe empezar dentro de la temporada (${season.startDate} – ${season.endDate}). Puede terminar en la siguiente.`
+          : `The program must start inside the season (${season.startDate} – ${season.endDate}). It may end in the next one.`
       return
     }
+  }
+
+  if (!editingId.value && form.value.start_date < todayYmd()) {
+    const ok = window.confirm(language.value === 'es'
+      ? `La fecha de inicio (${form.value.start_date}) ya pasó, así que se crearán clases en el pasado. Úsalo para registrar clases que sí se dieron. ¿Continuar?`
+      : `The start date (${form.value.start_date}) is in the past, so classes will be created in the past. Use this to log classes that already happened. Continue?`)
+    if (!ok) return
   }
 
   if (
@@ -4230,7 +4244,7 @@ const selectDay = (day: Date) => {
                   </p>
                   <AdminCheckboxDropdown
                     labelledby="program-age-label"
-                    :options="PROGRAM_AGE_BANDS.map(band => ({ id: band.id, label: language === 'es' ? band.label.es : band.label.en }))"
+                    :options="PROGRAM_AGE_BANDS.map(band => ({ id: band.id, label: `${band.emoji} ${language === 'es' ? band.label.es : band.label.en}` }))"
                     :selected="form.audience_categories"
                     :placeholder="language === 'es' ? 'Elige edades' : 'Choose ages'"
                     @toggle="id => toggleAudience(id as AudienceCategory)"
@@ -4465,8 +4479,8 @@ const selectDay = (day: Date) => {
                     <input
                       v-model="form.end_date"
                       type="date"
-                      :min="formSeason?.startDate || form.start_date || undefined"
-                      :max="formSeason?.endDate || undefined"
+                      :min="form.start_date || formSeason?.startDate || undefined"
+                      :max="isSummerCourseForm ? formSeason?.endDate || undefined : undefined"
                       class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-600 text-white text-sm"
                       :class="{ 'opacity-80': Boolean(formSeason) }"
                     />
@@ -4479,8 +4493,8 @@ const selectDay = (day: Date) => {
                         ? 'Inicio/fin = temporada de verano. Lun–Vie 9:00 AM – 1:00 PM. No se crean clases fuera de esas fechas.'
                         : 'Start/end = summer season. Mon–Fri 9:00 AM – 1:00 PM. Classes cannot be created outside that window.'
                       : language === 'es'
-                        ? 'Inicio/fin siguen la temporada seleccionada. Las clases no pueden salir de ese rango.'
-                        : 'Start/end follow the selected season. Classes cannot be created outside that window.'
+                        ? 'El inicio cae dentro de la temporada elegida; el programa puede terminar en la siguiente.'
+                        : 'The start falls inside the chosen season; the program may end in the next one.'
                   }}
                 </p>
                 <p v-if="formSeason && !programFitsSeason" class="text-[11px] text-amber-400">

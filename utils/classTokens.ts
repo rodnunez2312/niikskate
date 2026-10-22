@@ -5,7 +5,7 @@ export const CLASS_TOKENS = [
   { id: 'group', es: 'Grupal', en: 'Group', color: '#22D3EE' },
   { id: 'individual', es: 'Individual', en: 'Individual', color: '#A855F7' },
   { id: 'pro', es: 'Pro', en: 'Pro', color: '#F59E0B' },
-  { id: 'free', es: 'Libre', en: 'Free', color: '#C9EF42' },
+  { id: 'free', es: 'Libre', en: 'Free', color: '#F6C453' },
 ] as const satisfies ReadonlyArray<{ id: TokenKind; es: string; en: string; color: string }>
 
 export type TokenCounts = Record<TokenKind, { available: number; owed: number }>

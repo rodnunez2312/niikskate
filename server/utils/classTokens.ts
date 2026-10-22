@@ -8,7 +8,6 @@ type OwnerKind = 'profile' | 'crew'
 export type TokenCharge = 'balance' | 'due'
 export type TokenRelease = 'returned' | 'voided' | 'none'
 
-const ATTENDANCE_PER_FREE_TOKEN = 8
 
 type TokenRow = {
   id: string
@@ -309,30 +308,7 @@ export async function returnLegacyClass(
 }
 
 async function grantEarnedTokens(admin: Db, kind: OwnerKind, skaterId: string) {
-  const spent = await countSpent(admin, kind, skaterId)
   const reward = await rewardRow(admin, kind, skaterId)
-  let issued = Number(reward.attendance_rewards_issued)
-  if (issued < 0) {
-    issued = Math.floor(spent / ATTENDANCE_PER_FREE_TOKEN)
-    const { error } = await admin
-      .from('skater_token_rewards')
-      .update({ attendance_rewards_issued: issued })
-      .eq('id', reward.id)
-    if (error) throw createError({ statusCode: 500, message: error.message })
-  } else {
-    const due = Math.floor(spent / ATTENDANCE_PER_FREE_TOKEN) - issued
-    if (due > 0) {
-      const { data: claimed, error } = await admin
-        .from('skater_token_rewards')
-        .update({ attendance_rewards_issued: issued + due })
-        .eq('id', reward.id)
-        .eq('attendance_rewards_issued', issued)
-        .select('id')
-      if (error) throw createError({ statusCode: 500, message: error.message })
-      if (claimed?.length) await insertTokens(admin, kind, skaterId, 'free', 'available', 'attendance', null, due)
-    }
-  }
-
   if (kind !== 'profile') return
   let level: number
   try {
@@ -359,13 +335,6 @@ async function grantEarnedTokens(admin: Db, kind: OwnerKind, skaterId: string) {
     if (error) throw createError({ statusCode: 500, message: error.message })
     if (claimed?.length) await insertTokens(admin, kind, skaterId, 'free', 'available', 'level', null, level - previous)
   }
-}
-
-async function countSpent(admin: Db, kind: OwnerKind, skaterId: string) {
-  const query = admin.from('skater_tokens').select('id', { count: 'exact', head: true }).eq('status', 'spent')
-  const { count, error } = await ownerFilter(query, kind, skaterId)
-  if (error) throw createError({ statusCode: 500, message: error.message })
-  return Number(count || 0)
 }
 
 async function rewardRow(admin: Db, kind: OwnerKind, skaterId: string) {

@@ -84,16 +84,28 @@ function itemKey(prefix: string, sectionId: string, item: { path: string; name: 
 const sectionHasActive = (section: { items: Array<{ path: string; children?: Array<{ path: string }> }> }) =>
   section.items.some(item => isActive(item.path) || item.children?.some(child => isActive(child.path)))
 
+/** Path of the item whose subpage menu is open. */
+const submenuOpen = ref<string | null>(null)
+
+function toggleSubmenu(path: string) {
+  submenuOpen.value = submenuOpen.value === path ? null : path
+}
+
+const groupActive = (item: { path: string; children?: Array<{ path: string }> }) =>
+  isActive(item.path) || Boolean(item.children?.some(child => isActive(child.path)))
+
 watch(
   () => route.fullPath,
   () => {
     accountOpen.value = false
+    submenuOpen.value = null
     if (props.mobileOpen) emit('close')
   },
 )
 
 function onDocPointer(event: Event) {
   const target = event.target as HTMLElement | null
+  if (!target?.closest('[data-submenu]')) submenuOpen.value = null
   if (target?.closest('[data-account]')) return
   accountOpen.value = false
 }
@@ -231,10 +243,21 @@ function linkClass(active: boolean) {
               <NuxtLink
                 :to="item.path"
                 class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] transition-colors"
-                :class="[linkClass(isActive(item.path)), showSessionPill(item.path) ? 'pr-20' : '']"
+                :class="[linkClass(groupActive(item)), showSessionPill(item.path) ? 'pr-20' : '']"
+                :aria-haspopup="item.children?.length ? 'menu' : undefined"
               >
                 <MemberNavIcon :name="item.icon" class-name="w-4 h-4 shrink-0" />
                 <span class="truncate">{{ item.name }}</span>
+                <svg
+                  v-if="item.children?.length && !showSessionPill(item.path)"
+                  class="ml-auto h-3 w-3 shrink-0 opacity-60 transition-transform group-hover:rotate-180"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                </svg>
               </NuxtLink>
               <NuxtLink
                 v-if="showSessionPill(item.path)"
@@ -246,20 +269,25 @@ function linkClass(active: boolean) {
                 <span class="h-1.5 w-1.5 rounded-full" :class="sessionDotClass" aria-hidden="true" />
                 {{ activeClock }}
               </NuxtLink>
-              <ul
+              <!-- pt-1 instead of a margin keeps the hover alive while the pointer moves down. -->
+              <div
                 v-if="item.children?.length"
-                class="hidden group-hover:block mt-0.5 ml-6 space-y-0.5"
+                class="absolute left-4 right-0 top-full z-40 hidden pt-1 group-hover:block"
               >
-                <li v-for="child in item.children" :key="child.path">
-                  <NuxtLink
-                    :to="child.path"
-                    class="block rounded-md px-2.5 py-1.5 text-[12px] transition-colors"
-                    :class="linkClass(isActive(child.path))"
-                  >
-                    {{ child.name }}
-                  </NuxtLink>
-                </li>
-              </ul>
+                <ul role="menu" class="space-y-0.5 rounded-xl border border-charcoal-600 bg-charcoal-800 p-1 shadow-xl">
+                  <li v-for="child in item.children" :key="child.path" role="none">
+                    <NuxtLink
+                      :to="child.path"
+                      role="menuitem"
+                      class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors"
+                      :class="linkClass(isActive(child.path))"
+                    >
+                      <MemberNavIcon :name="child.icon" class-name="w-3.5 h-3.5 shrink-0" />
+                      {{ child.name }}
+                    </NuxtLink>
+                  </li>
+                </ul>
+              </div>
             </div>
           </li>
         </ul>
@@ -405,36 +433,66 @@ function linkClass(active: boolean) {
                 v-for="item in section.items"
                 :key="itemKey('m-', section.id, item)"
               >
-                <div class="relative">
+                <div class="relative" :data-submenu="item.children?.length ? '' : undefined">
                   <NuxtLink
                     :to="item.path"
                     class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors"
-                    :class="[linkClass(isActive(item.path)), showSessionPill(item.path) ? 'pr-20' : '']"
+                    :class="[
+                      linkClass(groupActive(item)),
+                      showSessionPill(item.path) ? (item.children?.length ? 'pr-28' : 'pr-20') : item.children?.length ? 'pr-10' : '',
+                    ]"
                   >
                     <MemberNavIcon :name="item.icon" class-name="w-4 h-4 shrink-0" />
                     <span class="truncate">{{ item.name }}</span>
                   </NuxtLink>
+                  <button
+                    v-if="item.children?.length"
+                    type="button"
+                    class="absolute right-1 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md"
+                    :class="groupActive(item) ? 'text-charcoal hover:bg-black/10' : 'text-cream/60 hover:bg-charcoal-700 hover:text-cream'"
+                    :aria-expanded="submenuOpen === item.path"
+                    aria-haspopup="menu"
+                    :aria-label="es ? `Más en ${item.name}` : `More in ${item.name}`"
+                    @click="toggleSubmenu(item.path)"
+                  >
+                    <svg
+                      class="h-3.5 w-3.5 transition-transform"
+                      :class="submenuOpen === item.path ? 'rotate-180' : ''"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                   <NuxtLink
                     v-if="showSessionPill(item.path)"
                     to="/member/coach/plans"
-                    class="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[10px] tabular-nums bg-charcoal-900"
-                    :class="sessionPillClass"
+                    class="absolute top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[10px] tabular-nums bg-charcoal-900"
+                    :class="[sessionPillClass, item.children?.length ? 'right-9' : 'right-1']"
                   >
                     <span class="h-1.5 w-1.5 rounded-full" :class="sessionDotClass" aria-hidden="true" />
                     {{ activeClock }}
                   </NuxtLink>
+                  <ul
+                    v-if="item.children?.length && submenuOpen === item.path"
+                    role="menu"
+                    class="absolute left-4 right-0 top-full z-40 mt-1 space-y-0.5 rounded-xl border border-charcoal-600 bg-charcoal-800 p-1 shadow-xl"
+                  >
+                    <li v-for="child in item.children" :key="'m-' + child.path" role="none">
+                      <NuxtLink
+                        :to="child.path"
+                        role="menuitem"
+                        class="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors"
+                        :class="linkClass(isActive(child.path))"
+                      >
+                        <MemberNavIcon :name="child.icon" class-name="w-4 h-4 shrink-0" />
+                        {{ child.name }}
+                      </NuxtLink>
+                    </li>
+                  </ul>
                 </div>
-                <ul v-if="item.children?.length" class="ml-6 space-y-0.5">
-                  <li v-for="child in item.children" :key="'m-' + child.path">
-                    <NuxtLink
-                      :to="child.path"
-                      class="block rounded-md px-2.5 py-2 text-sm transition-colors"
-                      :class="linkClass(isActive(child.path))"
-                    >
-                      {{ child.name }}
-                    </NuxtLink>
-                  </li>
-                </ul>
               </li>
             </ul>
           </div>

@@ -104,7 +104,7 @@ export const PROGRAM_AGE_BANDS: Array<{
 }> = [
   {
     id: 'tots_5_7',
-    emoji: '🛹',
+    emoji: '🍼',
     label: { en: '5–7', es: '5–7' },
     nickname: { en: 'tots', es: 'peques' },
     minAge: 5,
@@ -120,7 +120,7 @@ export const PROGRAM_AGE_BANDS: Array<{
   },
   {
     id: 'teens_13_17',
-    emoji: '⚡',
+    emoji: '🛹',
     label: { en: '13–17', es: '13–17' },
     nickname: { en: 'teen kids', es: 'niños teens' },
     minAge: 13,
@@ -164,7 +164,7 @@ export const PROGRAM_SKILL_TRACKS: Array<{
   {
     id: 'advanced',
     skillLevelId: 'advanced_5',
-    emoji: '🏆',
+    emoji: '⚡',
     label: { en: 'Advanced', es: 'Avanzado' },
   },
 ]
@@ -194,7 +194,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
 }> = [
   {
     id: 'skater_tots',
-    emoji: '🛹',
+    emoji: '🍼',
     ageLabel: { en: 'Ages 5–7 (tots)', es: 'Edades 5–7 (peques)' },
     title: { en: 'Skater Tots', es: 'Skater Tots' },
     purpose: {
@@ -218,7 +218,7 @@ export const SKATE_PROGRAM_OFFERINGS: Array<{
   },
   {
     id: 'teen_foundations',
-    emoji: '⚡',
+    emoji: '🛹',
     ageLabel: { en: 'Ages 13–17 (teen kids)', es: 'Edades 13–17 (niños teens)' },
     title: { en: 'Teen Foundations', es: 'Fundamentos Teen' },
     purpose: {
