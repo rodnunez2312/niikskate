@@ -42,14 +42,47 @@ async function fetchAll(query) {
   }
 }
 
+function fail(message) {
+  // On GitHub Actions this becomes a run annotation, visible without opening the log.
+  const line = String(message).replace(/\s*\n\s*/g, ' / ')
+  console.error(process.env.GITHUB_ACTIONS ? `::error title=Trick library backup::${line}` : line)
+  process.exit(1)
+}
+
+// Describes the shape of the secrets without printing them.
+function checkCredentials(url, key) {
+  const problems = []
+  if (!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(url)) {
+    const hints = []
+    if (!url.startsWith('https://')) hints.push('does not start with https://')
+    if (url.endsWith('/')) hints.push('ends with /')
+    if (url.includes('/rest/') || url.includes('/dashboard')) hints.push('contains a path')
+    if (/\s/.test(url)) hints.push('contains spaces or line breaks')
+    if (/["']/.test(url)) hints.push('contains quotes')
+    if (hints.length) problems.push(`SUPABASE_URL should be exactly https://<project>.supabase.co (it ${hints.join(', ')})`)
+  }
+  if (/\s|["']/.test(key)) problems.push('SUPABASE_SERVICE_ROLE_KEY contains spaces, line breaks or quotes')
+  if (key.startsWith('sb_publishable_')) problems.push('SUPABASE_SERVICE_ROLE_KEY is a publishable key, not a secret key')
+  if (key.startsWith('eyJ')) {
+    try {
+      const role = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString()).role
+      if (role !== 'service_role') problems.push(`SUPABASE_SERVICE_ROLE_KEY has role "${role}", expected "service_role"`)
+    } catch {
+      problems.push('SUPABASE_SERVICE_ROLE_KEY looks like a JWT but is not readable (copied partially?)')
+    }
+  } else if (!key.startsWith('sb_secret_') && !key.startsWith('sb_publishable_')) {
+    problems.push('SUPABASE_SERVICE_ROLE_KEY does not look like a Supabase key (should start with eyJ or sb_secret_)')
+  }
+  return problems
+}
+
 async function main() {
   const env = loadEnv()
-  const url = process.env.SUPABASE_URL || env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY
-  if (!url || !key) {
-    console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
-    process.exit(1)
-  }
+  const url = (process.env.SUPABASE_URL || env.SUPABASE_URL || '').trim()
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY || '').trim()
+  if (!url || !key) fail(`Missing ${!url ? 'SUPABASE_URL' : 'SUPABASE_SERVICE_ROLE_KEY'}`)
+  const problems = checkCredentials(url, key)
+  if (problems.length) fail(problems.join('; '))
   const supabase = createClient(url, key, { auth: { persistSession: false } })
 
   const skills = await fetchAll(() => supabase
@@ -98,6 +131,5 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e?.message || e)
-  process.exit(1)
+  fail([...new Set([e?.message, e?.code, e?.details, e?.hint, e?.cause?.message].filter(Boolean))].join(' | ') || String(e))
 })
