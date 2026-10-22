@@ -1,0 +1,4556 @@
+[
+  {
+    "id": 323,
+    "skill_id": "c7baab6a-1434-4110-86b9-d3045172dd86",
+    "skill_name": "Reloj",
+    "action": "reorder",
+    "changes": {
+      "sort_order": {
+        "to": 2,
+        "from": 1
+      }
+    },
+    "changed_by": "1275a690-9bf3-4c12-91f4-d8e285a2a688",
+    "changed_at": "2026-10-21T21:57:31.774384+00:00"
+  },
+  {
+    "id": 322,
+    "skill_id": "1cc98cb6-abcf-42bc-a5f2-82d5d0ef6b3e",
+    "skill_name": "360 tabla sin llantas",
+    "action": "reorder",
+    "changes": {
+      "sort_order": {
+        "to": 3,
+        "from": 1
+      }
+    },
+    "changed_by": "1275a690-9bf3-4c12-91f4-d8e285a2a688",
+    "changed_at": "2026-10-21T21:27:24.297318+00:00"
+  },
+  {
+    "id": 321,
+    "skill_id": "abcca675-7a57-4a58-baf9-ff3d488aa396",
+    "skill_name": "Frontside 180",
+    "action": "update",
+    "changes": {
+      "name": {
+        "to": "Frontside 180",
+        "from": "180 FS"
+      },
+      "name_es": {
+        "to": "Frontside 180",
+        "from": "180 FS"
+      },
+      "categoria": {
+        "to": "Level 4: Progression",
+        "from": "Level 3: Basic Tricks"
+      },
+      "structure": {
+        "to": "Level 4: Progression",
+        "from": "Level 3: Basic Tricks"
+      },
+      "video_url": {
+        "to": "https://www.instagram.com/reel/Cr3p2yYgH8A/?utm_source=ig_web_copy_link&igshid=MzRlODBiNWFlZA==",
+        "from": "https://www.instagram.com/reel/Cr3p2yYgH8A/"
+      }
+    },
+    "changed_by": "1275a690-9bf3-4c12-91f4-d8e285a2a688",
+    "changed_at": "2026-10-21T21:26:06.985537+00:00"
+  },
+  {
+    "id": 320,
+    "skill_id": "2a75de9c-3e41-41cb-8c46-0995fbf26517",
+    "skill_name": "BS 180",
+    "action": "update",
+    "changes": {
+      "name": {
+        "to": "BS 180",
+        "from": "180 BS"
+      },
+      "name_es": {
+        "to": "BS 180",
+        "from": "180 BS"
+      },
+      "categoria": {
+        "to": "Level 4: Progression",
+        "from": "Level 3: Basic Tricks"
+      },
+      "structure": {
+        "to": "Level 4: Progression",
+        "from": "Level 3: Basic Tricks"
+      },
+      "description": {
+        "to": "BS 180",
+        "from": "180 BS"
+      }
+    },
+    "changed_by": "1275a690-9bf3-4c12-91f4-d8e285a2a688",
+    "changed_at": "2026-10-21T21:26:06.348466+00:00"
+  },
+  {
+    "id": 1,
+    "skill_id": "459ab3fb-65f0-45eb-927d-b58e3f6052a2",
+    "skill_name": "Escalera",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 2,
+    "skill_id": "2d0a358a-a6ee-4a9b-b69d-221e37511918",
+    "skill_name": "Carrera de obstaculos",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 3,
+    "skill_id": "b126def3-988c-4dae-849f-cbb6dbbeec9b",
+    "skill_name": "Bank Roll-In",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 4,
+    "skill_id": "53852480-ea5e-4813-92b1-aebed095714f",
+    "skill_name": "Carving in Shallow Bowl",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 5,
+    "skill_id": "06894f06-7514-4d2e-bea6-852dd9580c45",
+    "skill_name": "Rolling on Flat Bottom",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 6,
+    "skill_id": "e665ef72-4b8a-49e0-829e-49a0590959a6",
+    "skill_name": "Pumping Basics",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 7,
+    "skill_id": "73be5884-9a62-4c19-afc8-0abe40109f54",
+    "skill_name": "Balance y equilibrio > Powerpush & Balance one foot",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 8,
+    "skill_id": "765a6e7e-19dd-4391-ba9b-52917e4c4f4a",
+    "skill_name": "Pop",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 9,
+    "skill_id": "e4a7acd1-ee4e-45e1-b9de-67bb029ce52c",
+    "skill_name": "Walk the dog - Carrera",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 10,
+    "skill_id": "74872e54-5815-4663-825b-94324e49f724",
+    "skill_name": "Toe taps, Single leg snakes, Toe touches and Switcheroo",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 11,
+    "skill_id": "5658143e-33ab-4266-a9d8-5edb66c91846",
+    "skill_name": "Backside pivot, front side pivot, pivot walks, backside revert, frontside revert, BS powerslide, FS powerslide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 12,
+    "skill_id": "bb19e52d-0cf9-4fe1-bf07-f6c9952bfa06",
+    "skill_name": "Saltar y caer en la tabla",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 13,
+    "skill_id": "cdf4cae2-5605-4d05-8a2d-555a4d27f0fc",
+    "skill_name": "Trow Down",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 14,
+    "skill_id": "589c1115-3801-4e59-b837-99f9e3395964",
+    "skill_name": "Nose stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 15,
+    "skill_id": "3c547ce7-9b9a-4e1d-9c7f-f1426bb7a551",
+    "skill_name": "Sex Change (giro 180 cuerpo)",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 16,
+    "skill_id": "744f0862-7774-4648-8c8f-355051dc5639",
+    "skill_name": "Fakie Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 17,
+    "skill_id": "42ba4627-939d-46ae-8b5c-a76835331cdf",
+    "skill_name": "Tailslide Pop Out",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 18,
+    "skill_id": "73069f1a-12c8-4d8b-8557-049df05227fe",
+    "skill_name": "Confianza en el Bowl",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 19,
+    "skill_id": "2a75de9c-3e41-41cb-8c46-0995fbf26517",
+    "skill_name": "180 BS",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 20,
+    "skill_id": "f7aab736-f7c7-4225-b557-2402c274b43f",
+    "skill_name": "Boardslide 180 Out",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 21,
+    "skill_id": "5b1db8e2-de67-4bf2-9648-f46b90b426b4",
+    "skill_name": "540 Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 22,
+    "skill_id": "d834103f-e19a-46d9-a718-ac29dcf7796f",
+    "skill_name": "Postura y Equilibrio",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 23,
+    "skill_id": "69d49e5d-d449-463b-b4c5-7a72ba3a6c1e",
+    "skill_name": "Trabajo en equipo",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 24,
+    "skill_id": "17a68fd2-2acd-4be6-8153-36ab02734470",
+    "skill_name": "Tic toc > subir botador > kick turn",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 25,
+    "skill_id": "abf1985d-aa14-4e93-b72a-6b7d506ced52",
+    "skill_name": "Rock to Fakie - Fakie Half-Cab Rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 26,
+    "skill_id": "1d82dd85-391d-4dd3-9b2d-4f3c6102ee27",
+    "skill_name": "Linea en",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 27,
+    "skill_id": "6fce3108-9ba2-49de-8d6c-bec303e2baee",
+    "skill_name": "540 Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 28,
+    "skill_id": "ddbd51e6-5f5d-4ffe-bdba-b9b638dd9067",
+    "skill_name": "Linea en",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 29,
+    "skill_id": "32ad5c9c-9754-45fa-8d5d-cb00365a6cda",
+    "skill_name": "Early grabs en piso",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 30,
+    "skill_id": "7f695709-bd56-43b6-80fc-4052e8f9ed11",
+    "skill_name": "Rock to fakie - Fakie a Rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 31,
+    "skill_id": "994b7816-7d64-45b7-a9b7-6a65817dffdc",
+    "skill_name": "Carving Frontside",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 32,
+    "skill_id": "41f1c13c-24b6-4c49-be6b-bb5a0c037b33",
+    "skill_name": "Drop-in",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 33,
+    "skill_id": "3a9b8074-b6c1-44f2-b132-896125078741",
+    "skill_name": "Roll in",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 34,
+    "skill_id": "f61f9f11-8d86-4f83-b56a-6f089f39697c",
+    "skill_name": "Roll in",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 35,
+    "skill_id": "aaaf9c0c-b3f2-4bb3-9926-5d830340f704",
+    "skill_name": "Early grabs",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 36,
+    "skill_id": "430c0a51-cae9-4e16-a641-dc27c2f98dce",
+    "skill_name": "Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 37,
+    "skill_id": "c0e3f33e-c404-4938-9219-101d8af7bfd9",
+    "skill_name": "No Comply",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 38,
+    "skill_id": "f34793ef-c1f7-418e-b29f-33359b5745b3",
+    "skill_name": "Ollie Up Curb",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 39,
+    "skill_id": "a36144d6-4b0e-4572-8063-4a6e2d309e34",
+    "skill_name": "Pumping in",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 40,
+    "skill_id": "5926f8ba-b33e-4e1d-bbef-b0901333e368",
+    "skill_name": "Drop-In",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 41,
+    "skill_id": "4b146d31-7086-4b6b-9afb-21937b897caa",
+    "skill_name": "Kick Turn on",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 42,
+    "skill_id": "3243d618-852d-4108-a165-0cf928dd1175",
+    "skill_name": "Roll-in to fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 43,
+    "skill_id": "457c4cab-5279-49a5-abec-30dc964539fd",
+    "skill_name": "Spine - rock to rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 44,
+    "skill_id": "c1df8492-638c-497b-bc10-5602cfc0c912",
+    "skill_name": "Slash",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 45,
+    "skill_id": "cc924592-bae8-4548-80e4-54c076952d2f",
+    "skill_name": "Half Cab Rock to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 46,
+    "skill_id": "b7af55ec-7c5a-4bd2-92f2-f885b1ca9637",
+    "skill_name": "Fakie Tail Nose Grab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 47,
+    "skill_id": "4e0c4abd-65f1-4c41-84e6-1e3e6cc9c63e",
+    "skill_name": "One Foot Tail",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 48,
+    "skill_id": "93bf253c-719c-499e-86cf-030bc0534853",
+    "skill_name": "Bombear",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 49,
+    "skill_id": "110e0bb0-e533-447b-8edb-0bde945a904c",
+    "skill_name": "Step up",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 50,
+    "skill_id": "fc7decd9-f805-4ac5-bbc4-c55a2f5cd25b",
+    "skill_name": "Stance Identification",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 51,
+    "skill_id": "2095732b-98ce-4e2a-be2a-b1dc7d30b772",
+    "skill_name": "Tic-Tac",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 52,
+    "skill_id": "896c76da-7cb0-4622-b6c5-2d47eee244b4",
+    "skill_name": "Watching Others",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 53,
+    "skill_id": "e39ec4a1-0a18-4bf4-aaea-29531fb07a8e",
+    "skill_name": "Developing balance and basic movements",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 54,
+    "skill_id": "e67a430b-11e4-4ee6-8c97-5c67c2b981bd",
+    "skill_name": "Manual",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 55,
+    "skill_id": "72ef5750-d185-46a5-896d-2ad8f637fa4e",
+    "skill_name": "Carving",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 56,
+    "skill_id": "2237b809-7552-4356-b696-27c751e4f4ec",
+    "skill_name": "Speed Control - carving",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 57,
+    "skill_id": "4eb77cf5-f7e2-495b-ac93-05bf84ee82b4",
+    "skill_name": "Feeble Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 58,
+    "skill_id": "17a254e9-d71a-490b-8e34-36d3dc22501c",
+    "skill_name": "Ollie to rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 59,
+    "skill_id": "2e2f2947-7e87-43d7-8c2a-168005a6e563",
+    "skill_name": "Fakie 360 Kick turn",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 60,
+    "skill_id": "250bc372-a1a5-4f2a-a2ca-61c388a672ff",
+    "skill_name": "Nollie Disaster",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 61,
+    "skill_id": "f72b87ce-95f1-4afc-8ec2-826fbc493c11",
+    "skill_name": "Tirarse",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 62,
+    "skill_id": "c72042c2-ac4d-4771-b643-312c28ff8916",
+    "skill_name": "Quick Stop - powerslide intro",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 63,
+    "skill_id": "6d5aee77-7129-4b7c-9bb2-e22e8bb0dd80",
+    "skill_name": "Riding Over Small Objects",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 64,
+    "skill_id": "d2735280-a19e-490f-a319-5afa19c97021",
+    "skill_name": "Air to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 65,
+    "skill_id": "da64f5bc-a812-415d-837a-f94dce66961c",
+    "skill_name": "Melon Grab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 66,
+    "skill_id": "2a5097e0-5423-46b4-a271-e2d6db07961a",
+    "skill_name": "Stalefish",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 67,
+    "skill_id": "be5462b0-696f-4be1-a42e-81654d1c1525",
+    "skill_name": "Mute Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 68,
+    "skill_id": "831636fd-795a-4597-90c8-077740bb9bf4",
+    "skill_name": "Frontside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 69,
+    "skill_id": "fb4d4542-2498-43e2-a8dd-7d57d1105aa9",
+    "skill_name": "Backside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 70,
+    "skill_id": "4939118c-9da8-430e-9831-8e3d00b5407e",
+    "skill_name": "Bank Roll-Out",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 71,
+    "skill_id": "663d82bd-d57f-463c-a1ee-d6eb5dfd0ad5",
+    "skill_name": "Gentle Ramp Descent",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 72,
+    "skill_id": "e29d44b9-8c86-4612-8f4b-51e623080db8",
+    "skill_name": "Fakie 360",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 73,
+    "skill_id": "13444877-a787-4dd4-b9e8-987a01530410",
+    "skill_name": "Bowl Wall Riding - low",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 74,
+    "skill_id": "c539506b-42b3-41a6-b373-c52d9c63a686",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 75,
+    "skill_id": "daf52b29-d76b-401f-9aa1-4b50103f9b99",
+    "skill_name": "Air to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 76,
+    "skill_id": "14932d4f-7312-4cb5-a035-bd1adaa4eb4b",
+    "skill_name": "Backside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 77,
+    "skill_id": "5f98589a-ea7f-4ae6-866d-39b03b9ce280",
+    "skill_name": "Frontside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 78,
+    "skill_id": "61cbf00f-e0db-497d-a4ee-889c152675d8",
+    "skill_name": "Nosegrind Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 79,
+    "skill_id": "4c28747c-7e03-4348-9953-00234d30f912",
+    "skill_name": "Lipslide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 80,
+    "skill_id": "2bd1ecd3-6fe1-4023-b95e-242859eb29b8",
+    "skill_name": "Stalefish Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 81,
+    "skill_id": "e0b9494c-ad8a-4a58-9f16-f724e1d8e578",
+    "skill_name": "Melon Grab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 82,
+    "skill_id": "bdc7b7cd-6a04-4ad0-8cbd-e42f3ac13e0e",
+    "skill_name": "Lien Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 83,
+    "skill_id": "e92ec5f1-dbe6-4f99-8229-719e4b2beb9b",
+    "skill_name": "540 Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 84,
+    "skill_id": "1c8b2ab4-18a1-4815-bdbb-a3a5e8c7664c",
+    "skill_name": "Laser Flip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 85,
+    "skill_id": "62730c43-a1cd-4a7c-882d-1885fb59c412",
+    "skill_name": "Impossible",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 86,
+    "skill_id": "eb65c7bb-b763-44e2-9e92-85feba8fc95e",
+    "skill_name": "360 Shuvit",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 87,
+    "skill_id": "7e62cb75-b141-4ae5-b733-9ec238bc18cf",
+    "skill_name": "Switch Kickflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 88,
+    "skill_id": "234934c5-eb21-412f-b524-ed1c069baa5f",
+    "skill_name": "Fakie Disaster",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 89,
+    "skill_id": "30718771-3785-4c4f-95d5-1d4d7130244d",
+    "skill_name": "Overcrook",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 90,
+    "skill_id": "505fa869-6a5b-46c7-a483-e39102a23127",
+    "skill_name": "Trown down & Caveman",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 91,
+    "skill_id": "b743ca04-3680-4923-99f8-ea5640319a04",
+    "skill_name": "Varial",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 92,
+    "skill_id": "5c911e73-bbb4-4d09-a752-8cd72be11c11",
+    "skill_name": "Boardslide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 93,
+    "skill_id": "1560ccbb-6f55-482b-b9b3-5218c9d1b695",
+    "skill_name": "Lipslide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 94,
+    "skill_id": "07c935e1-5581-4bdc-92ef-da3d2af89526",
+    "skill_name": "5-O",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 95,
+    "skill_id": "eb426b6e-16e4-4851-96a2-8f0f0699795a",
+    "skill_name": "Noseblunt",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 96,
+    "skill_id": "a337977e-9a49-4bca-a275-03c99415ecdb",
+    "skill_name": "Crooked Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 97,
+    "skill_id": "3453cf0d-1695-4589-a38c-32e2a478719b",
+    "skill_name": "Blunt",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 98,
+    "skill_id": "4aa482e8-be97-4064-9406-eeaea9995491",
+    "skill_name": "Blunt to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 99,
+    "skill_id": "10696370-fe6f-42e0-aebc-522dbd95bcfa",
+    "skill_name": "Disaster",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 100,
+    "skill_id": "380ba970-d5c0-49f8-a48c-454b84c28a35",
+    "skill_name": "Feeble Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 101,
+    "skill_id": "d40a17dd-3989-431f-b6b1-1af9e3623769",
+    "skill_name": "Smith Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 102,
+    "skill_id": "2961f78b-f8be-4678-8460-3e1fb905d245",
+    "skill_name": "Bombeo (Surf)",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 103,
+    "skill_id": "74e96b3f-0767-4657-8a4c-c4452176f287",
+    "skill_name": "Frenar > Tail scratch (stop)",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 104,
+    "skill_id": "7e2d8f8b-851b-4557-ad5a-df9f79c77d50",
+    "skill_name": "Hippy Jumps",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 105,
+    "skill_id": "1f2f5e17-e045-4523-b9b4-c9353811f4f2",
+    "skill_name": "SKATE",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 106,
+    "skill_id": "be243005-2887-48d3-ad7c-bf377ec9e49a",
+    "skill_name": "Doble Ollie, despues subir y bajar rampa con slappy",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 107,
+    "skill_id": "c5124517-14b4-41d4-8a2f-add83a64d9c0",
+    "skill_name": "Step on, step off",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 108,
+    "skill_id": "0373a5c9-c0b4-4848-b124-74ad7ef81870",
+    "skill_name": "Stalefish",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 109,
+    "skill_id": "ca7d3b06-9e55-4210-bdd1-4c5d9118d725",
+    "skill_name": "Mute Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 110,
+    "skill_id": "1cba3077-b41a-4c1d-b37e-48da8f2d4496",
+    "skill_name": "Frontside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 111,
+    "skill_id": "c80e08c5-249c-4c11-8be3-67f702e8e9b7",
+    "skill_name": "Balance board",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 112,
+    "skill_id": "5c1e7e56-4e6d-42b4-9a5d-dac78081a114",
+    "skill_name": "Frontside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 113,
+    "skill_id": "2c2cf906-3937-43f2-bb3a-bed74f3395af",
+    "skill_name": "Nosegrind Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 114,
+    "skill_id": "33d7643d-44b7-4646-8268-3a2450e72c13",
+    "skill_name": "Lipslide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 115,
+    "skill_id": "5c31fc7b-38c0-42e3-8bcc-b718a1a9fce8",
+    "skill_name": "Stalefish Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 116,
+    "skill_id": "33cf2141-dc30-459e-8c19-20427eb13798",
+    "skill_name": "Melon Grab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 117,
+    "skill_id": "a54578aa-233e-4cc0-900e-2950837bd619",
+    "skill_name": "Lien Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 118,
+    "skill_id": "6e884ab5-0914-49d4-8510-eed5114046c5",
+    "skill_name": "Laser Flip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 119,
+    "skill_id": "9d50028a-65b9-4ee1-a4a8-83548a299de6",
+    "skill_name": "Handplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 120,
+    "skill_id": "8c358950-73a3-47d5-ad69-b83033d0f806",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 121,
+    "skill_id": "890df0a5-e74e-4b98-9760-1409044d7ed1",
+    "skill_name": "Handplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 122,
+    "skill_id": "c26e11e9-c4b3-4176-ad8d-b2fca893f19a",
+    "skill_name": "Gay Twist",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 123,
+    "skill_id": "c7228ab4-bc25-42df-bae6-36ae491cfada",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 124,
+    "skill_id": "32862ce9-a15d-4e31-8c28-d4edf924c360",
+    "skill_name": "Mounting Board Safely",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 125,
+    "skill_id": "98dd9705-c705-4afc-89f5-0b015cf9f7e4",
+    "skill_name": "Regular vs Goofy",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 126,
+    "skill_id": "8257003a-6d35-47ec-baa6-19e3afa1a774",
+    "skill_name": "Riding on Flat Surface",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 127,
+    "skill_id": "be916ce8-7884-4e6d-8a1e-01ae27dcc26b",
+    "skill_name": "Ollie, Lift the body, step up, hippie jumps",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 128,
+    "skill_id": "cc682b00-c118-4ffd-ade9-41783dfa68e0",
+    "skill_name": "Jump off/on",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 129,
+    "skill_id": "a62c0441-1e9f-4c42-9338-3f70e4debe12",
+    "skill_name": "Hippy Jump Avanzado",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 130,
+    "skill_id": "d2089d79-8b3c-4fce-8af9-11806ad317c2",
+    "skill_name": "Brincar del cajon a la tabla",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 131,
+    "skill_id": "ce9f4419-3a15-43d6-8baa-a5bda58761d1",
+    "skill_name": "Ollie Down Curb",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 132,
+    "skill_id": "b9c24681-521e-4f48-b190-ea68fcd33fa0",
+    "skill_name": "Impossible",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 133,
+    "skill_id": "397318a2-7c1d-4155-863a-021156e007ec",
+    "skill_name": "360 Shuvit",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 134,
+    "skill_id": "4f23e2d6-d31e-49f9-9a3b-edec6fd58063",
+    "skill_name": "Switch Kickflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 135,
+    "skill_id": "26ba4d41-5b43-4a12-bacb-9a6ceb822b91",
+    "skill_name": "Boardslide 270 Out",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 136,
+    "skill_id": "9dcfdfbf-2af9-4583-8c3a-8838e8f3d7b7",
+    "skill_name": "stationary",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 137,
+    "skill_id": "5b873f58-5137-4b51-a7ca-d2cc1e502c73",
+    "skill_name": "Linea en",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 138,
+    "skill_id": "8f811bdd-b663-4679-be6c-1eb17c2832f8",
+    "skill_name": "Mini ramp basics",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 139,
+    "skill_id": "1c896a0f-a336-46b0-9e66-ca4ef78d4719",
+    "skill_name": "Boneless",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 140,
+    "skill_id": "c7baab6a-1434-4110-86b9-d3045172dd86",
+    "skill_name": "Reloj",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 141,
+    "skill_id": "a97018d8-5179-49a0-ad0b-7b230b1f5c16",
+    "skill_name": "Transfer - bajo",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 142,
+    "skill_id": "e55ee4c3-7e8e-4bf2-8c22-298f7fb62872",
+    "skill_name": "Fakie 360 Kick turn",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 143,
+    "skill_id": "af97c89a-04ba-4a78-ba62-709f4b1ca159",
+    "skill_name": "Early Grab to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 144,
+    "skill_id": "68766084-5018-44b3-b037-d6b9a6f0bd61",
+    "skill_name": "Fakie Tail Stall Madonna",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 145,
+    "skill_id": "570a44c9-28f7-4877-b644-92829fd5f5ba",
+    "skill_name": "Tail stall FS",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 146,
+    "skill_id": "56b4d683-83f9-4988-95b6-78fa0dcc6bbe",
+    "skill_name": "5-0 grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 147,
+    "skill_id": "3905f0e8-7b01-4852-91d2-f3dd41a89536",
+    "skill_name": "Pop Shuvit",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 148,
+    "skill_id": "c26d6e72-149c-46d1-a394-accfdb4f09fb",
+    "skill_name": "Rock and Roll",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 149,
+    "skill_id": "6ebed57a-1e01-489a-b833-062a125a2092",
+    "skill_name": "Backside Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 150,
+    "skill_id": "68867079-0d4c-4951-be0b-25580137453a",
+    "skill_name": "Tail Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 151,
+    "skill_id": "45ac9135-7367-4ecd-b9e4-f3dfe579d27d",
+    "skill_name": "Axle Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 152,
+    "skill_id": "20b013f1-1f4c-4a91-8842-051bb078bc00",
+    "skill_name": "Tail Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 153,
+    "skill_id": "5a45f2f7-4bdd-40da-b427-2a615f8e8804",
+    "skill_name": "50-50 On",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 154,
+    "skill_id": "c4ca90a1-1b7d-4796-897c-987f98214c43",
+    "skill_name": "Tre Flip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 155,
+    "skill_id": "d47ec1a1-ac57-406e-a517-0e75fab99308",
+    "skill_name": "Gentle Slope Roll",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 156,
+    "skill_id": "7618d5ae-e7f1-4822-bca9-215016adace7",
+    "skill_name": "Bowl Safety Awareness",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 157,
+    "skill_id": "495302e3-25ce-42ba-b0f4-a8212ead8c7c",
+    "skill_name": "Rock and Roll",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 158,
+    "skill_id": "17b2368c-63d4-41de-ae39-b7e4b1163e26",
+    "skill_name": "Axle Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 159,
+    "skill_id": "2b0985ff-7219-419a-b58d-77c607cbd34d",
+    "skill_name": "Rock to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 160,
+    "skill_id": "a3c80933-3b61-48ab-a65b-53b209b1c9fc",
+    "skill_name": "Tail Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 161,
+    "skill_id": "b79c12bb-7c96-4965-b8e5-cef6882221f6",
+    "skill_name": "Backside",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 162,
+    "skill_id": "ddc6f35d-87c6-45c3-91ad-f2d312601961",
+    "skill_name": "Backside Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 163,
+    "skill_id": "36325035-5625-4492-b60f-73ecf4eefd92",
+    "skill_name": "Indy Grab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 164,
+    "skill_id": "feef1ec2-bde2-4d82-9494-cf3eec3ca9bd",
+    "skill_name": "Method Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 165,
+    "skill_id": "0a55e580-18f1-40b0-9a93-dca5bd7f74bd",
+    "skill_name": "Mute Grab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 166,
+    "skill_id": "5e6a50fa-5750-4d58-8a58-1e4c3efc1a73",
+    "skill_name": "Blunt 180",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 167,
+    "skill_id": "11956104-efb0-4050-867d-9b92aec73728",
+    "skill_name": "Hardflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 168,
+    "skill_id": "b16ea3e0-c811-4b73-8fb2-b6329e0133f3",
+    "skill_name": "Nollie Kickflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 169,
+    "skill_id": "60d54b3a-0b1a-4bde-a1a7-5a387dc154dd",
+    "skill_name": "Feeble Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 170,
+    "skill_id": "88005346-1750-4073-bc61-990261dc6c28",
+    "skill_name": "Smith Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 171,
+    "skill_id": "f2480295-1fdb-49f8-a85d-8dd53bf1e3de",
+    "skill_name": "Nosegrind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 172,
+    "skill_id": "9df7be2c-a321-45cd-8fc7-22026e8c0069",
+    "skill_name": "Juego: Skate",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 173,
+    "skill_id": "25207bc9-612d-478b-9371-dff9be9fd87c",
+    "skill_name": "Frenado",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 174,
+    "skill_id": "035ac33e-2699-48bd-b4b7-6e3ce78067c2",
+    "skill_name": "Giros",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 175,
+    "skill_id": "7eaca3a9-4b37-4af6-bf0e-cb12a179b43a",
+    "skill_name": "Penguins and Monster walks",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 176,
+    "skill_id": "e70cf10c-4efd-4721-bace-6e9584f581db",
+    "skill_name": "Pivot Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 177,
+    "skill_id": "6b2ff22d-302a-4b83-87c7-71d1120ae001",
+    "skill_name": "Hurricane Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 178,
+    "skill_id": "0130d370-f75e-41ee-a3d2-7f606190b9e7",
+    "skill_name": "Air to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 179,
+    "skill_id": "0511abfc-3631-4e87-bf22-105073ad7dda",
+    "skill_name": "Nose stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 180,
+    "skill_id": "def24860-7fcc-442c-9bf3-69cc835d3110",
+    "skill_name": "Melon Grab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 181,
+    "skill_id": "5e183b70-aab3-42b7-9b87-e6da93c1cca6",
+    "skill_name": "Air to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 182,
+    "skill_id": "0700bc23-b393-4c32-b35f-f9998ee2fafb",
+    "skill_name": "Backside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 183,
+    "skill_id": "64be1b9c-f243-447f-a00e-91839ae7ce7b",
+    "skill_name": "Cutback",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 184,
+    "skill_id": "c14f4613-48df-4be8-9e91-698d2e3343bc",
+    "skill_name": "Caer de Forma Segura",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 185,
+    "skill_id": "812b98e8-ead7-407a-ae79-0e41ee391d6c",
+    "skill_name": "Revisión de Equipo",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 186,
+    "skill_id": "ebcbe664-f81d-4856-ab67-5979c0b891f5",
+    "skill_name": "Vert Ramp Orientation",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 187,
+    "skill_id": "dbedd1b0-ca10-40e1-9e86-e156bc9c43ea",
+    "skill_name": "Knee Slide Bail Practice",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 188,
+    "skill_id": "be31c9ea-d362-4ad0-8ff1-c80f3920e408",
+    "skill_name": "Riding Low on Vert Wall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 189,
+    "skill_id": "590a2205-5541-40d8-ba9a-f48f40cbea94",
+    "skill_name": "Empujarse y frenar > Push & Stop",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 190,
+    "skill_id": "712b4302-e0fa-46ec-ab11-80f045b4d196",
+    "skill_name": "Girar > Como girar BS/FS",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 191,
+    "skill_id": "82130ccf-5940-4585-827d-879301c239ad",
+    "skill_name": "Como caerse > How to bail",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 192,
+    "skill_id": "e17a44cd-94e5-471c-81e5-73445bf7cfbd",
+    "skill_name": "Overcrook",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 193,
+    "skill_id": "227c55a7-0080-4b8d-99eb-8cef470aea11",
+    "skill_name": "Escalera",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 194,
+    "skill_id": "4e513d84-d72d-440e-bc0b-81de3d353722",
+    "skill_name": "Carrera de impulso - solo tic tocs",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 195,
+    "skill_id": "3a112efc-745c-4df0-a0ee-beca50438cdd",
+    "skill_name": "Lift the body",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 196,
+    "skill_id": "c07f178d-6718-42fd-9193-386b47bbdd10",
+    "skill_name": "Slalom",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 197,
+    "skill_id": "d7c4caa9-bad1-4671-8e72-1aaa3e96b26d",
+    "skill_name": "Pegar una cuerda en el piso y hacer un fakie ollie sin pop",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 198,
+    "skill_id": "81a83e5b-04fb-43e4-8e7a-27b2c25762f0",
+    "skill_name": "Snap",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 199,
+    "skill_id": "c9f356e3-a010-4258-be14-01a594fd59b4",
+    "skill_name": "Tick Tack",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 200,
+    "skill_id": "c0569f27-6420-4607-9edf-3052c750c6c5",
+    "skill_name": "Foot Brake Stop",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 201,
+    "skill_id": "b77b8c37-e1e7-4e6d-952e-3e6dd913a242",
+    "skill_name": "Standing on Board",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 202,
+    "skill_id": "4f74a04e-121a-4118-a2c8-0c6ee0356bb1",
+    "skill_name": "Mini Ramp Safety Awareness",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 203,
+    "skill_id": "30812818-81a5-4f4f-b0b8-96484e62722e",
+    "skill_name": "Standing on Board on Flat Bottom",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 204,
+    "skill_id": "1c203efc-84eb-45bb-817d-504ebb61637e",
+    "skill_name": "Ramp Observation",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 205,
+    "skill_id": "5dd9a8d6-fb19-4a96-b97b-a1a9081e3525",
+    "skill_name": "Monster Walks",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 206,
+    "skill_id": "0c7fd0f9-d9bb-4929-bacf-cfd6b26d30a9",
+    "skill_name": "Penguin steps",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 207,
+    "skill_id": "0b407e57-e382-41ed-b51e-23ece29fa4b1",
+    "skill_name": "Backside Ollie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 208,
+    "skill_id": "b5c96803-8000-4057-ae8b-717277b52b87",
+    "skill_name": "Noseblunt",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 209,
+    "skill_id": "ab4c67df-370c-4231-8faa-a796a0bc08a8",
+    "skill_name": "Tailslide Pop Out",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 210,
+    "skill_id": "4afc04d8-c6a7-490b-a40f-863a674a9e86",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 211,
+    "skill_id": "ef0ea953-8be7-4a63-a38b-ff4c27ea4b86",
+    "skill_name": "Handplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 212,
+    "skill_id": "a5719abe-67a9-4c78-be2c-b1897940801d",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 213,
+    "skill_id": "6c17dbeb-e879-44ab-b14b-b493f1b5ab77",
+    "skill_name": "Miller Flip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 214,
+    "skill_id": "72754ac9-cf5d-4d07-91fb-5a4d650600ee",
+    "skill_name": "360 en piso",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 215,
+    "skill_id": "2784f5a7-1420-4b5a-ac51-329807578617",
+    "skill_name": "Dismounting Board Safely",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 216,
+    "skill_id": "a28278de-b542-4e36-bc2b-73fc78eb5969",
+    "skill_name": "Pushing",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 217,
+    "skill_id": "cf8b8f2f-c70e-478f-8d40-34f74bbaa145",
+    "skill_name": "Controlled Speed on Sidewalk",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 218,
+    "skill_id": "63ed45d1-d03e-48f5-b09a-6655f8717306",
+    "skill_name": "Skatepak Etiquette",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 219,
+    "skill_id": "c124bf5c-fa92-4ab6-a3cc-c127f97fa96f",
+    "skill_name": "Pump (impulso y momentum)",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 220,
+    "skill_id": "cd68a14e-0b10-4750-9d00-2f4aae8269d2",
+    "skill_name": "Carving > Caveman > Ghostride > Tic tacs",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 221,
+    "skill_id": "6a6cad78-0ce3-487f-b90e-5277a170df4f",
+    "skill_name": "Half Cab",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 222,
+    "skill_id": "2045360e-d3e4-474e-8f8d-5ae612594fc2",
+    "skill_name": "McTwist",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 223,
+    "skill_id": "32dc5460-3610-4415-937c-e80d4ccffdbe",
+    "skill_name": "Handplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 224,
+    "skill_id": "9eb68976-3fb2-4cbf-997c-e81fde0451fb",
+    "skill_name": "Gay Twist",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 225,
+    "skill_id": "531d6141-c4ec-437f-b5b2-ed37e2b8e72a",
+    "skill_name": "Shuvit",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 226,
+    "skill_id": "7e373181-525a-4910-b81d-654e4552ba7c",
+    "skill_name": "Drop-In",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 227,
+    "skill_id": "eaa18657-e62a-4ff5-8ebd-e528e32330ef",
+    "skill_name": "Fakie Roll Back",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 228,
+    "skill_id": "f449cdce-0c70-4dec-86e2-c6c2ad639eca",
+    "skill_name": "Rock to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 229,
+    "skill_id": "0a1761f3-3855-4a35-9bc3-7a6fe2fcdce1",
+    "skill_name": "Backside Carve",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 230,
+    "skill_id": "7ea2418d-0c49-442d-af0a-5991a6215e0b",
+    "skill_name": "Pumping Full Transition",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 231,
+    "skill_id": "929ede1c-1965-44c5-a56e-a7f71a7d24c2",
+    "skill_name": "Caballerial",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 232,
+    "skill_id": "d0f9dc5f-c21b-4a88-9df5-72fcb0112e00",
+    "skill_name": "Tail stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 233,
+    "skill_id": "083f3afc-e366-4169-9822-2a0c43b256f8",
+    "skill_name": "Pumping Basics",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 234,
+    "skill_id": "c9b538f0-18d5-47fe-a4e3-5124f3f1a717",
+    "skill_name": "Pop rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 235,
+    "skill_id": "cd6d6196-0f0b-4ff4-9a87-06c3b1e51cd9",
+    "skill_name": "Roll-in 50/50",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 236,
+    "skill_id": "0856797d-c3e5-487c-ab68-69f67b76589c",
+    "skill_name": "Boardslide 180 Out",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 237,
+    "skill_id": "068490b9-0ae8-465c-aaee-f3201148c10c",
+    "skill_name": "540 Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 238,
+    "skill_id": "b2cad9fa-fcdb-43a7-8276-fbcc66a2d2b7",
+    "skill_name": "Nollie Pop Rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 239,
+    "skill_id": "67aa2a98-eb90-40b4-bbe3-21b46f464e56",
+    "skill_name": "Ollie to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 240,
+    "skill_id": "bbbce5f4-eddb-4f88-80e6-e26d10f36efc",
+    "skill_name": "Bajar un escalon > Roll of a Ledge",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 241,
+    "skill_id": "52574524-ffb3-4e31-82c5-e9fd4b042cde",
+    "skill_name": "Drop-In",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 242,
+    "skill_id": "158b35aa-7420-4811-9f6e-04bd57c0789d",
+    "skill_name": "Ghost Ride - cajon",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 243,
+    "skill_id": "7350d9d7-961b-40bb-a0f7-e68f6a330444",
+    "skill_name": "Fakie 360 turn",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 244,
+    "skill_id": "296d3f17-4488-4943-b890-d50808bdb0f9",
+    "skill_name": "Fakie Smith stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 245,
+    "skill_id": "97aab66f-4a17-48cb-a1cb-6f96cf06491c",
+    "skill_name": "Heelflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 246,
+    "skill_id": "e969ef4b-76e3-4a0a-a849-ce42bf7f8581",
+    "skill_name": "Nose stall Revert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 247,
+    "skill_id": "db806d5f-8bb5-41ac-8f1b-fc0b934b44b4",
+    "skill_name": "50-50 Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 248,
+    "skill_id": "2f70b160-0836-4b0c-8f50-e3a25a876130",
+    "skill_name": "Nose Slide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 249,
+    "skill_id": "abcca675-7a57-4a58-baf9-ff3d488aa396",
+    "skill_name": "180 FS",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 250,
+    "skill_id": "9e158a70-e650-43d6-9c57-011c28d16879",
+    "skill_name": "Walking with Board",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 251,
+    "skill_id": "7b5eeae5-ddc8-4310-aafd-076d8a4fdf33",
+    "skill_name": "Riding Up Transition",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 252,
+    "skill_id": "316e6691-dd18-4fdf-8569-b32a454fb9fb",
+    "skill_name": "Kick Turn on",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 253,
+    "skill_id": "7ac2b7ad-1b05-4861-9136-9f03b6886a29",
+    "skill_name": "Fakie 180",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 254,
+    "skill_id": "b4d194da-e60f-450b-8de8-174165fe7c7b",
+    "skill_name": "Caveman",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 255,
+    "skill_id": "a8c2ada4-c21e-40d6-91dd-a03b834606a6",
+    "skill_name": "Powerslide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 256,
+    "skill_id": "1d93824b-9f37-46ed-9647-846b6b6081b4",
+    "skill_name": "Pumping on",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 257,
+    "skill_id": "36d61a5e-48b4-4786-9187-9b507b3df8e7",
+    "skill_name": "Bajar el cajon/banqueta",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 258,
+    "skill_id": "1cc98cb6-abcf-42bc-a5f2-82d5d0ef6b3e",
+    "skill_name": "360 tabla sin llantas",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 259,
+    "skill_id": "d2c0ee0d-6a3a-4a4e-8401-bb1f99820d16",
+    "skill_name": "Carrera de velocidad",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 260,
+    "skill_id": "63c6fc16-84d4-48e9-985a-412c52420ca8",
+    "skill_name": "Empujarse > subir botador > bajar de fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 261,
+    "skill_id": "b27d07f3-7c0c-40ca-8329-1c8ce018be43",
+    "skill_name": "Vert Safety Rules",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 262,
+    "skill_id": "b3bd3348-ec71-4345-ad8d-346eb1a73af0",
+    "skill_name": "Nose Manual",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 263,
+    "skill_id": "422da6fd-f6c4-4578-b028-4ec263dc9a8d",
+    "skill_name": "Riding Switch",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 264,
+    "skill_id": "a459d05f-0c5e-4fcb-a381-daeb329dade3",
+    "skill_name": "Rock to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 265,
+    "skill_id": "71be6768-fed2-4bb5-aa99-611b897d796c",
+    "skill_name": "Axle Stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 266,
+    "skill_id": "c3312b0c-f567-49bb-9039-8a0cb1a105e8",
+    "skill_name": "Fakie 360",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 267,
+    "skill_id": "7b180693-f3da-49f7-ab53-98d35ac28173",
+    "skill_name": "Curb Ride Up",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 268,
+    "skill_id": "de84e5f7-60e5-40f6-90e1-de0b22ee07fe",
+    "skill_name": "Curb Ride Down",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 269,
+    "skill_id": "9b60a8e7-d9fd-44f3-8b8a-9734be02b22e",
+    "skill_name": "Ghost Ride",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 270,
+    "skill_id": "84dc612b-25c1-4191-96be-166152bd383f",
+    "skill_name": "360 Rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 271,
+    "skill_id": "4a79a6c0-b8c1-4d1b-a438-1b5180a5e6ce",
+    "skill_name": "BS Tail stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 272,
+    "skill_id": "493bc5b9-d7ae-4d45-a352-486e18b2dc77",
+    "skill_name": "50-50 On",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 273,
+    "skill_id": "2188e307-6908-47cc-883d-e1164921095b",
+    "skill_name": "Disaster",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 274,
+    "skill_id": "723a9db1-82df-44b0-a7df-5e12f64d8d01",
+    "skill_name": "Frontside Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 275,
+    "skill_id": "9b14ea9d-97f3-4fb4-a118-8c8ce19c1e99",
+    "skill_name": "Varial Kickflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 276,
+    "skill_id": "4f72b9a7-8161-4d2e-aa54-17fb5baeaac7",
+    "skill_name": "Principiantes Course #1",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 277,
+    "skill_id": "9f2995dc-27e9-4524-94ce-3f68f81ce2f4",
+    "skill_name": "Strong Push",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 278,
+    "skill_id": "7fa18ee5-bc14-4c26-babb-a60497b83697",
+    "skill_name": "Kick Turn on",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 279,
+    "skill_id": "eaa7e90a-5ce0-4668-94ef-193d1f660587",
+    "skill_name": "Fakie Roll Back",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 280,
+    "skill_id": "47a5f552-e1ee-446f-b09b-00c28f7f72fa",
+    "skill_name": "Riding Over Cracks",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 281,
+    "skill_id": "40a6fee6-356a-481b-863f-5f5d6085f5a1",
+    "skill_name": "Handplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 282,
+    "skill_id": "4c747502-8e38-4b66-a882-e527273ecb98",
+    "skill_name": "Boardslide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 283,
+    "skill_id": "e4e6409c-2e25-418e-84d4-0131d2b80511",
+    "skill_name": "Walking",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 284,
+    "skill_id": "493558c7-c94c-4e37-900a-1548160ea565",
+    "skill_name": "Pop and grab the board",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 285,
+    "skill_id": "a7437c9e-225a-4cd0-a786-0e5caf605428",
+    "skill_name": "Basic Kick Turn",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 286,
+    "skill_id": "ec58937d-077f-4016-88e6-f8fbdd671aba",
+    "skill_name": "Tail Slide",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 287,
+    "skill_id": "b66f90d3-21c7-434d-bb70-2c296059dbf1",
+    "skill_name": "Fakie Rock",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 288,
+    "skill_id": "31286194-fa6c-467c-a30c-54085de3a3f9",
+    "skill_name": "Feeble Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 289,
+    "skill_id": "d29fbbf1-a88f-4942-87b2-593e6bebd343",
+    "skill_name": "Smith Grind",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 290,
+    "skill_id": "f0c82e7d-dee4-4af2-9283-6526e1574ed8",
+    "skill_name": "Pivot",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 291,
+    "skill_id": "e58665cb-fd0a-42d4-9dae-855baa11dad7",
+    "skill_name": "Frontside Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 292,
+    "skill_id": "2a2c0117-161f-4a36-a466-a24cb3294bae",
+    "skill_name": "Backside",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 293,
+    "skill_id": "975c1e3c-623b-4c62-a568-6663f5a5b11c",
+    "skill_name": "Layback",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 294,
+    "skill_id": "72cc95c6-b4dc-4a53-a7e4-2921b985ebfd",
+    "skill_name": "Frontside Carve",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 295,
+    "skill_id": "11f77985-1835-4593-8602-d38319ef292a",
+    "skill_name": "Fakie roll-in",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 296,
+    "skill_id": "045036ad-7610-4329-9b4a-a7aa924dc7e0",
+    "skill_name": "Frontside Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 297,
+    "skill_id": "c3c22bee-fa45-4b44-9373-7b7a244128b8",
+    "skill_name": "360 Flip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 298,
+    "skill_id": "1cc58ca6-201e-41ba-b167-347f20632448",
+    "skill_name": "FS 180",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 299,
+    "skill_id": "b5835750-0346-4a78-be65-65c63057d9b6",
+    "skill_name": "Fakie Tail stall",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 300,
+    "skill_id": "f316a9f0-c5ef-4197-8bdc-b5befebdd79d",
+    "skill_name": "Inward Heelflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 301,
+    "skill_id": "b12ca66c-02b0-4da8-8c9b-778f5f93bd0b",
+    "skill_name": "Basic board control and safety",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 302,
+    "skill_id": "e36a19cf-8661-4e11-ad67-3a532e220b74",
+    "skill_name": "Vert Ramp Awareness",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 303,
+    "skill_id": "8f2ea81b-f196-45a1-8b62-0b3b3ebcaed3",
+    "skill_name": "Ollie, Lift the body, step up, hippie jumps",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 304,
+    "skill_id": "9976669f-c814-4f7f-9c69-9559782bbdaf",
+    "skill_name": "Equilibrio con un pie en movimiento de skate",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 305,
+    "skill_id": "4c5ee65e-627c-4c82-b3c4-5bffb4d271c4",
+    "skill_name": "Salto de tabla. Poner tablas en el piso y saltarlas. Subir y bajar botador, regresar la tabla a su lugar.",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 306,
+    "skill_id": "24d07cc8-c2b4-4608-8ce2-b0765e888efd",
+    "skill_name": "Boardslide en coping",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 307,
+    "skill_id": "2a5e6bb6-dbcd-4455-817c-ad1707639312",
+    "skill_name": "Kickflip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 308,
+    "skill_id": "9de21208-6625-4902-9750-820f9127a76d",
+    "skill_name": "Eggplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 309,
+    "skill_id": "9e3a06b5-a7f7-4b2a-85ab-14f94b728e5a",
+    "skill_name": "540 Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 310,
+    "skill_id": "a0cecb4e-2158-4e57-b263-688aed10d9f2",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 311,
+    "skill_id": "7534ce5f-efd5-4acf-83e2-c09db178e079",
+    "skill_name": "Kickflip to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 312,
+    "skill_id": "d686a09d-3b52-47b7-913b-3af90619fc97",
+    "skill_name": "Handplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 313,
+    "skill_id": "0b2cea23-8bf8-45a9-9996-a2df3caf36af",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 314,
+    "skill_id": "0dc3b083-0c18-4cc3-8a65-24ecc83cc0ef",
+    "skill_name": "Miller Flip",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 315,
+    "skill_id": "4a2f093f-3b55-4d49-b551-3490991b2161",
+    "skill_name": "Eggplant",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 316,
+    "skill_id": "c61dc4d9-6c6c-4aed-a6f1-6ff4c0c79aae",
+    "skill_name": "540 Air",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 317,
+    "skill_id": "2ac59698-1e37-44f9-97da-3a75575a4cf2",
+    "skill_name": "Frontside Invert",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 318,
+    "skill_id": "9881739a-09da-44d7-a96c-ea5d8629e43f",
+    "skill_name": "Kickflip to Fakie",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  },
+  {
+    "id": 319,
+    "skill_id": "71eca590-2c9b-4242-98c0-c62639c78444",
+    "skill_name": "McTwist",
+    "action": "update",
+    "changes": {
+      "discipline": {
+        "to": "skateboarding",
+        "from": null
+      }
+    },
+    "changed_by": null,
+    "changed_at": "2026-10-21T20:02:17.633125+00:00"
+  }
+]
