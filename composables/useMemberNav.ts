@@ -256,7 +256,7 @@ export function useMemberNav() {
             adminOnly: true,
             children: [
               {
-                name: es.value ? 'Solicitudes de rampas' : 'Ramp requests',
+                name: es.value ? 'Solicitudes' : 'Requests',
                 path: '/member/admin/skateramp-requests',
                 icon: 'check',
                 adminOnly: true,

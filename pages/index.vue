@@ -138,6 +138,13 @@ const { data: collaboratorsData } = await useFetch<{ collaborators: Collaborator
 
 const communityDecks = computed(() => collaboratorsData.value?.collaborators || [])
 
+// One line per name: the font shrinks with name length to fit the tag (93% of the deck minus padding).
+// A heavy uppercase letter plus tracking-widest is roughly 0.82em wide.
+function deckNameSize(name: string) {
+  const chars = Math.max(name.length, 1)
+  return `min(10px, calc((93cqw - 1rem) / ${(chars * 0.82).toFixed(2)}))`
+}
+
 const quoteIndex = ref(0)
 
 function nextQuote() {
@@ -507,7 +514,7 @@ watch(parentQuotes, () => {
           <div
             v-for="(deck, i) in [...communityDecks, ...communityDecks]"
             :key="deck.id + '-' + i"
-            class="group relative w-36 sm:w-44 aspect-[8/22] shrink-0 transition-transform duration-300 hover:-translate-y-1"
+            class="group relative w-[6.75rem] sm:w-[8.25rem] aspect-[8/22] shrink-0 [container-type:inline-size] transition-transform duration-300 hover:-translate-y-1"
             :aria-hidden="i >= communityDecks.length ? 'true' : undefined"
           >
             <NuxtLink
@@ -518,19 +525,15 @@ watch(parentQuotes, () => {
               :tabindex="i >= communityDecks.length ? -1 : undefined"
             />
             <img
-              src="/images/decks/blank-deck.svg"
+              src="/images/decks/niik-deck.webp"
               alt=""
               loading="lazy"
               decoding="async"
               class="absolute inset-0 w-full h-full object-contain drop-shadow-xl pointer-events-none"
             />
-            <div
-              class="absolute inset-[8%] rounded-[2rem] bg-gradient-to-b opacity-70 pointer-events-none"
-              :class="deck.tone || 'from-white/10 to-black/50'"
-            />
-            <div class="absolute inset-0 flex flex-col items-center justify-center px-4 sm:px-5 pointer-events-none">
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <div
-                class="w-[78%] aspect-square rounded-2xl bg-charcoal/60 border border-white/10 flex items-center justify-center p-2.5 sm:p-3 shadow-lg transition-transform duration-300 group-hover:scale-105"
+                class="w-[80%] aspect-square rounded-2xl bg-charcoal border-2 border-charcoal flex items-center justify-center p-2 sm:p-2.5 shadow-lg transition-transform duration-300 group-hover:scale-105"
               >
                 <img
                   :src="deck.logo"
@@ -540,7 +543,10 @@ watch(parentQuotes, () => {
                   class="w-full h-full object-contain"
                 />
               </div>
-              <p class="mt-4 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white/90 text-center leading-tight">
+              <p
+                class="mt-3 max-w-[93%] whitespace-nowrap rounded-md bg-charcoal px-2 py-1 font-black uppercase tracking-widest text-cream text-center leading-tight"
+                :style="{ fontSize: deckNameSize(deck.name) }"
+              >
                 {{ deck.name }}
               </p>
             </div>
