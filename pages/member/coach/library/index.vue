@@ -112,6 +112,8 @@ function isSkaterRow(row: SkaterKindFields & { skill_group_id: string | null }) 
 const programs = ref<ProgramRow[]>([])
 const roster = ref<RosterStudent[]>([])
 const rosterProgramId = ref<string | null>(null)
+const rosterMode = ref<'members' | 'unassigned'>('members')
+const unassignedLevelChoice = ref<Record<string, string>>({})
 const rosterAddId = ref('')
 const rosterLevelId = ref('')
 const rosterSaving = ref(false)
@@ -534,13 +536,39 @@ const unassignedStudents = computed(() => roster.value.filter(student => !studen
 function openRoster(program: ProgramRow, event?: Event) {
   event?.stopPropagation()
   rosterProgramId.value = program.id
+  rosterMode.value = 'members'
   rosterError.value = ''
   rosterAddId.value = ''
   rosterLevelId.value = assignableLevels(program)[0]?.id || ''
 }
 
+function openUnassigned(program: ProgramRow, event?: Event) {
+  event?.stopPropagation()
+  rosterProgramId.value = program.id
+  rosterMode.value = 'unassigned'
+  rosterError.value = ''
+  const firstLevel = assignableLevels(program)[0]?.id || ''
+  unassignedLevelChoice.value = Object.fromEntries(unassignedStudents.value.map(student => [student.id, firstLevel]))
+}
+
 function closeRoster() {
   rosterProgramId.value = null
+}
+
+async function assignUnassigned(studentId: string) {
+  const levelId = unassignedLevelChoice.value[studentId]
+  if (!levelId) return
+  rosterSaving.value = true
+  rosterError.value = ''
+  try {
+    const { error } = await client.from('profiles').update({ skill_group_id: levelId }).eq('id', studentId)
+    if (error) throw error
+    await fetchPrograms(true)
+  } catch (e: any) {
+    rosterError.value = e?.message || 'Error'
+  } finally {
+    rosterSaving.value = false
+  }
 }
 
 async function addRosterStudent() {
@@ -1046,7 +1074,7 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
                   class="rounded-lg bg-black/40 border px-3 py-2 text-left hover:border-orange-400/50"
                   :class="unassignedStudents.length ? 'border-orange-400/30' : 'border-gray-800'"
                   :title="unassignedStudents.map(student => student.full_name || '?').join(', ')"
-                  @click="openRoster(p, $event)"
+                  @click="openUnassigned(p, $event)"
                 >
                   <div class="text-lg font-bold" :class="unassignedStudents.length ? 'text-orange-300' : 'text-gray-500'">{{ unassignedStudents.length }}</div>
                   <div class="text-[11px] text-gray-500">{{ language === 'es' ? 'Sin programa' : 'No program' }}</div>
@@ -1323,13 +1351,62 @@ async function toggleFavorite(program: ProgramRow, event?: Event) {
               <h3 class="text-lg font-semibold text-white truncate">
                 {{ rosterProgram.name }}
               </h3>
-              <p class="text-xs text-gray-500">
+              <p v-if="rosterMode === 'unassigned'" class="text-xs text-orange-300">
+                {{ unassignedStudents.length }} {{ language === 'es' ? 'sin programa · asígnalos a un nivel' : 'without a program · assign them a level' }}
+              </p>
+              <p v-else class="text-xs text-gray-500">
                 {{ rosterMembers.length }} {{ language === 'es' ? 'estudiantes' : 'students' }}
               </p>
             </div>
             <button type="button" class="p-2 text-gray-400 hover:text-white" @click="closeRoster">✕</button>
           </div>
-          <div class="p-4 space-y-3 overflow-y-auto">
+          <div v-if="rosterMode === 'unassigned'" class="p-4 space-y-3 overflow-y-auto">
+            <p v-if="rosterError" class="text-sm text-red-400">{{ rosterError }}</p>
+            <p v-if="!unassignedStudents.length" class="text-sm text-gray-500">
+              {{ language === 'es' ? 'Todos los estudiantes ya tienen programa.' : 'Every student already has a program.' }}
+            </p>
+            <ul v-else class="space-y-2">
+              <li
+                v-for="student in unassignedStudents"
+                :key="student.id"
+                class="flex flex-col gap-2 rounded-lg border border-gray-800 px-3 py-2 sm:flex-row sm:items-center"
+              >
+                <div class="flex min-w-0 flex-1 items-center gap-2">
+                  <img
+                    v-if="student.avatar_url"
+                    :src="student.avatar_url"
+                    :alt="student.full_name || ''"
+                    class="h-7 w-7 shrink-0 rounded-full object-cover"
+                  >
+                  <span
+                    v-else
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                    :class="coachPillClass(student.id)"
+                  >{{ coachInitials(student.full_name || '?') }}</span>
+                  <p class="truncate text-sm font-semibold text-white">{{ student.full_name || '—' }}</p>
+                </div>
+                <div class="flex gap-2">
+                  <select
+                    v-model="unassignedLevelChoice[student.id]"
+                    class="min-w-0 flex-1 rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white sm:w-44 sm:flex-none"
+                  >
+                    <option v-for="level in assignableLevels(rosterProgram)" :key="level.id" :value="level.id">
+                      {{ normalizeSkillGroupDisplayName(level.name) }}
+                    </option>
+                  </select>
+                  <button
+                    type="button"
+                    class="rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-black disabled:opacity-40"
+                    :disabled="!unassignedLevelChoice[student.id] || rosterSaving"
+                    @click="assignUnassigned(student.id)"
+                  >
+                    {{ language === 'es' ? 'Asignar' : 'Assign' }}
+                  </button>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div v-else class="p-4 space-y-3 overflow-y-auto">
             <div class="flex flex-col sm:flex-row gap-2">
               <select v-model="rosterAddId" class="flex-1 px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm">
                 <option value="">{{ language === 'es' ? 'Añadir estudiante…' : 'Add student…' }}</option>
