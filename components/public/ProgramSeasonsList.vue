@@ -59,44 +59,44 @@ const confirmRemoveSeason = async (row: { slug: string; name: string }) => {
 
 <template>
   <section id="temporadas" class="scroll-mt-24">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <h2 class="t-eyebrow text-sage-700 text-center sm:text-left">
-        {{ es ? 'Temporadas del programa' : 'Program seasons' }}
+    <div class="flex flex-col items-center gap-3 mb-6">
+      <h2 class="t-eyebrow rounded-md bg-charcoal/25 px-3 py-1.5 text-acid ring-1 ring-white/15 backdrop-blur-md">
+        {{ es ? 'Temporadas' : 'Seasons' }}
       </h2>
       <button
         v-if="isAdmin"
         type="button"
-        class="self-center sm:self-auto px-4 py-2.5 rounded-full font-semibold text-sm border-2 border-charcoal hover:bg-charcoal hover:text-cream transition-colors"
+        class="px-4 py-2.5 rounded-full font-semibold text-sm bg-cream border-2 border-charcoal hover:bg-charcoal hover:text-cream transition-colors"
         @click="addSeasonOpen = true"
       >
         + {{ es ? 'Añadir temporada' : 'Add season' }}
       </button>
     </div>
     <p v-if="isAdmin && seasonRemoveError" class="text-sm text-flame-600 mb-3" role="alert">{{ seasonRemoveError }}</p>
-    <ul class="divide-y divide-cream-200 border-y border-cream-200">
+    <ul class="flex flex-wrap justify-center gap-3 sm:gap-4">
       <li
         v-for="row in seasons"
         :key="row.slug"
-        class="flex items-center gap-3 py-4"
+        class="relative flex w-full flex-col rounded-2xl bg-charcoal/30 p-4 backdrop-blur-md sm:w-[calc(50%-0.5rem)] lg:w-[13rem]"
+        :class="row.statusKey === 'enrolling' ? 'ring-2 ring-acid/70' : 'ring-1 ring-white/15'"
       >
-        <div class="min-w-0 flex-1">
-          <NuxtLink :to="row.href" class="block font-bold hover:text-sage-700 transition-colors truncate rounded">
-            <span class="mr-1.5" aria-hidden="true">{{ row.icon }}</span>{{ row.name }}
-          </NuxtLink>
-          <p class="text-sm text-charcoal/65 truncate">{{ row.dates }}</p>
-        </div>
+        <span class="text-2xl leading-none" aria-hidden="true">{{ row.icon }}</span>
+        <NuxtLink :to="row.href" class="mt-3 block font-bold text-cream hover:text-acid transition-colors truncate rounded">
+          {{ row.name }}
+        </NuxtLink>
+        <p class="text-sm text-cream/75 truncate">{{ row.dates }}</p>
         <NuxtLink
           v-if="row.statusKey === 'enrolling'"
           :to="row.href"
-          class="shrink-0 inline-flex items-center justify-center px-4 py-2 rounded-full bg-acid text-charcoal text-xs font-bold hover:bg-acid-300 transition-colors"
+          class="mt-4 inline-flex w-full items-center justify-center px-4 py-2 rounded-full bg-acid text-charcoal text-xs font-bold shadow hover:bg-acid-300 transition-colors"
         >
           {{ es ? 'Inscribirse' : 'Register' }}
         </NuxtLink>
-        <span v-else class="shrink-0 text-charcoal/60 text-xs font-semibold">{{ row.status }}</span>
+        <span v-else class="mt-4 inline-flex w-full items-center justify-center rounded-full bg-white/10 px-4 py-2 text-cream/85 text-xs font-semibold">{{ row.status }}</span>
         <button
           v-if="isAdmin"
           type="button"
-          class="shrink-0 inline-flex p-2 rounded-lg text-charcoal/50 hover:text-flame-600 hover:bg-flame-500/10 disabled:opacity-40"
+          class="absolute right-2 top-2 inline-flex p-2 rounded-lg text-cream/60 hover:text-flame-400 disabled:opacity-40"
           :disabled="removingSeasonSlug === row.slug"
           :title="es ? 'Quitar temporada' : 'Remove season'"
           :aria-label="es ? 'Quitar temporada' : 'Remove season'"
@@ -109,10 +109,10 @@ const confirmRemoveSeason = async (row: { slug: string; name: string }) => {
       </li>
     </ul>
     <details class="mt-8 max-w-2xl mx-auto text-left">
-      <summary class="cursor-pointer text-center text-sm font-bold text-sage-700 hover:text-charcoal rounded">
+      <summary class="mx-auto w-fit cursor-pointer rounded-md bg-charcoal/25 px-3 py-1.5 text-center text-sm font-bold text-acid ring-1 ring-white/15 backdrop-blur-md hover:text-cream">
         {{ es ? 'Cómo funciona' : 'How this works' }}
       </summary>
-      <div class="mt-4 rounded-2xl border border-cream-200 bg-cream-50 p-5 text-sm text-charcoal/80 leading-relaxed space-y-3">
+      <div class="mt-4 rounded-2xl bg-charcoal/25 p-5 text-sm text-cream/90 leading-relaxed space-y-3 ring-1 ring-white/15 backdrop-blur-md">
         <p>
           {{
             es
@@ -130,7 +130,7 @@ const confirmRemoveSeason = async (row: { slug: string; name: string }) => {
       </div>
     </details>
     <div class="mt-6 text-center">
-      <NuxtLink to="/classes" class="link-underline text-sm decoration-acid-600 hover:text-sage-700">
+      <NuxtLink to="/classes" class="inline-block rounded-md bg-charcoal/25 px-3 py-1.5 link-underline text-sm font-semibold text-cream decoration-acid ring-1 ring-white/15 backdrop-blur-md hover:text-acid">
         {{ es ? 'Ver todas las clases publicadas →' : 'Browse all published classes →' }}
       </NuxtLink>
     </div>

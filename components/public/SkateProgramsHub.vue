@@ -28,6 +28,11 @@ const skillTrackColumns = computed(() =>
 
 const levelsOpen = ref(false)
 
+const seasonsVideo = ref<HTMLVideoElement | null>(null)
+onMounted(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) seasonsVideo.value?.pause()
+})
+
 function classesLink(offering: (typeof offerings)[number]) {
   const query: Record<string, string> = { nivel: offering.skillTrack }
   if (offering.audiences.length) query.edad = offering.audiences.join(',')
@@ -38,8 +43,11 @@ function classesLink(offering: (typeof offerings)[number]) {
 <template>
   <div class="space-y-16 sm:space-y-20">
     <section class="text-center max-w-3xl mx-auto">
-      <p class="t-eyebrow text-sage-700 mb-4">
-        {{ language === 'es' ? 'Programas de Skate' : 'Skate Programs' }}
+      <p class="t-eyebrow text-sage-700 mb-4 inline-flex flex-wrap items-center justify-center gap-2">
+        <span>{{ language === 'es' ? 'Programas de' : 'Programs by' }}</span>
+        <span class="inline-flex rounded-md bg-charcoal px-2.5 py-1 font-display text-base font-black normal-case tracking-tight">
+          <span class="text-acid">Niik</span><span class="text-cream">Skate</span>
+        </span>
       </p>
       <h1 class="t-h2 mb-5">
         {{
@@ -57,9 +65,26 @@ function classesLink(offering: (typeof offerings)[number]) {
       </p>
     </section>
 
-    <PublicProgramSeasonsList class="max-w-3xl mx-auto" />
+    <div class="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden !mt-8">
+      <video
+        ref="seasonsVideo"
+        class="absolute inset-0 h-full w-full object-cover"
+        src="/videos/temporadas.mp4"
+        poster="/videos/temporadas-poster.webp"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="metadata"
+        aria-hidden="true"
+      />
+      <div class="absolute inset-0 bg-charcoal/20" aria-hidden="true" />
+      <div class="relative px-5 sm:px-6 py-16 sm:py-20">
+        <PublicProgramSeasonsList class="max-w-6xl mx-auto" />
+      </div>
+    </div>
 
-    <PublicMemberAppCta />
+    <PublicMemberAppCta class="!mt-6" />
 
     <!-- How we group classes: age left, skill levels explained on the right -->
     <section class="max-w-6xl mx-auto grid lg:grid-cols-[16rem_minmax(0,1fr)] gap-4 items-start">
