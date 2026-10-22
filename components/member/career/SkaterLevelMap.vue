@@ -32,7 +32,7 @@ defineProps<{
                 class="text-[10px] font-black tracking-[0.15em] shrink-0"
                 :class="m.phase === 'locked' ? 'text-gray-600' : 'text-white'"
               >
-                {{ es ? 'FASE' : 'PHASE' }} {{ m.levelNum }}
+                {{ es ? 'NIVEL' : 'LEVEL' }} {{ m.levelNum }}
               </span>
               <span
                 class="text-xs truncate"
@@ -60,10 +60,10 @@ defineProps<{
               <span v-if="m.phase === 'complete'" class="w-1.5 h-1.5 rounded-full bg-[#22C55E]" aria-hidden="true" />
               {{
                 m.phase === 'complete'
-                  ? (es ? 'COMPLETADA' : 'COMPLETE')
+                  ? (es ? 'COMPLETADO' : 'COMPLETE')
                   : m.phase === 'active'
-                    ? (es ? 'ACTIVA' : 'ACTIVE')
-                    : (es ? 'BLOQUEADA' : 'LOCKED')
+                    ? (es ? 'ACTIVO' : 'ACTIVE')
+                    : (es ? 'BLOQUEADO' : 'LOCKED')
               }}
             </span>
           </li>

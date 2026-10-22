@@ -516,6 +516,10 @@
 :is(.niik-app, html.niik-staff) .text-gray-400 { color: rgb(245 242 234 / 0.68); }
 :is(.niik-app, html.niik-staff) .text-gray-500 { color: rgb(245 242 234 / 0.5); }
 :is(.niik-app, html.niik-staff) .text-gray-600 { color: rgb(245 242 234 / 0.4); }
+/* Cream pages (temporadas, Familia) keep grey text: the cream remap above would vanish on them. */
+:is(.niik-app, html.niik-staff) .bg-\[\#fff9f0\] :is(.text-gray-200, .text-gray-300, .text-gray-400) { color: #9CA3AF; }
+:is(.niik-app, html.niik-staff) .bg-\[\#fff9f0\] :is(.text-gray-500, .text-gray-600) { color: #6B7280; }
+:is(.niik-app, html.niik-staff) .bg-\[\#fff9f0\] :is(.text-teal-500, .text-teal-700) { color: #0F766E; }
 :is(.niik-app, html.niik-staff) h1,
 :is(.niik-app, html.niik-staff) h2 {
   font-family: Archivo, Inter, system-ui, sans-serif;

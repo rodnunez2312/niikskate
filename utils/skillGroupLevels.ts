@@ -17,6 +17,45 @@ export function normalizeSkillGroupDisplayName(name?: string | null): string {
   return n
 }
 
+/** Stored level names and descriptions are English; these are their Spanish versions. */
+const LEVEL_TITLE_ES: Record<string, string> = {
+  'foundations': 'Fundamentos',
+  'balance & control': 'Equilibrio y control',
+  'basic tricks': 'Trucos básicos',
+  'progression': 'Progresión',
+  'advanced': 'Avanzado',
+  'intermediate': 'Intermedio',
+  'advanced basics': 'Bases avanzadas',
+  'beginner': 'Principiante',
+}
+
+const LEVEL_DESCRIPTION_ES: Record<string, string> = {
+  'basic board control and safety': 'Control básico de la tabla y seguridad',
+  'developing balance and basic movements': 'Desarrollo del equilibrio y movimientos básicos',
+  'first tricks and transitions': 'Primeros trucos y transiciones',
+  'building on fundamentals': 'Construyendo sobre los fundamentos',
+  'advanced tricks and lines': 'Trucos y líneas avanzadas',
+  'advanced fundamental skills': 'Habilidades fundamentales avanzadas',
+}
+
+/** "Level 1: Foundations" → "Nivel 1: Fundamentos" in Spanish; unknown names pass through. */
+export function skillGroupNameFor(name: string | null | undefined, es: boolean): string {
+  const display = normalizeSkillGroupDisplayName(name)
+  if (!es || !display) return display
+  if (display === STRENGTH_TRAINING_DISPLAY_NAME) return 'Entrenamiento de fuerza'
+  const match = display.match(/^level\s*(\d+)\s*[:\-–]?\s*(.*)$/i)
+  if (!match) return LEVEL_TITLE_ES[display.toLowerCase()] || display
+  const [, num, rest] = match
+  const title = LEVEL_TITLE_ES[rest.trim().toLowerCase()] || rest.trim()
+  return title ? `Nivel ${num}: ${title}` : `Nivel ${num}`
+}
+
+export function skillGroupDescriptionFor(description: string | null | undefined, es: boolean): string {
+  const text = (description || '').trim()
+  if (!es || !text) return text
+  return LEVEL_DESCRIPTION_ES[text.toLowerCase()] || text
+}
+
 /** Levels 1–5 use the public Principiante / Intermedio / Avanzado copy. */
 const PUBLIC_LEVEL_BY_NUMBER: Record<number, SkateSkillLevelId> = {
   1: 'beginner_1',

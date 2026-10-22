@@ -73,13 +73,16 @@ function goAddCrew() {
           <p v-if="fullName" class="text-[10px] text-gray-500 truncate">{{ fullName }} · {{ roleLabel }}</p>
         </div>
 
-        <button
-          type="button"
-          class="text-sm font-semibold text-gray-400 hover:text-white shrink-0"
-          @click="signOut"
-        >
-          {{ language === 'es' ? 'Salir' : 'Sign out' }}
-        </button>
+        <div class="flex items-center gap-3 shrink-0">
+          <LanguageCurrencyToggle compact />
+          <button
+            type="button"
+            class="text-sm font-semibold text-gray-400 hover:text-white"
+            @click="signOut"
+          >
+            {{ language === 'es' ? 'Salir' : 'Sign out' }}
+          </button>
+        </div>
       </div>
 
       <MemberCrewSwitcher

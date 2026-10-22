@@ -1,5 +1,7 @@
 <script setup lang="ts">
 const { items, isActive } = usePublicNav()
+// On mobile the shop is the floating button in the public layout.
+const mobileItems = computed(() => items.value.filter(item => item.path !== '/skateshop'))
 const user = useSupabaseUser()
 const { language } = useI18n()
 const route = useRoute()
@@ -64,7 +66,7 @@ const goAddFamilyMember = () => {
       <!-- Mobile nav -->
       <nav class="md:hidden flex gap-1.5 overflow-x-auto pb-3 pt-0.5 -mx-1 px-1 scrollbar-none" :aria-label="language === 'es' ? 'Principal' : 'Main'">
         <NuxtLink
-          v-for="item in items"
+          v-for="item in mobileItems"
           :key="'m-' + item.path"
           :to="item.path"
           class="shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold border transition-colors"

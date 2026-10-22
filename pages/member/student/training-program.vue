@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { disciplineFromJoin } from '~/utils/trainingDisciplines'
+import { skillGroupDescriptionFor, skillGroupNameFor } from '~/utils/skillGroupLevels'
 
 definePageMeta({ middleware: ['auth', 'member'], layout: 'member' })
 
@@ -187,7 +188,7 @@ function phaseStatus(board: SkaterBoard, phase: ProgramPhase, index: number) {
   const currentIndex = board.programPhases.findIndex(item => item.id === board.profile?.skill_group_id)
   if (phase.id === board.profile?.skill_group_id) {
     return {
-      label: language.value === 'es' ? 'Fase actual' : 'Current phase',
+      label: language.value === 'es' ? 'Nivel actual' : 'Current level',
       classes: 'border-gold-400/50 bg-gold-400/10 text-gold-300',
     }
   }
@@ -235,17 +236,17 @@ function phaseStatus(board: SkaterBoard, phase: ProgramPhase, index: number) {
         </p>
         <div>
           <p class="text-lg font-black text-white">
-            {{ board.programName || (language === 'es' ? 'Sin programa asignado' : 'No program assigned') }}
+            {{ board.programName ? skillGroupNameFor(board.programName, language === 'es') : (language === 'es' ? 'Sin programa asignado' : 'No program assigned') }}
           </p>
-          <p v-if="board.programDescription" class="mt-1 text-xs text-gray-400">{{ board.programDescription }}</p>
+          <p v-if="board.programDescription" class="mt-1 text-xs text-gray-400">{{ skillGroupDescriptionFor(board.programDescription, language === 'es') }}</p>
         </div>
         <div v-if="board.skillGroupName" class="rounded-lg bg-gray-900/80 p-3">
           <div class="flex items-center justify-between gap-3">
-            <span class="text-xs text-gray-400">{{ language === 'es' ? 'Fase actual' : 'Current phase' }}</span>
-            <span class="text-xs font-bold text-white">{{ board.skillGroupName }}</span>
+            <span class="text-xs text-gray-400">{{ language === 'es' ? 'Nivel actual' : 'Current level' }}</span>
+            <span class="text-xs font-bold text-white">{{ skillGroupNameFor(board.skillGroupName, language === 'es') }}</span>
           </div>
           <div class="flex justify-between text-xs text-gray-400 mb-1">
-            <span>{{ language === 'es' ? 'Progreso de la fase' : 'Phase progress' }}</span>
+            <span>{{ language === 'es' ? 'Progreso del nivel' : 'Level progress' }}</span>
             <span>{{ board.programPct }}%</span>
           </div>
           <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -257,7 +258,7 @@ function phaseStatus(board: SkaterBoard, phase: ProgramPhase, index: number) {
       <section class="space-y-3">
         <div>
           <h2 class="text-sm font-bold uppercase tracking-wide text-gold-400">
-            {{ language === 'es' ? 'Fases del programa' : 'Program phases' }}
+            {{ language === 'es' ? 'Niveles del programa' : 'Program levels' }}
           </h2>
           <p class="mt-1 text-xs text-gray-500">
             {{
@@ -285,8 +286,8 @@ function phaseStatus(board: SkaterBoard, phase: ProgramPhase, index: number) {
             />
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
-                <p class="text-sm font-bold text-white">{{ phase.name }}</p>
-                <p v-if="phase.description" class="mt-0.5 text-xs text-gray-500">{{ phase.description }}</p>
+                <p class="text-sm font-bold text-white">{{ skillGroupNameFor(phase.name, language === 'es') }}</p>
+                <p v-if="phase.description" class="mt-0.5 text-xs text-gray-500">{{ skillGroupDescriptionFor(phase.description, language === 'es') }}</p>
               </div>
               <span
                 class="shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
@@ -316,7 +317,7 @@ function phaseStatus(board: SkaterBoard, phase: ProgramPhase, index: number) {
           </article>
         </div>
         <p v-else class="rounded-xl border border-gray-800 bg-gray-900 p-4 text-sm text-gray-500">
-          {{ language === 'es' ? 'Las fases del programa aún no están disponibles.' : 'Program phases are not available yet.' }}
+          {{ language === 'es' ? 'Los niveles del programa aún no están disponibles.' : 'Program levels are not available yet.' }}
         </p>
       </section>
 

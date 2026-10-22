@@ -90,7 +90,7 @@ export function useSkaterCareer(src: CareerSources) {
         if (e.kind === 'trick') {
           celebrations.value.push({ id: nextId++, kind: 'trick', title: es ? '🎉 NUEVO TRUCO DESBLOQUEADO' : '🎉 NEW TRICK UNLOCKED', subject: e.subject || '', xp: e.xp, rarity: e.rarity })
         } else if (e.kind === 'phase') {
-          celebrations.value.push({ id: nextId++, kind: 'phase', title: es ? '🏆 FASE COMPLETADA' : '🏆 PHASE COMPLETE', subject: e.subject || '', xp: e.xp })
+          celebrations.value.push({ id: nextId++, kind: 'phase', title: es ? '🏆 NIVEL COMPLETADO' : '🏆 LEVEL COMPLETE', subject: e.subject || '', xp: e.xp })
         }
       }
       if (c.level > seenLevel) {

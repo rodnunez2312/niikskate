@@ -55,9 +55,9 @@ export function useMemberNav() {
       icon: 'user',
     },
     {
-      name: es.value ? 'Cuenta' : 'Account',
+      name: es.value ? 'Mis tokens' : 'My tokens',
       path: '/member/student/account',
-      icon: 'credits',
+      icon: 'token',
     },
     {
       name: es.value ? 'Progreso' : 'Progress',

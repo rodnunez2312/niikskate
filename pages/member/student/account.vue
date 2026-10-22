@@ -113,13 +113,13 @@ onMounted(load)
       :class="skaters.length > 1 ? 'max-w-lg lg:max-w-6xl' : 'max-w-lg lg:max-w-4xl'"
     >
       <h1 class="text-2xl font-bold text-white pt-4">
-        {{ es ? 'Mi cuenta' : 'My account' }}
+        {{ es ? 'Mis tokens' : 'My tokens' }}
       </h1>
       <p class="text-xs text-gray-500 mt-1">
         {{
           es
-            ? 'Clases pagadas, asistencia, próximas sesiones y pagos de tu familia.'
-            : 'Classes paid, attendance, upcoming sessions and payments for your family.'
+            ? 'Cada token es una clase. Aquí ves los tokens que compraste, los que te quedan, tu asistencia y tus pagos.'
+            : 'Each token is one class. See the tokens you bought, how many are left, your attendance and payments.'
         }}
       </p>
     </header>
@@ -181,13 +181,13 @@ onMounted(load)
             <div class="grid grid-cols-3 divide-x divide-gray-800 border-b border-gray-800">
               <div class="px-3 py-3 text-center">
                 <p class="text-[10px] font-bold uppercase text-gray-500">
-                  {{ es ? 'Quedan' : 'Left' }}
+                  {{ es ? 'Tokens' : 'Tokens' }}
                 </p>
                 <p class="text-xl font-black" :class="remainingClass(s.totals.remaining)">
                   {{ s.totals.remaining }}
                 </p>
                 <p class="text-[10px] text-gray-600">
-                  {{ es ? `de ${s.totals.sessionsPaid} pagadas` : `of ${s.totals.sessionsPaid} paid` }}
+                  {{ es ? `de ${s.totals.sessionsPaid} comprados` : `of ${s.totals.sessionsPaid} bought` }}
                 </p>
               </div>
               <div class="px-3 py-3 text-center">
@@ -216,7 +216,7 @@ onMounted(load)
 
             <div v-if="s.plans.length" class="px-4 py-3 border-b border-gray-800 space-y-2">
               <p class="text-[10px] font-bold uppercase text-gray-500">
-                {{ es ? 'Clases compradas' : 'Purchased classes' }}
+                {{ es ? 'Tokens comprados' : 'Tokens bought' }}
               </p>
               <div
                 v-for="plan in s.plans"
@@ -230,7 +230,7 @@ onMounted(load)
                   </span>
                 </span>
                 <span class="text-gray-400 shrink-0 tabular-nums">
-                  {{ plan.sessionsPaid }} {{ es ? 'ses.' : 'sess.' }} ·
+                  {{ plan.sessionsPaid }} tokens ·
                   {{ formatMoneyMxn(plan.amountPaidMxn) }}
                 </span>
               </div>

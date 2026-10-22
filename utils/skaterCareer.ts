@@ -261,7 +261,7 @@ export function computeSkaterCareer(input: CareerInput): SkaterCareer {
       kind: 'phase',
       subject: name,
       xp: XP_RULES.phase,
-      label: `${es ? 'Fase completada' : 'Phase complete'}: ${name}`,
+      label: `${es ? 'Nivel completado' : 'Level complete'}: ${name}`,
       date,
     })
   }
